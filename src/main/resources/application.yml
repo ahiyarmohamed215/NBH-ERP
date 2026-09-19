@@ -1,0 +1,63 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: erp
+  datasource:
+    url: jdbc:mysql://localhost:3306/nbhdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
+# Application-specific configuration
+app:
+  jwt:
+    # 256-bit secure secret key
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    access-token-expiration-ms: 86400000 # 24 hours
+    refresh-token-expiration-ms: 604800000 # 7 days
+  security:
+    initial-admin:
+      # Can be overridden via environment variables: APP_SECURITY_INITIAL_ADMIN_USERNAME, etc.
+      username: ${INITIAL_ADMIN_USERNAME:admin}
+      password: ${INITIAL_ADMIN_PASSWORD:admin123}
+      email: ${INITIAL_ADMIN_EMAIL:admin@nbh.com}
+  company:
+    name: NBH Warehouse & Distribution
+    address: 123 Commercial Avenue, Colombo, Sri Lanka
+    phone: "+94 11 234 5678"
+    currency: LKR
+    currency-symbol: "Rs."
+    default-tax-rate: 0.00
+
+# SpringDoc OpenAPI configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
