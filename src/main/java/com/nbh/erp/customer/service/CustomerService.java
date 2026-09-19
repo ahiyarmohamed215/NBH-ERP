@@ -1,11 +1,13 @@
 package com.nbh.erp.customer.service;
 
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.customer.dto.CreateCustomerRequest;
 import com.nbh.erp.customer.dto.CustomerDto;
 import com.nbh.erp.customer.entity.Customer;
 import com.nbh.erp.customer.repository.CustomerRepository;
+import com.nbh.erp.sales.repository.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final InvoiceRepository invoiceRepository;
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
@@ -116,5 +119,17 @@ public class CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
         customer.setIsActive(!customer.getIsActive());
         customerRepository.save(customer);
+    }
+
+    @Transactional
+    public void deleteCustomer(Long id) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+
+        if (invoiceRepository.existsByCustomerId(id)) {
+            throw new BusinessException("Cannot delete customer '" + customer.getName() + "' because historical invoices exist for this customer. Please deactivate the customer instead.");
+        }
+
+        customerRepository.delete(customer);
     }
 }

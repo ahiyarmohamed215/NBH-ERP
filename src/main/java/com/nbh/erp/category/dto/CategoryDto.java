@@ -21,6 +21,10 @@ public class CategoryDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public Boolean getActive() {
+        return isActive;
+    }
+
     public static CategoryDto from(Category c) {
         return CategoryDto.builder()
                 .id(c.getId())

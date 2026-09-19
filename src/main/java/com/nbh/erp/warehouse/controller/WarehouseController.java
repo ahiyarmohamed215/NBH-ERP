@@ -67,4 +67,12 @@ public class WarehouseController {
         warehouseService.toggleActive(id);
         return ResponseEntity.ok(ApiResponse.ok("Warehouse status updated", null));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_MANAGE')")
+    @Operation(summary = "Delete warehouse")
+    public ResponseEntity<ApiResponse<Void>> deleteWarehouse(@PathVariable Long id) {
+        warehouseService.deleteWarehouse(id);
+        return ResponseEntity.ok(ApiResponse.ok("Warehouse deleted successfully", null));
+    }
 }

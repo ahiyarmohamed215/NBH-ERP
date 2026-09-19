@@ -8,19 +8,18 @@ import {
   Edit2,
   CheckCircle,
   XCircle,
-  Layers,
-  DollarSign,
-  AlertCircle,
   RefreshCw,
-  X
+  X,
+  Eye,
+  Trash2,
 } from 'lucide-react';
 
-export default function ProductsView() {
+export default function ProductsView({ isEmbedded = false }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterActive, setFilterActive] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -30,12 +29,16 @@ export default function ProductsView() {
     name: '',
     categoryId: '',
     unitOfMeasure: 'PCS',
-    costPrice: '',
-    sellingPrice: '',
+    costPrice: '0',
+    sellingPrice: '0',
     minStockLevel: '5',
     description: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // View Details Modal State
+  const [viewingProduct, setViewingProduct] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const { addToast } = useToast();
 
@@ -47,7 +50,7 @@ export default function ProductsView() {
     try {
       setLoading(true);
       const [prodRes, catRes] = await Promise.all([
-        productApi.getProducts({ size: 100 }),
+        productApi.getProducts({ size: 200 }),
         categoryApi.getActive(),
       ]);
       setProducts(prodRes.data?.content || prodRes.data || []);
@@ -59,6 +62,8 @@ export default function ProductsView() {
     }
   };
 
+  const isProductActive = (p) => Boolean(p?.isActive ?? p?.active ?? false);
+
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setFormData({
@@ -66,8 +71,8 @@ export default function ProductsView() {
       name: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
       unitOfMeasure: 'PCS',
-      costPrice: '',
-      sellingPrice: '',
+      costPrice: '0',
+      sellingPrice: '0',
       minStockLevel: '5',
       description: '',
     });
@@ -79,10 +84,10 @@ export default function ProductsView() {
     setFormData({
       sku: prod.sku,
       name: prod.name,
-      categoryId: prod.categoryId || (categories.find(c => c.name === prod.categoryName)?.id || ''),
+      categoryId: prod.categoryId || (categories.find((c) => c.name === prod.categoryName)?.id || ''),
       unitOfMeasure: prod.unitOfMeasure || 'PCS',
-      costPrice: prod.costPrice?.toString() || '',
-      sellingPrice: prod.sellingPrice?.toString() || '',
+      costPrice: prod.costPrice?.toString() || '0',
+      sellingPrice: prod.sellingPrice?.toString() || '0',
       minStockLevel: prod.minStockLevel?.toString() || '0',
       description: prod.description || '',
     });
@@ -91,31 +96,31 @@ export default function ProductsView() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.sku || !formData.name || !formData.sellingPrice) {
-      addToast('SKU, Product Name, and Selling Price are required', 'error');
+    if (!formData.sku || !formData.name) {
+      addToast('SKU and Product Name are required', 'error');
       return;
     }
 
     try {
       setSaving(true);
       const payload = {
-        sku: formData.sku.trim(),
+        sku: formData.sku.trim().toUpperCase(),
         barcode: null,
         name: formData.name.trim(),
         categoryId: formData.categoryId ? Number(formData.categoryId) : null,
         unitOfMeasure: formData.unitOfMeasure,
-        costPrice: parseFloat(formData.costPrice) || 0,
-        sellingPrice: parseFloat(formData.sellingPrice) || 0,
+        costPrice: editingProduct ? (parseFloat(editingProduct.costPrice) || 0) : 0,
+        sellingPrice: editingProduct ? (parseFloat(editingProduct.sellingPrice) || 0) : 0,
         minStockLevel: parseInt(formData.minStockLevel, 10) || 0,
-        description: formData.description.trim() || null,
+        description: formData.description?.trim() || null,
       };
 
       if (editingProduct) {
         await productApi.update(editingProduct.id, payload);
-        addToast(`Product ${payload.name} updated successfully!`, 'success');
+        addToast(`Product "${payload.name}" updated successfully!`, 'success');
       } else {
         await productApi.create(payload);
-        addToast(`Product ${payload.name} created successfully!`, 'success');
+        addToast(`Product "${payload.name}" created successfully!`, 'success');
       }
       setShowModal(false);
       loadData();
@@ -129,81 +134,120 @@ export default function ProductsView() {
   const handleToggleActive = async (id, currentStatus) => {
     try {
       await productApi.toggleActive(id);
-      addToast(`Product status updated`, 'info');
+      addToast(`Product status changed to ${currentStatus ? 'Inactive' : 'Active'}`, 'success');
       loadData();
     } catch (err) {
       addToast('Failed to toggle status: ' + err.message, 'error');
     }
   };
 
+  const handleDelete = async (p) => {
+    if (!window.confirm(`Are you sure you want to permanently delete product "${p.name}" (${p.sku})? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setDeletingId(p.id);
+      await productApi.delete(p.id);
+      addToast(`Product "${p.name}" deleted successfully`, 'success');
+      loadData();
+    } catch (err) {
+      addToast(err.message || 'Delete failed', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesActive =
-      filterActive === 'all'
-        ? true
-        : filterActive === 'active'
-        ? p.active
-        : !p.active;
-    return matchesSearch && matchesActive;
+    const active = isProductActive(p);
+    if (statusFilter === 'ACTIVE' && !active) return false;
+    if (statusFilter === 'INACTIVE' && active) return false;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      return (
+        p.name?.toLowerCase().includes(q) ||
+        p.sku?.toLowerCase().includes(q) ||
+        p.categoryName?.toLowerCase().includes(q)
+      );
+    }
+    return true;
   });
 
+  const activeCount = products.filter(isProductActive).length;
+  const inactiveCount = products.length - activeCount;
+
   return (
-    <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.8rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Package size={28} color="#2563eb" /> Product Catalog
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            Manage master product listings, categorizations, and pricing
-          </p>
+    <div style={{ padding: isEmbedded ? '0px' : '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Standalone Header (Shown only when not embedded in MastersView) */}
+      {!isEmbedded && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '1.8rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+              <Package size={28} color="#2563eb" /> Product Catalog
+            </h1>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '6px 0 0 0' }}>
+              Manage master product listings, category mappings, and directory specifications
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn btn-glass" onClick={loadData} title="Reload list">
+              <RefreshCw size={16} /> Refresh
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenAdd}>
+              <Plus size={18} /> New Product
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-glass" onClick={loadData} title="Reload list">
-            <RefreshCw size={16} /> Refresh
-          </button>
-          <button className="btn btn-primary" onClick={handleOpenAdd}>
-            <Plus size={18} /> New Product
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Filter Toolbar */}
-      <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 320px', position: 'relative' }}>
+      <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <div style={{ flex: '1 1 300px', position: 'relative' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: '#94a3b8' }} />
           <input
             type="text"
             className="input-glass"
             style={{ paddingLeft: '42px' }}
-            placeholder="Search by name or SKU..."
+            placeholder="Search products by SKU, name, or category..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>STATUS:</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            STATUS:
+          </span>
           <button
-            className={`btn btn-sm ${filterActive === 'all' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setFilterActive('all')}
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('ALL')}
           >
             All ({products.length})
           </button>
           <button
-            className={`btn btn-sm ${filterActive === 'active' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setFilterActive('active')}
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('ACTIVE')}
           >
-            Active ({products.filter(p => p.active).length})
+            Active ({activeCount})
           </button>
           <button
-            className={`btn btn-sm ${filterActive === 'inactive' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setFilterActive('inactive')}
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'INACTIVE' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('INACTIVE')}
           >
-            Inactive ({products.filter(p => !p.active).length})
+            Inactive ({inactiveCount})
           </button>
+
+          {isEmbedded && (
+            <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+              <button className="btn btn-glass btn-sm" onClick={loadData} title="Reload list">
+                <RefreshCw size={14} /> Refresh
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
+                <Plus size={16} /> New Product
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -237,104 +281,226 @@ export default function ProductsView() {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#2563eb', fontFamily: 'monospace' }}>
-                        {p.sku}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-info">{p.categoryName || 'General'}</span>
-                    </td>
-                    <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
-                    <td style={{ color: '#64748b' }}>${Number(p.costPrice || 0).toFixed(2)}</td>
-                    <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                      ${Number(p.sellingPrice || 0).toFixed(2)}
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
-                        {p.minStockLevel || 0}
-                      </span>
-                    </td>
-                    <td>
-                      {p.active ? (
-                        <span className="badge badge-success">Active</span>
-                      ) : (
-                        <span className="badge badge-danger">Inactive</span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                        <button
-                          className="btn btn-glass btn-sm"
-                          onClick={() => handleOpenEdit(p)}
-                          title="Edit product"
-                        >
-                          <Edit2 size={14} /> Edit
-                        </button>
-                        <button
-                          className={`btn btn-sm ${p.active ? 'btn-glass' : 'btn-primary'}`}
-                          onClick={() => handleToggleActive(p.id, p.active)}
-                          title={p.active ? 'Deactivate product' : 'Activate product'}
-                        >
-                          {p.active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredProducts.map((p) => {
+                  const active = isProductActive(p);
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#2563eb', fontFamily: 'monospace' }}>
+                          {p.sku}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-info">{p.categoryName || 'General'}</span>
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
+                      <td style={{ color: '#64748b' }}>${Number(p.costPrice || 0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                        ${Number(p.sellingPrice || 0).toFixed(2)}
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
+                          {p.minStockLevel || 0}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                          {active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-glass btn-sm"
+                            onClick={() => setViewingProduct(p)}
+                            title="View product details"
+                          >
+                            <Eye size={14} /> View
+                          </button>
+                          <button
+                            className="btn btn-glass btn-sm"
+                            onClick={() => handleOpenEdit(p)}
+                            title="Edit product"
+                          >
+                            <Edit2 size={14} /> Edit
+                          </button>
+                          <button
+                            className="btn btn-sm btn-glass"
+                            onClick={() => handleToggleActive(p.id, active)}
+                            title={active ? 'Deactivate product' : 'Activate product'}
+                          >
+                            {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
+                          </button>
+                          <button
+                            className="btn btn-glass btn-sm"
+                            style={{ color: '#dc2626' }}
+                            onClick={() => handleDelete(p)}
+                            disabled={deletingId === p.id}
+                            title="Delete product"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* View Product Details Modal */}
+      {viewingProduct && (
+        <div className="modal-backdrop" onClick={() => setViewingProduct(null)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+              <div>
+                <span style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', letterSpacing: '0.05em' }}>
+                  Product Specification & Status
+                </span>
+                <h2 style={{ fontSize: '1.45rem', color: '#0f172a', margin: '4px 0 0 0' }}>
+                  {viewingProduct.name}
+                </h2>
+              </div>
+              <button
+                onClick={() => setViewingProduct(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Catalog Status</span>
+                <div>
+                  <span className={`badge ${isProductActive(viewingProduct) ? 'badge-success' : 'badge-danger'}`}>
+                    {isProductActive(viewingProduct) ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>SKU / Item Code</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8', fontSize: '0.95rem' }}>{viewingProduct.sku}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Category</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingProduct.categoryName || 'General / Uncategorized'}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Unit of Measure</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingProduct.unitOfMeasure || 'PCS'}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Selling Price</span>
+                <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '1.15rem' }}>
+                  ${Number(viewingProduct.sellingPrice || 0).toFixed(2)}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Standard Cost</span>
+                <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.05rem' }}>${Number(viewingProduct.costPrice || 0).toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Min Stock Alert</span>
+                <span style={{ fontWeight: 700, color: viewingProduct.minStockLevel > 10 ? '#059669' : '#d97706' }}>
+                  {viewingProduct.minStockLevel || 0} {viewingProduct.unitOfMeasure || 'PCS'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Price Protocol</span>
+                <span style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>Dynamic GRN Inward</span>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Description</span>
+                <span style={{ color: '#334155', fontSize: '0.88rem' }}>{viewingProduct.description || 'No description provided.'}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button type="button" className="btn btn-glass" onClick={() => setViewingProduct(null)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const p = viewingProduct;
+                  setViewingProduct(null);
+                  handleOpenEdit(p);
+                }}
+              >
+                <Edit2 size={16} /> Edit Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Product Modal */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="glass-modal" style={{ width: '100%', maxWidth: '640px', padding: '28px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={22} color="#2563eb" />
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '840px', padding: '30px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+              <h2 style={{ fontSize: '1.35rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                <Package size={24} color="#2563eb" />
                 {editingProduct ? 'Edit Product Details' : 'Create New Master Product'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
 
             <form onSubmit={handleSave}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                  SKU / CODE *
-                </label>
-                <input
-                  type="text"
-                  className="input-glass"
-                  placeholder="e.g. PRD-001"
-                  value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                  required
-                />
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                  PRODUCT NAME *
-                </label>
-                <input
-                  type="text"
-                  className="input-glass"
-                  placeholder="e.g. Industrial Steel Pipe 2 inch"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    SKU / CODE *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-glass"
+                    placeholder="e.g. PRD-001"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    PRODUCT NAME *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-glass"
+                    placeholder="e.g. Industrial Steel Pipe 2 inch"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
@@ -374,49 +540,53 @@ export default function ProductsView() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                    COST PRICE ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input-glass"
-                    placeholder="0.00"
-                    value={formData.costPrice}
-                    onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                  />
+              {/* Pricing & Stock Details: Read-Only (Managed dynamically via GRN) */}
+              <div style={{ marginBottom: '16px', padding: '14px 16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Valuation & Pricing (Read-Only)
+                  </span>
+                  <span style={{ fontSize: '0.72rem', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    Managed via Inward GRN
+                  </span>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                    SELLING PRICE ($) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input-glass"
-                    placeholder="0.00"
-                    value={formData.sellingPrice}
-                    onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                    required
-                  />
+                {editingProduct ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Latest Cost Price:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                        ${Number(formData.costPrice || 0).toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Current Selling Price:</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1d4ed8', marginTop: '2px' }}>
+                        ${Number(formData.sellingPrice || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.4 }}>
+                    Cost price, selling price, and stock levels start at $0.00 and are updated dynamically when inventory is received through <strong>Inward GRN</strong>.
+                  </div>
+                )}
+                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '8px' }}>
+                  * Direct price and quantity editing is disabled here. Pricing and inventory counts are audited and updated during GRN intake.
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                    MIN STOCK ALERT
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="input-glass"
-                    placeholder="5"
-                    value={formData.minStockLevel}
-                    onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
-                  />
-                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                  MIN STOCK ALERT LEVEL
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input-glass"
+                  placeholder="5"
+                  value={formData.minStockLevel}
+                  onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
+                />
               </div>
 
               <div style={{ marginBottom: '24px' }}>

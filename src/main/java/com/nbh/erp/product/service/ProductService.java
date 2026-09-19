@@ -3,8 +3,10 @@ package com.nbh.erp.product.service;
 import com.nbh.erp.category.entity.Category;
 import com.nbh.erp.category.repository.CategoryRepository;
 import com.nbh.erp.common.dto.PagedResponse;
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
+import com.nbh.erp.inventory.repository.StockBalanceRepository;
 import com.nbh.erp.product.dto.CreateProductRequest;
 import com.nbh.erp.product.dto.ProductDto;
 import com.nbh.erp.product.entity.Product;
@@ -28,6 +30,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final SupplierRepository supplierRepository;
+    private final StockBalanceRepository stockBalanceRepository;
 
     @Transactional(readOnly = true)
     public PagedResponse<ProductDto> getProductsPaginated(String query, Long categoryId, Pageable pageable) {
@@ -161,5 +164,17 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         product.setIsActive(!product.getIsActive());
         productRepository.save(product);
+    }
+
+    @Transactional
+    public void deleteProduct(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        if (stockBalanceRepository.existsByProductId(id)) {
+            throw new BusinessException("Cannot delete product '" + product.getName() + "' because inventory stock records exist for it. Please deactivate it instead.");
+        }
+
+        productRepository.delete(product);
     }
 }

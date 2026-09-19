@@ -73,4 +73,12 @@ public class SupplierController {
         supplierService.toggleActive(id);
         return ResponseEntity.ok(ApiResponse.ok("Supplier status updated", null));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
+    @Operation(summary = "Delete a supplier")
+    public ResponseEntity<ApiResponse<Void>> deleteSupplier(@PathVariable Long id) {
+        supplierService.deleteSupplier(id);
+        return ResponseEntity.ok(ApiResponse.ok("Supplier deleted successfully", null));
+    }
 }

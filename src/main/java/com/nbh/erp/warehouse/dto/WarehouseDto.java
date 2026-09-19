@@ -18,11 +18,16 @@ public class WarehouseDto {
     private String name;
     private String address;
     private String phone;
+    private String contactNumber;
     private String contactPerson;
     private Boolean isActive;
     private Boolean isPrimary;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public Boolean getActive() {
+        return isActive;
+    }
 
     public static WarehouseDto from(Warehouse w) {
         return WarehouseDto.builder()
@@ -31,6 +36,7 @@ public class WarehouseDto {
                 .name(w.getName())
                 .address(w.getAddress())
                 .phone(w.getPhone())
+                .contactNumber(w.getPhone())
                 .contactPerson(w.getContactPerson())
                 .isActive(w.getIsActive())
                 .isPrimary(w.getIsPrimary())
@@ -39,3 +45,4 @@ public class WarehouseDto {
                 .build();
     }
 }
+

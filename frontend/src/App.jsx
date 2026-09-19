@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
@@ -10,6 +10,8 @@ import MastersView from './views/MastersView';
 import ReportsView from './views/ReportsView';
 import AdminHub from './views/AdminHub';
 import SidebarProfile from './components/SidebarProfile';
+import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import useErpShortcuts from './hooks/useErpShortcuts';
 
 import {
   LayoutDashboard,
@@ -22,6 +24,12 @@ import {
   ChevronRight,
   ShieldAlert,
   Lock,
+  Maximize,
+  Minimize,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Keyboard,
+  Monitor,
 } from 'lucide-react';
 
 export default function App() {
@@ -29,6 +37,11 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [currentView, setCurrentView] = useState('dashboard');
   const [subTab, setSubTab] = useState('');
+
+  // Fullscreen & Distraction-Free States
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
   const userPermissions = user?.permissions || [];
@@ -47,7 +60,7 @@ export default function App() {
       icon: Boxes,
       permissions: ['INVENTORY_VIEW', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS', 'INVENTORY_ADJUST'],
       subItems: [
-        { id: 'stock', label: 'Stock & Ledger', permission: 'INVENTORY_VIEW' },
+        { id: 'stock', label: 'Stock Balances & Ledger', permission: 'INVENTORY_VIEW' },
         { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
         { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
         { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
@@ -65,16 +78,17 @@ export default function App() {
       ],
     },
     {
-      id: 'products',
-      label: 'Products Catalog',
-      icon: Package,
-      permissions: ['PRODUCT_MANAGE'],
-    },
-    {
       id: 'masters',
       label: 'Business Directories',
       icon: Database,
-      permissions: ['WAREHOUSE_MANAGE', 'CUSTOMER_MANAGE', 'SUPPLIER_MANAGE'],
+      permissions: ['WAREHOUSE_MANAGE', 'CUSTOMER_MANAGE', 'SUPPLIER_MANAGE', 'PRODUCT_MANAGE'],
+      subItems: [
+        { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
+        { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
+        { id: 'categories', label: 'Product Categories', permission: 'PRODUCT_MANAGE' },
+        { id: 'customers', label: 'Customers', permission: 'CUSTOMER_MANAGE' },
+        { id: 'suppliers', label: 'Suppliers', permission: 'SUPPLIER_MANAGE' },
+      ],
     },
     {
       id: 'reports',
@@ -117,7 +131,7 @@ export default function App() {
   );
 
   // Seamless navigation helper supporting legacy single routes and hierarchical hubs
-  const navigateTo = (view, sub = '') => {
+  const navigateTo = useCallback((view, sub = '') => {
     if (view === 'pos') {
       setCurrentView('sales');
       setSubTab('pos');
@@ -146,7 +160,7 @@ export default function App() {
       setCurrentView(view);
       if (sub) setSubTab(sub);
     }
-  };
+  }, []);
 
   // Redirect to first permitted module if current view is not accessible
   useEffect(() => {
@@ -155,7 +169,57 @@ export default function App() {
         navigateTo(allowedModuleIds[0]);
       }
     }
-  }, [user, allowedModuleIds, currentView]);
+  }, [user, allowedModuleIds, currentView, navigateTo]);
+
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.warn('Fullscreen request failed:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch((err) => {
+          console.warn('Exit fullscreen failed:', err);
+        });
+      }
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  const isModalOpen = Boolean(document.querySelector('.modal-backdrop') || showShortcutsModal);
+
+  const closeModals = useCallback(() => {
+    if (showShortcutsModal) {
+      setShowShortcutsModal(false);
+      return;
+    }
+    const closeBtn = document.querySelector(
+      '.modal-backdrop button[title*="Close"], .modal-backdrop button:has(svg.lucide-x), .modal-backdrop button.btn-glass'
+    );
+    if (closeBtn) closeBtn.click();
+  }, [showShortcutsModal]);
+
+  // Global ERP shortcuts listener
+  useErpShortcuts({
+    toggleFullscreen,
+    toggleSidebar,
+    openShortcutsModal: () => setShowShortcutsModal(true),
+    closeModals,
+    navigateTo,
+    isModalOpen,
+  });
 
   if (loading) {
     return (
@@ -174,13 +238,13 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
       {/* Sidebar Navigation */}
       <aside
-        className="glass-sidebar"
+        className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
         style={{
-          width: '260px',
-          minWidth: '260px',
+          width: isSidebarCollapsed ? '62px' : '260px',
+          minWidth: isSidebarCollapsed ? '62px' : '260px',
           height: '100vh',
           maxHeight: '100vh',
           position: 'sticky',
@@ -191,36 +255,98 @@ export default function App() {
           zIndex: 40,
         }}
       >
-        <div style={{ padding: '20px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {/* Logo & Brand Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 4px', marginBottom: '24px' }}>
-            <div
+        <div style={{ padding: isSidebarCollapsed ? '20px 8px' : '20px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Logo & Brand Header with Small Minimize/Expand Sidebar Button */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+              padding: isSidebarCollapsed ? '0' : '0 4px',
+              marginBottom: '18px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  cursor: isSidebarCollapsed ? 'pointer' : 'default',
+                }}
+                onClick={isSidebarCollapsed ? toggleSidebar : undefined}
+                title="NBH Enterprise ERP"
+              >
+                <Package size={20} />
+              </div>
+              <div className="sidebar-brand-text">
+                <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                  NBH ERP
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
+                  Enterprise System
+                </div>
+              </div>
+            </div>
+
+            {/* Small minimize button inside sidebar */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={isSidebarCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Minimize Sidebar (Ctrl+B)'}
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                backgroundColor: '#2563eb',
-                color: 'white',
-                display: 'flex',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '4px',
+                borderRadius: '6px',
+                display: isSidebarCollapsed ? 'none' : 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
-              <Package size={20} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                NBH ERP
-              </div>
-              <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
-                Enterprise System
-              </div>
-            </div>
+              <PanelLeftClose size={16} />
+            </button>
           </div>
+
+          {/* When collapsed, show small expand button right below logo */}
+          {isSidebarCollapsed && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Expand Sidebar (Ctrl+B)"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '5px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+              >
+                <PanelLeftOpen size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Navigation Menu Header */}
           <div
+            className="sidebar-section-title"
             style={{
               fontSize: '0.74rem',
               fontWeight: 700,
@@ -244,6 +370,7 @@ export default function App() {
                 <button
                   key={mod.id}
                   type="button"
+                  title={isSidebarCollapsed ? mod.label : undefined}
                   onClick={() => {
                     navigateTo(mod.id, mod.subItems?.[0]?.id || '');
                   }}
@@ -274,13 +401,17 @@ export default function App() {
         </div>
 
         {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
-        <SidebarProfile onNavigate={navigateTo} />
+        <SidebarProfile
+          onNavigate={navigateTo}
+          onOpenShortcuts={() => setShowShortcutsModal(true)}
+        />
       </aside>
 
       {/* Main Workspace Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
+
         {/* Dynamic Workspace Rendering */}
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+        <main style={{ flex: 1, overflowY: 'auto', minHeight: 0, position: 'relative' }}>
           {accessibleModules.length === 0 ? (
             <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '0 auto' }}>
               <div
@@ -335,8 +466,12 @@ export default function App() {
               {currentView === 'sales' && (
                 <SalesHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
-              {currentView === 'products' && <ProductsView />}
-              {currentView === 'masters' && <MastersView />}
+              {currentView === 'products' && (
+                <MastersView activeSubTab="products" onSubTabChange={setSubTab} />
+              )}
+              {currentView === 'masters' && (
+                <MastersView activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
               {currentView === 'reports' && <ReportsView />}
               {currentView === 'admin' && (
                 <AdminHub activeSubTab={subTab} onSubTabChange={setSubTab} />
@@ -345,6 +480,47 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Floating Bottom-Right Fullscreen Trigger Button (Icon Only) */}
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Exit Full Screen (F11 or Alt+Enter)' : 'Enter Full Screen (F11 or Alt+Enter)'}
+        style={{
+          position: 'fixed',
+          bottom: '18px',
+          right: '18px',
+          zIndex: 80,
+          width: '36px',
+          height: '36px',
+          borderRadius: '50%',
+          backgroundColor: '#ffffff',
+          border: '1px solid #cbd5e1',
+          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: '#2563eb',
+          padding: 0,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f1f5f9';
+          e.currentTarget.style.borderColor = '#94a3b8';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#ffffff';
+          e.currentTarget.style.borderColor = '#cbd5e1';
+        }}
+      >
+        {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
+      </button>
+
+      {/* Standard ERP Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+      />
     </div>
   );
 }

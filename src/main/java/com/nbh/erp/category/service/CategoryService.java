@@ -4,8 +4,10 @@ import com.nbh.erp.category.dto.CategoryDto;
 import com.nbh.erp.category.dto.CreateCategoryRequest;
 import com.nbh.erp.category.entity.Category;
 import com.nbh.erp.category.repository.CategoryRepository;
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
+import com.nbh.erp.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final ProductRepository productRepository;
 
     @Transactional(readOnly = true)
     public List<CategoryDto> getAllCategories() {
@@ -84,4 +87,17 @@ public class CategoryService {
         category.setIsActive(!category.getIsActive());
         categoryRepository.save(category);
     }
+
+    @Transactional
+    public void deleteCategory(Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        if (productRepository.existsByCategoryId(id)) {
+            throw new BusinessException("Cannot delete category '" + category.getName() + "' because products belong to it. Please reassign products or deactivate the category.");
+        }
+
+        categoryRepository.delete(category);
+    }
 }
+

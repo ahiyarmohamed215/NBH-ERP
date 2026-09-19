@@ -83,4 +83,12 @@ public class ProductController {
         productService.toggleActive(id);
         return ResponseEntity.ok(ApiResponse.ok("Product status updated", null));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @Operation(summary = "Delete a product")
+    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.ok(ApiResponse.ok("Product deleted successfully", null));
+    }
 }

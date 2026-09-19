@@ -31,6 +31,10 @@ public class ProductDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public Boolean getActive() {
+        return isActive;
+    }
+
     public static ProductDto from(Product p) {
         return ProductDto.builder()
                 .id(p.getId())

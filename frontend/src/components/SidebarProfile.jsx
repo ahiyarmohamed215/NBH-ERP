@@ -10,13 +10,19 @@ import {
   X,
   Clock,
   ShieldCheck,
+  Keyboard,
+  HelpCircle,
+  PhoneCall,
+  Mail,
+  BookOpen,
 } from 'lucide-react';
 
-export default function SidebarProfile({ onNavigate }) {
+export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
   const { user, logout, updateUser } = useAuth();
   const { addToast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const menuRef = useRef(null);
 
@@ -272,6 +278,61 @@ export default function SidebarProfile({ onNavigate }) {
                 </button>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                if (onOpenShortcuts) onOpenShortcuts();
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '9px 16px',
+                fontSize: '0.86rem',
+                color: '#334155',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Keyboard size={16} color="#64748b" />
+                Keyboard Shortcuts
+              </span>
+              <span className="erp-kbd">F1</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setShowHelpModal(true);
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '9px 16px',
+                fontSize: '0.86rem',
+                color: '#334155',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <HelpCircle size={16} color="#64748b" />
+              Help & Support
+            </button>
           </div>
 
           {/* Sign Out Action */}
@@ -361,7 +422,7 @@ export default function SidebarProfile({ onNavigate }) {
             />
           </div>
 
-          <div style={{ minWidth: 0 }}>
+          <div className="profile-details" style={{ minWidth: 0 }}>
             <div
               style={{
                 fontWeight: 600,
@@ -382,7 +443,7 @@ export default function SidebarProfile({ onNavigate }) {
           </div>
         </div>
 
-        <ChevronUp size={16} color="#64748b" style={{ flexShrink: 0 }} />
+        <ChevronUp size={16} color="#64748b" className="profile-details" style={{ flexShrink: 0 }} />
       </div>
 
       {/* Edit Profile Modal */}
@@ -535,6 +596,118 @@ export default function SidebarProfile({ onNavigate }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Help & Support Modal */}
+      {showHelpModal && (
+        <div className="modal-backdrop" onClick={() => setShowHelpModal(false)}>
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              backgroundColor: '#ffffff',
+              padding: '24px 28px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingBottom: '14px',
+                borderBottom: '1px solid #e2e8f0',
+                marginBottom: '18px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <HelpCircle size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0 }}>
+                    Help & Enterprise Support
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    NBH ERP System Assistance & Documentation
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHelpModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                  <PhoneCall size={16} color="#2563eb" /> IT Operations Hotline
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                  Direct Phone: <strong>+94 11 234 5678</strong> (Mon - Sat, 8:00 AM - 6:00 PM)
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                  Internal Extension: <strong>Ext. 104 / 105</strong>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                  <Mail size={16} color="#2563eb" /> Email & Support Desk
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                  Technical Support: <strong>support@nbh-erp.com</strong>
+                </div>
+                <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                  Administrator: <strong>admin@nbh-erp.com</strong>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                  <BookOpen size={16} color="#2563eb" /> System Quick Reference
+                </div>
+                <ul style={{ fontSize: '0.82rem', color: '#64748b', paddingLeft: '18px', margin: 0 }}>
+                  <li>Press <strong>F1</strong> anytime to view all keyboard shortcuts.</li>
+                  <li>Press <strong>F11</strong> to toggle full-screen distraction-free mode.</li>
+                  <li>Press <strong>Ctrl + B</strong> to collapse/expand the sidebar.</li>
+                  <li>Press <strong>Esc</strong> to dismiss any open modal or popover.</li>
+                </ul>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                <span style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: 600 }}>System Status: Operational & Connected</span>
+                <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>v1.2</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowHelpModal(false)}
+              >
+                Close Support
+              </button>
+            </div>
           </div>
         </div>
       )}

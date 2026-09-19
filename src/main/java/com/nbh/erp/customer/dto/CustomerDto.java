@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class CustomerDto {
     private Long id;
     private String customerCode;
+    private String code;
     private String name;
     private String contactPerson;
     private String phone;
@@ -27,10 +28,15 @@ public class CustomerDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public Boolean getActive() {
+        return isActive;
+    }
+
     public static CustomerDto from(Customer c) {
         return CustomerDto.builder()
                 .id(c.getId())
                 .customerCode(c.getCustomerCode())
+                .code(c.getCustomerCode())
                 .name(c.getName())
                 .contactPerson(c.getContactPerson())
                 .phone(c.getPhone())

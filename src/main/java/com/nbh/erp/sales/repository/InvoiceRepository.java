@@ -22,6 +22,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByStatusAndCreatedBy(String status, String createdBy);
 
+    boolean existsByWarehouseId(Long warehouseId);
+
+    boolean existsByCustomerId(Long customerId);
+
     @Query("SELECT i FROM Invoice i WHERE " +
             "(:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR i.customer.id = :customerId) AND " +

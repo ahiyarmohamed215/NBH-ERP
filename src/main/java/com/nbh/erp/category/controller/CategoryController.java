@@ -67,4 +67,12 @@ public class CategoryController {
         categoryService.toggleActive(id);
         return ResponseEntity.ok(ApiResponse.ok("Category status updated", null));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @Operation(summary = "Delete category")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
+        categoryService.deleteCategory(id);
+        return ResponseEntity.ok(ApiResponse.ok("Category deleted successfully", null));
+    }
 }

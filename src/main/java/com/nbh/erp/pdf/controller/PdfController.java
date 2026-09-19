@@ -7,39 +7,60 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/pdf")
 @RequiredArgsConstructor
-@Tag(name = "PDF Generation", description = "Printable PDF documents generation APIs")
+@Tag(name = "PDF Generation", description = "Printable and downloadable PDF documents generation APIs")
 public class PdfController {
 
     private final PdfGenerationService pdfService;
 
     @GetMapping("/invoices/{id}")
-    @Operation(summary = "Generate and stream printable PDF for sales invoice")
-    public ResponseEntity<byte[]> getInvoicePdf(@PathVariable Long id) {
+    @Operation(summary = "Generate and stream or download PDF for sales invoice")
+    public ResponseEntity<byte[]> getInvoicePdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
         byte[] pdf = pdfService.generateInvoicePdf(id);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("inline", "invoice-" + id + ".pdf");
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"invoice-" + id + ".pdf\"");
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }
 
     @GetMapping("/grns/{id}")
-    @Operation(summary = "Generate and stream printable PDF for GRN intake")
-    public ResponseEntity<byte[]> getGrnPdf(@PathVariable Long id) {
+    @Operation(summary = "Generate and stream or download PDF for GRN intake")
+    public ResponseEntity<byte[]> getGrnPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
         byte[] pdf = pdfService.generateGrnPdf(id);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("inline", "grn-" + id + ".pdf");
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"grn-" + id + ".pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/gtns/{id}")
+    @Operation(summary = "Generate and stream or download PDF for GTN transfer")
+    public ResponseEntity<byte[]> getGtnPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateGtnPdf(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"gtn-" + id + ".pdf\"");
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }

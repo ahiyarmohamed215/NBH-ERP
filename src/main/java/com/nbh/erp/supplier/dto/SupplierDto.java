@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class SupplierDto {
     private Long id;
     private String supplierCode;
+    private String code;
     private String name;
     private String contactPerson;
     private String phone;
@@ -24,10 +25,15 @@ public class SupplierDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public Boolean getActive() {
+        return isActive;
+    }
+
     public static SupplierDto from(Supplier s) {
         return SupplierDto.builder()
                 .id(s.getId())
                 .supplierCode(s.getSupplierCode())
+                .code(s.getSupplierCode())
                 .name(s.getName())
                 .contactPerson(s.getContactPerson())
                 .phone(s.getPhone())

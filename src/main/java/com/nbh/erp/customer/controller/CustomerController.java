@@ -73,4 +73,12 @@ public class CustomerController {
         customerService.toggleActive(id);
         return ResponseEntity.ok(ApiResponse.ok("Customer status updated", null));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE')")
+    @Operation(summary = "Delete a customer")
+    public ResponseEntity<ApiResponse<Void>> deleteCustomer(@PathVariable Long id) {
+        customerService.deleteCustomer(id);
+        return ResponseEntity.ok(ApiResponse.ok("Customer deleted successfully", null));
+    }
 }

@@ -131,6 +131,10 @@ h4 {
 .glass-sub-header {
   background: #ffffff;
   border-bottom: 1px solid var(--slate-200);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 /* Sidebar Standard Navigation Buttons */
@@ -199,9 +203,9 @@ h4 {
 
 .glass-modal {
   background: #ffffff;
-  border: 1px solid var(--slate-300);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 20px 35px -8px rgba(15, 23, 42, 0.18), 0 10px 15px -6px rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
 }
 
 /* Standard Segmented Pill Sub-navigation Bar */
@@ -431,12 +435,14 @@ textarea:disabled {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 24px;
 }
 
 /* Profile Dropdown Menu */
@@ -492,4 +498,116 @@ textarea:disabled {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ==========================================================================
+   Full-Screen Distraction-Free & Standard ERP Keyboard Shortcuts System
+   ========================================================================== */
+
+/* Crisp ERP Keyboard Badge */
+.erp-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  color: var(--slate-700);
+  background: #ffffff;
+  border: 1px solid var(--slate-300);
+  border-bottom: 2px solid var(--slate-400);
+  border-radius: 4px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  line-height: 1.2;
+  min-width: 22px;
+}
+
+/* Enterprise Top Bar */
+.erp-topbar {
+  height: 48px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 30;
+  flex-shrink: 0;
+}
+
+/* Collapsed Sidebar in Distraction-Free / Full Screen Mode */
+.glass-sidebar.collapsed {
+  width: 62px !important;
+  min-width: 62px !important;
+}
+
+.glass-sidebar.collapsed .sidebar-brand-text,
+.glass-sidebar.collapsed .sidebar-section-title,
+.glass-sidebar.collapsed .sidebar-nav-btn span,
+.glass-sidebar.collapsed .forward-icon,
+.glass-sidebar.collapsed .profile-details {
+  display: none !important;
+}
+
+.glass-sidebar.collapsed .sidebar-nav-btn {
+  justify-content: center !important;
+  padding: 10px 0 !important;
+}
+
+.glass-sidebar.collapsed .nav-icon-wrap {
+  margin: 0 !important;
+  gap: 0 !important;
+}
+
+/* Fullscreen Indicator Badge */
+.fullscreen-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Print Optimization */
+@media print {
+  .glass-sidebar,
+  .erp-topbar,
+  .btn,
+  .glass-pill-bar,
+  .modal-backdrop:not(.printable-modal),
+  th:last-child,
+  td:last-child {
+    display: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  .glass-card {
+    box-shadow: none !important;
+    border: 1px solid #cccccc !important;
+    padding: 0 !important;
+  }
+
+  .glass-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .glass-table th,
+  .glass-table td {
+    border: 1px solid #dddddd !important;
+    color: #000000 !important;
+    padding: 6px 10px !important;
+  }
 }

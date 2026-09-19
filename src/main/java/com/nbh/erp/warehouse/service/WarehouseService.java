@@ -1,7 +1,11 @@
 package com.nbh.erp.warehouse.service;
 
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
+import com.nbh.erp.grn.repository.GrnRepository;
+import com.nbh.erp.inventory.repository.StockBalanceRepository;
+import com.nbh.erp.sales.repository.InvoiceRepository;
 import com.nbh.erp.warehouse.dto.CreateWarehouseRequest;
 import com.nbh.erp.warehouse.dto.WarehouseDto;
 import com.nbh.erp.warehouse.entity.Warehouse;
@@ -18,6 +22,9 @@ import java.util.stream.Collectors;
 public class WarehouseService {
 
     private final WarehouseRepository warehouseRepository;
+    private final StockBalanceRepository stockBalanceRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final GrnRepository grnRepository;
 
     @Transactional(readOnly = true)
     public List<WarehouseDto> getAllWarehouses() {
@@ -104,4 +111,25 @@ public class WarehouseService {
         warehouse.setIsActive(!warehouse.getIsActive());
         warehouseRepository.save(warehouse);
     }
+
+    @Transactional
+    public void deleteWarehouse(Long id) {
+        Warehouse warehouse = warehouseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+
+        if (Boolean.TRUE.equals(warehouse.getIsPrimary())) {
+            throw new BusinessException("Primary warehouse cannot be deleted. Please assign another warehouse as primary first.");
+        }
+
+        if (stockBalanceRepository.existsByWarehouseId(id)) {
+            throw new BusinessException("Cannot delete warehouse '" + warehouse.getName() + "' because it has stock balances. Please deactivate it instead.");
+        }
+
+        if (invoiceRepository.existsByWarehouseId(id) || grnRepository.existsByWarehouseId(id)) {
+            throw new BusinessException("Cannot delete warehouse '" + warehouse.getName() + "' because it is referenced in transactions. Please deactivate it instead.");
+        }
+
+        warehouseRepository.delete(warehouse);
+    }
 }
+

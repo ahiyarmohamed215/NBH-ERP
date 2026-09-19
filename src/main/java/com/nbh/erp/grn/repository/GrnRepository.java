@@ -15,6 +15,10 @@ public interface GrnRepository extends JpaRepository<Grn, Long> {
 
     Optional<Grn> findByGrnNumber(String grnNumber);
 
+    boolean existsByWarehouseId(Long warehouseId);
+
+    boolean existsBySupplierId(Long supplierId);
+
     @Query("SELECT g FROM Grn g WHERE " +
             "(:warehouseId IS NULL OR g.warehouse.id = :warehouseId) AND " +
             "(:supplierId IS NULL OR g.supplier.id = :supplierId) AND " +

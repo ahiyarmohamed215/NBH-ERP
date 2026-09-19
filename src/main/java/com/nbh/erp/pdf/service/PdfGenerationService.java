@@ -239,6 +239,88 @@ public class PdfGenerationService {
         return out.toByteArray();
     }
 
+    @Transactional(readOnly = true)
+    public byte[] generateGtnPdf(Long gtnId) {
+        Gtn gtn = gtnRepository.findById(gtnId)
+                .orElseThrow(() -> new ResourceNotFoundException("GTN", "id", gtnId));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, new Color(30, 41, 59));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 10, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, new Color(15, 23, 42));
+
+            document.add(new Paragraph(companyName, headerFont));
+            Paragraph addr = new Paragraph("GOODS TRANSFER NOTE (GTN)", titleFont);
+            addr.setSpacingAfter(15);
+            document.add(addr);
+
+            PdfPTable meta = new PdfPTable(2);
+            meta.setWidthPercentage(100);
+
+            PdfPCell c1 = new PdfPCell();
+            c1.setBorder(Rectangle.NO_BORDER);
+            c1.addElement(new Paragraph("GTN #: " + gtn.getGtnNumber(), boldBody));
+            c1.addElement(new Paragraph("Source: " + gtn.getSourceWarehouse().getName(), bodyFont));
+            c1.addElement(new Paragraph("Destination: " + gtn.getDestinationWarehouse().getName(), bodyFont));
+
+            PdfPCell c2 = new PdfPCell();
+            c2.setBorder(Rectangle.NO_BORDER);
+            c2.addElement(new Paragraph("Status: " + gtn.getStatus(), boldBody));
+            c2.addElement(new Paragraph("Dispatch Date: " + (gtn.getDispatchDate() != null ? DateUtils.formatDate(gtn.getDispatchDate()) : "-"), bodyFont));
+            c2.addElement(new Paragraph("Notes: " + (gtn.getNotes() != null ? gtn.getNotes() : "-"), bodyFont));
+
+            meta.addCell(c1);
+            meta.addCell(c2);
+            meta.setSpacingAfter(15);
+            document.add(meta);
+
+            PdfPTable items = new PdfPTable(4);
+            items.setWidthPercentage(100);
+            items.setWidths(new float[]{1f, 5f, 2f, 2f});
+
+            String[] heads = {"#", "Product Description & SKU", "Qty Transferred", "Unit Cost (" + currencySymbol + ")"};
+            for (String h : heads) {
+                PdfPCell c = new PdfPCell(new Phrase(h, tableHeadFont));
+                c.setBackgroundColor(new Color(37, 99, 235));
+                c.setPadding(6);
+                c.setHorizontalAlignment(Element.ALIGN_CENTER);
+                items.addCell(c);
+            }
+
+            int idx = 1;
+            java.math.BigDecimal totalUnits = java.math.BigDecimal.ZERO;
+            for (GtnItem it : gtn.getItems()) {
+                addTableCell(items, String.valueOf(idx++), bodyFont, Element.ALIGN_CENTER);
+                addTableCell(items, it.getProduct().getName() + " (" + it.getProduct().getSku() + ")", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(items, NumberUtils.formatQuantity(it.getQuantityTransferred()), bodyFont, Element.ALIGN_RIGHT);
+                addTableCell(items, NumberUtils.formatCurrency(it.getUnitCost()), bodyFont, Element.ALIGN_RIGHT);
+                totalUnits = totalUnits.add(it.getQuantityTransferred() != null ? it.getQuantityTransferred() : java.math.BigDecimal.ZERO);
+            }
+
+            items.setSpacingAfter(15);
+            document.add(items);
+
+            Paragraph tot = new Paragraph("Total Transfer Units: " + NumberUtils.formatQuantity(totalUnits), boldBody);
+            tot.setAlignment(Element.ALIGN_RIGHT);
+            document.add(tot);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate GTN PDF: " + gtnId, e);
+            throw new RuntimeException("Could not generate GTN PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
     private void addTableCell(PdfPTable table, String text, Font font, int alignment) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setPadding(5);

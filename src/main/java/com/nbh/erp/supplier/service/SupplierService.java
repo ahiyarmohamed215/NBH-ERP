@@ -1,7 +1,10 @@
 package com.nbh.erp.supplier.service;
 
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
+import com.nbh.erp.grn.repository.GrnRepository;
+import com.nbh.erp.product.repository.ProductRepository;
 import com.nbh.erp.supplier.dto.CreateSupplierRequest;
 import com.nbh.erp.supplier.dto.SupplierDto;
 import com.nbh.erp.supplier.entity.Supplier;
@@ -19,6 +22,8 @@ import java.util.stream.Collectors;
 public class SupplierService {
 
     private final SupplierRepository supplierRepository;
+    private final GrnRepository grnRepository;
+    private final ProductRepository productRepository;
 
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
@@ -110,5 +115,21 @@ public class SupplierService {
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
         supplier.setIsActive(!supplier.getIsActive());
         supplierRepository.save(supplier);
+    }
+
+    @Transactional
+    public void deleteSupplier(Long id) {
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+
+        if (grnRepository.existsBySupplierId(id)) {
+            throw new BusinessException("Cannot delete supplier '" + supplier.getName() + "' because Goods Received Notes (GRN) exist for this supplier. Please deactivate it instead.");
+        }
+
+        if (productRepository.existsByDefaultSupplierId(id)) {
+            throw new BusinessException("Cannot delete supplier '" + supplier.getName() + "' because products are linked to it as default supplier. Please reassign products or deactivate it instead.");
+        }
+
+        supplierRepository.delete(supplier);
     }
 }

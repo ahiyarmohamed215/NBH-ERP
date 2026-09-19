@@ -70,6 +70,7 @@ export const warehouseApi = {
   create: (data) => api.post('/warehouses', data),
   update: (id, data) => api.put(`/warehouses/${id}`, data),
   toggleActive: (id) => api.patch(`/warehouses/${id}/toggle-active`),
+  delete: (id) => api.delete(`/warehouses/${id}`),
 };
 
 export const categoryApi = {
@@ -78,6 +79,7 @@ export const categoryApi = {
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),
   toggleActive: (id) => api.patch(`/categories/${id}/toggle-active`),
+  delete: (id) => api.delete(`/categories/${id}`),
 };
 
 export const productApi = {
@@ -88,6 +90,7 @@ export const productApi = {
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
   toggleActive: (id) => api.patch(`/products/${id}/toggle-active`),
+  delete: (id) => api.delete(`/products/${id}`),
 };
 
 export const customerApi = {
@@ -98,6 +101,7 @@ export const customerApi = {
   create: (data) => api.post('/customers', data),
   update: (id, data) => api.put(`/customers/${id}`, data),
   toggleActive: (id) => api.patch(`/customers/${id}/toggle-active`),
+  delete: (id) => api.delete(`/customers/${id}`),
 };
 
 export const supplierApi = {
@@ -108,6 +112,7 @@ export const supplierApi = {
   create: (data) => api.post('/suppliers', data),
   update: (id, data) => api.put(`/suppliers/${id}`, data),
   toggleActive: (id) => api.patch(`/suppliers/${id}/toggle-active`),
+  delete: (id) => api.delete(`/suppliers/${id}`),
 };
 
 export const salesmanApi = {
@@ -183,9 +188,69 @@ export const reportApi = {
     `/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
 };
 
+export const printPdfDocument = (pdfUrl) => {
+  let iframe = document.getElementById('pdf-silent-printer');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'pdf-silent-printer';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+  }
+
+  iframe.src = pdfUrl;
+  iframe.onload = () => {
+    setTimeout(() => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (err) {
+        const win = window.open(pdfUrl, '_blank');
+        if (win) {
+          win.onload = () => win.print();
+        }
+      }
+    }, 350);
+  };
+};
+
+export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pdf') => {
+  try {
+    const downloadUrl = pdfUrl.includes('?') ? `${pdfUrl}&download=true` : `${pdfUrl}?download=true`;
+    const response = await fetch(downloadUrl);
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = defaultFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    console.error('Download error, falling back to direct link:', err);
+    window.open(pdfUrl, '_blank');
+  }
+};
+
 export const pdfApi = {
   getInvoicePdfUrl: (id) => `/api/v1/pdf/invoices/${id}`,
   getGrnPdfUrl: (id) => `/api/v1/pdf/grns/${id}`,
+  getGtnPdfUrl: (id) => `/api/v1/pdf/gtns/${id}`,
+  printInvoice: (id) => printPdfDocument(`/api/v1/pdf/invoices/${id}`),
+  downloadInvoice: (id, num) => downloadPdfDocument(`/api/v1/pdf/invoices/${id}`, `Invoice-${num || id}.pdf`),
+  printGrn: (id) => printPdfDocument(`/api/v1/pdf/grns/${id}`),
+  downloadGrn: (id, num) => downloadPdfDocument(`/api/v1/pdf/grns/${id}`, `GRN-${num || id}.pdf`),
+  printGtn: (id) => printPdfDocument(`/api/v1/pdf/gtns/${id}`),
+  downloadGtn: (id, num) => downloadPdfDocument(`/api/v1/pdf/gtns/${id}`, `GTN-${num || id}.pdf`),
+  printPdf: printPdfDocument,
+  downloadPdf: downloadPdfDocument,
 };
 
 export default api;
+

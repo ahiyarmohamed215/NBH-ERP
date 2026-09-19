@@ -30,6 +30,10 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
 
     List<StockBalance> findByProductId(Long productId);
 
+    boolean existsByWarehouseId(Long warehouseId);
+
+    boolean existsByProductId(Long productId);
+
     @Query("SELECT COALESCE(SUM(sb.quantity), 0) FROM StockBalance sb WHERE sb.product.id = :productId")
     BigDecimal getTotalEnterpriseStockForProduct(@Param("productId") Long productId);
 

@@ -165,15 +165,14 @@ export default function DashboardView({ onNavigate }) {
                       </span>
                     </td>
                     <td>
-                      <a
-                        href={pdfApi.getInvoicePdfUrl(inv.id)}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => pdfApi.printInvoice(inv.id)}
                         className="btn btn-glass btn-sm"
-                        title="Print Invoice PDF"
+                        title="Print Invoice PDF Directly"
                       >
                         <Printer size={14} /> Print
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -218,15 +217,14 @@ export default function DashboardView({ onNavigate }) {
                       </span>
                     </td>
                     <td>
-                      <a
-                        href={pdfApi.getGrnPdfUrl(grn.id)}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => pdfApi.printGrn(grn.id)}
                         className="btn btn-glass btn-sm"
-                        title="Print GRN PDF"
+                        title="Print GRN PDF Directly"
                       >
                         <Printer size={14} /> Print
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 ))

@@ -17,7 +17,8 @@ import {
   Clock,
   User,
   ShieldAlert,
-  X
+  X,
+  Download,
 } from 'lucide-react';
 
 export default function PosView() {
@@ -291,6 +292,54 @@ export default function PosView() {
     }
   };
 
+  // Standard POS Keyboard Shortcuts (F2: Search, F5: Pay, F12: Hold, F9: Print)
+  useEffect(() => {
+    const handlePosKeys = (e) => {
+      // F2: Focus search
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      // F5 or Alt+P: Proceed to Payment
+      if (e.key === 'F5' || (e.altKey && (e.key === 'p' || e.key === 'P'))) {
+        if (cart.length > 0 && !showPayModal && !completedInvoice) {
+          e.preventDefault();
+          setTenderedAmount(netTotal.toFixed(2));
+          setShowPayModal(true);
+        }
+        return;
+      }
+
+      // F12 or Alt+H: Hold bill
+      if (e.key === 'F12' || (e.altKey && (e.key === 'h' || e.key === 'H'))) {
+        if (cart.length > 0 && !showPayModal && !completedInvoice) {
+          e.preventDefault();
+          handleHoldCart();
+        }
+        return;
+      }
+
+      // F9: Print in Completed modal
+      if (completedInvoice && e.key === 'F9') {
+        e.preventDefault();
+        pdfApi.printInvoice(completedInvoice.id);
+        return;
+      }
+
+      // Enter in Pay modal completes sale
+      if (showPayModal && e.key === 'Enter') {
+        e.preventDefault();
+        handleCompleteSale();
+      }
+    };
+
+    window.addEventListener('keydown', handlePosKeys);
+    return () => window.removeEventListener('keydown', handlePosKeys);
+  }, [cart, showPayModal, completedInvoice, netTotal]);
+
   return (
     <div style={{ padding: '28px', display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
       {/* Left Column: Product Selection & Cart (Takes 65%) */}
@@ -399,7 +448,7 @@ export default function PosView() {
               type="text"
               className="input-glass"
               style={{ paddingLeft: '44px', width: '100%' }}
-              placeholder="Search product name or SKU..."
+              placeholder="Search product name or SKU... (Press F2 to focus)"
               value={searchQuery}
               onChange={(e) => handleProductSearch(e.target.value)}
               autoFocus
@@ -602,23 +651,33 @@ export default function PosView() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <button
               className="btn btn-primary"
-              style={{ width: '100%', padding: '14px', fontSize: '1.05rem', borderRadius: '10px' }}
+              style={{ width: '100%', padding: '14px', fontSize: '1.05rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
               disabled={cart.length === 0}
               onClick={() => {
                 setTenderedAmount(netTotal.toFixed(2));
                 setShowPayModal(true);
               }}
+              title="Proceed to Payment (F5)"
             >
-              <CheckCircle size={20} /> Proceed to Payment
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle size={20} /> Proceed to Payment
+              </div>
+              <kbd className="erp-kbd" style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff', borderColor: 'rgba(255,255,255,0.4)', borderBottomColor: 'rgba(255,255,255,0.6)' }}>
+                F5
+              </kbd>
             </button>
 
             <button
               className="btn btn-glass"
-              style={{ width: '100%', padding: '12px' }}
+              style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
               disabled={cart.length === 0}
               onClick={handleHoldCart}
+              title="Hold Cart (F12)"
             >
-              <PauseCircle size={18} color="#f59e0b" /> Hold Bill (Save Draft)
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <PauseCircle size={18} color="#f59e0b" /> Hold Bill (Save Draft)
+              </div>
+              <kbd className="erp-kbd">F12</kbd>
             </button>
           </div>
         </div>
@@ -725,20 +784,33 @@ export default function PosView() {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <a
-                href={pdfApi.getInvoicePdfUrl(completedInvoice.id)}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
                 className="btn btn-primary"
-                style={{ padding: '12px' }}
+                onClick={() => pdfApi.printInvoice(completedInvoice.id)}
+                style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.92rem', fontWeight: 700 }}
+                title="Print Receipt Directly (F9)"
               >
-                <Printer size={18} /> Print Thermal / A4 Receipt
-              </a>
+                <Printer size={18} /> Print Receipt Directly
+                <kbd className="erp-kbd" style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff', borderColor: 'rgba(255,255,255,0.4)' }}>
+                  F9
+                </kbd>
+              </button>
+              <button
+                type="button"
+                className="btn btn-glass"
+                onClick={() => pdfApi.downloadInvoice(completedInvoice.id, completedInvoice.invoiceNumber)}
+                style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#15803d', borderColor: '#86efac', fontWeight: 700 }}
+                title="Download PDF File"
+              >
+                <Download size={16} color="#15803d" /> Download PDF Receipt
+              </button>
               <button
                 className="btn btn-glass"
                 onClick={() => setCompletedInvoice(null)}
+                title="Dismiss (Esc)"
               >
-                Start New Transaction
+                Start New Transaction (Esc)
               </button>
             </div>
           </div>
