@@ -330,16 +330,29 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
   }, [currentPrimaryTab]);
 
   return (
-    <div style={{ padding: '28px 32px', minHeight: '100%', backgroundColor: '#f8fafc' }}>
+    <div
+      style={{
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px 32px',
+        backgroundColor: '#f8fafc',
+        overflow: 'hidden',
+      }}
+    >
       {/* Top Header matching user screenshot */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '18px',
+          marginBottom: '14px',
           flexWrap: 'wrap',
           gap: '16px',
+          flexShrink: 0,
         }}
       >
         <h1
@@ -388,6 +401,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
           borderBottom: '1px solid #e2e8f0',
           marginBottom: '16px',
           overflowX: 'auto',
+          flexShrink: 0,
         }}
       >
         {PRIMARY_TABS.map((tab) => {
@@ -426,9 +440,9 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 1. CUSTOMER REPORTS TAB CONTENT (Matching user screenshot) */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'customer-reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
           {/* Sub-Navigation Tabs (Row 2 matching user screenshot) */}
-          <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>
+          <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px', flexShrink: 0 }}>
             {CUSTOMER_SUB_TABS.map((sub) => {
               const isActive = customerSubTab === sub.id;
               return (
@@ -455,9 +469,9 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
 
           {/* Sub-Tab 1: OUTSTANDING BALANCES (Matching screenshot) */}
           {customerSubTab === 'outstanding' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
               {/* Ageing Overview Header & Cards */}
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                   <div>
                     <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
@@ -499,12 +513,12 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                         backgroundColor: '#ffffff',
                         borderRadius: '12px',
                         border: '1px solid #e2e8f0',
-                        padding: '20px 24px',
+                        padding: '16px 20px',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#475569' }}>0–7 days</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>0–7 days</span>
                         <span
                           style={{
                             backgroundColor: '#ecfdf5',
@@ -519,7 +533,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                           {ageingTotals.cnt0to7} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot0to7.toFixed(2)}
                       </div>
                     </div>
@@ -532,12 +546,12 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                         backgroundColor: '#ffffff',
                         borderRadius: '12px',
                         border: '1px solid #e2e8f0',
-                        padding: '20px 24px',
+                        padding: '16px 20px',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#475569' }}>8–21 days</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>8–21 days</span>
                         <span
                           style={{
                             backgroundColor: '#fef3c7',
@@ -552,7 +566,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                           {ageingTotals.cnt8to21} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot8to21.toFixed(2)}
                       </div>
                     </div>
@@ -565,12 +579,12 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                         backgroundColor: '#ffffff',
                         borderRadius: '12px',
                         border: '1px solid #e2e8f0',
-                        padding: '20px 24px',
+                        padding: '16px 20px',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 600, color: '#475569' }}>22+ days</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>22+ days</span>
                         <span
                           style={{
                             backgroundColor: '#fee2e2',
@@ -585,7 +599,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                           {ageingTotals.cnt22Plus} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot22Plus.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -599,19 +613,20 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                   backgroundColor: '#ffffff',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
-                  padding: '18px 24px',
+                  padding: '14px 20px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                  flexShrink: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', color: '#475569', fontWeight: 700, fontSize: '0.84rem' }}>
-                  <Sliders size={15} color="#0284c7" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: '#475569', fontWeight: 700, fontSize: '0.82rem' }}>
+                  <Sliders size={14} color="#0284c7" />
                   Filter results
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px', alignItems: 'flex-start' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '14px', alignItems: 'flex-start' }}>
                   {/* Search Customer */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Search customer
                     </label>
                     <input
@@ -621,21 +636,21 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                       onChange={(e) => setCustomerSearch(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '9px 12px',
+                        padding: '7px 12px',
                         borderRadius: '7px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.86rem',
+                        fontSize: '0.84rem',
                         outline: 'none',
                       }}
                     />
-                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
                       Showing outstanding invoices posted in the selected branch. Search updates as you type.
                     </span>
                   </div>
 
                   {/* Posted By */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Posted by
                     </label>
                     <select
@@ -643,11 +658,11 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                       onChange={(e) => setFilterPostedBy(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '9px 12px',
+                        padding: '7px 12px',
                         borderRadius: '7px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
-                        fontSize: '0.86rem',
+                        fontSize: '0.84rem',
                         color: '#334155',
                         cursor: 'pointer',
                       }}
@@ -663,7 +678,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
 
                   {/* Customer Group */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Customer group
                     </label>
                     <select
@@ -671,11 +686,11 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                       onChange={(e) => setFilterGroup(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '9px 12px',
+                        padding: '7px 12px',
                         borderRadius: '7px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
-                        fontSize: '0.86rem',
+                        fontSize: '0.84rem',
                         color: '#334155',
                         cursor: 'pointer',
                       }}
@@ -694,14 +709,19 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
               {/* Customer Outstanding Balances Table Card */}
               <div
                 style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
                   backgroundColor: '#ffffff',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
-                  padding: '24px 28px',
+                  padding: '18px 24px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                  overflow: 'hidden',
                 }}
               >
-                <div style={{ marginBottom: '16px' }}>
+                <div style={{ marginBottom: '14px', flexShrink: 0 }}>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
                     Customer Outstanding Balances
                   </h3>
@@ -710,17 +730,17 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                   </p>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                    <thead>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                       <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>TOTAL OUTSTANDING</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>0–7 DAYS</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>8–21 DAYS</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>22+ DAYS</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'center' }}>INVOICES</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>CUSTOMER</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>TOTAL OUTSTANDING</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>0–7 DAYS</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>8–21 DAYS</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>22+ DAYS</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>INVOICES</th>
+                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -795,45 +815,51 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
 
           {/* Sub-Tab 2: Installment Tracking */}
           {customerSubTab === 'installment' && (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-                Customer Installment Schedules & Tracking
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-                Monitor hire-purchase installment milestones, overdue cycles, and monthly repayment compliance.
-              </p>
-              <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-                All customer installment facilities are currently monitored with zero defaults across active branches.
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                  Customer Installment Schedules & Tracking
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                  Monitor hire-purchase installment milestones, overdue cycles, and monthly repayment compliance.
+                </p>
+                <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+                  All customer installment facilities are currently monitored with zero defaults across active branches.
+                </div>
               </div>
             </div>
           )}
 
           {/* Sub-Tab 3: Advance Payments */}
           {customerSubTab === 'advances' && (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-                Customer Advance Deposits & Credit Ledger
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-                Review unallocated customer advances and pre-payments available for invoice clearance.
-              </p>
-              <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-                Total active customer advance float: <strong>LKR 30,000.00</strong> across registered clients.
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                  Customer Advance Deposits & Credit Ledger
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                  Review unallocated customer advances and pre-payments available for invoice clearance.
+                </p>
+                <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+                  Total active customer advance float: <strong>LKR 30,000.00</strong> across registered clients.
+                </div>
               </div>
             </div>
           )}
 
           {/* Sub-Tab 4: Top Spending */}
           {customerSubTab === 'top-spending' && (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-                Top Spending Customers Ranking
-              </h3>
-              <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-                Lifetime value, frequency of sales orders, and revenue distribution.
-              </p>
-              <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-                Ranking updated automatically based on POS and Commercial Invoicing turnover.
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                  Top Spending Customers Ranking
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                  Lifetime value, frequency of sales orders, and revenue distribution.
+                </p>
+                <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+                  Ranking updated automatically based on POS and Commercial Invoicing turnover.
+                </div>
               </div>
             </div>
           )}
@@ -844,7 +870,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 2. SALES REPORTS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'sales-reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px 28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
               <div>
@@ -901,7 +927,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 3. INVENTORY REPORTS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'inventory-reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px 28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
@@ -937,15 +963,17 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 4. PURCHASE REPORTS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'purchase-reports' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-            Supplier Procurement & Spend Analytics
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-            Vendor purchase order compliance, goods received notes (GRN) volume, and payables ageing.
-          </p>
-          <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-            Total GRN receipts processed this quarter: <strong>14 Receipts</strong> totaling <strong>LKR 458,900.00</strong>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+              Supplier Procurement & Spend Analytics
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+              Vendor purchase order compliance, goods received notes (GRN) volume, and payables ageing.
+            </p>
+            <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+              Total GRN receipts processed this quarter: <strong>14 Receipts</strong> totaling <strong>LKR 458,900.00</strong>
+            </div>
           </div>
         </div>
       )}
@@ -954,15 +982,17 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 5. PROJECT REPORT TAB */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'project-reports' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-            Commercial Projects & Supply Job Cards
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-            Project milestones, contractor billing, and material dispatch allocations.
-          </p>
-          <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-            All active commercial project accounts are reconciled and up to date.
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+              Commercial Projects & Supply Job Cards
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+              Project milestones, contractor billing, and material dispatch allocations.
+            </p>
+            <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+              All active commercial project accounts are reconciled and up to date.
+            </div>
           </div>
         </div>
       )}
@@ -971,15 +1001,17 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* 6. ACCOUNTING REPORTS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentPrimaryTab === 'accounting-reports' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-            Financial Accounting & Ledger Statements
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-            Trial Balance, Profit & Loss overview, and Balance Sheet ledger consolidation.
-          </p>
-          <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-            General ledger audit accounts prepared for upcoming fiscal closing.
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+              Financial Accounting & Ledger Statements
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+              Trial Balance, Profit & Loss overview, and Balance Sheet ledger consolidation.
+            </p>
+            <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
+              General ledger audit accounts prepared for upcoming fiscal closing.
+            </div>
           </div>
         </div>
       )}

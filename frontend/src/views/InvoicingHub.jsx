@@ -416,16 +416,32 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   const [advances] = useState(INITIAL_ADVANCES);
 
   return (
-    <div style={{ padding: '28px 32px', minHeight: '100%', backgroundColor: '#f8fafc' }}>
-      {/* Top Header matching user screenshot */}
+    <div
+      style={{
+        padding: '24px 32px',
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Top Header (Fixed / Sticky at Top) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '18px',
+          marginBottom: '16px',
           flexWrap: 'wrap',
           gap: '16px',
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -499,15 +515,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         </div>
       </div>
 
-      {/* Navigation Tabs matching user screenshot */}
+      {/* Navigation Tabs (Fixed / Sticky at Top) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '22px',
+          marginBottom: '16px',
           overflowX: 'auto',
+          flexShrink: 0,
         }}
       >
         {INVOICING_TABS.map((tab) => {
@@ -546,7 +563,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* IF POS MODE ACTIVE */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'pos' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div
             style={{
               backgroundColor: '#f0fdf4',
@@ -587,18 +604,28 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* TAB 3: SALES (Commercial Invoices - Matching Screenshot) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'sales' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Card Container for Filters matching screenshot */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Card Container for Filters matching screenshot (Fixed / Sticky) */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              padding: '20px 24px',
+              padding: '16px 20px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '14px',
+              flexShrink: 0,
             }}
           >
             {/* Filter Row 1: Search, Status, Payment Type, Customise Columns */}
@@ -811,7 +838,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
           </div>
 
-          {/* Invoices Table Card */}
+          {/* Invoices Table Card (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -819,22 +846,26 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               border: '1px solid #e2e8f0',
               overflow: 'hidden',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {visibleColumns.invoiceNumber && <th style={{ padding: '12px 16px' }}>INVOICE #</th>}
-                    {visibleColumns.customer && <th style={{ padding: '12px 16px' }}>CUSTOMER</th>}
-                    {visibleColumns.delivery && <th style={{ padding: '12px 16px' }}>DELIVERY</th>}
-                    {visibleColumns.date && <th style={{ padding: '12px 16px' }}>DATE</th>}
-                    {visibleColumns.paymentType && <th style={{ padding: '12px 16px' }}>PAYMENT TYPE</th>}
-                    {visibleColumns.paymentMethod && <th style={{ padding: '12px 16px' }}>PAYMENT METHOD</th>}
-                    {visibleColumns.total && <th style={{ padding: '12px 16px', textAlign: 'right' }}>TOTAL</th>}
-                    {visibleColumns.paid && <th style={{ padding: '12px 16px', textAlign: 'right' }}>PAID</th>}
-                    {visibleColumns.balance && <th style={{ padding: '12px 16px', textAlign: 'right' }}>BALANCE</th>}
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>
+                    {visibleColumns.invoiceNumber && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>}
+                    {visibleColumns.customer && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>}
+                    {visibleColumns.delivery && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
+                    {visibleColumns.date && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>}
+                    {visibleColumns.paymentType && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>}
+                    {visibleColumns.paymentMethod && <th style={{ padding: '12px 16px', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT METHOD</th>}
+                    {visibleColumns.total && <th style={{ padding: '12px 16px', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>}
+                    {visibleColumns.paid && <th style={{ padding: '12px 16px', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
+                    {visibleColumns.balance && <th style={{ padding: '12px 16px', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
+                    <th style={{ padding: '12px 16px', textAlign: 'center', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -972,7 +1003,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* TAB 1: QUOTATIONS */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'quotations' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1041,7 +1072,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* TAB 2: ORDERS */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'orders' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1256,7 +1287,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* TAB 6: REFUNDS */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'refunds' && (
-        <div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <SalesReturnsView />
         </div>
       )}

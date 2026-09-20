@@ -314,14 +314,30 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   };
 
   return (
-    <div style={{ padding: '28px 36px', minHeight: '100%', backgroundColor: '#f8fafc' }}>
-      {/* Page Header */}
+    <div
+      style={{
+        padding: '24px 32px',
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        backgroundColor: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Page Header (Fixed / Sticky at Top) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          marginBottom: '20px',
+          marginBottom: '16px',
+          flexShrink: 0,
         }}
       >
         <div>
@@ -356,14 +372,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </button>
       </div>
 
-      {/* Subtabs Bar (Underline Style exactly as in screenshot) */}
+      {/* Subtabs Bar (Underline Style - Fixed / Sticky at Top) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '24px',
+          marginBottom: '16px',
+          flexShrink: 0,
         }}
       >
         <button
@@ -474,7 +491,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
       {/* Tab 1: Employee List */}
       {activeTab === 'list' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
           {/* Pending Employee Approvals Banner (Styled exactly like image) */}
           {pendingApprovals.length > 0 && (
             <div
@@ -482,7 +508,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 backgroundColor: '#fffbeb',
                 border: '1px solid #fef08a',
                 borderRadius: '10px',
-                padding: '18px 24px',
+                padding: '14px 20px',
+                flexShrink: 0,
               }}
             >
               <div
@@ -601,7 +628,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             </div>
           )}
 
-          {/* Search Bar & Action Buttons (Import & Export CSV) */}
+          {/* Search Bar & Action Buttons (Fixed / Sticky) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -613,6 +640,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               justifyContent: 'space-between',
               gap: '16px',
               flexWrap: 'wrap',
+              flexShrink: 0,
             }}
           >
             <div style={{ flex: 1, minWidth: '280px', position: 'relative' }}>
@@ -661,41 +689,47 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             </div>
           </div>
 
-          {/* Employees Table (Clean, matches screenshot layout) */}
+          {/* Employees Table (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
           <div
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '8px',
               overflow: 'hidden',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
             }}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    EMPLOYEE
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    ROLE
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    TYPE
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    CONTACT
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    JOINED
-                  </th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    STATUS
-                  </th>
-                  <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>
-                    ACTIONS
-                  </th>
-                </tr>
-              </thead>
+            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      EMPLOYEE
+                    </th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ROLE
+                    </th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      TYPE
+                    </th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      CONTACT
+                    </th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      JOINED
+                    </th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
+                    </th>
+                    <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ACTIONS
+                    </th>
+                  </tr>
+                </thead>
               <tbody>
                 {loading ? (
                   <tr>
@@ -844,135 +878,142 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   })
                 )}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
       {/* Tab 2: Groups & Permissions (Renders RolesView) */}
       {activeTab === 'groups' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '8px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '8px' }}>
           <RolesView />
         </div>
       )}
 
       {/* Tab 3: Attendance (Placeholder) */}
       {activeTab === 'attendance' && (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            padding: '60px 24px',
-            textAlign: 'center',
-            maxWidth: '560px',
-            margin: '20px auto',
-          }}
-        >
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
           <div
             style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: '#eff6ff',
-              color: '#0284c7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              padding: '60px 24px',
+              textAlign: 'center',
+              maxWidth: '560px',
+              margin: '0 auto',
             }}
           >
-            <Calendar size={28} />
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: '#eff6ff',
+                color: '#0284c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <Calendar size={28} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              Branch Attendance & Clock-in
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
+              Track daily shifts, check-in timestamps, leave requests, and branch staff work logs.
+            </p>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 12px', borderRadius: '9999px' }}>
+              FEATURE IN PROGRESS
+            </span>
           </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-            Branch Attendance & Clock-in
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-            Track daily shifts, check-in timestamps, leave requests, and branch staff work logs.
-          </p>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 12px', borderRadius: '9999px' }}>
-            FEATURE IN PROGRESS
-          </span>
         </div>
       )}
 
       {/* Tab 4: Payroll (Placeholder) */}
       {activeTab === 'payroll' && (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            padding: '60px 24px',
-            textAlign: 'center',
-            maxWidth: '560px',
-            margin: '20px auto',
-          }}
-        >
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
           <div
             style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: '#ecfdf5',
-              color: '#059669',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              padding: '60px 24px',
+              textAlign: 'center',
+              maxWidth: '560px',
+              margin: '0 auto',
             }}
           >
-            <CreditCard size={28} />
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: '#ecfdf5',
+                color: '#059669',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <CreditCard size={28} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              Employee Payroll Processing
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
+              Manage monthly salary disbursements, deductions, overtime calculations, and pay slip exports.
+            </p>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#059669', backgroundColor: '#d1fae5', padding: '4px 12px', borderRadius: '9999px' }}>
+              FEATURE IN PROGRESS
+            </span>
           </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-            Employee Payroll Processing
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-            Manage monthly salary disbursements, deductions, overtime calculations, and pay slip exports.
-          </p>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#059669', backgroundColor: '#d1fae5', padding: '4px 12px', borderRadius: '9999px' }}>
-            FEATURE IN PROGRESS
-          </span>
         </div>
       )}
 
       {/* Tab 5: Commission Templates (Placeholder) */}
       {activeTab === 'commissions' && (
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            padding: '60px 24px',
-            textAlign: 'center',
-            maxWidth: '560px',
-            margin: '20px auto',
-          }}
-        >
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
           <div
             style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '50%',
-              backgroundColor: '#fef3c7',
-              color: '#d97706',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              padding: '60px 24px',
+              textAlign: 'center',
+              maxWidth: '560px',
+              margin: '0 auto',
             }}
           >
-            <Percent size={28} />
+            <div
+              style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                backgroundColor: '#fef3c7',
+                color: '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <Percent size={28} />
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              Sales Commission Templates
+            </h2>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
+              Configure commission tiers for POS cashiers, managers, and branch sales representatives.
+            </p>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#d97706', backgroundColor: '#fef3c7', padding: '4px 12px', borderRadius: '9999px' }}>
+              FEATURE IN PROGRESS
+            </span>
           </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-            Sales Commission Templates
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-            Configure commission tiers for POS cashiers, managers, and branch sales representatives.
-          </p>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#d97706', backgroundColor: '#fef3c7', padding: '4px 12px', borderRadius: '9999px' }}>
-            FEATURE IN PROGRESS
-          </span>
         </div>
       )}
 

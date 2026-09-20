@@ -574,7 +574,7 @@ export default function App() {
       {/* Main Workspace Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
         {/* Dynamic Workspace Rendering */}
-        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
           {accessibleModules.length === 0 ? (
             <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '0 auto' }}>
               <div

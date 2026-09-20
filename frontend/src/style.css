@@ -407,7 +407,16 @@ textarea:disabled {
   border-collapse: collapse;
 }
 
+.glass-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 .glass-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: var(--slate-50);
   color: var(--slate-600);
   font-weight: 600;

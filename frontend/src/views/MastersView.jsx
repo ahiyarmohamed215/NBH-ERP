@@ -384,9 +384,21 @@ export default function MastersView({
   };
 
   return (
-    <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div
+      style={{
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+        padding: isStandalone ? '0' : '24px 32px',
+        overflow: 'hidden',
+      }}
+    >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', flexShrink: 0 }}>
         <div>
           <h1 style={{ fontSize: '1.8rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
             {getHeaderIcon()} {displayTitle}
@@ -407,7 +419,7 @@ export default function MastersView({
 
       {/* Directory Tabs (only if more than 1 tab visible) */}
       {visibleTabs.length > 1 && (
-        <div>
+        <div style={{ flexShrink: 0 }}>
           <div className="glass-pill-bar">
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
@@ -428,7 +440,7 @@ export default function MastersView({
       )}
 
       {/* Search & Status Filters Bar */}
-      <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
         <div style={{ flex: '1 1 300px', position: 'relative' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: '#94a3b8' }} />
           <input
@@ -470,8 +482,8 @@ export default function MastersView({
       </div>
 
       {/* Master Data Tables */}
-      <div className="glass-card" style={{ overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
+      <div className="glass-card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
               Loading {activeTab} data...

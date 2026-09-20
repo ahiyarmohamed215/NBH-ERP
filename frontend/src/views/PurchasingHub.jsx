@@ -85,7 +85,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+    <div style={{ flex: 1, height: '100%', maxHeight: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Sub-navigation Header Bar (Fixed / Sticky at Top) */}
       <div
         className="glass-sub-header"
@@ -128,9 +128,9 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
       </div>
 
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         {visitedTabs.has('suppliers') && (
-          <div style={{ display: currentTab === 'suppliers' ? 'block' : 'none' }}>
+          <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
             <MastersView
               activeSubTab="suppliers"
               isStandalone={true}
@@ -141,22 +141,22 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
           </div>
         )}
         {visitedTabs.has('grn') && (
-          <div style={{ display: currentTab === 'grn' ? 'block' : 'none' }}>
+          <div style={{ display: currentTab === 'grn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <GrnView />
           </div>
         )}
         {visitedTabs.has('gtn') && (
-          <div style={{ display: currentTab === 'gtn' ? 'block' : 'none' }}>
+          <div style={{ display: currentTab === 'gtn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <GtnView />
           </div>
         )}
         {visitedTabs.has('prn') && (
-          <div style={{ display: currentTab === 'prn' ? 'block' : 'none' }}>
+          <div style={{ display: currentTab === 'prn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <PrnView />
           </div>
         )}
         {visitedTabs.has('purchase-orders') && (
-          <div style={{ display: currentTab === 'purchase-orders' ? 'block' : 'none', padding: '60px 24px' }}>
+          <div style={{ display: currentTab === 'purchase-orders' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto', padding: '60px 24px' }}>
             <div
               style={{
                 backgroundColor: '#ffffff',

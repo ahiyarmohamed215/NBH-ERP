@@ -458,9 +458,21 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
   };
 
   return (
-    <div style={{ padding: '28px 32px', minHeight: '100%', backgroundColor: '#f8fafc' }}>
+    <div
+      style={{
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px 32px',
+        backgroundColor: '#f8fafc',
+        overflow: 'hidden',
+      }}
+    >
       {/* Main Page Title matching user screenshot */}
-      <div style={{ marginBottom: '18px' }}>
+      <div style={{ marginBottom: '14px', flexShrink: 0 }}>
         <h1
           style={{
             fontSize: '1.65rem',
@@ -481,8 +493,9 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
           alignItems: 'center',
           gap: '28px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '24px',
+          marginBottom: '20px',
           overflowX: 'auto',
+          flexShrink: 0,
         }}
       >
         {INVENTORY_TABS.map((tab) => {
@@ -521,19 +534,20 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
       {/* 1. STOCK ADJUSTMENT TAB (Matches user screenshot) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'adjustments' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           {/* Top Filter Bar matching user screenshot */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              padding: '16px 20px',
+              padding: '14px 20px',
               display: 'flex',
               alignItems: 'center',
               gap: '16px',
               flexWrap: 'wrap',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              flexShrink: 0,
             }}
           >
             {/* Search records input */}
@@ -661,11 +675,16 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
           {/* Adjustment Records Card */}
           <div
             style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              padding: '24px 28px',
+              padding: '20px 24px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              overflow: 'hidden',
             }}
           >
             <div
@@ -673,9 +692,10 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 flexWrap: 'wrap',
                 gap: '16px',
+                flexShrink: 0,
               }}
             >
               <div>
@@ -712,20 +732,20 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
             </div>
 
             {/* Adjustment Records Table */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '12px 16px' }}>Record #</th>
-                    <th style={{ padding: '12px 16px' }}>Date</th>
-                    <th style={{ padding: '12px 16px' }}>Type</th>
-                    <th style={{ padding: '12px 16px' }}>Warehouse</th>
-                    <th style={{ padding: '12px 16px' }}>SKU</th>
-                    <th style={{ padding: '12px 16px' }}>Product name</th>
-                    <th style={{ padding: '12px 16px' }}>Batch</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Quantity</th>
-                    <th style={{ padding: '12px 16px' }}>Reason</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Record #</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Date</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Type</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Warehouse</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>SKU</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Product name</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Batch</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>Quantity</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Reason</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -810,40 +830,49 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
       {/* 2. WAREHOUSES TAB */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'warehouses' && (
-        <MastersView
-          activeSubTab="warehouses"
-          isStandalone={true}
-          allowedTabs={['warehouses']}
-          title="Warehouse Locations"
-          subtitle="Manage distribution centers, storerooms, fulfillment facilities and branch storage"
-        />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <MastersView
+            activeSubTab="warehouses"
+            isStandalone={true}
+            allowedTabs={['warehouses']}
+            title="Warehouse Locations"
+            subtitle="Manage distribution centers, storerooms, fulfillment facilities and branch storage"
+          />
+        </div>
       )}
 
       {/* ------------------------------------------------------------- */}
       {/* 3. PRODUCTS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'products' && (
-        <MastersView
-          activeSubTab="products"
-          isStandalone={true}
-          allowedTabs={['products']}
-          title="Master Product Directory"
-          subtitle="Manage inventory items, SKUs, barcode tracking, pricing, and stock limits"
-        />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <MastersView
+            activeSubTab="products"
+            isStandalone={true}
+            allowedTabs={['products']}
+            title="Master Product Directory"
+            subtitle="Manage inventory items, SKUs, barcode tracking, pricing, and stock limits"
+          />
+        </div>
       )}
 
       {/* ------------------------------------------------------------- */}
       {/* 4. BRANDS TAB */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'brands' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           <div
             style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              padding: '24px 28px',
+              padding: '20px 24px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              overflow: 'hidden',
             }}
           >
             <div
@@ -851,9 +880,10 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 flexWrap: 'wrap',
                 gap: '16px',
+                flexShrink: 0,
               }}
             >
               <div>
@@ -887,7 +917,7 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
             </div>
 
             {/* Brand Search Bar */}
-            <div style={{ maxWidth: '340px', position: 'relative', marginBottom: '18px' }}>
+            <div style={{ maxWidth: '340px', position: 'relative', marginBottom: '16px', flexShrink: 0 }}>
               <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
@@ -899,15 +929,15 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
             </div>
 
             {/* Brands Table */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '12px 16px' }}>Brand Code</th>
-                    <th style={{ padding: '12px 16px' }}>Brand Name</th>
-                    <th style={{ padding: '12px 16px' }}>Description</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Brand Code</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Brand Name</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Description</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -988,27 +1018,34 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
       {/* 5. CATEGORIES TAB */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'categories' && (
-        <MastersView
-          activeSubTab="categories"
-          isStandalone={true}
-          allowedTabs={['categories']}
-          title="Product Categories"
-          subtitle="Manage product departments, item taxonomies, and group hierarchies"
-        />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <MastersView
+            activeSubTab="categories"
+            isStandalone={true}
+            allowedTabs={['categories']}
+            title="Product Categories"
+            subtitle="Manage product departments, item taxonomies, and group hierarchies"
+          />
+        </div>
       )}
 
       {/* ------------------------------------------------------------- */}
       {/* 6. RESERVED STOCK TAB */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'reserved' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           <div
             style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              padding: '24px 28px',
+              padding: '20px 24px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              overflow: 'hidden',
             }}
           >
             <div
@@ -1016,9 +1053,10 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 flexWrap: 'wrap',
                 gap: '16px',
+                flexShrink: 0,
               }}
             >
               <div>
@@ -1038,7 +1076,7 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
             </div>
 
             {/* Reserved Search */}
-            <div style={{ maxWidth: '340px', position: 'relative', marginBottom: '18px' }}>
+            <div style={{ maxWidth: '340px', position: 'relative', marginBottom: '16px', flexShrink: 0 }}>
               <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
@@ -1050,18 +1088,18 @@ export default function InventoryHub({ activeSubTab = 'adjustments', onSubTabCha
             </div>
 
             {/* Reserved Table */}
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '12px 16px' }}>Reference #</th>
-                    <th style={{ padding: '12px 16px' }}>Product Name</th>
-                    <th style={{ padding: '12px 16px' }}>SKU</th>
-                    <th style={{ padding: '12px 16px' }}>Warehouse</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Reserved Qty</th>
-                    <th style={{ padding: '12px 16px' }}>Reason / Allocation</th>
-                    <th style={{ padding: '12px 16px' }}>Reserved At</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Reference #</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Product Name</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>SKU</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Warehouse</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>Reserved Qty</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Reason / Allocation</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>Reserved At</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>

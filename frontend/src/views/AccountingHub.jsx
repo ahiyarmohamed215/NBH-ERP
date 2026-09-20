@@ -135,9 +135,21 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
   }, [searchQuery, typeFilter, showInactive]);
 
   return (
-    <div style={{ padding: '24px 32px', minHeight: '100%', backgroundColor: '#f8fafc' }}>
+    <div
+      style={{
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px 32px',
+        backgroundColor: '#f8fafc',
+        overflow: 'hidden',
+      }}
+    >
       {/* Top Header matching user screenshot */}
-      <div style={{ marginBottom: '18px' }}>
+      <div style={{ marginBottom: '14px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <h1
             style={{
@@ -186,8 +198,9 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
           borderRadius: '10px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          marginBottom: '22px',
+          marginBottom: '18px',
           overflowX: 'auto',
+          flexShrink: 0,
         }}
       >
         {ACCOUNTING_TABS.map((tab) => {
@@ -227,7 +240,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
 
       {/* Tab 1: Chart of Accounts UI (matches user mockup with Coming Soon overlay/badge) */}
       {currentTab === 'chart-of-accounts' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
           {/* Coming soon notice banner */}
           <div
             style={{
@@ -239,6 +252,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
+              flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -280,6 +294,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
               justifyContent: 'space-between',
               gap: '16px',
               flexWrap: 'wrap',
+              flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '320px' }}>
@@ -348,6 +363,10 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
           {/* Table matching user screenshot */}
           <div
             style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
               backgroundColor: '#ffffff',
               borderRadius: '10px',
               border: '1px solid #e2e8f0',
@@ -355,17 +374,17 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
             }}
           >
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
-                <thead>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '12px 18px' }}>CODE</th>
-                    <th style={{ padding: '12px 18px' }}>ACCOUNT NAME</th>
-                    <th style={{ padding: '12px 18px' }}>TYPE</th>
-                    <th style={{ padding: '12px 18px' }}>PARENT</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'right' }}>BALANCE</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>TRANSACTIONS</th>
-                    <th style={{ padding: '12px 18px', textAlign: 'center' }}>ACTIONS</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px' }}>CODE</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px' }}>ACCOUNT NAME</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px' }}>TYPE</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px' }}>PARENT</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px', textAlign: 'right' }}>BALANCE</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px', textAlign: 'center' }}>TRANSACTIONS</th>
+                    <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 18px', textAlign: 'center' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -705,7 +724,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
 // Reusable Coming Soon Section for each accounting navigation
 function ComingSoonSection({ title, subtitle, icon: Icon, color, bg, features }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Hero Coming Soon Card */}
       <div
         style={{

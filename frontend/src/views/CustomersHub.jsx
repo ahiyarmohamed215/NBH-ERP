@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   customerApi,
   salesmanApi,
+  userApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
@@ -68,10 +69,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [viewingCustomer, setViewingCustomer] = useState(null);
   const [deletingCustomerId, setDeletingCustomerId] = useState(null);
 
-  // High-Security Deletion Modal State
+  // Simple Deletion Confirmation Modal State
   const [securityModalData, setSecurityModalData] = useState(null);
-  const [securityConfirmInput, setSecurityConfirmInput] = useState('');
-  const [hasCopiedPhrase, setHasCopiedPhrase] = useState(false);
   const [isExecutingDelete, setIsExecutingDelete] = useState(false);
 
   // Routes / Groups State
@@ -95,23 +94,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     ];
   });
 
-  // Route Modals
-  const [showCreateRouteModal, setShowCreateRouteModal] = useState(false);
-  const [newRouteForm, setNewRouteForm] = useState({
+  // Inline Route View state (replaces all popups for Groups & Routes)
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [isCreatingRoute, setIsCreatingRoute] = useState(false);
+  const [routeEditForm, setRouteEditForm] = useState({
     name: '',
     description: '',
     salesmanId: '',
     selectedCustomerIds: [],
   });
-
-  const [managingRoute, setManagingRoute] = useState(null);
-  const [manageForm, setManageForm] = useState({
-    name: '',
-    description: '',
-    salesmanId: '',
-    selectedCustomerIds: [],
-  });
-  const [customerSearchInModal, setCustomerSearchInModal] = useState('');
+  const [customerSearchInRoute, setCustomerSearchInRoute] = useState('');
+  const [showAssignCustomerModal, setShowAssignCustomerModal] = useState(false);
+  const [assignCustomerSearch, setAssignCustomerSearch] = useState('');
 
   // Sync subTab prop
   useEffect(() => {
@@ -129,7 +123,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   }, [routes]);
 
-  // Initial load of customers and salesmen
+  // Initial load of customers, salesmen, and user employees
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -137,20 +131,52 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [cRes, sRes] = await Promise.allSettled([
+      const [cRes, sRes, uRes] = await Promise.allSettled([
         customerApi.getAll(),
         salesmanApi.getAll(),
+        userApi.getAll({ page: 0, size: 200 }),
       ]);
 
       let loadedCustomers = [];
       if (cRes.status === 'fulfilled') {
-        loadedCustomers = cRes.value.data || [];
+        loadedCustomers = cRes.value.data || cRes.value || [];
         setCustomers(loadedCustomers);
       }
 
-      if (sRes.status === 'fulfilled') {
-        setSalesmen(sRes.value.data || []);
-      }
+      const rawSalesmen = sRes.status === 'fulfilled' ? (sRes.value.data || sRes.value || []) : [];
+      const rawUsers = uRes.status === 'fulfilled' ? (uRes.value.data?.content || uRes.value.data || uRes.value || []) : [];
+
+      // Combine sales representatives and staff members so all sales reps show up
+      const combinedReps = [];
+      const seen = new Set();
+
+      rawSalesmen.forEach((s) => {
+        const name = s.name || s.fullName;
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          combinedReps.push({
+            id: String(s.id),
+            name: name,
+            salesmanCode: s.salesmanCode || s.code || 'REP',
+            phone: s.phone || '',
+          });
+        }
+      });
+
+      rawUsers.forEach((u) => {
+        const name = u.fullName || u.username;
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          combinedReps.push({
+            id: String(u.id),
+            name: name,
+            salesmanCode: u.username || 'EMP',
+            phone: u.phone || '',
+          });
+        }
+      });
+
+      setSalesmen(combinedReps);
 
       // If default Route 1 has no customers yet and we have customers, assign first 3
       setRoutes((prevRoutes) => {
@@ -184,10 +210,16 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
-  // Helper to find which route a customer belongs to
-  const getCustomerRoute = (customerId) => {
+  // Helper to find all routes a customer belongs to
+  const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
-    return routes.find((r) => r.customerIds && r.customerIds.includes(cid));
+    return routes.filter((r) => r.customerIds && r.customerIds.includes(cid));
+  };
+
+  // Helper for single route fallback
+  const getCustomerRoute = (customerId) => {
+    const assigned = getCustomerRoutes(customerId);
+    return assigned[0] || null;
   };
 
   const isCustomerActive = (c) => Boolean(c?.isActive ?? c?.active ?? false);
@@ -199,11 +231,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       if (statusFilter === 'ACTIVE' && !active) return false;
       if (statusFilter === 'INACTIVE' && active) return false;
 
-      const cRoute = getCustomerRoute(c.id);
+      const cRoutes = getCustomerRoutes(c.id);
       if (routeFilter !== 'ALL') {
         if (routeFilter === 'UNASSIGNED') {
-          if (cRoute) return false;
-        } else if (!cRoute || cRoute.id !== routeFilter) {
+          if (cRoutes.length > 0) return false;
+        } else if (!cRoutes.some((r) => r.id === routeFilter)) {
           return false;
         }
       }
@@ -215,8 +247,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         const contact = (c.contactPerson || '').toLowerCase();
         const phone = (c.phone || '').toLowerCase();
         const email = (c.email || '').toLowerCase();
-        const routeName = (cRoute?.name || '').toLowerCase();
-        if (!code.includes(q) && !name.includes(q) && !contact.includes(q) && !phone.includes(q) && !email.includes(q) && !routeName.includes(q)) {
+        const routeNames = cRoutes.map((r) => r.name.toLowerCase()).join(' ');
+        if (!code.includes(q) && !name.includes(q) && !contact.includes(q) && !phone.includes(q) && !email.includes(q) && !routeNames.includes(q)) {
           return false;
         }
       }
@@ -247,7 +279,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: '',
       address: '',
       creditLimit: '0',
-      routeId: '',
+      routeIds: [],
     });
     setShowCustomerModal(true);
   };
@@ -255,7 +287,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Open Edit Customer Modal
   const handleOpenEditCustomer = (c) => {
     setEditingCustomer(c);
-    const assignedRoute = getCustomerRoute(c.id);
+    const assignedRoutes = getCustomerRoutes(c.id);
     setCustomerForm({
       code: c.code || c.customerCode || '',
       name: c.name || '',
@@ -264,7 +296,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: c.email || '',
       address: c.address || '',
       creditLimit: c.creditLimit ? String(c.creditLimit) : '0',
-      routeId: assignedRoute ? assignedRoute.id : '',
+      routeIds: assignedRoutes.map((r) => r.id),
     });
     setShowCustomerModal(true);
   };
@@ -301,14 +333,16 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         addToast('Customer created successfully', 'success');
       }
 
-      // Update Route assignment if selected
+      // Update Route assignments
       if (savedCustomerId) {
+        const selectedRouteIds = customerForm.routeIds || [];
         setRoutes((prevRoutes) => {
           return prevRoutes.map((r) => {
             const hasC = r.customerIds && r.customerIds.includes(savedCustomerId);
-            if (r.id === customerForm.routeId) {
-              if (!hasC) return { ...r, customerIds: [...(r.customerIds || []), savedCustomerId] };
-            } else if (hasC) {
+            const shouldHave = selectedRouteIds.includes(r.id);
+            if (shouldHave && !hasC) {
+              return { ...r, customerIds: [...(r.customerIds || []), savedCustomerId] };
+            } else if (!shouldHave && hasC) {
               return { ...r, customerIds: (r.customerIds || []).filter((id) => id !== savedCustomerId) };
             }
             return r;
@@ -329,77 +363,36 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // High-Security Deletion System
   // -------------------------------------------------------------
   const handleInitiateDeleteCustomer = (c) => {
-    const codeOrName = c.code || c.customerCode || c.name;
-    const phrase = `DELETE ${codeOrName}`.toUpperCase();
-    const assignedRoute = getCustomerRoute(c.id);
-
     setSecurityModalData({
       type: 'customer',
       item: c,
-      requiredPhrase: phrase,
-      title: `Permanently Delete Customer "${c.name}"`,
       entityName: c.name,
       entityCode: c.code || c.customerCode || '—',
-      warnings: [
-        `Customer record "${c.name}" (${codeOrName}) will be permanently wiped from the database.`,
-        `Assigned credit limit (LKR ${Number(c.creditLimit || 0).toFixed(2)}) and outstanding balance records (LKR ${Number(c.currentBalance || 0).toFixed(2)}) will be erased.`,
-        assignedRoute
-          ? `Customer will be permanently detached from Route "${assignedRoute.name}".`
-          : 'Any pending route assignments or delivery notes will be cleared.',
-        'Historical commercial invoices, orders, and quotations linked to this customer ID will remain orphaned without an active customer profile.',
-        'This action is irreversible. There is no recovery or undo for deleted customer database records.',
-      ],
     });
-    setSecurityConfirmInput('');
-    setHasCopiedPhrase(false);
   };
 
   const handleInitiateDeleteRoute = (route) => {
-    const phrase = `DELETE ROUTE ${route.name}`.toUpperCase();
     setSecurityModalData({
       type: 'route',
       item: route,
-      title: `Permanently Delete Route "${route.name}"`,
-      requiredPhrase: phrase,
       entityName: route.name,
       entityCode: route.id,
-      warnings: [
-        `Route "${route.name}" will be permanently removed from the system.`,
-        `All ${route.customerIds?.length || 0} assigned customer(s) will become unassigned.`,
-        `Salesman assignment (${route.salesmanName || 'None'}) will be disconnected.`,
-        'This action is irreversible and permanently deletes the route record.',
-      ],
     });
-    setSecurityConfirmInput('');
-    setHasCopiedPhrase(false);
   };
 
   const handleDeleteCustomer = (c) => {
     handleInitiateDeleteCustomer(c);
   };
 
-  const handleCopyConfirmationPhrase = () => {
-    if (!securityModalData) return;
-    navigator.clipboard.writeText(securityModalData.requiredPhrase);
-    setHasCopiedPhrase(true);
-    addToast('Confirmation text copied to clipboard!', 'info');
-    setTimeout(() => setHasCopiedPhrase(false), 2500);
-  };
-
   const handleExecuteSecureDelete = async () => {
     if (!securityModalData) return;
-    if (securityConfirmInput.trim().toUpperCase() !== securityModalData.requiredPhrase.trim().toUpperCase()) {
-      addToast('Confirmation text does not match. Deletion aborted.', 'error');
-      return;
-    }
-
     try {
       setIsExecutingDelete(true);
       if (securityModalData.type === 'customer') {
         const c = securityModalData.item;
         setDeletingCustomerId(c.id);
         await customerApi.delete(c.id);
-        addToast(`Customer "${c.name}" permanently deleted from database.`, 'success');
+        addToast(`Customer "${c.name}" deleted successfully.`, 'success');
         const cid = String(c.id);
         setRoutes((prev) => prev.map((r) => ({ ...r, customerIds: (r.customerIds || []).filter((id) => id !== cid) })));
         if (viewingCustomer?.id === c.id) {
@@ -409,7 +402,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       } else if (securityModalData.type === 'route') {
         const r = securityModalData.item;
         setRoutes((prev) => prev.filter((route) => route.id !== r.id));
-        addToast(`Route "${r.name}" permanently deleted from database.`, 'success');
+        addToast(`Route "${r.name}" deleted successfully.`, 'success');
+        if (selectedRoute?.id === r.id) {
+          setSelectedRoute(null);
+          setIsCreatingRoute(false);
+        }
       }
       setSecurityModalData(null);
     } catch (err) {
@@ -421,110 +418,127 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   // -------------------------------------------------------------
-  // Route / Group Management Actions
+  // Route / Group Management Actions (Inline View - No Popups)
   // -------------------------------------------------------------
-  const handleOpenCreateRoute = () => {
-    setNewRouteForm({
-      name: '',
+  const handleOpenRouteView = (route) => {
+    setSelectedRoute(route);
+    setIsCreatingRoute(false);
+    setRouteEditForm({
+      name: route.name,
+      description: route.description || '',
+      salesmanId: route.salesmanId || '',
+      selectedCustomerIds: route.customerIds ? [...route.customerIds] : [],
+    });
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
+  };
+
+  const handleOpenCreateRouteView = () => {
+    setSelectedRoute(null);
+    setIsCreatingRoute(true);
+    setRouteEditForm({
+      name: `Route ${routes.length + 1}`,
       description: '',
       salesmanId: '',
       selectedCustomerIds: [],
     });
-    setCustomerSearchInModal('');
-    setShowCreateRouteModal(true);
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
   };
 
-  const handleCreateRoute = (e) => {
-    e.preventDefault();
-    if (!newRouteForm.name.trim()) {
+  const handleCloseRouteView = () => {
+    setSelectedRoute(null);
+    setIsCreatingRoute(false);
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
+  };
+
+  const handleSaveRouteView = (e) => {
+    if (e) e.preventDefault();
+    if (!routeEditForm.name.trim()) {
       addToast('Route name is required', 'error');
       return;
     }
 
-    const assignedSalesman = salesmen.find((s) => String(s.id) === String(newRouteForm.salesmanId));
+    const assignedSalesman = salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId));
+    const salesmanName = assignedSalesman?.name || '';
 
-    const newRoute = {
-      id: 'route-' + Date.now(),
-      name: newRouteForm.name.trim(),
-      description: newRouteForm.description.trim(),
-      salesmanId: newRouteForm.salesmanId || '',
-      salesmanName: assignedSalesman?.name || '',
-      customerIds: newRouteForm.selectedCustomerIds,
-      createdAt: new Date().toISOString(),
-    };
+    if (isCreatingRoute) {
+      const newRoute = {
+        id: 'route-' + Date.now(),
+        name: routeEditForm.name.trim(),
+        description: routeEditForm.description.trim(),
+        salesmanId: routeEditForm.salesmanId || '',
+        salesmanName,
+        customerIds: routeEditForm.selectedCustomerIds || [],
+        createdAt: new Date().toISOString(),
+      };
 
-    // Remove selected customers from other routes to prevent overlap
-    setRoutes((prev) => {
-      const cleaned = prev.map((r) => ({
-        ...r,
-        customerIds: (r.customerIds || []).filter((id) => !newRoute.customerIds.includes(id)),
-      }));
-      return [...cleaned, newRoute];
-    });
-
-    addToast(`Route "${newRoute.name}" created with ${newRoute.customerIds.length} customers!`, 'success');
-    setShowCreateRouteModal(false);
-  };
-
-  const handleOpenManageRoute = (route) => {
-    setManagingRoute(route);
-    setManageForm({
-      name: route.name,
-      description: route.description || '',
-      salesmanId: route.salesmanId || '',
-      selectedCustomerIds: [...(route.customerIds || [])],
-    });
-    setCustomerSearchInModal('');
-  };
-
-  const handleSaveManagedRoute = (e) => {
-    e.preventDefault();
-    if (!manageForm.name.trim()) {
-      addToast('Route name is required', 'error');
-      return;
+      setRoutes((prev) => [...prev, newRoute]);
+      addToast(`Route "${newRoute.name}" created successfully!`, 'success');
+    } else if (selectedRoute) {
+      setRoutes((prev) =>
+        prev.map((r) => {
+          if (r.id === selectedRoute.id) {
+            return {
+              ...r,
+              name: routeEditForm.name.trim(),
+              description: routeEditForm.description.trim(),
+              salesmanId: routeEditForm.salesmanId || '',
+              salesmanName,
+              customerIds: routeEditForm.selectedCustomerIds || [],
+            };
+          }
+          return r;
+        })
+      );
+      addToast(`Route "${routeEditForm.name}" updated successfully!`, 'success');
     }
 
-    const assignedSalesman = salesmen.find((s) => String(s.id) === String(manageForm.salesmanId));
-
-    setRoutes((prev) => {
-      return prev.map((r) => {
-        if (r.id === managingRoute.id) {
-          return {
-            ...r,
-            name: manageForm.name.trim(),
-            description: manageForm.description.trim(),
-            salesmanId: manageForm.salesmanId || '',
-            salesmanName: assignedSalesman?.name || '',
-            customerIds: manageForm.selectedCustomerIds,
-          };
-        } else {
-          // Remove assigned customer ids from other routes
-          return {
-            ...r,
-            customerIds: (r.customerIds || []).filter((id) => !manageForm.selectedCustomerIds.includes(id)),
-          };
-        }
-      });
-    });
-
-    addToast(`Route "${manageForm.name}" updated successfully!`, 'success');
-    setManagingRoute(null);
+    handleCloseRouteView();
   };
 
-  const handleDeleteRoute = (route) => {
-    handleInitiateDeleteRoute(route);
+  const handleDeleteCurrentRoute = () => {
+    if (!selectedRoute) return;
+    handleInitiateDeleteRoute(selectedRoute);
   };
 
-  // Filter customers inside modal
-  const getModalFilteredCustomers = (selectedIds) => {
-    return customers.filter((c) => {
-      if (!customerSearchInModal.trim()) return true;
-      const q = customerSearchInModal.toLowerCase();
-      const code = (c.code || c.customerCode || '').toLowerCase();
-      const name = (c.name || '').toLowerCase();
-      return code.includes(q) || name.includes(q);
-    });
-  };
+  // Assigned customers memo for Route View
+  const assignedCustomerList = useMemo(() => {
+    if (!selectedRoute && !isCreatingRoute) return [];
+    const selectedSet = new Set((routeEditForm.selectedCustomerIds || []).map((id) => String(id)));
+    let list = customers.filter((c) => selectedSet.has(String(c.id)));
+    if (customerSearchInRoute.trim()) {
+      const q = customerSearchInRoute.trim().toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          (c.code && c.code.toLowerCase().includes(q)) ||
+          (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.toLowerCase().includes(q)) ||
+          (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [customers, routeEditForm.selectedCustomerIds, customerSearchInRoute, selectedRoute, isCreatingRoute]);
+
+  // Available customers for Assign Customer popup
+  const availableCustomersToAssign = useMemo(() => {
+    if (!showAssignCustomerModal) return [];
+    const q = assignCustomerSearch.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
+    );
+  }, [customers, assignCustomerSearch, showAssignCustomerModal]);
 
   // Export CSV matching EmployeesHub style
   const handleExportCSV = () => {
@@ -532,13 +546,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast('No customers to export', 'error');
       return;
     }
-    const headers = ['Code', 'Name', 'Route', 'Contact Person', 'Phone', 'Email', 'Credit Limit', 'Current Balance', 'Status'];
+    const headers = ['Code', 'Name', 'Routes', 'Contact Person', 'Phone', 'Email', 'Credit Limit', 'Current Balance', 'Status'];
     const rows = customers.map((c) => {
-      const assignedRoute = getCustomerRoute(c.id);
+      const assignedRoutes = getCustomerRoutes(c.id);
+      const routeNames = assignedRoutes.map((r) => r.name).join('; ') || 'Unassigned';
       return [
         `"${(c.code || c.customerCode || '').replace(/"/g, '""')}"`,
         `"${(c.name || '').replace(/"/g, '""')}"`,
-        `"${(assignedRoute?.name || 'Unassigned').replace(/"/g, '""')}"`,
+        `"${routeNames.replace(/"/g, '""')}"`,
         `"${(c.contactPerson || '').replace(/"/g, '""')}"`,
         `"${(c.phone || '').replace(/"/g, '""')}"`,
         `"${(c.email || '').replace(/"/g, '""')}"`,
@@ -570,21 +585,28 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     <div
       style={{
         padding: '24px 32px',
-        minHeight: '100%',
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
         backgroundColor: '#f8fafc',
         fontFamily: "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)",
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
-      {/* Page Header */}
+      {/* Page Header (Fixed / Sticky to Desktop Screen) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          marginBottom: '20px',
+          marginBottom: '16px',
+          flexShrink: 0,
         }}
       >
         <div>
@@ -626,14 +648,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         </button>
       </div>
 
-      {/* Subtabs Bar (Underline Style matching EmployeesHub) */}
+      {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '24px',
+          marginBottom: '16px',
+          flexShrink: 0,
         }}
       >
         <button
@@ -683,8 +706,21 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* TAB 1: Customer List View                                    */}
       {/* ------------------------------------------------------------- */}
       {activeTab === 'list' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-          {/* Top Filter & Actions Bar */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Top Filter & Actions Bar (Fixed / Sticky to Desktop Screen) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -699,6 +735,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               maxWidth: '100%',
               boxSizing: 'border-box',
               flexWrap: 'wrap',
+              flexShrink: 0,
             }}
           >
             {/* Left Control: Search Input extending directly up to All Routes dropdown */}
@@ -955,67 +992,71 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </div>
           </div>
 
-          {/* Customers Table (Standardized Enterprise Table) */}
+          {/* Customers Table (Fixed Table Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
           <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                width: '100%',
-                maxWidth: '100%',
-                boxSizing: 'border-box',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-              }}
-            >
-              <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
-                <table style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                      <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        CUSTOMER
-                      </th>
-                      <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        ROUTE / GROUP
-                      </th>
-                      <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        CONTACT PERSON
-                      </th>
-                      <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        PHONE NUMBER
-                      </th>
-                      <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
-                        CREDIT LIMIT
-                      </th>
-                      <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
-                        BALANCE
-                      </th>
-                      <th style={{ padding: '12px 12px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        STATUS
-                      </th>
-                      <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>
-                        ACTIONS
-                      </th>
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      CUSTOMER
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ROUTE / GROUP
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      CONTACT PERSON
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      PHONE NUMBER
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      CREDIT LIMIT
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      BALANCE
+                    </th>
+                    <th style={{ padding: '12px 12px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
+                    </th>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ACTIONS
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontSize: '0.875rem' }}>
+                        Loading customer records...
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontSize: '0.875rem' }}>
-                          Loading customer records...
-                        </td>
-                      </tr>
-                    ) : filteredCustomers.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: '0.875rem' }}>
-                          No customers found matching criteria.
-                        </td>
-                      </tr>
-                    ) : (
+                  ) : filteredCustomers.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: '0.875rem' }}>
+                        No customers found matching criteria.
+                      </td>
+                    </tr>
+                  ) : (
                       filteredCustomers.map((c) => {
                         const active = isCustomerActive(c);
                         const code = c.code || c.customerCode;
-                        const assignedRoute = getCustomerRoute(c.id);
+                        const assignedRoutes = getCustomerRoutes(c.id);
 
                         return (
                           <tr
@@ -1061,814 +1102,1097 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </td>
 
                             <td style={{ padding: '12px 14px', color: '#334155', fontWeight: 500, fontSize: '0.84rem' }}>
-                              {assignedRoute ? (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    backgroundColor: '#eff6ff',
-                                    color: '#1d4ed8',
-                                    border: '1px solid #dbeafe',
-                                    borderRadius: '5px',
-                                    padding: '2px 8px',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 500,
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  <MapPin size={11} /> {assignedRoute.name}
-                                </span>
+                              {assignedRoutes.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {assignedRoutes.map((r) => (
+                                    <span
+                                      key={r.id}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #dbeafe',
+                                        borderRadius: '5px',
+                                        padding: '2px 8px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      <MapPin size={11} color="#2563eb" /> {r.name}
+                                    </span>
+                                  ))}
+                                </div>
                               ) : (
                                 <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Unassigned</span>
                               )}
                             </td>
 
-                            <td style={{ padding: '12px 14px', color: '#1e293b', fontWeight: 500, fontSize: '0.84rem' }}>
-                              {c.contactPerson || '—'}
-                            </td>
+                          <td style={{ padding: '12px 14px', color: '#1e293b', fontWeight: 500, fontSize: '0.84rem' }}>
+                            {c.contactPerson || '—'}
+                          </td>
 
-                            <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
-                              <div>{c.phone || '—'}</div>
-                              {c.email && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{c.email}</div>}
-                            </td>
+                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                            <div>{c.phone || '—'}</div>
+                            {c.email && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{c.email}</div>}
+                          </td>
 
-                            <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem', fontWeight: 500, textAlign: 'right' }}>
-                              LKR {Number(c.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
+                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem', fontWeight: 500, textAlign: 'right' }}>
+                            LKR {Number(c.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
 
-                            <td style={{ padding: '12px 14px', fontSize: '0.84rem', fontWeight: 600, textAlign: 'right', color: Number(c.currentBalance || 0) > 0 ? '#dc2626' : '#16a34a' }}>
-                              LKR {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
+                          <td style={{ padding: '12px 14px', fontSize: '0.84rem', fontWeight: 600, textAlign: 'right', color: Number(c.currentBalance || 0) > 0 ? '#dc2626' : '#16a34a' }}>
+                            LKR {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
 
-                            <td style={{ padding: '12px 12px' }}>
+                          <td style={{ padding: '12px 12px' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleCustomerActive(c.id, active);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                color: active ? '#16a34a' : '#dc2626',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                            >
+                              <span
+                                style={{
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  backgroundColor: active ? '#16a34a' : '#dc2626',
+                                  display: 'inline-block',
+                                }}
+                              />
+                              {active ? 'Active' : 'Inactive'}
+                            </button>
+                          </td>
+
+                          <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleToggleCustomerActive(c.id, active);
+                                  handleOpenEditCustomer(c);
                                 }}
                                 style={{
-                                  background: 'none',
-                                  border: 'none',
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '6px',
                                   cursor: 'pointer',
-                                  padding: 0,
-                                  display: 'inline-flex',
+                                  color: '#475569',
+                                  display: 'flex',
                                   alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 500,
-                                  color: active ? '#16a34a' : '#dc2626',
-                                  whiteSpace: 'nowrap',
+                                  justifyContent: 'center',
                                 }}
-                                title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                                title="Edit Customer"
                               >
-                                <span
-                                  style={{
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    backgroundColor: active ? '#16a34a' : '#dc2626',
-                                    display: 'inline-block',
-                                  }}
-                                />
-                                {active ? 'Active' : 'Inactive'}
+                                <Edit2 size={13} />
                               </button>
-                            </td>
-
-                            <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditCustomer(c);
-                                  }}
-                                  style={{
-                                    width: '30px',
-                                    height: '30px',
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#475569',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                  title="Edit Customer"
-                                >
-                                  <Edit2 size={13} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleInitiateDeleteCustomer(c);
-                                  }}
-                                  disabled={deletingCustomerId === c.id}
-                                  style={{
-                                    width: '30px',
-                                    height: '30px',
-                                    background: '#ffffff',
-                                    border: '1px solid #fecaca',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#dc2626',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                  title="Delete Customer from Database"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleInitiateDeleteCustomer(c);
+                                }}
+                                disabled={deletingCustomerId === c.id}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#dc2626',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                title="Delete Customer from Database"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
+          </div>
         </div>
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB 2: Customer Groups & Routes View (matching screenshot) */}
+      {/* TAB 2: Customer Groups & Routes View */}
       {/* ------------------------------------------------------------- */}
       {activeTab === 'groups' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Card Container matching the screenshot */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header row with Title, subtitle and Create Group button (Fixed / Sticky to Desktop Screen) */}
           <div
             style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              padding: '24px 28px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '4px',
+              flexWrap: 'wrap',
+              gap: '12px',
+              flexShrink: 0,
             }}
           >
-            {/* Header row with Title, subtitle and Create Group button */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '24px',
-                flexWrap: 'wrap',
-                gap: '16px',
-              }}
-            >
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
-                  Customer Groups & Routes
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '0.88rem', margin: 0 }}>
-                  Organize customers for targeted pricing, delivery routes, sales territories, and follow-up.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleOpenCreateRoute}
-                style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '9px 18px',
-                  fontWeight: 700,
-                  fontSize: '0.86rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(2,132,199,0.2)',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-              >
-                <Plus size={16} /> Create Group / Route
-              </button>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
+                Customer Groups & Routes
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
+                Organize customers into targeted delivery routes, pricing groups, or sales territories.
+              </p>
             </div>
 
-            {/* Routes Cards Grid matching user screenshot */}
+            <button
+              type="button"
+              onClick={handleOpenCreateRouteView}
+              style={{
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '9px 18px',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+            >
+              <Plus size={16} /> Create Group / Route
+            </button>
+          </div>
+
+          {/* Routes Cards Grid Scroll Container (Only cards scroll) */}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              paddingRight: '4px',
+            }}
+          >
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '20px',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '14px',
+                paddingBottom: '16px',
               }}
             >
-              {routes.map((route) => {
-                const count = route.customerIds?.length || 0;
-                const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.salesmanId));
-                const repName = route.salesmanName || assignedSalesman?.name;
+            {routes.map((route) => {
+              const count = route.customerIds?.length || 0;
+              const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.salesmanId));
+              const repName = route.salesmanName || assignedSalesman?.name;
 
-                return (
-                  <div
-                    key={route.id}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '10px',
-                      border: '1px solid #e2e8f0',
-                      padding: '18px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                      minHeight: '170px',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#93c5fd';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
-                    }}
-                  >
-                    <div>
-                      {/* Card Top: Route Name & User Count Badge */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                          {route.name}
-                        </h3>
-
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            backgroundColor: '#eff6ff',
-                            color: '#2563eb',
-                            border: '1px solid #dbeafe',
-                            borderRadius: '9999px',
-                            padding: '2px 8px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <Users size={12} />
-                          {count}
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      <p style={{ color: '#94a3b8', fontSize: '0.84rem', margin: '0 0 12px 0' }}>
-                        {route.description || 'No description added'}
-                      </p>
-
-                      {/* Sales Representative */}
-                      <p
-                        style={{
-                          color: repName ? '#0369a1' : '#0284c7',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          margin: '0 0 18px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
-                        {repName ? `Sales Rep: ${repName}` : 'No sales representative assigned'}
-                      </p>
-                    </div>
-
-                    {/* Card Footer: count & Manage button & delete icon matching screenshot */}
+              return (
+                <div
+                  key={route.id}
+                  onClick={() => handleOpenRouteView(route)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    padding: '16px 18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                    minHeight: '140px',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#0284c7';
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(2, 132, 199, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                  }}
+                >
+                  <div>
+                    {/* Card Top: Route Name & User Count Badge */}
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        paddingTop: '12px',
-                        borderTop: '1px solid #f1f5f9',
+                        marginBottom: '6px',
                       }}
                     >
-                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                        {route.name}
+                      </h3>
+
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          backgroundColor: '#f0f9ff',
+                          color: '#0284c7',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '9999px',
+                          padding: '2px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Users size={12} />
                         {count} customer{count === 1 ? '' : 's'}
-                      </span>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenManageRoute(route)}
-                          style={{
-                            backgroundColor: '#f1f5f9',
-                            color: '#334155',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '6px',
-                            padding: '5px 12px',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#e2e8f0';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f1f5f9';
-                          }}
-                        >
-                          <Edit2 size={13} />
-                          Manage
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRoute(route)}
-                          style={{
-                            backgroundColor: 'transparent',
-                            color: '#94a3b8',
-                            border: 'none',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#dc2626';
-                            e.currentTarget.style.backgroundColor = '#fee2e2';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#94a3b8';
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                          title="Delete Route"
-                        >
-                          <Trash2 size={15} />
-                        </button>
                       </div>
                     </div>
+
+                    {/* Description */}
+                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0' }}>
+                      {route.description || 'No description added'}
+                    </p>
+
+                    {/* Sales Representative */}
+                    <p
+                      style={{
+                        color: repName ? '#0369a1' : '#64748b',
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                        margin: '0 0 12px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
+                      {repName ? `Sales Rep: ${repName}` : 'No sales representative assigned'}
+                    </p>
                   </div>
-                );
-              })}
+
+                  {/* Card Footer: count & Manage link (Delete icon removed as requested) */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '10px',
+                      borderTop: '1px solid #f1f5f9',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      Manage Group / Route →
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             </div>
           </div>
         </div>
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Create Group / Route */}
+      {/* MODAL: Customer Group & Route View Popup (Split 2 Columns)   */}
       {/* ------------------------------------------------------------- */}
-      {showCreateRouteModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateRouteModal(false)}>
+      {(selectedRoute || isCreatingRoute) && (
+        <div className="modal-backdrop" onClick={handleCloseRouteView}>
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '800px',
-              padding: '28px 32px',
-              borderRadius: '16px',
+              maxWidth: '1040px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
+              height: 'min(640px, 86vh)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <MapPin size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Create Customer Group / Route</h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Define delivery routes and territorial customer clusters</p>
-                </div>
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '14px 22px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                  {isCreatingRoute ? 'Create Group / Route' : `Manage Route: ${routeEditForm.name}`}
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: '#f0f9ff',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  {routeEditForm.selectedCustomerIds.length} Assigned
+                </span>
               </div>
               <button
                 type="button"
-                onClick={() => setShowCreateRouteModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                onClick={handleCloseRouteView}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateRoute} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Route / Group Name *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Route 1, City North, Wholesale Supermarkets"
-                    value={newRouteForm.name}
-                    onChange={(e) => setNewRouteForm({ ...newRouteForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                    required
-                  />
+            {/* Modal Body: Split into Two Columns */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(280px, 340px) 1fr',
+                gap: '20px',
+                padding: '18px 22px',
+                overflow: 'hidden',
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {/* LEFT COLUMN: Text Fields & Settings (Sticky/Fixed - No Scroll) */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
+                    Route Details
+                  </div>
+
+                  {/* Route Name Input */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Route / Group Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Route 1 - Colombo Central"
+                      value={routeEditForm.name}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Sales Rep Dropdown */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Assigned Sales Representative
+                    </label>
+                    <select
+                      value={routeEditForm.salesmanId}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, salesmanId: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 28px 0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 10px center',
+                      }}
+                    >
+                      <option value="">None (Unassigned)</option>
+                      {salesmen.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.salesmanCode || 'Sales Rep'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Description Input */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Description / Territory Notes
+                    </label>
+                    <textarea
+                      rows="3"
+                      placeholder="e.g. Daily retail delivery route covering Central Business District"
+                      value={routeEditForm.description}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.86rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Assigned Sales Representative (Optional)
-                  </label>
-                  <select
-                    value={newRouteForm.salesmanId}
-                    onChange={(e) => setNewRouteForm({ ...newRouteForm, salesmanId: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
-                  >
-                    <option value="">No sales representative assigned</option>
-                    {salesmen.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.salesmanCode || 'Sales Rep'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Left Column Delete Button if editing */}
+                {!isCreatingRoute && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleDeleteCurrentRoute}
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        border: '1px solid #fecaca',
+                        backgroundColor: '#ffffff',
+                        color: '#dc2626',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                        e.currentTarget.style.borderColor = '#dc2626';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#fecaca';
+                      }}
+                    >
+                      <Trash2 size={14} /> Delete this Route
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Description (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Weekly delivery route covered on Tuesdays"
-                  value={newRouteForm.description}
-                  onChange={(e) => setNewRouteForm({ ...newRouteForm, description: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                />
-              </div>
+              {/* RIGHT COLUMN: Assigned Customers Table & Workspace */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  minHeight: 0,
+                  height: '100%',
+                }}
+              >
+                {/* Top Row: Small Route Summary on Table Side & Assign Customer Button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                  {/* Small Route Summary */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                      Route Summary:
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        border: '1px solid #bae6fd',
+                      }}
+                    >
+                      {routeEditForm.selectedCustomerIds.length} Assigned Customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
 
-              {/* Assign Customers Section */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                    Assign Customers to this Route ({newRouteForm.selectedCustomerIds.length} selected)
-                  </label>
+                  {/* Assign Customer Button (Opens Small Popup) */}
                   <button
                     type="button"
                     onClick={() => {
-                      if (newRouteForm.selectedCustomerIds.length === customers.length) {
-                        setNewRouteForm({ ...newRouteForm, selectedCustomerIds: [] });
-                      } else {
-                        setNewRouteForm({ ...newRouteForm, selectedCustomerIds: customers.map((c) => String(c.id)) });
-                      }
+                      setShowAssignCustomerModal(true);
+                      setAssignCustomerSearch('');
                     }}
-                    style={{ background: 'transparent', border: 'none', color: '#0284c7', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '0 14px',
+                      height: '34px',
+                      borderRadius: '6px',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                      transition: 'background-color 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                   >
-                    {newRouteForm.selectedCustomerIds.length === customers.length ? 'Deselect All' : 'Select All'}
+                    <Plus size={14} /> Assign Customer
                   </button>
                 </div>
 
-                <div style={{ position: 'relative', marginBottom: '10px' }}>
-                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '10px', pointerEvents: 'none' }} />
+                {/* Table Side Search with Small Icon */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search
+                    size={14}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '10px',
+                      color: '#94a3b8',
+                      pointerEvents: 'none',
+                    }}
+                  />
                   <input
                     type="text"
-                    placeholder="Search customers to add..."
-                    value={customerSearchInModal}
-                    onChange={(e) => setCustomerSearchInModal(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px 8px 36px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    placeholder="Search assigned customers..."
+                    value={customerSearchInRoute}
+                    onChange={(e) => setCustomerSearchInRoute(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      padding: '0 28px 0 30px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      backgroundColor: '#ffffff',
+                      boxSizing: 'border-box',
+                    }}
                   />
+                  {customerSearchInRoute && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerSearchInRoute('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#94a3b8',
+                        padding: 0,
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
 
+                {/* Assigned Customers Table Container (Only Data Rows Scroll, Header is Sticky) */}
                 <div
                   style={{
-                    maxHeight: '240px',
-                    overflowY: 'auto',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
-                    padding: '10px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '8px',
-                    backgroundColor: '#fafafa',
+                    overflow: 'hidden',
+                    backgroundColor: '#ffffff',
+                    flex: 1,
+                    minHeight: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
                 >
-                  {getModalFilteredCustomers(newRouteForm.selectedCustomerIds).map((c) => {
-                    const cid = String(c.id);
-                    const isChecked = newRouteForm.selectedCustomerIds.includes(cid);
-                    const otherRoute = getCustomerRoute(c.id);
-
-                    return (
-                      <label
-                        key={c.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: isChecked ? '#eff6ff' : '#ffffff',
-                          border: isChecked ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
-                          cursor: 'pointer',
-                          fontSize: '0.84rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewRouteForm({
-                                  ...newRouteForm,
-                                  selectedCustomerIds: [...newRouteForm.selectedCustomerIds, cid],
-                                });
-                              } else {
-                                setNewRouteForm({
-                                  ...newRouteForm,
-                                  selectedCustomerIds: newRouteForm.selectedCustomerIds.filter((id) => id !== cid),
-                                });
-                              }
-                            }}
-                          />
-                          <span style={{ fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {c.name}
-                          </span>
-                          <span style={{ color: '#64748b', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                            ({c.code || c.customerCode || 'NO CODE'})
-                          </span>
-                        </div>
-
-                        {otherRoute && (
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: '6px', whiteSpace: 'nowrap' }}>
-                            in {otherRoute.name}
-                          </span>
+                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignedCustomerList.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                <Users size={28} color="#cbd5e1" />
+                                <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                  {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                  {customerSearchInRoute
+                                    ? 'Try adjusting your search query above.'
+                                    : 'Click the "Assign Customer" button above to search and assign customers.'}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          assignedCustomerList.map((c) => (
+                            <tr
+                              key={c.id}
+                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <td style={{ padding: '8px 12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div
+                                    style={{
+                                      width: '26px',
+                                      height: '26px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#e0f2fe',
+                                      color: '#0284c7',
+                                      border: '1px solid #bae6fd',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 600,
+                                      fontSize: '0.74rem',
+                                    }}
+                                  >
+                                    {(c.name || 'C').slice(0, 1).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
+                                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                      {c.code || c.customerCode}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                <div>{c.contactPerson || '—'}</div>
+                                {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    padding: '2px 7px',
+                                    borderRadius: '9999px',
+                                    backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
+                                    color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
+                                  }}
+                                >
+                                  {isCustomerActive(c) ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRouteEditForm({
+                                      ...routeEditForm,
+                                      selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                                    });
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: '#dc2626',
+                                    cursor: 'pointer',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 600,
+                                    padding: '3px 6px',
+                                    borderRadius: '4px',
+                                  }}
+                                  title="Remove customer from route"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))
                         )}
-                      </label>
-                    );
-                  })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateRouteModal(false)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '8px 16px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    color: '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '8px 18px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(2,132,199,0.2)',
-                  }}
-                >
-                  Create Route
-                </button>
-              </div>
-            </form>
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '12px 22px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleCloseRouteView}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRouteView}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                <Check size={16} /> {isCreatingRoute ? 'Save New Route' : 'Update Route'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Manage Route / Group */}
+      {/* SMALL POPUP: Search & Assign Customers to Route               */}
       {/* ------------------------------------------------------------- */}
-      {managingRoute && (
-        <div className="modal-backdrop" onClick={() => setManagingRoute(null)}>
+      {showAssignCustomerModal && (
+        <div
+          className="modal-backdrop"
+          style={{ zIndex: 1100, backgroundColor: 'rgba(15, 23, 42, 0.55)' }}
+          onClick={() => setShowAssignCustomerModal(false)}
+        >
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '840px',
-              padding: '28px 32px',
-              borderRadius: '16px',
+              maxWidth: '520px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Edit2 size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Manage {managingRoute.name}</h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>Update delivery route details and assigned customers</p>
-                </div>
+            {/* Header */}
+            <div
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                  Assign Customers
+                </h4>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Search and add customers to {routeEditForm.name || 'this route'}.
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => setManagingRoute(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                onClick={() => setShowAssignCustomerModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px',
+                }}
+                title="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveManagedRoute} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Route / Group Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={manageForm.name}
-                    onChange={(e) => setManageForm({ ...manageForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Assigned Sales Representative
-                  </label>
-                  <select
-                    value={manageForm.salesmanId}
-                    onChange={(e) => setManageForm({ ...manageForm, salesmanId: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
-                  >
-                    <option value="">No sales representative assigned</option>
-                    {salesmen.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.salesmanCode || 'Sales Rep'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Description
-                </label>
+            {/* Search Input */}
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '10px',
+                    color: '#94a3b8',
+                    pointerEvents: 'none',
+                  }}
+                />
                 <input
                   type="text"
-                  value={manageForm.description}
-                  onChange={(e) => setManageForm({ ...manageForm, description: e.target.value })}
-                  placeholder="e.g. Weekly delivery route covered on Tuesdays"
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              {/* Customer Checkboxes */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                    Assigned Customers ({manageForm.selectedCustomerIds.length} in this route)
-                  </label>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    Check or uncheck to update customer route membership
-                  </span>
-                </div>
-
-                <div style={{ position: 'relative', marginBottom: '10px' }}>
-                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '10px', pointerEvents: 'none' }} />
-                  <input
-                    type="text"
-                    placeholder="Search customers..."
-                    value={customerSearchInModal}
-                    onChange={(e) => setCustomerSearchInModal(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px 8px 36px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div
+                  placeholder="Search by name, code, phone..."
+                  value={assignCustomerSearch}
+                  onChange={(e) => setAssignCustomerSearch(e.target.value)}
+                  autoFocus
                   style={{
-                    maxHeight: '260px',
-                    overflowY: 'auto',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '10px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '8px',
-                    backgroundColor: '#fafafa',
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 28px 0 32px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.84rem',
+                    backgroundColor: '#ffffff',
+                    boxSizing: 'border-box',
                   }}
-                >
-                  {getModalFilteredCustomers(manageForm.selectedCustomerIds).map((c) => {
-                    const cid = String(c.id);
-                    const isChecked = manageForm.selectedCustomerIds.includes(cid);
-                    const otherRoute = getCustomerRoute(c.id);
-                    const isOther = otherRoute && otherRoute.id !== managingRoute.id;
+                />
+                {assignCustomerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignCustomerSearch('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '8px',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      padding: 0,
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-                    return (
-                      <label
-                        key={c.id}
+            {/* Customers List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 12px', maxHeight: '360px' }}>
+              {availableCustomersToAssign.length === 0 ? (
+                <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                  No matching customers found.
+                </div>
+              ) : (
+                availableCustomersToAssign.map((c) => {
+                  const isAssigned = routeEditForm.selectedCustomerIds.includes(String(c.id));
+                  const otherRoutes = routes.filter(
+                    (r) => r.id !== (selectedRoute?.id) && r.customerIds && r.customerIds.includes(String(c.id))
+                  );
+
+                  return (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <div
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            backgroundColor: '#e0f2fe',
+                            color: '#0284c7',
+                            border: '1px solid #bae6fd',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 600,
+                            fontSize: '0.74rem',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {(c.name || 'C').slice(0, 1).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {c.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{c.code || c.customerCode}</span>
+                            {c.phone && <span>• {c.phone}</span>}
+                            {otherRoutes.length > 0 && (
+                              <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
+                                Also in: {otherRoutes.map((r) => r.name).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isAssigned) {
+                            setRouteEditForm({
+                              ...routeEditForm,
+                              selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                            });
+                          } else {
+                            setRouteEditForm({
+                              ...routeEditForm,
+                              selectedCustomerIds: [...routeEditForm.selectedCustomerIds, String(c.id)],
+                            });
+                          }
+                        }}
                         style={{
-                          display: 'flex',
+                          marginLeft: '10px',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: isChecked ? '#eff6ff' : '#ffffff',
-                          border: isChecked ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                          gap: '4px',
+                          padding: '4px 10px',
+                          borderRadius: '5px',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
                           cursor: 'pointer',
-                          fontSize: '0.84rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                          border: isAssigned ? '1px solid #bbf7d0' : 'none',
+                          backgroundColor: isAssigned ? '#f0fdf4' : '#0284c7',
+                          color: isAssigned ? '#15803d' : '#ffffff',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setManageForm({
-                                  ...manageForm,
-                                  selectedCustomerIds: [...manageForm.selectedCustomerIds, cid],
-                                });
-                              } else {
-                                setManageForm({
-                                  ...manageForm,
-                                  selectedCustomerIds: manageForm.selectedCustomerIds.filter((id) => id !== cid),
-                                });
-                              }
-                            }}
-                          />
-                          <span style={{ fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {c.name}
-                          </span>
-                          <span style={{ color: '#64748b', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                            ({c.code || c.customerCode || 'NO CODE'})
-                          </span>
-                        </div>
-
-                        {isOther && (
-                          <span style={{ fontSize: '0.72rem', color: '#d97706', marginLeft: '6px', whiteSpace: 'nowrap', fontWeight: 500 }}>
-                            in {otherRoute.name}
-                          </span>
+                        {isAssigned ? (
+                          <>
+                            <Check size={12} /> Assigned
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={12} /> Add
+                          </>
                         )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
-                <button
-                  type="button"
-                  onClick={() => setManagingRoute(null)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '8px 16px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    color: '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '8px 18px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(2,132,199,0.2)',
-                  }}
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
+            {/* Footer */}
+            <div
+              style={{
+                padding: '10px 18px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                <strong style={{ color: '#0f172a' }}>{routeEditForm.selectedCustomerIds.length}</strong> customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'} in route
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAssignCustomerModal(false)}
+                style={{
+                  padding: '6px 18px',
+                  borderRadius: '6px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1882,11 +2206,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '840px',
-              padding: '28px 32px',
-              borderRadius: '16px',
+              maxWidth: '740px',
+              padding: '24px 28px',
+              borderRadius: '12px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               maxHeight: '90vh',
               overflowY: 'auto',
             }}
@@ -1897,20 +2222,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                paddingBottom: '18px',
+                alignItems: 'center',
+                paddingBottom: '16px',
                 borderBottom: '1px solid #e2e8f0',
-                marginBottom: '20px',
-                gap: '16px',
+                marginBottom: '18px',
+                gap: '12px',
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div
                   style={{
-                    width: '46px',
-                    height: '46px',
-                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
                     backgroundColor: '#e0f2fe',
                     color: '#0284c7',
                     border: '1px solid #bae6fd',
@@ -1918,26 +2243,26 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: '1.2rem',
+                    fontSize: '1.1rem',
                     flexShrink: 0,
                   }}
                 >
                   {(viewingCustomer.name || 'C').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
                       {viewingCustomer.name}
                     </h2>
                     <span
                       style={{
                         fontFamily: 'monospace',
                         fontWeight: 600,
-                        fontSize: '0.82rem',
-                        backgroundColor: '#f1f5f9',
-                        color: '#0284c7',
-                        padding: '3px 8px',
-                        borderRadius: '5px',
+                        fontSize: '0.8rem',
+                        backgroundColor: '#f8fafc',
+                        color: '#475569',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
                         border: '1px solid #e2e8f0',
                       }}
                     >
@@ -1945,27 +2270,29 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </span>
                     <span
                       style={{
-                        fontSize: '0.78rem',
+                        fontSize: '0.74rem',
                         fontWeight: 600,
-                        padding: '3px 9px',
+                        padding: '2px 8px',
                         borderRadius: '9999px',
                         backgroundColor: isCustomerActive(viewingCustomer) ? '#dcfce7' : '#fee2e2',
                         color: isCustomerActive(viewingCustomer) ? '#15803d' : '#b91c1c',
-                        border: `1px solid ${isCustomerActive(viewingCustomer) ? '#bbf7d0' : '#fecaca'}`,
                       }}
                     >
-                      {isCustomerActive(viewingCustomer) ? '● Active' : '● Inactive'}
+                      {isCustomerActive(viewingCustomer) ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={13} color="#0284c7" />
-                    Route: <strong style={{ color: '#334155' }}>{getCustomerRoute(viewingCustomer.id)?.name || 'Unassigned'}</strong>
-                    {getCustomerRoute(viewingCustomer.id)?.salesmanName && (
-                      <>
-                        <span style={{ color: '#cbd5e1' }}>•</span>
-                        <span>Sales Rep: {getCustomerRoute(viewingCustomer.id).salesmanName}</span>
-                      </>
-                    )}
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '3px' }}>
+                    {(() => {
+                      const cRoutes = getCustomerRoutes(viewingCustomer.id);
+                      if (cRoutes.length === 0) {
+                        return <span>Route: <strong style={{ color: '#334155' }}>Unassigned</strong></span>;
+                      }
+                      return (
+                        <span>
+                          Routes: <strong style={{ color: '#334155' }}>{cRoutes.map((r) => r.name).join(', ')}</strong>
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1983,13 +2310,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
                     borderRadius: '6px',
-                    padding: '8px 12px',
+                    padding: '6px 12px',
                     fontSize: '0.82rem',
                     fontWeight: 600,
                     color: '#334155',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     cursor: 'pointer',
                   }}
                 >
@@ -2006,13 +2333,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     backgroundColor: '#ffffff',
                     border: '1px solid #fecaca',
                     borderRadius: '6px',
-                    padding: '8px 12px',
+                    padding: '6px 12px',
                     fontSize: '0.82rem',
                     fontWeight: 600,
                     color: '#dc2626',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     cursor: 'pointer',
                   }}
                 >
@@ -2026,90 +2353,122 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     border: 'none',
                     cursor: 'pointer',
                     color: '#64748b',
-                    padding: '6px',
+                    padding: '4px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
-                  title="Close Profile Popup"
+                  title="Close"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
             {/* Profile Details Cards in Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '16px', marginBottom: '22px' }}>
-              <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#334155', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Phone size={15} color="#0284c7" /> Contact Details
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                  Contact Information
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Contact Person</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Contact Person</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.contactPerson || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Phone Number</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Phone Number</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.phone || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Email Address</span>
-                    <span style={{ fontWeight: 500, color: '#0f172a' }}>{viewingCustomer.email || '—'}</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Email Address</span>
+                    <span style={{ color: '#334155' }}>{viewingCustomer.email || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Physical Address</span>
-                    <span style={{ fontWeight: 500, color: '#334155' }}>{viewingCustomer.address || '—'}</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Physical Address</span>
+                    <span style={{ color: '#334155' }}>{viewingCustomer.address || '—'}</span>
                   </div>
                 </div>
               </div>
 
-              <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#334155', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <DollarSign size={15} color="#16a34a" /> Financial & Credit Terms
+              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                  Financial & Credit Terms
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Approved Credit Limit</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.98rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Credit Limit</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem', fontFamily: 'monospace' }}>
                       LKR {Number(viewingCustomer.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Current Balance</span>
-                    <span style={{ fontWeight: 700, color: Number(viewingCustomer.currentBalance || 0) > 0 ? '#dc2626' : '#16a34a', fontSize: '0.98rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Current Balance</span>
+                    <span style={{ fontWeight: 700, color: Number(viewingCustomer.currentBalance || 0) > 0 ? '#dc2626' : '#0f172a', fontSize: '0.92rem', fontFamily: 'monospace' }}>
                       LKR {Number(viewingCustomer.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Credit Status</span>
-                    <span style={{ fontWeight: 600, color: Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? '#dc2626' : '#16a34a' }}>
-                      {Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? '⚠ Credit Limit Exceeded' : '✓ Within Approved Limit'}
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Credit Status</span>
+                    <span style={{ fontWeight: 600, color: Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? '#dc2626' : '#15803d' }}>
+                      {Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? 'Exceeded Limit' : 'Within Limit'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#334155', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <MapPin size={15} color="#d97706" /> Route & Logistics
+              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                  Route & Logistics
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Assigned Route</span>
-                    <span style={{ fontWeight: 600, color: '#0369a1' }}>
-                      {getCustomerRoute(viewingCustomer.id)?.name || 'Unassigned'}
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block', marginBottom: '4px' }}>
+                      Assigned Route(s)
                     </span>
+                    {(() => {
+                      const cRoutes = getCustomerRoutes(viewingCustomer.id);
+                      if (cRoutes.length === 0) {
+                        return <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Unassigned</span>;
+                      }
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {cRoutes.map((r) => (
+                            <span
+                              key={r.id}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #dbeafe',
+                                borderRadius: '4px',
+                                padding: '2px 8px',
+                                fontSize: '0.74rem',
+                                fontWeight: 500,
+                              }}
+                            >
+                              <MapPin size={11} color="#2563eb" /> {r.name}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Sales Representative</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Sales Representative(s)</span>
                     <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                      {getCustomerRoute(viewingCustomer.id)?.salesmanName || 'None assigned'}
+                      {(() => {
+                        const cRoutes = getCustomerRoutes(viewingCustomer.id);
+                        const reps = [...new Set(cRoutes.map((r) => r.salesmanName).filter(Boolean))];
+                        return reps.length > 0 ? reps.join(', ') : 'None assigned';
+                      })()}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Customer ID Reference</span>
-                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.75rem' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Customer ID</span>
+                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.74rem' }}>
                       {viewingCustomer.id}
                     </span>
                   </div>
@@ -2117,18 +2476,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
               <button
                 type="button"
                 onClick={() => setViewingCustomer(null)}
                 style={{
-                  backgroundColor: '#f1f5f9',
+                  backgroundColor: '#ffffff',
                   color: '#475569',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
-                  padding: '8px 18px',
+                  padding: '7px 16px',
                   fontWeight: 600,
-                  fontSize: '0.86rem',
+                  fontSize: '0.84rem',
                   cursor: 'pointer',
                 }}
               >
@@ -2150,9 +2509,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               width: '100%',
               maxWidth: '800px',
               padding: '28px 32px',
-              borderRadius: '16px',
+              borderRadius: '12px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               maxHeight: '90vh',
               overflowY: 'auto',
             }}
@@ -2160,7 +2520,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Users size={20} />
                 </div>
                 <div>
@@ -2214,20 +2574,47 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Delivery Route / Customer Group
+                    Delivery Routes / Customer Groups (Can select multiple)
                   </label>
-                  <select
-                    value={customerForm.routeId}
-                    onChange={(e) => setCustomerForm({ ...customerForm, routeId: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
-                  >
-                    <option value="">Unassigned (No specific route)</option>
-                    {routes.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', minHeight: '38px', alignItems: 'center', boxSizing: 'border-box' }}>
+                    {routes.length === 0 ? (
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No routes created yet</span>
+                    ) : (
+                      routes.map((r) => {
+                        const isSelected = (customerForm.routeIds || []).includes(r.id);
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => {
+                              const current = customerForm.routeIds || [];
+                              const updated = isSelected ? current.filter((id) => id !== r.id) : [...current, r.id];
+                              setCustomerForm({ ...customerForm, routeIds: updated });
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                              backgroundColor: isSelected ? '#0284c7' : '#ffffff',
+                              color: isSelected ? '#ffffff' : '#334155',
+                              boxShadow: isSelected ? '0 1px 3px rgba(2, 132, 199, 0.25)' : 'none',
+                              fontSize: '0.78rem',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <MapPin size={11} color={isSelected ? '#ffffff' : '#64748b'} />
+                            {r.name}
+                            {isSelected && <Check size={11} color="#ffffff" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
@@ -2322,6 +2709,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   disabled={savingCustomer}
                   style={{
                     backgroundColor: '#0284c7',
+                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '6px',
@@ -2329,8 +2717,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     fontSize: '0.86rem',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(2,132,199,0.2)',
+                    transition: 'all 0.15s ease',
                   }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                 >
                   {savingCustomer ? 'Saving...' : editingCustomer ? 'Update Customer' : 'Create Customer'}
                 </button>
@@ -2343,7 +2733,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
 
       {/* ------------------------------------------------------------- */}
-      {/* HIGH-SECURITY DELETION CONFIRMATION MODAL */}
+      {/* SIMPLE & USER-FRIENDLY DELETE CONFIRMATION MODAL */}
       {/* ------------------------------------------------------------- */}
       {securityModalData && (
         <div
@@ -2355,230 +2745,90 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '540px',
-              padding: '28px',
-              borderRadius: '16px',
+              maxWidth: '440px',
+              padding: '24px',
+              borderRadius: '12px',
               backgroundColor: '#ffffff',
-              border: '2px solid #ef4444',
-              boxShadow: '0 25px 50px -12px rgba(220, 38, 38, 0.25)',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Security Alert Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '18px' }}>
+            {/* Header / Icon */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
               <div
                 style={{
-                  width: '46px',
-                  height: '46px',
-                  borderRadius: '10px',
-                  backgroundColor: '#fef2f2',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '8px',
+                  backgroundColor: '#fee2e2',
                   color: '#dc2626',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  border: '1px solid #fecaca',
                 }}
               >
-                <ShieldAlert size={26} />
+                <Trash2 size={20} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span
-                    style={{
-                      backgroundColor: '#dc2626',
-                      color: '#ffffff',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    CRITICAL ACTION
-                  </span>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                    Permanent Database Removal
-                  </span>
-                </div>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>
-                  {securityModalData.title}
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                  {securityModalData.type === 'route' ? 'Delete Route' : 'Delete Customer'}
                 </h3>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
+                  Are you sure you want to delete <strong style={{ color: '#0f172a' }}>{securityModalData.entityName}</strong>? This action cannot be undone.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => !isExecutingDelete && setSecurityModalData(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Consequence Warning Box: Detailed Explanation */}
-            <div
-              style={{
-                backgroundColor: '#fff1f2',
-                border: '1px solid #fecdd3',
-                borderRadius: '10px',
-                padding: '14px 16px',
-                marginBottom: '18px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#9f1239', fontWeight: 700, fontSize: '0.86rem', marginBottom: '8px' }}>
-                <AlertTriangle size={16} />
-                <span>What will happen upon deletion:</span>
-              </div>
-              <ul style={{ margin: 0, paddingLeft: '18px', color: '#881337', fontSize: '0.82rem', lineHeight: '1.6' }}>
-                {securityModalData.warnings.map((w, idx) => (
-                  <li key={idx} style={{ marginBottom: '4px' }}>
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Copy-Paste Confirmation Phrase Box */}
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                  Required Confirmation Phrase:
-                </label>
-                <button
-                  type="button"
-                  onClick={handleCopyConfirmationPhrase}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    backgroundColor: hasCopiedPhrase ? '#dcfce7' : '#f1f5f9',
-                    color: hasCopiedPhrase ? '#15803d' : '#475569',
-                    border: '1px solid',
-                    borderColor: hasCopiedPhrase ? '#86efac' : '#cbd5e1',
-                    borderRadius: '6px',
-                    padding: '4px 12px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {hasCopiedPhrase ? <Check size={13} /> : <Copy size={13} />}
-                  {hasCopiedPhrase ? 'Copied to Clipboard!' : 'Copy Phrase'}
-                </button>
-              </div>
-
-              <div
-                style={{
-                  backgroundColor: '#0f172a',
-                  borderRadius: '8px',
-                  padding: '11px 14px',
-                  color: '#38bdf8',
-                  fontFamily: 'monospace',
-                  fontWeight: 800,
-                  fontSize: '0.98rem',
-                  letterSpacing: '0.04em',
-                  userSelect: 'all',
-                  border: '1px solid #1e293b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span>{securityModalData.requiredPhrase}</span>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>click button to copy</span>
-              </div>
-            </div>
-
-            {/* Input to Type or Paste Phrase */}
-            <div style={{ marginBottom: '22px' }}>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Type or paste the exact confirmation phrase below:
-              </label>
-              <input
-                type="text"
-                autoFocus
-                placeholder={`Type or paste "${securityModalData.requiredPhrase}"`}
-                value={securityConfirmInput}
-                onChange={(e) => setSecurityConfirmInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  border: '1.5px solid',
-                  borderColor:
-                    securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                      ? '#16a34a'
-                      : '#cbd5e1',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'monospace',
-                  backgroundColor: '#ffffff',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <div
-                style={{
-                  fontSize: '0.75rem',
-                  marginTop: '6px',
-                  fontWeight: 600,
-                  color:
-                    securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                      ? '#16a34a'
-                      : '#94a3b8',
-                }}
-              >
-                {securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                  ? '✓ Confirmation phrase matches. You may now execute permanent deletion.'
-                  : 'Enter the exact confirmation phrase to enable the delete button.'}
-              </div>
-            </div>
-
             {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
               <button
                 type="button"
-                className="btn btn-glass"
                 disabled={isExecutingDelete}
                 onClick={() => setSecurityModalData(null)}
-                style={{ padding: '8px 18px', fontSize: '0.86rem' }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  cursor: isExecutingDelete ? 'not-allowed' : 'pointer',
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={
-                  securityConfirmInput.trim().toUpperCase() !== securityModalData.requiredPhrase.trim().toUpperCase() ||
-                  isExecutingDelete
-                }
+                disabled={isExecutingDelete}
                 onClick={handleExecuteSecureDelete}
                 style={{
-                  backgroundColor:
-                    securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                      ? '#dc2626'
-                      : '#fca5a5',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.86rem',
-                  padding: '8px 20px',
-                  borderRadius: '8px',
+                  padding: '8px 18px',
+                  borderRadius: '6px',
                   border: 'none',
-                  cursor:
-                    securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                      ? 'pointer'
-                      : 'not-allowed',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  cursor: isExecutingDelete ? 'not-allowed' : 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  boxShadow:
-                    securityConfirmInput.trim().toUpperCase() === securityModalData.requiredPhrase.trim().toUpperCase()
-                      ? '0 2px 6px rgba(220, 38, 38, 0.35)'
-                      : 'none',
-                  transition: 'all 0.15s ease',
+                  gap: '6px',
                 }}
+                onMouseEnter={(e) => !isExecutingDelete && (e.currentTarget.style.backgroundColor = '#b91c1c')}
+                onMouseLeave={(e) => !isExecutingDelete && (e.currentTarget.style.backgroundColor = '#dc2626')}
               >
-                <Trash2 size={16} />
-                {isExecutingDelete ? 'Deleting from Database...' : 'Permanently Delete from Database'}
+                <Trash2 size={15} />
+                {isExecutingDelete ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
