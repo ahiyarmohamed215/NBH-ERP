@@ -131,7 +131,7 @@ export default function App() {
         permissions: ['USER_MANAGE', 'ROLE_MANAGE'],
         subItems: [
           { id: 'list', label: 'Employee List', permission: 'USER_MANAGE' },
-          { id: 'groups', label: 'Groups', permission: 'ROLE_MANAGE' },
+          { id: 'roles', label: 'Roles', permission: 'ROLE_MANAGE' },
           { id: 'attendance', label: 'Attendance', permission: 'USER_MANAGE' },
           { id: 'payroll', label: 'Payroll', permission: 'USER_MANAGE' },
           { id: 'commissions', label: 'Commission Templates', permission: 'USER_MANAGE' },
@@ -252,7 +252,7 @@ export default function App() {
       setSubTab(sub || 'list');
     } else if (view === 'roles' || view === 'groups') {
       setCurrentView('employees');
-      setSubTab('groups');
+      setSubTab('roles');
     } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
       setCurrentView('purchasing');
       setSubTab(view);

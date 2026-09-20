@@ -94,4 +94,12 @@ public class UserController {
         UserDto rejected = userService.rejectUser(id);
         return ResponseEntity.ok(ApiResponse.ok("User registration rejected", rejected));
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @Operation(summary = "Delete an existing user")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok(ApiResponse.ok("User deleted successfully", null));
+    }
 }

@@ -50,7 +50,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Customer List Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
-  const [routeFilter, setRouteFilter] = useState('ALL');
 
   // Customer Add/Edit Modal
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -232,13 +231,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       if (statusFilter === 'INACTIVE' && active) return false;
 
       const cRoutes = getCustomerRoutes(c.id);
-      if (routeFilter !== 'ALL') {
-        if (routeFilter === 'UNASSIGNED') {
-          if (cRoutes.length > 0) return false;
-        } else if (!cRoutes.some((r) => r.id === routeFilter)) {
-          return false;
-        }
-      }
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -255,7 +247,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       return true;
     });
-  }, [customers, statusFilter, routeFilter, searchTerm, routes]);
+  }, [customers, statusFilter, searchTerm, routes]);
 
   // Customer Toggle Active
   const handleToggleCustomerActive = async (id, currentStatus) => {
@@ -574,10 +566,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     addToast('Customer list exported to CSV', 'success');
   };
 
-  const isFiltered = Boolean(searchTerm.trim() || routeFilter !== 'ALL' || statusFilter !== 'ALL');
+  const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ALL');
   const handleResetFilters = () => {
     setSearchTerm('');
-    setRouteFilter('ALL');
     setStatusFilter('ALL');
   };
 
@@ -612,8 +603,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         <div>
           <h1
             style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
+              fontSize: '1.65rem',
+              fontWeight: 800,
               color: '#0f172a',
               margin: '0 0 4px 0',
               letterSpacing: '-0.02em',
@@ -801,53 +792,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
             {/* Right Controls: Filters (to the left of Export CSV), Export CSV (icon only), & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              {/* All Routes Filter Dropdown */}
-              <select
-                value={routeFilter}
-                onChange={(e) => setRouteFilter(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 30px 0 12px',
-                  width: '150px',
-                  minWidth: '130px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
-              >
-                <option value="ALL">All Routes</option>
-                <option value="UNASSIGNED">Unassigned</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-
               {/* Status Filter Dropdown */}
               <select
                 value={statusFilter}
@@ -2528,7 +2472,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                    Enter customer directory details and route assignments
+                    Enter customer directory details and contact information
                   </p>
                 </div>
               </div>
@@ -2570,52 +2514,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
               </div>
 
-              {/* Route Assignment & Contact Person */}
+              {/* Contact Person & Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Delivery Routes / Customer Groups (Can select multiple)
-                  </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', minHeight: '38px', alignItems: 'center', boxSizing: 'border-box' }}>
-                    {routes.length === 0 ? (
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No routes created yet</span>
-                    ) : (
-                      routes.map((r) => {
-                        const isSelected = (customerForm.routeIds || []).includes(r.id);
-                        return (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => {
-                              const current = customerForm.routeIds || [];
-                              const updated = isSelected ? current.filter((id) => id !== r.id) : [...current, r.id];
-                              setCustomerForm({ ...customerForm, routeIds: updated });
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '4px 10px',
-                              borderRadius: '4px',
-                              border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                              backgroundColor: isSelected ? '#0284c7' : '#ffffff',
-                              color: isSelected ? '#ffffff' : '#334155',
-                              boxShadow: isSelected ? '0 1px 3px rgba(2, 132, 199, 0.25)' : 'none',
-                              fontSize: '0.78rem',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <MapPin size={11} color={isSelected ? '#ffffff' : '#64748b'} />
-                            {r.name}
-                            {isSelected && <Check size={11} color="#ffffff" />}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Contact Person
@@ -2628,10 +2528,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
-              </div>
-
-              {/* Phone & Email */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Phone Number
@@ -2644,6 +2540,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
+
+              {/* Email & Credit Limit */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Email Address
@@ -2656,10 +2556,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
-              </div>
-
-              {/* Credit Limit & Address */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Approved Credit Limit (LKR)
@@ -2673,18 +2569,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Physical Address
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 123 Main Street, Colombo 03"
-                    value={customerForm.address}
-                    onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                  />
-                </div>
+              </div>
+
+              {/* Address (Full Width) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Physical Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 123 Main Street, Colombo 03"
+                  value={customerForm.address}
+                  onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>

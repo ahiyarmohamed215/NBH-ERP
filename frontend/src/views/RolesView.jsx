@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { roleApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
-import { ShieldCheck, Plus, Edit2, Trash2, X, Check, Search, Shield } from 'lucide-react';
+import { ShieldCheck, Plus, Edit2, Trash2, X, Check, Search, Shield, ChevronRight, Eye } from 'lucide-react';
 
 export default function RolesView() {
   const { addToast } = useToast();
@@ -12,6 +12,7 @@ export default function RolesView() {
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
+  const [viewingRole, setViewingRole] = useState(null);
   const [editingRole, setEditingRole] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -148,123 +149,601 @@ export default function RolesView() {
   );
 
   return (
-    <div style={{ padding: '24px 32px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        padding: '20px 24px',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Header (Sticky / Fixed at Top) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px',
+          flexShrink: 0,
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '1.5rem', color: '#0f172a', marginBottom: '4px' }}>Role Management</h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>Role Management</h1>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
             Create and configure company roles with fine-grained access permissions
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openCreateModal}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={openCreateModal}
+          style={{
+            backgroundColor: '#0284c7',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            padding: '9px 18px',
+            borderRadius: '8px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
           <Plus size={16} /> Create New Role
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="glass-card" style={{ padding: '16px 20px', marginBottom: '20px', backgroundColor: '#ffffff' }}>
-        <div style={{ position: 'relative', maxWidth: '380px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
+      {/* Search Bar (Sticky / Fixed at Top) */}
+      <div
+        style={{
+          padding: '12px 18px',
+          marginBottom: '16px',
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+        }}
+      >
+        <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
           <input
             type="text"
-            className="input-glass"
-            style={{ paddingLeft: '34px' }}
-            placeholder="Search roles..."
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 32px 0 36px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.88rem',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+            }}
+            placeholder="Search roles by title, permissions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '2px',
+              }}
+              title="Clear search"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>
+          {filteredRoles.length} Role{filteredRoles.length === 1 ? '' : 's'} Configured
         </div>
       </div>
 
-      {/* Roles Grid / Table */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading roles...</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
-          {filteredRoles.map((role) => {
-            const isSystemAdmin = role.name === 'ROLE_ADMIN';
-            return (
-              <div
-                key={role.id}
-                className="glass-card"
-                style={{
-                  padding: '20px',
-                  backgroundColor: '#ffffff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Shield size={18} color="#2563eb" />
-                      <span style={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
-                        {role.name}
+      {/* Roles Cards Grid (ONLY this section scrolls vertically!) */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          paddingRight: '6px',
+        }}
+      >
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading roles...</div>
+        ) : filteredRoles.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: '0.9rem' }}>
+            No roles found matching "{searchQuery}".
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px', paddingBottom: '20px' }}>
+            {filteredRoles.map((role) => {
+              const isSystemAdmin = role.name === 'ROLE_ADMIN';
+              return (
+                <div
+                  key={role.id}
+                  onClick={() => setViewingRole(role)}
+                  style={{
+                    padding: '14px 16px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#93c5fd';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.08)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                  title="Click to view full role details & permissions"
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '6px',
+                            backgroundColor: '#e0f2fe',
+                            color: '#0284c7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Shield size={15} />
+                        </div>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            fontSize: '0.92rem',
+                            color: '#0f172a',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {role.name}
+                        </span>
+                      </div>
+                      {isSystemAdmin && (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #dbeafe',
+                            flexShrink: 0,
+                          }}
+                        >
+                          System
+                        </span>
+                      )}
+                    </div>
+
+                    <p
+                      style={{
+                        fontSize: '0.78rem',
+                        color: '#64748b',
+                        margin: '0 0 10px 0',
+                        lineHeight: '1.35',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        minHeight: '32px',
+                      }}
+                    >
+                      {role.description || 'No description provided'}
+                    </p>
+
+                    {/* Count only the permissions */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingTop: '8px',
+                        borderTop: '1px solid #f1f5f9',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          backgroundColor: '#eff6ff',
+                          color: '#0284c7',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '5px',
+                          padding: '2px 8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <ShieldCheck size={12} color="#0284c7" />
+                        {role.permissions?.length || 0} Permission{role.permissions?.length === 1 ? '' : 's'}
+                      </span>
+
+                      <span style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                        View <ChevronRight size={12} />
                       </span>
                     </div>
-                    {isSystemAdmin && (
-                      <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                    <button
+                      type="button"
+                      style={{
+                        flex: 1,
+                        height: '30px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '5px',
+                        color: '#334155',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(role);
+                      }}
+                    >
+                      <Edit2 size={12} /> Edit
+                    </button>
+                    {!isSystemAdmin && (
+                      <button
+                        type="button"
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #fecaca',
+                          borderRadius: '5px',
+                          color: '#dc2626',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(role);
+                        }}
+                        title="Delete Role"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* View Role Full Details Popup Modal */}
+      {viewingRole && (
+        <div className="modal-backdrop" onClick={() => setViewingRole(null)}>
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '720px',
+              padding: '24px 28px',
+              borderRadius: '12px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingBottom: '16px',
+                borderBottom: '1px solid #e2e8f0',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Shield size={22} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                      {viewingRole.name}
+                    </h2>
+                    {viewingRole.name === 'ROLE_ADMIN' && (
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          border: '1px solid #dbeafe',
+                        }}
+                      >
                         System Role
                       </span>
                     )}
                   </div>
-
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '14px', minHeight: '38px' }}>
-                    {role.description || 'No description provided'}
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                    {viewingRole.description || 'No description provided'}
                   </p>
-
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                      PERMISSIONS ({role.permissions?.length || 0})
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxHeight: '100px', overflowY: 'auto' }}>
-                      {role.permissions?.length > 0 ? (
-                        role.permissions.map((p) => (
-                          <span
-                            key={p}
-                            style={{
-                              fontSize: '0.72rem',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              backgroundColor: '#f1f5f9',
-                              color: '#334155',
-                              border: '1px solid #e2e8f0',
-                            }}
-                          >
-                            {p}
-                          </span>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No permissions assigned</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px' }}>
-                  <button
-                    className="btn btn-glass btn-sm"
-                    style={{ flex: 1 }}
-                    onClick={() => openEditModal(role)}
-                  >
-                    <Edit2 size={13} /> Edit Permissions
-                  </button>
-                  {!isSystemAdmin && (
-                    <button
-                      className="btn btn-glass btn-sm"
-                      style={{ color: '#ef4444', borderColor: '#fecaca' }}
-                      onClick={() => handleDelete(role)}
-                      title="Delete Role"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
                 </div>
               </div>
-            );
-          })}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = viewingRole;
+                    setViewingRole(null);
+                    openEditModal(r);
+                  }}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#334155',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Edit2 size={13} /> Edit Permissions
+                </button>
+                {viewingRole.name !== 'ROLE_ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = viewingRole;
+                      setViewingRole(null);
+                      handleDelete(r);
+                    }}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #fecaca',
+                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: '#dc2626',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewingRole(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    padding: '4px',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Permissions Count Banner */}
+            <div
+              style={{
+                margin: '16px 0 12px 0',
+                padding: '10px 14px',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
+                Assigned Access Permissions
+              </span>
+              <span
+                style={{
+                  backgroundColor: '#e0f2fe',
+                  color: '#0284c7',
+                  border: '1px solid #bae6fd',
+                  borderRadius: '9999px',
+                  padding: '2px 10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                }}
+              >
+                {viewingRole.permissions?.length || 0} Total
+              </span>
+            </div>
+
+            {/* Scrollable Permissions List */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                paddingRight: '6px',
+              }}
+            >
+              {Object.entries(permissionsByModule).map(([mod, perms]) => {
+                const assignedInMod = perms.filter((p) => (viewingRole.permissions || []).includes(p.name));
+                if (assignedInMod.length === 0) return null;
+
+                return (
+                  <div
+                    key={mod}
+                    style={{
+                      marginBottom: '16px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '14px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '10px',
+                        borderBottom: '1px solid #f1f5f9',
+                        paddingBottom: '6px',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>
+                        {mod.replace('_', ' ')}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                        {assignedInMod.length} of {perms.length} active
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                      {assignedInMod.map((p) => (
+                        <div
+                          key={p.name}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 10px',
+                            backgroundColor: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '6px',
+                            fontSize: '0.76rem',
+                            fontWeight: 500,
+                            color: '#166534',
+                          }}
+                        >
+                          <Check size={13} color="#16a34a" />
+                          <span style={{ fontFamily: 'monospace' }}>{p.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {(!viewingRole.permissions || viewingRole.permissions.length === 0) && (
+                <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', fontSize: '0.88rem' }}>
+                  No permissions have been assigned to this role yet. Click "Edit Permissions" to add some.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e2e8f0',
+                marginTop: '12px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setViewingRole(null)}
+                style={{
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '7px 18px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

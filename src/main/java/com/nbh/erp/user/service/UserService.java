@@ -157,4 +157,13 @@ public class UserService {
         User rejectedUser = userRepository.save(user);
         return UserDto.from(rejectedUser);
     }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+
+        user.getRoles().clear();
+        userRepository.delete(user);
+    }
 }

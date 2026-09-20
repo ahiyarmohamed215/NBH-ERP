@@ -49,6 +49,7 @@ export const userApi = {
   toggleActive: (id) => api.patch(`/users/${id}/toggle-active`),
   approve: (id, roles) => api.post(`/users/${id}/approve`, { roles }),
   reject: (id) => api.post(`/users/${id}/reject`),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 export const roleApi = {
