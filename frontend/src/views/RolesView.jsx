@@ -270,17 +270,19 @@ export default function RolesView() {
 
       {/* Create / Edit Role Modal */}
       {showModal && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '680px',
+              maxWidth: '920px',
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
               backgroundColor: '#ffffff',
+              borderRadius: '14px',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div style={{

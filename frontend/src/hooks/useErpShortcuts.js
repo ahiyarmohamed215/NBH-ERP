@@ -141,27 +141,31 @@ export default function useErpShortcuts({
             break;
           case '2':
             e.preventDefault();
-            navigateTo('inventory', 'stock');
+            navigateTo('invoicing');
             break;
           case '3':
             e.preventDefault();
-            navigateTo('sales', 'pos');
+            navigateTo('invoicing', 'pos');
             break;
           case '4':
             e.preventDefault();
-            navigateTo('masters', 'products');
+            navigateTo('customers');
             break;
           case '5':
             e.preventDefault();
-            navigateTo('masters');
+            navigateTo('employees');
             break;
           case '6':
             e.preventDefault();
-            navigateTo('reports');
+            navigateTo('inventory');
             break;
           case '7':
             e.preventDefault();
-            navigateTo('admin', 'users');
+            navigateTo('purchasing');
+            break;
+          case '8':
+            e.preventDefault();
+            navigateTo('reports');
             break;
           default:
             break;

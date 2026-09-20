@@ -467,14 +467,16 @@ export default function UsersView() {
 
       {/* Approval & Role Assignment Modal */}
       {approvingUser && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" onClick={() => setApprovingUser(null)}>
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '720px',
               backgroundColor: '#ffffff',
+              borderRadius: '14px',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{
               display: 'flex',
@@ -589,14 +591,16 @@ export default function UsersView() {
 
       {/* User Create / Edit Modal */}
       {showUserModal && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" onClick={() => setShowUserModal(false)}>
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '540px',
+              maxWidth: '820px',
               backgroundColor: '#ffffff',
+              borderRadius: '14px',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{
               display: 'flex',

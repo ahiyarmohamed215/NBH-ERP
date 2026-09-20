@@ -47,8 +47,8 @@ export default function DashboardView({ onNavigate }) {
       {/* Top Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: '4px' }}>Executive Overview</h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Real-time inventory valuation & warehouse operations monitor</p>
+          <h1 style={{ fontSize: '1.8rem', color: '#0f172a', marginBottom: '4px' }}>NBH ERP Dashboard</h1>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Real-time enterprise metrics, sales performance & inventory status</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-primary" onClick={() => onNavigate('pos')}>

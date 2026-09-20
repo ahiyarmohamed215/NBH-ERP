@@ -237,17 +237,6 @@ export default function ProductsView({ isEmbedded = false }) {
           >
             Inactive ({inactiveCount})
           </button>
-
-          {isEmbedded && (
-            <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
-              <button className="btn btn-glass btn-sm" onClick={loadData} title="Reload list">
-                <RefreshCw size={14} /> Refresh
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>
-                <Plus size={16} /> New Product
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -257,10 +246,10 @@ export default function ProductsView({ isEmbedded = false }) {
           <table className="glass-table">
             <thead>
               <tr>
-                <th>Product / SKU</th>
+                <th>Code / SKU</th>
+                <th>Product Name</th>
                 <th>Category</th>
                 <th>Unit</th>
-                <th>Cost Price</th>
                 <th>Selling Price</th>
                 <th>Min Stock</th>
                 <th>Status</th>
@@ -285,19 +274,14 @@ export default function ProductsView({ isEmbedded = false }) {
                   const active = isProductActive(p);
                   return (
                     <tr key={p.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</div>
-                        <div style={{ fontSize: '0.78rem', color: '#2563eb', fontFamily: 'monospace' }}>
-                          {p.sku}
-                        </div>
-                      </td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{p.sku}</td>
+                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
                       <td>
                         <span className="badge badge-info">{p.categoryName || 'General'}</span>
                       </td>
                       <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
-                      <td style={{ color: '#64748b' }}>${Number(p.costPrice || 0).toFixed(2)}</td>
                       <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                        ${Number(p.sellingPrice || 0).toFixed(2)}
+                        Rs. {Number(p.sellingPrice || 0).toFixed(2)}
                       </td>
                       <td>
                         <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
@@ -305,9 +289,24 @@ export default function ProductsView({ isEmbedded = false }) {
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                        <button
+                          type="button"
+                          className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                          style={{
+                            cursor: 'pointer',
+                            border: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '5px 10px',
+                            transition: 'all 0.15s ease-in-out',
+                          }}
+                          onClick={() => handleToggleActive(p.id, active)}
+                          title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                        >
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                           {active ? 'Active' : 'Inactive'}
-                        </span>
+                        </button>
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -324,13 +323,6 @@ export default function ProductsView({ isEmbedded = false }) {
                             title="Edit product"
                           >
                             <Edit2 size={14} /> Edit
-                          </button>
-                          <button
-                            className="btn btn-sm btn-glass"
-                            onClick={() => handleToggleActive(p.id, active)}
-                            title={active ? 'Deactivate product' : 'Activate product'}
-                          >
-                            {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
                           </button>
                           <button
                             className="btn btn-glass btn-sm"
@@ -381,9 +373,28 @@ export default function ProductsView({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Catalog Status</span>
                 <div>
-                  <span className={`badge ${isProductActive(viewingProduct) ? 'badge-success' : 'badge-danger'}`}>
+                  <button
+                    type="button"
+                    className={`badge ${isProductActive(viewingProduct) ? 'badge-success' : 'badge-danger'}`}
+                    style={{
+                      cursor: 'pointer',
+                      border: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '5px 10px',
+                      transition: 'all 0.15s ease-in-out',
+                    }}
+                    onClick={async () => {
+                      const active = isProductActive(viewingProduct);
+                      await handleToggleActive(viewingProduct.id, active);
+                      setViewingProduct(prev => prev ? ({ ...prev, active: !active, isActive: !active, is_active: !active, status: !active ? 'ACTIVE' : 'INACTIVE' }) : null);
+                    }}
+                    title={`Status: ${isProductActive(viewingProduct) ? 'Active' : 'Inactive'} (Click to toggle)`}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                     {isProductActive(viewingProduct) ? 'Active' : 'Inactive'}
-                  </span>
+                  </button>
                 </div>
               </div>
 
@@ -405,13 +416,13 @@ export default function ProductsView({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Selling Price</span>
                 <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '1.15rem' }}>
-                  ${Number(viewingProduct.sellingPrice || 0).toFixed(2)}
+                  Rs. {Number(viewingProduct.sellingPrice || 0).toFixed(2)}
                 </span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Standard Cost</span>
-                <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.05rem' }}>${Number(viewingProduct.costPrice || 0).toFixed(2)}</span>
+                <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.05rem' }}>Rs. {Number(viewingProduct.costPrice || 0).toFixed(2)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
@@ -457,13 +468,12 @@ export default function ProductsView({ isEmbedded = false }) {
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '840px', padding: '30px' }}
+            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '1.35rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                <Package size={24} color="#2563eb" />
-                {editingProduct ? 'Edit Product Details' : 'Create New Master Product'}
+              <h2 style={{ fontSize: '1.35rem', color: '#0f172a', margin: 0 }}>
+                {editingProduct ? 'Edit' : 'Create New'} Product
               </h2>
               <button
                 onClick={() => setShowModal(false)}
@@ -477,7 +487,7 @@ export default function ProductsView({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    SKU / CODE *
+                    PRODUCT CODE (SKU) *
                   </label>
                   <input
                     type="text"
@@ -503,9 +513,9 @@ export default function ProductsView({ isEmbedded = false }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     CATEGORY
                   </label>
                   <select
@@ -522,7 +532,7 @@ export default function ProductsView({ isEmbedded = false }) {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     UNIT OF MEASURE
                   </label>
                   <select
@@ -540,66 +550,60 @@ export default function ProductsView({ isEmbedded = false }) {
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    MIN STOCK ALERT LEVEL
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="input-glass"
+                    placeholder="5"
+                    value={formData.minStockLevel}
+                    onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    DESCRIPTION / NOTES
+                  </label>
+                  <input
+                    type="text"
+                    className="input-glass"
+                    placeholder="e.g. Heavy-duty construction grade, Shelf A-1"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+              </div>
+
               {/* Pricing & Stock Details: Read-Only (Managed dynamically via GRN) */}
-              <div style={{ marginBottom: '16px', padding: '14px 16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Valuation & Pricing (Read-Only)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                    VALUATION & PRICING
                   </span>
-                  <span style={{ fontSize: '0.72rem', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                    Managed via Inward GRN
-                  </span>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                    Cost price and selling price are established dynamically via <strong>Inward GRN</strong>.
+                  </p>
                 </div>
                 {editingProduct ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '18px', textAlign: 'right' }}>
                     <div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Latest Cost Price:</span>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                        ${Number(formData.costPrice || 0).toFixed(2)}
-                      </div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>COST PRICE</span>
+                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>${Number(formData.costPrice || 0).toFixed(2)}</div>
                     </div>
                     <div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Current Selling Price:</span>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1d4ed8', marginTop: '2px' }}>
-                        ${Number(formData.sellingPrice || 0).toFixed(2)}
-                      </div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>SELLING PRICE</span>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>${Number(formData.sellingPrice || 0).toFixed(2)}</div>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.4 }}>
-                    Cost price, selling price, and stock levels start at $0.00 and are updated dynamically when inventory is received through <strong>Inward GRN</strong>.
-                  </div>
+                  <span className="badge badge-info" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    Managed via Inward GRN
+                  </span>
                 )}
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '8px' }}>
-                  * Direct price and quantity editing is disabled here. Pricing and inventory counts are audited and updated during GRN intake.
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                  MIN STOCK ALERT LEVEL
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input-glass"
-                  placeholder="5"
-                  value={formData.minStockLevel}
-                  onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
-                />
-              </div>
-
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                  DESCRIPTION / NOTES
-                </label>
-                <textarea
-                  className="input-glass"
-                  rows="2"
-                  placeholder="Optional product specifications, dimensions, supplier references..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -616,7 +620,7 @@ export default function ProductsView({ isEmbedded = false }) {
                   className="btn btn-primary"
                   disabled={saving}
                 >
-                  {saving ? 'Saving...' : (editingProduct ? 'Update Product' : 'Create Product')}
+                  {saving ? 'Saving...' : 'Save Record'}
                 </button>
               </div>
             </form>

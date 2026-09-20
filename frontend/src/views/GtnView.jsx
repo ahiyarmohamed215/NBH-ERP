@@ -577,7 +577,7 @@ export default function GtnView() {
         <div className="modal-backdrop" onClick={() => setSelectedGtn(null)}>
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '720px', padding: '26px', background: '#ffffff', borderRadius: '12px' }}
+            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>

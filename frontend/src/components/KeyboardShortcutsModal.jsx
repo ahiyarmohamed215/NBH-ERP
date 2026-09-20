@@ -19,13 +19,14 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
       title: 'Module Quick Navigation',
       icon: Navigation,
       shortcuts: [
-        { keys: ['Alt', '1'], description: 'Executive Dashboard' },
-        { keys: ['Alt', '2'], description: 'Inventory Operations Hub' },
-        { keys: ['Alt', '3', 'or', 'F3'], description: 'Sales & POS Terminal' },
-        { keys: ['Alt', '4'], description: 'Products (Business Directories)' },
-        { keys: ['Alt', '5', 'or', 'F7'], description: 'Master Business Directories' },
-        { keys: ['Alt', '6', 'or', 'F8'], description: 'Reports & Analytics' },
-        { keys: ['Alt', '7'], description: 'System Administration' },
+        { keys: ['Alt', '1'], description: 'Dashboard' },
+        { keys: ['Alt', '2'], description: 'Invoicing Hub' },
+        { keys: ['Alt', '3', 'or', 'F3'], description: 'POS Terminal' },
+        { keys: ['Alt', '4'], description: 'Customer Directory' },
+        { keys: ['Alt', '5'], description: 'Employees & Approvals' },
+        { keys: ['Alt', '6', 'or', 'F6'], description: 'Inventory Operations' },
+        { keys: ['Alt', '7'], description: 'Purchasing & Suppliers' },
+        { keys: ['Alt', '8', 'or', 'F8'], description: 'Reports & Analytics' },
       ],
     },
     {
@@ -56,10 +57,11 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
         className="glass-modal"
         style={{
           width: '100%',
-          maxWidth: '720px',
-          padding: '28px 32px',
+          maxWidth: '900px',
+          padding: '32px 36px',
           maxHeight: '90vh',
           overflowY: 'auto',
+          borderRadius: '14px',
         }}
         onClick={(e) => e.stopPropagation()}
       >

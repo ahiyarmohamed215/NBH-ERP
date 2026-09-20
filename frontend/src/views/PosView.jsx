@@ -685,15 +685,19 @@ export default function PosView() {
 
       {/* Payment Tender Modal */}
       {showPayModal && (
-        <div className="modal-backdrop">
-          <div className="glass-modal" style={{ width: '100%', maxWidth: '480px', padding: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1.3rem', color: '#0f172a' }}>Tender Payment</h3>
+        <div className="modal-backdrop" onClick={() => setShowPayModal(false)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '640px', padding: '34px', borderRadius: '14px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
+              <h3 style={{ fontSize: '1.4rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>Tender Payment</h3>
               <button
                 onClick={() => setShowPayModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
 
@@ -760,35 +764,39 @@ export default function PosView() {
 
       {/* Post-Sale Completed Receipt Dialog */}
       {completedInvoice && (
-        <div className="modal-backdrop">
-          <div className="glass-modal" style={{ width: '100%', maxWidth: '440px', padding: '32px', textAlign: 'center' }}>
+        <div className="modal-backdrop" onClick={() => setCompletedInvoice(null)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '560px', padding: '36px', textAlign: 'center', borderRadius: '14px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div
               style={{
-                width: '64px',
-                height: '64px',
+                width: '68px',
+                height: '68px',
                 borderRadius: '50%',
                 background: 'rgba(16, 185, 129, 0.15)',
                 color: '#10b981',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: '16px',
+                marginBottom: '18px',
               }}
             >
-              <CheckCircle size={36} />
+              <CheckCircle size={38} />
             </div>
 
-            <h3 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '6px' }}>Sale Completed!</h3>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '1.55rem', color: '#0f172a', marginBottom: '8px' }}>Sale Completed!</h3>
+            <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '24px' }}>
               Invoice <strong>{completedInvoice.invoiceNumber}</strong> has been logged and stock balances deducted.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={() => pdfApi.printInvoice(completedInvoice.id)}
-                style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.92rem', fontWeight: 700 }}
+                style={{ padding: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 700 }}
                 title="Print Receipt Directly (F9)"
               >
                 <Printer size={18} /> Print Receipt Directly
@@ -800,7 +808,7 @@ export default function PosView() {
                 type="button"
                 className="btn btn-glass"
                 onClick={() => pdfApi.downloadInvoice(completedInvoice.id, completedInvoice.invoiceNumber)}
-                style={{ padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#15803d', borderColor: '#86efac', fontWeight: 700 }}
+                style={{ padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#15803d', borderColor: '#86efac', fontWeight: 700 }}
                 title="Download PDF File"
               >
                 <Download size={16} color="#15803d" /> Download PDF Receipt
@@ -819,8 +827,12 @@ export default function PosView() {
 
       {/* Held Carts Modal */}
       {showHeldModal && (
-        <div className="modal-backdrop">
-          <div className="glass-modal" style={{ width: '100%', maxWidth: '620px', padding: '28px' }}>
+        <div className="modal-backdrop" onClick={() => setShowHeldModal(false)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '860px', padding: '30px', borderRadius: '14px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', color: '#0f172a' }}>

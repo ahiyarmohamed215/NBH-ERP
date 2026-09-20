@@ -426,11 +426,12 @@ export default function SalesAccountingView() {
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '850px',
+              maxWidth: '1060px',
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
-              padding: '24px',
+              padding: '30px',
+              borderRadius: '14px',
             }}
           >
             {/* Modal Header */}

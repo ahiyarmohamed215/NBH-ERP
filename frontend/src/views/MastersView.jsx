@@ -4,9 +4,9 @@ import {
   categoryApi,
   customerApi,
   supplierApi,
+  productApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
-import ProductsView from './ProductsView';
 import {
   Database,
   Building2,
@@ -25,13 +25,21 @@ import {
   Package,
 } from 'lucide-react';
 
-export default function MastersView({ activeSubTab, onSubTabChange }) {
+export default function MastersView({
+  activeSubTab,
+  onSubTabChange,
+  isStandalone = false,
+  allowedTabs = null,
+  title = '',
+  subtitle = '',
+}) {
   const [activeTab, setActiveTab] = useState(() => activeSubTab || 'products');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Data lists
+  const [products, setProducts] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -55,10 +63,31 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
     }
   }, [activeSubTab]);
 
+  // Initial load of counts for all tabs so pill badges show real numbers immediately
   useEffect(() => {
-    if (activeTab !== 'products') {
-      loadTabData();
-    }
+    const loadAllCounts = async () => {
+      try {
+        const [wRes, cRes, cuRes, sRes, pRes] = await Promise.allSettled([
+          warehouseApi.getAll(),
+          categoryApi.getAll(),
+          customerApi.getAll(),
+          supplierApi.getAll(),
+          productApi.getProducts({ size: 300 }),
+        ]);
+        if (wRes.status === 'fulfilled') setWarehouses(wRes.value.data || []);
+        if (cRes.status === 'fulfilled') setCategories(cRes.value.data || []);
+        if (cuRes.status === 'fulfilled') setCustomers(cuRes.value.data || []);
+        if (sRes.status === 'fulfilled') setSuppliers(sRes.value.data || []);
+        if (pRes.status === 'fulfilled') setProducts(pRes.value.data?.content || pRes.value.data || []);
+      } catch (e) {
+        // silent fallback
+      }
+    };
+    loadAllCounts();
+  }, []);
+
+  useEffect(() => {
+    loadTabData();
   }, [activeTab]);
 
   const handleTabChange = (tabId) => {
@@ -73,7 +102,16 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
   const loadTabData = async () => {
     try {
       setLoading(true);
-      if (activeTab === 'warehouses') {
+      if (activeTab === 'products') {
+        const [pRes, cRes] = await Promise.all([
+          productApi.getProducts({ size: 300 }),
+          categories.length === 0 ? categoryApi.getAll() : Promise.resolve({ data: categories }),
+        ]);
+        setProducts(pRes.data?.content || pRes.data || []);
+        if (categories.length === 0 && cRes.data) {
+          setCategories(cRes.data || []);
+        }
+      } else if (activeTab === 'warehouses') {
         const res = await warehouseApi.getAll();
         setWarehouses(res.data || []);
       } else if (activeTab === 'categories') {
@@ -97,10 +135,19 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
 
   const handleOpenAdd = () => {
     setEditingItem(null);
-    if (activeTab === 'warehouses') {
+    if (activeTab === 'products') {
+      setModalForm({
+        sku: '',
+        name: '',
+        categoryId: categories.length > 0 ? categories[0].id : '',
+        unitOfMeasure: 'PCS',
+        minStockLevel: '5',
+        description: '',
+      });
+    } else if (activeTab === 'warehouses') {
       setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '', isPrimary: false });
     } else if (activeTab === 'categories') {
-      setModalForm({ name: '', description: '' });
+      setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'customers') {
       setModalForm({ code: '', name: '', contactPerson: '', phone: '', email: '', address: '', creditLimit: '0' });
     } else if (activeTab === 'suppliers') {
@@ -111,11 +158,22 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
-    setModalForm({
-      ...item,
-      contactNumber: item.contactNumber || item.phone || '',
-      phone: item.phone || item.contactNumber || '',
-    });
+    if (activeTab === 'products') {
+      setModalForm({
+        sku: item.sku || '',
+        name: item.name || '',
+        categoryId: item.categoryId || (categories.find((c) => c.name === item.categoryName)?.id || ''),
+        unitOfMeasure: item.unitOfMeasure || 'PCS',
+        minStockLevel: item.minStockLevel?.toString() || '0',
+        description: item.description || '',
+      });
+    } else {
+      setModalForm({
+        ...item,
+        contactNumber: item.contactNumber || item.phone || '',
+        phone: item.phone || item.contactNumber || '',
+      });
+    }
     setShowModal(true);
   };
 
@@ -123,7 +181,29 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
     e.preventDefault();
     try {
       setSaving(true);
-      if (activeTab === 'warehouses') {
+      if (activeTab === 'products') {
+        if (!modalForm.sku || !modalForm.name) {
+          addToast('SKU and Product Name are required', 'error');
+          setSaving(false);
+          return;
+        }
+        const payload = {
+          sku: (modalForm.sku || '').trim().toUpperCase(),
+          barcode: null,
+          name: (modalForm.name || '').trim(),
+          categoryId: modalForm.categoryId ? Number(modalForm.categoryId) : null,
+          unitOfMeasure: modalForm.unitOfMeasure || 'PCS',
+          costPrice: editingItem ? (parseFloat(editingItem.costPrice) || 0) : 0,
+          sellingPrice: editingItem ? (parseFloat(editingItem.sellingPrice) || 0) : 0,
+          minStockLevel: parseInt(modalForm.minStockLevel, 10) || 0,
+          description: modalForm.description?.trim() || null,
+        };
+        if (editingItem) {
+          await productApi.update(editingItem.id, payload);
+        } else {
+          await productApi.create(payload);
+        }
+      } else if (activeTab === 'warehouses') {
         const payload = {
           ...modalForm,
           contactNumber: modalForm.contactNumber || modalForm.phone || '',
@@ -135,10 +215,15 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
           await warehouseApi.create(payload);
         }
       } else if (activeTab === 'categories') {
+        const payload = {
+          code: (modalForm.code || '').trim().toUpperCase(),
+          name: (modalForm.name || '').trim(),
+          description: modalForm.description || '',
+        };
         if (editingItem) {
-          await categoryApi.update(editingItem.id, modalForm);
+          await categoryApi.update(editingItem.id, payload);
         } else {
-          await categoryApi.create(modalForm);
+          await categoryApi.create(payload);
         }
       } else if (activeTab === 'customers') {
         const payload = {
@@ -175,6 +260,7 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
 
   const handleToggleActive = async (id, currentStatus) => {
     try {
+      if (activeTab === 'products') await productApi.toggleActive(id);
       if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
       if (activeTab === 'categories') await categoryApi.toggleActive(id);
       if (activeTab === 'customers') await customerApi.toggleActive(id);
@@ -188,13 +274,14 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
   };
 
   const handleDelete = async (item) => {
-    const itemName = item.name || item.code || 'this record';
+    const itemName = item.name || item.code || item.sku || 'this record';
     if (!window.confirm(`Are you sure you want to permanently delete "${itemName}"? This action cannot be undone.`)) {
       return;
     }
     try {
       setDeletingId(item.id);
-      if (activeTab === 'warehouses') await warehouseApi.delete(item.id);
+      if (activeTab === 'products') await productApi.delete(item.id);
+      else if (activeTab === 'warehouses') await warehouseApi.delete(item.id);
       else if (activeTab === 'categories') await categoryApi.delete(item.id);
       else if (activeTab === 'customers') await customerApi.delete(item.id);
       else if (activeTab === 'suppliers') await supplierApi.delete(item.id);
@@ -211,6 +298,7 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
   // Get current active tab list
   const getCurrentItems = () => {
     switch (activeTab) {
+      case 'products': return products;
       case 'warehouses': return warehouses;
       case 'categories': return categories;
       case 'customers': return customers;
@@ -238,13 +326,62 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
     });
   };
 
+  const filteredProducts = filterList(products, ['name', 'sku', 'categoryName', 'description']);
   const filteredWarehouses = filterList(warehouses, ['name', 'code', 'contactNumber', 'phone', 'address']);
-  const filteredCategories = filterList(categories, ['name', 'description']);
+  const filteredCategories = filterList(categories, ['code', 'name', 'description']);
   const filteredCustomers = filterList(customers, ['name', 'code', 'customerCode', 'phone', 'contactPerson', 'email']);
   const filteredSuppliers = filterList(suppliers, ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email']);
 
   const activeCount = currentItems.filter(isItemActive).length;
   const inactiveCount = currentItems.length - activeCount;
+
+  const allTabs = [
+    { id: 'products', label: 'Products', count: products.length, icon: Package },
+    { id: 'warehouses', label: 'Warehouses', count: warehouses.length, icon: Building2 },
+    { id: 'categories', label: 'Categories', count: categories.length, icon: FolderTree },
+    { id: 'customers', label: 'Customers', count: customers.length, icon: Users },
+    { id: 'suppliers', label: 'Suppliers', count: suppliers.length, icon: Truck },
+  ];
+
+  const visibleTabs = allowedTabs ? allTabs.filter((t) => allowedTabs.includes(t.id)) : allTabs;
+
+  const displayTitle =
+    title ||
+    (isStandalone
+      ? activeTab === 'customers'
+        ? 'Customer Management'
+        : activeTab === 'suppliers'
+        ? 'Supplier Directory'
+        : activeTab === 'warehouses'
+        ? 'Warehouse Locations'
+        : activeTab === 'products'
+        ? 'Products & Categories'
+        : activeTab === 'categories'
+        ? 'Product Categories'
+        : 'Master Data Management'
+      : 'Master Data Management');
+
+  const displaySubtitle =
+    subtitle ||
+    (isStandalone
+      ? activeTab === 'customers'
+        ? 'Manage customer records, credit balances, terms, and contact profiles'
+        : activeTab === 'suppliers'
+        ? 'Manage procurement vendors, contact personnel, and addresses'
+        : activeTab === 'warehouses'
+        ? 'Manage storage centers, fulfillment hubs, and stock locations'
+        : activeTab === 'products'
+        ? 'Manage master product catalog, categories, pricing, and stock limits'
+        : 'Enterprise catalog and records management'
+      : 'Enterprise management for products, warehouses, categories, customers, and suppliers');
+
+  const getHeaderIcon = () => {
+    if (activeTab === 'customers') return <Users size={28} color="#2563eb" />;
+    if (activeTab === 'suppliers') return <Truck size={28} color="#2563eb" />;
+    if (activeTab === 'warehouses') return <Building2 size={28} color="#2563eb" />;
+    if (activeTab === 'products' || activeTab === 'categories') return <Package size={28} color="#2563eb" />;
+    return <Database size={28} color="#2563eb" />;
+  };
 
   return (
     <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -252,120 +389,191 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '1.8rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <Database size={28} color="#2563eb" /> Master Data Management
+            {getHeaderIcon()} {displayTitle}
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '6px 0 0 0' }}>
-            Enterprise management for products, warehouses, categories, customers, and suppliers
+            {displaySubtitle}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-glass" onClick={loadTabData} title="Refresh data">
             <RefreshCw size={16} /> Refresh
           </button>
-          {activeTab !== 'products' && (
-            <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={18} /> Add New {activeTab.slice(0, -1)}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Directory Tabs */}
-      <div>
-        <div className="glass-pill-bar">
-          <button
-            type="button"
-            className={`glass-pill-btn ${activeTab === 'products' ? 'active' : ''}`}
-            onClick={() => handleTabChange('products')}
-          >
-            <Package size={16} /> Products
-          </button>
-          <button
-            type="button"
-            className={`glass-pill-btn ${activeTab === 'warehouses' ? 'active' : ''}`}
-            onClick={() => handleTabChange('warehouses')}
-          >
-            <Building2 size={16} /> Warehouses ({warehouses.length})
-          </button>
-          <button
-            type="button"
-            className={`glass-pill-btn ${activeTab === 'categories' ? 'active' : ''}`}
-            onClick={() => handleTabChange('categories')}
-          >
-            <FolderTree size={16} /> Categories ({categories.length})
-          </button>
-          <button
-            type="button"
-            className={`glass-pill-btn ${activeTab === 'customers' ? 'active' : ''}`}
-            onClick={() => handleTabChange('customers')}
-          >
-            <Users size={16} /> Customers ({customers.length})
-          </button>
-          <button
-            type="button"
-            className={`glass-pill-btn ${activeTab === 'suppliers' ? 'active' : ''}`}
-            onClick={() => handleTabChange('suppliers')}
-          >
-            <Truck size={16} /> Suppliers ({suppliers.length})
+          <button className="btn btn-primary" onClick={handleOpenAdd}>
+            <Plus size={18} /> Add New {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab.slice(0, -1)}
           </button>
         </div>
       </div>
 
-      {/* If Products tab active, render embedded ProductsView */}
-      {activeTab === 'products' ? (
-        <ProductsView isEmbedded={true} />
-      ) : (
-        <>
-          {/* Search & Status Filters Bar */}
-          <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 300px', position: 'relative' }}>
-              <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="input-glass"
-                style={{ paddingLeft: '42px' }}
-                placeholder={`Search ${activeTab} by name, code, contact...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                STATUS:
-              </span>
-              <button
-                type="button"
-                className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-glass'}`}
-                onClick={() => setStatusFilter('ALL')}
-              >
-                All ({currentItems.length})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-glass'}`}
-                onClick={() => setStatusFilter('ACTIVE')}
-              >
-                Active ({activeCount})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${statusFilter === 'INACTIVE' ? 'btn-primary' : 'btn-glass'}`}
-                onClick={() => setStatusFilter('INACTIVE')}
-              >
-                Inactive ({inactiveCount})
-              </button>
-            </div>
+      {/* Directory Tabs (only if more than 1 tab visible) */}
+      {visibleTabs.length > 1 && (
+        <div>
+          <div className="glass-pill-bar">
+            {visibleTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`glass-pill-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => handleTabChange(tab.id)}
+                >
+                  <Icon size={16} /> {tab.label} ({tab.count})
+                </button>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      {/* Search & Status Filters Bar */}
+      <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 300px', position: 'relative' }}>
+          <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: '#94a3b8' }} />
+          <input
+            type="text"
+            className="input-glass"
+            style={{ paddingLeft: '42px' }}
+            placeholder={activeTab === 'products' ? 'Search products by SKU, name, category...' : `Search ${activeTab} by name, code, contact...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            STATUS:
+          </span>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('ALL')}
+          >
+            All ({currentItems.length})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('ACTIVE')}
+          >
+            Active ({activeCount})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'INACTIVE' ? 'btn-primary' : 'btn-glass'}`}
+            onClick={() => setStatusFilter('INACTIVE')}
+          >
+            Inactive ({inactiveCount})
+          </button>
+        </div>
+      </div>
 
       {/* Master Data Tables */}
       <div className="glass-card" style={{ overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-          {loading ? (
+          {loading && (
             <div style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
               Loading {activeTab} data...
             </div>
-          ) : activeTab === 'warehouses' && (
+          )}
+
+          {!loading && activeTab === 'products' && (
+            <table className="glass-table">
+              <thead>
+                <tr>
+                  <th>Code / SKU</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Unit</th>
+                  <th>Selling Price</th>
+                  <th>Min Stock</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                      No products found matching current criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map((p) => {
+                    const active = isItemActive(p);
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{p.sku}</td>
+                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                        <td>
+                          <span className="badge badge-info">{p.categoryName || 'General'}</span>
+                        </td>
+                        <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
+                        <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                          Rs. {Number(p.sellingPrice || 0).toFixed(2)}
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
+                            {p.minStockLevel || 0}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            style={{
+                              cursor: 'pointer',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            onClick={() => handleToggleActive(p.id, active)}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            {active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn btn-glass btn-sm"
+                              onClick={() => setViewingItem({ ...p, type: 'products' })}
+                              title="View Details"
+                            >
+                              <Eye size={14} /> View
+                            </button>
+                            <button
+                              className="btn btn-glass btn-sm"
+                              onClick={() => handleOpenEdit(p)}
+                              title="Edit Product"
+                            >
+                              <Edit2 size={14} /> Edit
+                            </button>
+                            <button
+                              className="btn btn-glass btn-sm"
+                              style={{ color: '#dc2626' }}
+                              onClick={() => handleDelete(p)}
+                              disabled={deletingId === p.id}
+                              title="Delete Product"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {!loading && activeTab === 'warehouses' && (
             <table className="glass-table">
               <thead>
                 <tr>
@@ -403,9 +611,24 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                           )}
                         </td>
                         <td>
-                          <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                          <button
+                            type="button"
+                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            style={{
+                              cursor: 'pointer',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            onClick={() => handleToggleActive(w.id, active)}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                             {active ? 'Active' : 'Inactive'}
-                          </span>
+                          </button>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -422,13 +645,6 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                               title="Edit Warehouse"
                             >
                               <Edit2 size={14} /> Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-glass"
-                              onClick={() => handleToggleActive(w.id, active)}
-                              title={active ? 'Deactivate Warehouse' : 'Activate Warehouse'}
-                            >
-                              {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
                             </button>
                             <button
                               className="btn btn-glass btn-sm"
@@ -453,6 +669,7 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
             <table className="glass-table">
               <thead>
                 <tr>
+                  <th>Code</th>
                   <th>Category Name</th>
                   <th>Description</th>
                   <th>Status</th>
@@ -462,7 +679,7 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
               <tbody>
                 {filteredCategories.length === 0 ? (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
                       No categories found matching current criteria.
                     </td>
                   </tr>
@@ -471,12 +688,28 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                     const active = isItemActive(c);
                     return (
                       <tr key={c.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{c.code}</td>
                         <td style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
                         <td style={{ color: '#64748b' }}>{c.description || '—'}</td>
                         <td>
-                          <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                          <button
+                            type="button"
+                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            style={{
+                              cursor: 'pointer',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            onClick={() => handleToggleActive(c.id, active)}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                             {active ? 'Active' : 'Inactive'}
-                          </span>
+                          </button>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -493,13 +726,6 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                               title="Edit Category"
                             >
                               <Edit2 size={14} /> Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-glass"
-                              onClick={() => handleToggleActive(c.id, active)}
-                              title={active ? 'Deactivate Category' : 'Activate Category'}
-                            >
-                              {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
                             </button>
                             <button
                               className="btn btn-glass btn-sm"
@@ -556,9 +782,24 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                           ${Number(c.currentBalance || c.currentCredit || 0).toFixed(2)}
                         </td>
                         <td>
-                          <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                          <button
+                            type="button"
+                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            style={{
+                              cursor: 'pointer',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            onClick={() => handleToggleActive(c.id, active)}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                             {active ? 'Active' : 'Inactive'}
-                          </span>
+                          </button>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -575,13 +816,6 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                               title="Edit Customer"
                             >
                               <Edit2 size={14} /> Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-glass"
-                              onClick={() => handleToggleActive(c.id, active)}
-                              title={active ? 'Deactivate Customer' : 'Activate Customer'}
-                            >
-                              {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
                             </button>
                             <button
                               className="btn btn-glass btn-sm"
@@ -634,9 +868,24 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                         <td>{s.phone || s.email || '—'}</td>
                         <td style={{ color: '#64748b' }}>{s.address || '—'}</td>
                         <td>
-                          <span className={`badge ${active ? 'badge-success' : 'badge-danger'}`}>
+                          <button
+                            type="button"
+                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            style={{
+                              cursor: 'pointer',
+                              border: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              transition: 'all 0.15s ease-in-out',
+                            }}
+                            onClick={() => handleToggleActive(s.id, active)}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                             {active ? 'Active' : 'Inactive'}
-                          </span>
+                          </button>
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
@@ -653,13 +902,6 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                               title="Edit Supplier"
                             >
                               <Edit2 size={14} /> Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-glass"
-                              onClick={() => handleToggleActive(s.id, active)}
-                              title={active ? 'Deactivate Supplier' : 'Activate Supplier'}
-                            >
-                              {active ? <XCircle size={14} color="#ef4444" /> : <CheckCircle size={14} color="#10b981" />}
                             </button>
                             <button
                               className="btn btn-glass btn-sm"
@@ -681,8 +923,6 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
           )}
         </div>
       </div>
-      </>
-      )}
 
       {/* View Details Modal */}
       {viewingItem && (
@@ -713,17 +953,36 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Status</span>
                 <div>
-                  <span className={`badge ${isItemActive(viewingItem) ? 'badge-success' : 'badge-danger'}`}>
+                  <button
+                    type="button"
+                    className={`badge ${isItemActive(viewingItem) ? 'badge-success' : 'badge-danger'}`}
+                    style={{
+                      cursor: 'pointer',
+                      border: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '5px 10px',
+                      transition: 'all 0.15s ease-in-out',
+                    }}
+                    onClick={async () => {
+                      const active = isItemActive(viewingItem);
+                      await handleToggleActive(viewingItem.id, active);
+                      setViewingItem(prev => prev ? ({ ...prev, active: !active, isActive: !active, is_active: !active, status: !active ? 'ACTIVE' : 'INACTIVE' }) : null);
+                    }}
+                    title={`Status: ${isItemActive(viewingItem) ? 'Active' : 'Inactive'} (Click to toggle)`}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                     {isItemActive(viewingItem) ? 'Active' : 'Inactive'}
-                  </span>
+                  </button>
                 </div>
               </div>
 
-              {(viewingItem.code || viewingItem.customerCode || viewingItem.supplierCode) && (
+              {(viewingItem.code || viewingItem.sku || viewingItem.customerCode || viewingItem.supplierCode) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Code / Identifier</span>
                   <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8', fontSize: '0.95rem' }}>
-                    {viewingItem.code || viewingItem.customerCode || viewingItem.supplierCode}
+                    {viewingItem.code || viewingItem.sku || viewingItem.customerCode || viewingItem.supplierCode}
                   </span>
                 </div>
               )}
@@ -732,6 +991,45 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Name</span>
                 <span style={{ fontWeight: 700, color: '#0f172a' }}>{viewingItem.name}</span>
               </div>
+
+              {viewingItem.type === 'products' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Category</span>
+                    <span style={{ fontWeight: 600 }}>{viewingItem.categoryName || 'General / Uncategorized'}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Unit of Measure</span>
+                    <span style={{ fontWeight: 600 }}>{viewingItem.unitOfMeasure || 'PCS'}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Selling Price</span>
+                    <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '1.05rem' }}>
+                      Rs. {Number(viewingItem.sellingPrice || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Cost Price</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      Rs. {Number(viewingItem.costPrice || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Min Stock Alert</span>
+                    <span style={{ fontWeight: 700, color: viewingItem.minStockLevel > 10 ? '#059669' : '#d97706' }}>
+                      {viewingItem.minStockLevel || 0} {viewingItem.unitOfMeasure || 'PCS'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Price Protocol</span>
+                    <span style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>Dynamic GRN Inward</span>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Description</span>
+                    <span>{viewingItem.description || 'No description provided.'}</span>
+                  </div>
+                </>
+              )}
 
               {viewingItem.type === 'warehouses' && (
                 <>
@@ -832,99 +1130,230 @@ export default function MastersView({ activeSubTab, onSubTabChange }) {
 
       {/* Add / Edit Form Modal */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="glass-modal" style={{ width: '100%', maxWidth: '560px', padding: '28px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', margin: 0 }}>
-                {editingItem ? 'Edit' : 'Create New'} {activeTab.slice(0, -1)}
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div
+            className="glass-modal"
+            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
+              <h2 style={{ fontSize: '1.35rem', color: '#0f172a', margin: 0 }}>
+                {editingItem ? 'Edit' : 'Create New'} {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab.slice(0, -1)}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
 
             <form onSubmit={handleSave}>
+              {activeTab === 'products' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        PRODUCT CODE (SKU) *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. SKU-PROD-001"
+                        value={modalForm.sku || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, sku: e.target.value.toUpperCase() })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        PRODUCT NAME *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. Standard Cement 50kg"
+                        value={modalForm.name || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        CATEGORY
+                      </label>
+                      <select
+                        className="input-glass"
+                        value={modalForm.categoryId || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, categoryId: e.target.value })}
+                      >
+                        <option value="">Select Category...</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        UNIT OF MEASURE
+                      </label>
+                      <select
+                        className="input-glass"
+                        value={modalForm.unitOfMeasure || 'PCS'}
+                        onChange={(e) => setModalForm({ ...modalForm, unitOfMeasure: e.target.value })}
+                      >
+                        {['PCS', 'BOX', 'KG', 'LTR', 'MTR', 'PKT', 'DOZ', 'SET', 'BAG', 'ROLL'].map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        MIN STOCK ALERT LEVEL
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="input-glass"
+                        value={modalForm.minStockLevel || '0'}
+                        onChange={(e) => setModalForm({ ...modalForm, minStockLevel: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        DESCRIPTION / NOTES
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="Specifications, size, packaging details..."
+                        value={modalForm.description || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      background: 'rgba(37, 99, 235, 0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(37, 99, 235, 0.15)',
+                      fontSize: '0.8rem',
+                      color: '#2563eb',
+                      marginBottom: '20px',
+                    }}
+                  >
+                    <strong>Pricing & Stock:</strong> Managed automatically via Goods Received Notes (Inward GRN). Base selling price is recorded upon inventory intake.
+                  </div>
+                </>
+              )}
+
               {activeTab === 'warehouses' && (
                 <>
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      WAREHOUSE CODE *
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. WH-001"
-                      value={modalForm.code || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
-                      required
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        WAREHOUSE CODE *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. WH-001"
+                        value={modalForm.code || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        WAREHOUSE NAME *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. Central Logistics Hub"
+                        value={modalForm.name || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
                   </div>
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      WAREHOUSE NAME *
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. Central Logistics Hub"
-                      value={modalForm.name || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      CONTACT NUMBER
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. +94 77 123 4567"
-                      value={modalForm.contactNumber || modalForm.phone || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, contactNumber: e.target.value, phone: e.target.value })}
-                    />
-                  </div>
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      FACILITY ADDRESS
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. 100 Port Access Road, Colombo"
-                      value={modalForm.address || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, address: e.target.value })}
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        CONTACT NUMBER
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. +94 77 123 4567"
+                        value={modalForm.contactNumber || modalForm.phone || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, contactNumber: e.target.value, phone: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        FACILITY ADDRESS
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. 100 Port Access Road, Colombo"
+                        value={modalForm.address || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, address: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </>
               )}
 
               {activeTab === 'categories' && (
                 <>
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      CATEGORY NAME *
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        CATEGORY CODE (ID) *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. CAT-001"
+                        value={modalForm.code || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        CATEGORY NAME *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. Industrial Tools & Parts"
+                        value={modalForm.name || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                      DESCRIPTION
                     </label>
                     <input
                       type="text"
                       className="input-glass"
-                      placeholder="e.g. Industrial Tools"
-                      value={modalForm.name || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      DESCRIPTION
-                    </label>
-                    <textarea
-                      rows="3"
-                      className="input-glass"
-                      placeholder="e.g. Heavy-duty power tools and assembly equipment"
+                      placeholder="e.g. Heavy-duty tools, fixtures, and power assembly equipment"
                       value={modalForm.description || ''}
                       onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
                     />

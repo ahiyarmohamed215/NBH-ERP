@@ -148,7 +148,7 @@ export default function SignupView({ onSwitchToLogin }) {
             <Package size={26} />
           </div>
           <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>Create an Account</h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Register to request access to NBH Warehouse ERP</p>
+          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Register to request access to NBH ERP</p>
         </div>
 
         <form onSubmit={handleSubmit}>

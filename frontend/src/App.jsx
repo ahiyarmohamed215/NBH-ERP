@@ -4,23 +4,27 @@ import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
 import DashboardView from './views/DashboardView';
 import InventoryHub from './views/InventoryHub';
-import SalesHub from './views/SalesHub';
-import ProductsView from './views/ProductsView';
+import PurchasingHub from './views/PurchasingHub';
+import InvoicingHub from './views/InvoicingHub';
+import EmployeesHub from './views/EmployeesHub';
 import MastersView from './views/MastersView';
 import ReportsView from './views/ReportsView';
-import AdminHub from './views/AdminHub';
+import AccountingHub from './views/AccountingHub';
+import CustomersHub from './views/CustomersHub';
 import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
 import {
   LayoutDashboard,
-  Package,
+  BookOpen,
+  Users,
+  Contact,
   Boxes,
-  ShoppingCart,
-  Database,
+  Truck,
+  FileText,
   BarChart3,
-  ShieldCheck,
+  Package,
   ChevronRight,
   ShieldAlert,
   Lock,
@@ -28,12 +32,53 @@ import {
   Minimize,
   PanelLeftClose,
   PanelLeftOpen,
-  Keyboard,
-  Monitor,
 } from 'lucide-react';
 
+// Reusable coming-soon component for emerging ERP modules
+function ComingSoonModule({ title, description, icon: Icon, color = '#2563eb', bg = '#eff6ff' }) {
+  return (
+    <div style={{ padding: '80px 24px', textAlign: 'center', maxWidth: '540px', margin: '0 auto' }}>
+      <div
+        style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
+          backgroundColor: bg,
+          color: color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 18px auto',
+        }}
+      >
+        <Icon size={30} />
+      </div>
+      <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+        {title}
+      </h2>
+      <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '20px' }}>
+        {description}
+      </p>
+      <span
+        style={{
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          color: color,
+          backgroundColor: bg,
+          padding: '5px 14px',
+          borderRadius: '9999px',
+          letterSpacing: '0.04em',
+          border: `1px solid ${color}30`,
+        }}
+      >
+        MODULE COMING SOON
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [currentView, setCurrentView] = useState('dashboard');
   const [subTab, setSubTab] = useState('');
@@ -46,80 +91,123 @@ export default function App() {
   const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
   const userPermissions = user?.permissions || [];
 
-  // Hierarchical primary module definitions
-  const moduleDefinitions = useMemo(() => [
-    {
-      id: 'dashboard',
-      label: 'Executive Dashboard',
-      icon: LayoutDashboard,
-      permissions: ['DASHBOARD_VIEW'],
-    },
-    {
-      id: 'inventory',
-      label: 'Inventory Operations',
-      icon: Boxes,
-      permissions: ['INVENTORY_VIEW', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS', 'INVENTORY_ADJUST'],
-      subItems: [
-        { id: 'stock', label: 'Stock Balances & Ledger', permission: 'INVENTORY_VIEW' },
-        { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
-        { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
-        { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
-        { id: 'adjustments', label: 'Stock Adjustments', permission: 'INVENTORY_ADJUST' },
-      ],
-    },
-    {
-      id: 'sales',
-      label: 'Sales & POS',
-      icon: ShoppingCart,
-      permissions: ['SALES_CREATE', 'SALES_RETURN'],
-      subItems: [
-        { id: 'pos', label: 'POS Terminal', permission: 'SALES_CREATE' },
-        { id: 'returns', label: 'Sales Returns & Credit', permission: 'SALES_RETURN' },
-      ],
-    },
-    {
-      id: 'masters',
-      label: 'Business Directories',
-      icon: Database,
-      permissions: ['WAREHOUSE_MANAGE', 'CUSTOMER_MANAGE', 'SUPPLIER_MANAGE', 'PRODUCT_MANAGE'],
-      subItems: [
-        { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
-        { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
-        { id: 'categories', label: 'Product Categories', permission: 'PRODUCT_MANAGE' },
-        { id: 'customers', label: 'Customers', permission: 'CUSTOMER_MANAGE' },
-        { id: 'suppliers', label: 'Suppliers', permission: 'SUPPLIER_MANAGE' },
-      ],
-    },
-    {
-      id: 'reports',
-      label: 'Reports & Analytics',
-      icon: BarChart3,
-      permissions: ['REPORT_VIEW', 'AUDIT_VIEW'],
-    },
-    {
-      id: 'admin',
-      label: 'System Administration',
-      icon: ShieldCheck,
-      permissions: ['USER_MANAGE', 'ROLE_MANAGE'],
-      adminOnly: true,
-      subItems: [
-        { id: 'users', label: 'User Approvals & Staff', permission: 'USER_MANAGE' },
-        { id: 'roles', label: 'Custom Roles & Perms', permission: 'ROLE_MANAGE' },
-      ],
-    },
-  ], []);
+  // Primary module definitions ordered matching user mockup
+  const moduleDefinitions = useMemo(
+    () => [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        permissions: ['DASHBOARD_VIEW'],
+      },
+      {
+        id: 'invoicing',
+        label: 'Invoicing',
+        icon: FileText,
+        permissions: ['SALES_CREATE', 'SALES_RETURN'],
+        subItems: [
+          { id: 'quotations', label: 'Quotations', permission: 'SALES_CREATE' },
+          { id: 'orders', label: 'Orders', permission: 'SALES_CREATE' },
+          { id: 'sales', label: 'Sales', permission: 'SALES_CREATE' },
+          { id: 'payments', label: 'Payments', permission: 'SALES_CREATE' },
+          { id: 'advance-payments', label: 'Advance Payments', permission: 'SALES_CREATE' },
+          { id: 'refunds', label: 'Refunds', permission: 'SALES_RETURN' },
+        ],
+      },
+      {
+        id: 'customers',
+        label: 'Customers',
+        icon: Users,
+        permissions: ['CUSTOMER_MANAGE'],
+        subItems: [
+          { id: 'list', label: 'Customer List', permission: 'CUSTOMER_MANAGE' },
+          { id: 'groups', label: 'Groups & Routes', permission: 'CUSTOMER_MANAGE' },
+        ],
+      },
+      {
+        id: 'employees',
+        label: 'Employees',
+        icon: Contact,
+        permissions: ['USER_MANAGE', 'ROLE_MANAGE'],
+        subItems: [
+          { id: 'list', label: 'Employee List', permission: 'USER_MANAGE' },
+          { id: 'groups', label: 'Groups', permission: 'ROLE_MANAGE' },
+          { id: 'attendance', label: 'Attendance', permission: 'USER_MANAGE' },
+          { id: 'payroll', label: 'Payroll', permission: 'USER_MANAGE' },
+          { id: 'commissions', label: 'Commission Templates', permission: 'USER_MANAGE' },
+        ],
+      },
+      {
+        id: 'inventory',
+        label: 'Inventory',
+        icon: Boxes,
+        permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST'],
+        subItems: [
+          { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
+          { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
+          { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
+          { id: 'brands', label: 'Brands', permission: 'PRODUCT_MANAGE' },
+          { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
+          { id: 'reserved', label: 'Reserved', permission: 'INVENTORY_VIEW' },
+        ],
+      },
+      {
+        id: 'purchasing',
+        label: 'Purchasing',
+        icon: Truck,
+        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS'],
+        subItems: [
+          { id: 'suppliers', label: 'Suppliers Directory', permission: 'SUPPLIER_MANAGE' },
+          { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
+          { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
+          { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
+          { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_MANAGE' },
+        ],
+      },
+      {
+        id: 'accounting',
+        label: 'Accounting',
+        icon: BookOpen,
+        permissions: ['DASHBOARD_VIEW'],
+        subItems: [
+          { id: 'chart-of-accounts', label: 'Chart of Accounts' },
+          { id: 'banking', label: 'Banking' },
+          { id: 'cheques', label: 'Cheques' },
+          { id: 'expenses', label: 'Expenses' },
+          { id: 'dividend', label: 'Dividend' },
+          { id: 'journal-entries', label: 'Journal Entries' },
+        ],
+      },
+      {
+        id: 'reports',
+        label: 'Reports',
+        icon: BarChart3,
+        permissions: ['REPORT_VIEW', 'AUDIT_VIEW'],
+        subItems: [
+          { id: 'customer-reports', label: 'Customer Reports', permission: 'REPORT_VIEW' },
+          { id: 'sales-reports', label: 'Sales Report', permission: 'REPORT_VIEW' },
+          { id: 'inventory-reports', label: 'Inventory Reports', permission: 'REPORT_VIEW' },
+          { id: 'purchase-reports', label: 'Purchase Reports', permission: 'REPORT_VIEW' },
+          { id: 'project-reports', label: 'Project Report', permission: 'REPORT_VIEW' },
+          { id: 'accounting-reports', label: 'Accounting Reports', permission: 'REPORT_VIEW' },
+        ],
+      },
+    ],
+    []
+  );
 
   // Filter accessible modules based on permissions
   const accessibleModules = useMemo(() => {
     return moduleDefinitions
       .filter((mod) => {
         if (isSuperAdmin) return true;
+        if (!mod.permissions || mod.permissions.length === 0) return true;
         return mod.permissions.some((p) => userPermissions.includes(p));
       })
       .map((mod) => {
         if (!mod.subItems) return mod;
         const allowedSubs = mod.subItems.filter(
-          (sub) => isSuperAdmin || userPermissions.includes(sub.permission)
+          (sub) => isSuperAdmin || !sub.permission || userPermissions.includes(sub.permission)
         );
         return { ...mod, subItems: allowedSubs };
       });
@@ -130,32 +218,88 @@ export default function App() {
     [accessibleModules]
   );
 
-  // Seamless navigation helper supporting legacy single routes and hierarchical hubs
+  // Seamless navigation helper supporting legacy and restructured routes
   const navigateTo = useCallback((view, sub = '') => {
     if (view === 'pos') {
-      setCurrentView('sales');
+      setCurrentView('invoicing');
       setSubTab('pos');
-    } else if (view === 'sales-returns') {
-      setCurrentView('sales');
-      setSubTab('returns');
-    } else if (view === 'grn') {
+    } else if (view === 'invoicing') {
+      setCurrentView('invoicing');
+      setSubTab(sub || 'sales');
+    } else if (view === 'sales' || view === 'invoices') {
+      setCurrentView('invoicing');
+      setSubTab('sales');
+    } else if (view === 'quotations') {
+      setCurrentView('invoicing');
+      setSubTab('quotations');
+    } else if (view === 'orders') {
+      setCurrentView('invoicing');
+      setSubTab('orders');
+    } else if (view === 'payments') {
+      setCurrentView('invoicing');
+      setSubTab('payments');
+    } else if (view === 'advance-payments') {
+      setCurrentView('invoicing');
+      setSubTab('advance-payments');
+    } else if (view === 'refunds' || view === 'sales-returns') {
+      setCurrentView('invoicing');
+      setSubTab('refunds');
+    } else if (view === 'accounting') {
+      setCurrentView('accounting');
+      setSubTab(sub || 'chart-of-accounts');
+    } else if (view === 'admin' || view === 'users' || view === 'employees') {
+      setCurrentView('employees');
+      setSubTab(sub || 'list');
+    } else if (view === 'roles' || view === 'groups') {
+      setCurrentView('employees');
+      setSubTab('groups');
+    } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
+      setCurrentView('purchasing');
+      setSubTab(view);
+    } else if (view === 'inventory') {
       setCurrentView('inventory');
-      setSubTab('grn');
-    } else if (view === 'gtn') {
-      setCurrentView('inventory');
-      setSubTab('gtn');
-    } else if (view === 'prn') {
-      setCurrentView('inventory');
-      setSubTab('prn');
-    } else if (view === 'adjustments') {
+      setSubTab(sub || 'adjustments');
+    } else if (view === 'stock' || view === 'adjustments') {
       setCurrentView('inventory');
       setSubTab('adjustments');
-    } else if (view === 'users') {
-      setCurrentView('admin');
-      setSubTab('users');
-    } else if (view === 'roles') {
-      setCurrentView('admin');
-      setSubTab('roles');
+    } else if (view === 'warehouses') {
+      setCurrentView('inventory');
+      setSubTab('warehouses');
+    } else if (view === 'products') {
+      setCurrentView('inventory');
+      setSubTab('products');
+    } else if (view === 'brands') {
+      setCurrentView('inventory');
+      setSubTab('brands');
+    } else if (view === 'categories') {
+      setCurrentView('inventory');
+      setSubTab('categories');
+    } else if (view === 'reserved') {
+      setCurrentView('inventory');
+      setSubTab('reserved');
+    } else if (view === 'customers') {
+      setCurrentView('customers');
+      setSubTab(sub || 'list');
+    } else if (view === 'customer-groups' || view === 'routes') {
+      setCurrentView('customers');
+      setSubTab('groups');
+    } else if (view === 'masters') {
+      if (sub === 'customers') {
+        setCurrentView('customers');
+        setSubTab('list');
+      } else if (sub === 'suppliers') {
+        setCurrentView('purchasing');
+        setSubTab('suppliers');
+      } else if (sub === 'warehouses' || sub === 'categories') {
+        setCurrentView('inventory');
+        setSubTab(sub === 'warehouses' ? 'warehouses' : 'products');
+      } else {
+        setCurrentView('inventory');
+        setSubTab('products');
+      }
+    } else if (view === 'reports') {
+      setCurrentView('reports');
+      setSubTab(sub || 'customer-reports');
     } else {
       setCurrentView(view);
       if (sub) setSubTab(sub);
@@ -243,8 +387,8 @@ export default function App() {
       <aside
         className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
         style={{
-          width: isSidebarCollapsed ? '62px' : '260px',
-          minWidth: isSidebarCollapsed ? '62px' : '260px',
+          width: isSidebarCollapsed ? '64px' : '235px',
+          minWidth: isSidebarCollapsed ? '64px' : '235px',
           height: '100vh',
           maxHeight: '100vh',
           position: 'sticky',
@@ -253,26 +397,28 @@ export default function App() {
           flexDirection: 'column',
           justifyContent: 'space-between',
           zIndex: 40,
+          backgroundColor: '#ffffff',
+          borderRight: '1px solid #e2e8f0',
         }}
       >
-        <div style={{ padding: isSidebarCollapsed ? '20px 8px' : '20px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {/* Logo & Brand Header with Small Minimize/Expand Sidebar Button */}
+        <div style={{ padding: isSidebarCollapsed ? '16px 8px' : '16px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {/* Logo & Brand Header */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-              padding: isSidebarCollapsed ? '0' : '0 4px',
-              marginBottom: '18px',
+              padding: isSidebarCollapsed ? '0' : '4px 6px',
+              marginBottom: '20px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div
                 style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  backgroundColor: '#2563eb',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  backgroundColor: '#0284c7',
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
@@ -281,41 +427,40 @@ export default function App() {
                   cursor: isSidebarCollapsed ? 'pointer' : 'default',
                 }}
                 onClick={isSidebarCollapsed ? toggleSidebar : undefined}
-                title="NBH Enterprise ERP"
+                title="NBH ERP"
               >
-                <Package size={20} />
+                <Package size={17} />
               </div>
-              <div className="sidebar-brand-text">
-                <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+              {!isSidebarCollapsed && (
+                <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
                   NBH ERP
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
-                  Enterprise System
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Small minimize button inside sidebar */}
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              title={isSidebarCollapsed ? 'Expand Sidebar (Ctrl+B)' : 'Minimize Sidebar (Ctrl+B)'}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#94a3b8',
-                padding: '4px',
-                borderRadius: '6px',
-                display: isSidebarCollapsed ? 'none' : 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
-            >
-              <PanelLeftClose size={16} />
-            </button>
+            {/* Minimize button inside sidebar */}
+            {!isSidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Minimize Sidebar (Ctrl+B)"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            )}
           </div>
 
           {/* When collapsed, show small expand button right below logo */}
@@ -336,7 +481,7 @@ export default function App() {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#2563eb')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#0284c7')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
               >
                 <PanelLeftOpen size={14} />
@@ -344,24 +489,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Navigation Menu Header */}
-          <div
-            className="sidebar-section-title"
-            style={{
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              color: '#94a3b8',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              padding: '0 6px',
-              marginBottom: '8px',
-            }}
-          >
-            Modules
-          </div>
-
           {/* Standard Navigation Buttons */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {accessibleModules.map((mod) => {
               const Icon = mod.icon;
               const isCurrentModule = currentView === mod.id;
@@ -374,18 +503,53 @@ export default function App() {
                   onClick={() => {
                     navigateTo(mod.id, mod.subItems?.[0]?.id || '');
                   }}
-                  className={`sidebar-nav-btn ${isCurrentModule ? 'active' : ''}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                    width: '100%',
+                    padding: isSidebarCollapsed ? '10px 0' : '9px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
+                    color: isCurrentModule ? '#0284c7' : '#475569',
+                    fontWeight: isCurrentModule ? 600 : 500,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isCurrentModule) e.currentTarget.style.backgroundColor = '#f8fafc';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
                 >
-                  <div className="nav-icon-wrap">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
                     <Icon
                       size={18}
-                      color={isCurrentModule ? '#1d4ed8' : '#64748b'}
+                      color={isCurrentModule ? '#0284c7' : '#64748b'}
                       style={{ flexShrink: 0 }}
                     />
-                    <span style={{ fontWeight: isCurrentModule ? 600 : 500 }}>{mod.label}</span>
+                    {!isSidebarCollapsed && (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {mod.label}
+                      </span>
+                    )}
                   </div>
 
-                  <ChevronRight size={16} className="forward-icon" />
+                  {!isSidebarCollapsed && isCurrentModule && (
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: '#0284c7',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
                 </button>
               );
             })}
@@ -409,9 +573,8 @@ export default function App() {
 
       {/* Main Workspace Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
-
         {/* Dynamic Workspace Rendering */}
-        <main style={{ flex: 1, overflowY: 'auto', minHeight: 0, position: 'relative' }}>
+        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
           {accessibleModules.length === 0 ? (
             <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '0 auto' }}>
               <div
@@ -460,28 +623,31 @@ export default function App() {
           ) : (
             <>
               {currentView === 'dashboard' && <DashboardView onNavigate={navigateTo} />}
+              {currentView === 'invoicing' && (
+                <InvoicingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
+              {currentView === 'customers' && (
+                <CustomersHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
+              {currentView === 'employees' && (
+                <EmployeesHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
               {currentView === 'inventory' && (
                 <InventoryHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
-              {currentView === 'sales' && (
-                <SalesHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              {currentView === 'purchasing' && (
+                <PurchasingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
-              {currentView === 'products' && (
-                <MastersView activeSubTab="products" onSubTabChange={setSubTab} />
+              {currentView === 'accounting' && (
+                <AccountingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
-              {currentView === 'masters' && (
-                <MastersView activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'reports' && <ReportsView />}
-              {currentView === 'admin' && (
-                <AdminHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
+              {currentView === 'reports' && <ReportsView activeSubTab={subTab} />}
             </>
           )}
         </main>
       </div>
 
-      {/* Floating Bottom-Right Fullscreen Trigger Button (Icon Only) */}
+      {/* Floating Bottom-Right Fullscreen Trigger Button */}
       <button
         type="button"
         onClick={toggleFullscreen}

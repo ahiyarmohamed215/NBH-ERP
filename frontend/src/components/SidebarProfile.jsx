@@ -23,6 +23,7 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [helpTab, setHelpTab] = useState('shortcuts'); // 'shortcuts' | 'support'
   const [pendingCount, setPendingCount] = useState(0);
   const menuRef = useRef(null);
 
@@ -207,111 +208,11 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
               Profile Settings & Password
             </button>
 
-            {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onNavigate('users');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '9px 16px',
-                    fontSize: '0.86rem',
-                    color: '#334155',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Clock size={15} color="#64748b" />
-                    Pending Approvals
-                  </span>
-                  {pendingCount > 0 && (
-                    <span
-                      style={{
-                        backgroundColor: '#ef4444',
-                        color: '#ffffff',
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        borderRadius: '9999px',
-                        padding: '1px 6px',
-                      }}
-                    >
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onNavigate('roles');
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '9px 16px',
-                    fontSize: '0.86rem',
-                    color: '#334155',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <ShieldCheck size={15} color="#64748b" />
-                  Custom Roles & Perms
-                </button>
-              </>
-            )}
-
             <button
               type="button"
               onClick={() => {
                 setMenuOpen(false);
-                if (onOpenShortcuts) onOpenShortcuts();
-              }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '9px 16px',
-                fontSize: '0.86rem',
-                color: '#334155',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Keyboard size={16} color="#64748b" />
-                Keyboard Shortcuts
-              </span>
-              <span className="erp-kbd">F1</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
+                setHelpTab('shortcuts');
                 setShowHelpModal(true);
               }}
               style={{
@@ -319,8 +220,9 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                padding: '9px 16px',
-                fontSize: '0.86rem',
+                padding: '10px 16px',
+                fontSize: '0.88rem',
+                fontWeight: 500,
                 color: '#334155',
                 background: 'none',
                 border: 'none',
@@ -448,14 +350,16 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
 
       {/* Edit Profile Modal */}
       {showEditModal && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" onClick={() => setShowEditModal(false)}>
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '480px',
+              maxWidth: '680px',
               backgroundColor: '#ffffff',
+              borderRadius: '14px',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div
               style={{
@@ -607,9 +511,10 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '720px',
               backgroundColor: '#ffffff',
-              padding: '24px 28px',
+              padding: '28px 32px',
+              borderRadius: '14px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -620,7 +525,7 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
                 justifyContent: 'space-between',
                 paddingBottom: '14px',
                 borderBottom: '1px solid #e2e8f0',
-                marginBottom: '18px',
+                marginBottom: '16px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -643,7 +548,7 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
                     Help & Enterprise Support
                   </h3>
                   <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    NBH ERP System Assistance & Documentation
+                    NBH ERP System Assistance, Shortcuts & Documentation
                   </span>
                 </div>
               </div>
@@ -656,50 +561,191 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
-                  <PhoneCall size={16} color="#2563eb" /> IT Operations Hotline
-                </div>
-                <div style={{ fontSize: '0.84rem', color: '#475569' }}>
-                  Direct Phone: <strong>+94 11 234 5678</strong> (Mon - Sat, 8:00 AM - 6:00 PM)
-                </div>
-                <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
-                  Internal Extension: <strong>Ext. 104 / 105</strong>
-                </div>
-              </div>
+            {/* Subtabs for Help Modal: Shortcuts vs Support Desk */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '8px',
+                marginBottom: '18px',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '8px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setHelpTab('shortcuts')}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: helpTab === 'shortcuts' ? '#eff6ff' : 'transparent',
+                  color: helpTab === 'shortcuts' ? '#2563eb' : '#64748b',
+                  fontWeight: helpTab === 'shortcuts' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                <Keyboard size={15} /> Keyboard Shortcuts (F1)
+              </button>
 
-              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
-                  <Mail size={16} color="#2563eb" /> Email & Support Desk
-                </div>
-                <div style={{ fontSize: '0.84rem', color: '#475569' }}>
-                  Technical Support: <strong>support@nbh-erp.com</strong>
-                </div>
-                <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
-                  Administrator: <strong>admin@nbh-erp.com</strong>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
-                  <BookOpen size={16} color="#2563eb" /> System Quick Reference
-                </div>
-                <ul style={{ fontSize: '0.82rem', color: '#64748b', paddingLeft: '18px', margin: 0 }}>
-                  <li>Press <strong>F1</strong> anytime to view all keyboard shortcuts.</li>
-                  <li>Press <strong>F11</strong> to toggle full-screen distraction-free mode.</li>
-                  <li>Press <strong>Ctrl + B</strong> to collapse/expand the sidebar.</li>
-                  <li>Press <strong>Esc</strong> to dismiss any open modal or popover.</li>
-                </ul>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                <span style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: 600 }}>System Status: Operational & Connected</span>
-                <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>v1.2</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setHelpTab('support')}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: helpTab === 'support' ? '#eff6ff' : 'transparent',
+                  color: helpTab === 'support' ? '#2563eb' : '#64748b',
+                  fontWeight: helpTab === 'support' ? 700 : 500,
+                  fontSize: '0.86rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                <PhoneCall size={15} /> Support Hotline & Contacts
+              </button>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Tab 1: Keyboard Shortcuts Content */}
+            {helpTab === 'shortcuts' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Module Navigation (Alt + Number)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.84rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Dashboard</span>
+                      <span className="erp-kbd">Alt + 1</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Accounting Hub</span>
+                      <span className="erp-kbd">Alt + 2</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>POS Terminal</span>
+                      <span className="erp-kbd">Alt + 3 / F3</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Customer Directory</span>
+                      <span className="erp-kbd">Alt + 4</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Employees & Staff</span>
+                      <span className="erp-kbd">Alt + 5</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Inventory Operations</span>
+                      <span className="erp-kbd">Alt + 6 / F6</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Purchasing & Suppliers</span>
+                      <span className="erp-kbd">Alt + 7</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Reports & Analytics</span>
+                      <span className="erp-kbd">Alt + 8 / F8</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Quick Actions & Controls
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.84rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Focus Search Box</span>
+                      <span className="erp-kbd">F2</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Add New Record</span>
+                      <span className="erp-kbd">F4 / Alt + N</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Print View / Invoice</span>
+                      <span className="erp-kbd">F9 / Ctrl + P</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Save & Submit Form</span>
+                      <span className="erp-kbd">F10 / Ctrl + S</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Toggle Sidebar</span>
+                      <span className="erp-kbd">Ctrl + B</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Toggle Full Screen</span>
+                      <span className="erp-kbd">F11 / Alt + Enter</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>Close Modal / Cancel</span>
+                      <span className="erp-kbd">Esc</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#475569' }}>POS Tender / Payment</span>
+                      <span className="erp-kbd">F5 / Ctrl + Space</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Support & Desk Content */}
+            {helpTab === 'support' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                    <PhoneCall size={16} color="#2563eb" /> IT Operations Hotline
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                    Direct Phone: <strong>+94 11 234 5678</strong> (Mon - Sat, 8:00 AM - 6:00 PM)
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                    Internal Extension: <strong>Ext. 104 / 105</strong>
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                    <Mail size={16} color="#2563eb" /> Email & Support Desk
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                    Technical Support: <strong>support@nbh-erp.com</strong>
+                  </div>
+                  <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                    Administrator: <strong>admin@nbh-erp.com</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: 600 }}>System Status: Operational & Connected</span>
+                  <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>v1.2</span>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {helpTab === 'shortcuts' && onOpenShortcuts ? (
+                <button
+                  type="button"
+                  className="btn btn-glass btn-sm"
+                  onClick={() => {
+                    setShowHelpModal(false);
+                    onOpenShortcuts();
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Keyboard size={14} /> Open Full Overlay Guide
+                </button>
+              ) : <div />}
+
               <button
                 type="button"
                 className="btn btn-primary"

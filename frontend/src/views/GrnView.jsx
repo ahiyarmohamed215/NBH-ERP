@@ -1512,13 +1512,13 @@ export default function GrnView() {
         <div className="modal-backdrop" onClick={() => setShowUploadModal(false)}>
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '580px', padding: '24px', background: '#ffffff' }}
+            style={{ width: '100%', maxWidth: '760px', padding: '30px', background: '#ffffff' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileSpreadsheet size={22} color="#16a34a" />
-                <h2 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FileSpreadsheet size={24} color="#16a34a" />
+                <h2 style={{ fontSize: '1.35rem', color: '#0f172a', margin: 0 }}>
                   Upload GRN Spreadsheet
                 </h2>
               </div>
@@ -1526,31 +1526,31 @@ export default function GrnView() {
                 onClick={() => setShowUploadModal(false)}
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '18px', lineHeight: 1.5 }}>
               Upload your Excel (.xlsx / .csv) sheet or paste comma-separated product data to automatically import all line items into the GRN intake form.
             </p>
 
             <div
               style={{
                 border: '2px dashed #3b82f6',
-                borderRadius: '10px',
-                padding: '24px',
+                borderRadius: '12px',
+                padding: '32px 24px',
                 textAlign: 'center',
                 background: '#eff6ff',
-                marginBottom: '16px',
+                marginBottom: '18px',
                 cursor: 'pointer',
               }}
               onClick={() => fileInputRef.current?.click()}
             >
-              <UploadCloud size={36} color="#2563eb" style={{ margin: '0 auto 8px' }} />
-              <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>
+              <UploadCloud size={42} color="#2563eb" style={{ margin: '0 auto 10px' }} />
+              <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.98rem' }}>
                 Click to Select Spreadsheet File (.csv / .xlsx)
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '6px' }}>
                 File columns: ProductCode, TradeName, Quantity, FreeQty, CostPrice, SalePrice, Discount%
               </div>
               <input
@@ -1562,13 +1562,13 @@ export default function GrnView() {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Need a starting format?</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Need a starting format?</span>
               <button
                 type="button"
                 className="btn btn-glass btn-sm"
                 onClick={downloadSampleCsv}
-                style={{ fontSize: '0.78rem' }}
+                style={{ fontSize: '0.82rem', padding: '6px 14px' }}
               >
                 Download Sample CSV Template
               </button>
@@ -1588,7 +1588,7 @@ export default function GrnView() {
         <div className="modal-backdrop" onClick={() => setSelectedGrn(null)}>
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '860px', padding: '28px', background: '#ffffff', borderRadius: '12px' }}
+            style={{ width: '100%', maxWidth: '1080px', padding: '32px', background: '#ffffff', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with Title and Document Action Buttons */}

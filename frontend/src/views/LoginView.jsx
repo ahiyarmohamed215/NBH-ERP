@@ -62,8 +62,8 @@ export default function LoginView({ onSwitchToSignup }) {
           >
             <Package size={26} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>NBH Warehouse ERP</h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Sign in with your approved user account</p>
+          <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>NBH ERP</h2>
+          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Sign in to your enterprise account</p>
         </div>
 
         <form onSubmit={handleSubmit}>

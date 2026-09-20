@@ -557,7 +557,7 @@ export default function SalesReturnsView() {
         <div className="modal-backdrop" onClick={() => setSelectedReturn(null)}>
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '680px', padding: '24px', background: '#ffffff' }}
+            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
