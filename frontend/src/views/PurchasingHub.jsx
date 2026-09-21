@@ -86,6 +86,36 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
 
   return (
     <div style={{ flex: 1, height: '100%', maxHeight: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Page Header (Fixed / Sticky at Top) - Standardized across Hubs */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          padding: '24px 32px 14px 32px',
+          backgroundColor: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          flexShrink: 0,
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 4px 0',
+            }}
+          >
+            Purchasing Management
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+            Manage registered procurement vendors, purchase orders, goods receipts (GRN), and stock transfers (GTN).
+          </p>
+        </div>
+      </div>
+
       {/* Sub-navigation Header Bar (Fixed / Sticky at Top) */}
       <div
         className="glass-sub-header"

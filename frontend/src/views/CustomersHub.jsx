@@ -3,6 +3,7 @@ import {
   customerApi,
   salesmanApi,
   userApi,
+  salesApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
@@ -31,15 +32,60 @@ import {
   Upload,
   Download,
   ArrowLeft,
+  History,
+  Clock,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Printer,
+  Receipt,
+  Calendar,
+  CreditCard,
+  ChevronRight,
 } from 'lucide-react';
 
 const STORAGE_KEY_ROUTES = 'erp_customer_routes_v1';
+const STORAGE_KEY_INVOICES = 'erp_commercial_invoices_v1';
+const STORAGE_KEY_QUOTATIONS = 'erp_quotations_v1';
+const STORAGE_KEY_ORDERS = 'erp_sales_orders_v1';
+const STORAGE_KEY_PAYMENTS = 'erp_customer_payments_v1';
+const STORAGE_KEY_ADVANCES = 'erp_advance_payments_v1';
+
+// Seed sample records matching InvoicingHub for seamless ledger history
+const DEFAULT_SAMPLE_INVOICES = [
+  { id: 'inv-94', invoiceNumber: '26SEP_MB_:94', customerName: 'Negombo Motors', customerId: '1', invoiceDate: '2026-09-07', displayDate: 'Sep 7, 2026', paymentType: 'Full Payment', paymentMethod: 'Cheque', totalAmount: 118.0, paidAmount: 118.0, balanceAmount: 0.0, status: 'PAID' },
+  { id: 'inv-93', invoiceNumber: '26AUG_MB_:93', customerName: 'AIA', customerId: '2', invoiceDate: '2026-08-24', displayDate: 'Aug 24, 2026', paymentType: 'Installment', paymentMethod: 'Cash', totalAmount: 238.8, paidAmount: 10.0, balanceAmount: 228.8, status: 'PARTIAL' },
+  { id: 'inv-92', invoiceNumber: '26AUG_MB_:92', customerName: 'AIA', customerId: '2', invoiceDate: '2026-08-24', displayDate: 'Aug 24, 2026', paymentType: 'Installment', paymentMethod: 'Cash', totalAmount: 128.0, paidAmount: 18.0, balanceAmount: 110.0, status: 'PARTIAL' },
+  { id: 'inv-91', invoiceNumber: '26AUG_MB_:91', customerName: 'Walk-in', customerId: '3', invoiceDate: '2026-08-24', displayDate: 'Aug 24, 2026', paymentType: 'Full Payment', paymentMethod: 'Cash', totalAmount: 118.0, paidAmount: 118.0, balanceAmount: 0.0, status: 'PAID' },
+  { id: 'inv-90', invoiceNumber: '26AUG_MB_:90', customerName: 'Walk-in', customerId: '3', invoiceDate: '2026-08-23', displayDate: 'Aug 23, 2026', paymentType: 'Full Payment', paymentMethod: 'Cash', totalAmount: 151.33, paidAmount: 151.33, balanceAmount: 0.0, status: 'PAID' },
+  { id: 'inv-89', invoiceNumber: '26AUG_MB_:89', customerName: 'Walk-in', customerId: '3', invoiceDate: '2026-08-22', displayDate: 'Aug 22, 2026', paymentType: 'Full Payment', paymentMethod: 'Cash', totalAmount: 124.21, paidAmount: 124.21, balanceAmount: 0.0, status: 'PAID' },
+];
+
+const DEFAULT_SAMPLE_PAYMENTS = [
+  { id: 'pmt-1', receiptNo: 'REC-2026-094', invoiceNo: '26SEP_MB_:94', customerName: 'Negombo Motors', paymentDate: '2026-09-07', paymentMethod: 'Cheque', amount: 118.0, status: 'CLEARED' },
+  { id: 'pmt-2', receiptNo: 'REC-2026-093', invoiceNo: '26AUG_MB_:93', customerName: 'AIA', paymentDate: '2026-08-24', paymentMethod: 'Cash', amount: 10.0, status: 'RECEIVED' },
+];
+
+const DEFAULT_SAMPLE_ADVANCES = [
+  { id: 'adv-1', voucherNo: 'ADV-2026-01', customerName: 'Negombo Motors', date: '2026-09-05', amount: 25000.0, balance: 5000.0, paymentMethod: 'Bank Transfer', status: 'ACTIVE' },
+];
+
+const DEFAULT_SAMPLE_QUOTATIONS = [
+  { id: 'qt-1', quotationNo: 'QT-2026-001', customerName: 'Negombo Motors', date: '2026-09-18', validUntil: '2026-10-18', totalAmount: 45000.0, status: 'ACCEPTED' },
+  { id: 'qt-2', quotationNo: 'QT-2026-002', customerName: 'AIA Insurance', date: '2026-09-15', validUntil: '2026-10-15', totalAmount: 125000.0, status: 'SENT' },
+];
+
+const DEFAULT_SAMPLE_ORDERS = [
+  { id: 'ord-1', orderNo: 'SO-2026-001', customerName: 'Negombo Motors', orderDate: '2026-09-19', deliveryDate: '2026-09-25', totalAmount: 45000.0, paymentStatus: 'PAID', orderStatus: 'CONFIRMED' },
+  { id: 'ord-2', orderNo: 'SO-2026-002', customerName: 'AIA Insurance', orderDate: '2026-09-16', deliveryDate: '2026-09-22', totalAmount: 125000.0, paymentStatus: 'PARTIAL', orderStatus: 'PROCESSING' },
+];
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState(() => {
-    return activeSubTab === 'groups' || activeSubTab === 'routes' ? 'groups' : 'list';
+    if (activeSubTab === 'groups' || activeSubTab === 'routes') return 'groups';
+    if (activeSubTab === 'history') return 'history';
+    return 'list';
   });
 
   // Data states
@@ -71,6 +117,16 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Simple Deletion Confirmation Modal State
   const [securityModalData, setSecurityModalData] = useState(null);
   const [isExecutingDelete, setIsExecutingDelete] = useState(false);
+
+  // Customer History State
+  const [selectedHistoryCustomerId, setSelectedHistoryCustomerId] = useState('');
+  const [historyTypeFilter, setHistoryTypeFilter] = useState('ALL'); // 'ALL' | 'INVOICES' | 'PAYMENTS' | 'ADVANCES' | 'QUOTATIONS'
+  const [historyDatePreset, setHistoryDatePreset] = useState('ALL'); // 'ALL' | 'THIS_MONTH' | 'LAST_30' | 'THIS_YEAR' | 'CUSTOM'
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [selectedLedgerDoc, setSelectedLedgerDoc] = useState(null);
+  const [historyCustomerDropdownSearch, setHistoryCustomerDropdownSearch] = useState('');
 
   // Routes / Groups State
   const [routes, setRoutes] = useState(() => {
@@ -105,11 +161,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [customerSearchInRoute, setCustomerSearchInRoute] = useState('');
   const [showAssignCustomerModal, setShowAssignCustomerModal] = useState(false);
   const [assignCustomerSearch, setAssignCustomerSearch] = useState('');
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
 
   // Sync subTab prop
   useEffect(() => {
     if (activeSubTab) {
-      setActiveTab(activeSubTab === 'groups' || activeSubTab === 'routes' ? 'groups' : 'list');
+      setActiveTab(
+        activeSubTab === 'groups' || activeSubTab === 'routes'
+          ? 'groups'
+          : activeSubTab === 'history'
+          ? 'history'
+          : 'list'
+      );
     }
   }, [activeSubTab]);
 
@@ -209,6 +272,325 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
+  const handleViewCustomerHistory = (customer) => {
+    if (customer && customer.id) {
+      setSelectedHistoryCustomerId(String(customer.id));
+      handleTabChange('history');
+    }
+  };
+
+  // Currently selected customer for history
+  const selectedHistoryCustomer = useMemo(() => {
+    if (!selectedHistoryCustomerId) {
+      return customers.length > 0 ? customers[0] : null;
+    }
+    return customers.find((c) => String(c.id) === String(selectedHistoryCustomerId)) || (customers.length > 0 ? customers[0] : null);
+  }, [customers, selectedHistoryCustomerId]);
+
+  // Unified Customer Transaction Ledger
+  const customerHistoryLedger = useMemo(() => {
+    if (!selectedHistoryCustomer) return [];
+
+    let invoices = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_INVOICES);
+      invoices = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_INVOICES;
+    } catch (e) {
+      invoices = DEFAULT_SAMPLE_INVOICES;
+    }
+
+    let payments = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PAYMENTS);
+      payments = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_PAYMENTS;
+    } catch (e) {
+      payments = DEFAULT_SAMPLE_PAYMENTS;
+    }
+
+    let advances = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ADVANCES);
+      advances = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_ADVANCES;
+    } catch (e) {
+      advances = DEFAULT_SAMPLE_ADVANCES;
+    }
+
+    let quotations = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_QUOTATIONS);
+      quotations = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_QUOTATIONS;
+    } catch (e) {
+      quotations = DEFAULT_SAMPLE_QUOTATIONS;
+    }
+
+    let orders = [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ORDERS);
+      orders = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_ORDERS;
+    } catch (e) {
+      orders = DEFAULT_SAMPLE_ORDERS;
+    }
+
+    const cId = String(selectedHistoryCustomer.id);
+    const cName = (selectedHistoryCustomer.name || '').trim().toLowerCase();
+    const cCode = (selectedHistoryCustomer.code || selectedHistoryCustomer.customerCode || '').trim().toLowerCase();
+
+    const matchesCustomer = (itemCustomerId, itemCustomerName, itemCustomerCode) => {
+      if (itemCustomerId && String(itemCustomerId) === cId) return true;
+      if (itemCustomerCode && cCode && String(itemCustomerCode).trim().toLowerCase() === cCode) return true;
+      if (!itemCustomerName) return false;
+      const rawName = String(itemCustomerName).trim().toLowerCase();
+      if (rawName === cName) return true;
+      if (cName && (rawName.includes(cName) || cName.includes(rawName))) return true;
+      return false;
+    };
+
+    const ledger = [];
+
+    // Invoices
+    invoices.forEach((inv) => {
+      if (matchesCustomer(inv.customerId, inv.customerName, inv.customerCode)) {
+        const d = inv.invoiceDate || inv.date || '2026-09-01';
+        ledger.push({
+          id: `inv-${inv.id || inv.invoiceNumber}`,
+          date: d,
+          displayDate: inv.displayDate || d,
+          type: 'INVOICE',
+          docNumber: inv.invoiceNumber || `INV-${inv.id}`,
+          description: `Sales Invoice (${inv.paymentType || 'Commercial'})`,
+          debit: Number(inv.totalAmount || 0),
+          credit: Number(inv.paidAmount || 0),
+          balance: Number(inv.balanceAmount || 0),
+          paymentMethod: inv.paymentMethod || '—',
+          status: inv.status || (Number(inv.balanceAmount || 0) === 0 ? 'PAID' : 'PARTIAL'),
+          raw: inv,
+        });
+      }
+    });
+
+    // Payments
+    payments.forEach((pmt) => {
+      if (matchesCustomer(pmt.customerId, pmt.customerName)) {
+        const d = pmt.paymentDate || pmt.date || '2026-09-01';
+        ledger.push({
+          id: `pmt-${pmt.id || pmt.receiptNo}`,
+          date: d,
+          displayDate: d,
+          type: 'PAYMENT',
+          docNumber: pmt.receiptNo || `REC-${pmt.id}`,
+          description: pmt.invoiceNo ? `Payment received for ${pmt.invoiceNo}` : 'Payment Received',
+          debit: 0,
+          credit: Number(pmt.amount || 0),
+          balance: 0,
+          paymentMethod: pmt.paymentMethod || 'Cash',
+          status: pmt.status || 'CLEARED',
+          raw: pmt,
+        });
+      }
+    });
+
+    // Advances
+    advances.forEach((adv) => {
+      if (matchesCustomer(adv.customerId, adv.customerName)) {
+        const d = adv.date || '2026-09-01';
+        ledger.push({
+          id: `adv-${adv.id || adv.voucherNo}`,
+          date: d,
+          displayDate: d,
+          type: 'ADVANCE',
+          docNumber: adv.voucherNo || `ADV-${adv.id}`,
+          description: 'Advance Payment Deposit',
+          debit: 0,
+          credit: Number(adv.amount || 0),
+          balance: Number(adv.balance || 0),
+          paymentMethod: adv.paymentMethod || 'Bank Transfer',
+          status: adv.status || 'ACTIVE',
+          raw: adv,
+        });
+      }
+    });
+
+    // Quotations
+    quotations.forEach((qt) => {
+      if (matchesCustomer(qt.customerId, qt.customerName)) {
+        const d = qt.date || '2026-09-01';
+        ledger.push({
+          id: `qt-${qt.id || qt.quotationNo}`,
+          date: d,
+          displayDate: d,
+          type: 'QUOTATION',
+          docNumber: qt.quotationNo || `QT-${qt.id}`,
+          description: `Quotation (Valid until: ${qt.validUntil || '—'})`,
+          debit: Number(qt.totalAmount || 0),
+          credit: 0,
+          balance: Number(qt.totalAmount || 0),
+          paymentMethod: '—',
+          status: qt.status || 'SENT',
+          raw: qt,
+        });
+      }
+    });
+
+    // Orders
+    orders.forEach((ord) => {
+      if (matchesCustomer(ord.customerId, ord.customerName)) {
+        const d = ord.orderDate || ord.date || '2026-09-01';
+        ledger.push({
+          id: `ord-${ord.id || ord.orderNo}`,
+          date: d,
+          displayDate: d,
+          type: 'ORDER',
+          docNumber: ord.orderNo || `SO-${ord.id}`,
+          description: `Sales Order (Delivery: ${ord.deliveryDate || '—'})`,
+          debit: Number(ord.totalAmount || 0),
+          credit: ord.paymentStatus === 'PAID' ? Number(ord.totalAmount || 0) : 0,
+          balance: ord.paymentStatus === 'PAID' ? 0 : Number(ord.totalAmount || 0),
+          paymentMethod: '—',
+          status: ord.orderStatus || 'CONFIRMED',
+          raw: ord,
+        });
+      }
+    });
+
+    // Sort descending by date
+    ledger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return ledger;
+  }, [selectedHistoryCustomer]);
+
+  // Customer Financial Metrics
+  const customerHistoryMetrics = useMemo(() => {
+    if (!selectedHistoryCustomer) {
+      return {
+        totalInvoiced: 0,
+        totalPaid: 0,
+        outstandingBalance: 0,
+        creditLimit: 0,
+        creditAvailable: 0,
+        creditUtilization: 0,
+        totalAdvanceBalance: 0,
+        invoiceCount: 0,
+        paymentCount: 0,
+      };
+    }
+
+    const invoices = customerHistoryLedger.filter((item) => item.type === 'INVOICE');
+    const payments = customerHistoryLedger.filter((item) => item.type === 'PAYMENT');
+    const advances = customerHistoryLedger.filter((item) => item.type === 'ADVANCE');
+
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.debit, 0);
+    const totalPaidOnInvoices = invoices.reduce((sum, inv) => sum + inv.credit, 0);
+    const directReceipts = payments.reduce((sum, pmt) => sum + pmt.credit, 0);
+    const totalPaid = Math.max(totalPaidOnInvoices, directReceipts);
+    const outstandingBalance = invoices.reduce((sum, inv) => sum + inv.balance, 0);
+    const totalAdvanceBalance = advances.reduce((sum, adv) => sum + (Number(adv.balance) || 0), 0);
+
+    const creditLimit = Number(selectedHistoryCustomer.creditLimit || 0);
+    const creditAvailable = Math.max(0, creditLimit - outstandingBalance);
+    const creditUtilization = creditLimit > 0 ? Math.min(100, Math.round((outstandingBalance / creditLimit) * 100)) : 0;
+
+    return {
+      totalInvoiced,
+      totalPaid,
+      outstandingBalance,
+      creditLimit,
+      creditAvailable,
+      creditUtilization,
+      totalAdvanceBalance,
+      invoiceCount: invoices.length,
+      paymentCount: payments.length,
+    };
+  }, [selectedHistoryCustomer, customerHistoryLedger]);
+
+  // Filtered Customer Ledger entries
+  const filteredCustomerLedger = useMemo(() => {
+    return customerHistoryLedger.filter((item) => {
+      // Type Filter
+      if (historyTypeFilter !== 'ALL') {
+        if (historyTypeFilter === 'INVOICES' && item.type !== 'INVOICE') return false;
+        if (historyTypeFilter === 'PAYMENTS' && item.type !== 'PAYMENT') return false;
+        if (historyTypeFilter === 'ADVANCES' && item.type !== 'ADVANCE') return false;
+        if (historyTypeFilter === 'QUOTATIONS' && item.type !== 'QUOTATION' && item.type !== 'ORDER') return false;
+      }
+
+      // Date Preset Filter
+      if (historyDatePreset !== 'ALL' && item.date) {
+        const itemTime = new Date(item.date).getTime();
+        const now = new Date();
+        if (historyDatePreset === 'THIS_MONTH') {
+          const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          if (itemTime < firstDayOfMonth) return false;
+        } else if (historyDatePreset === 'LAST_30') {
+          const thirtyDaysAgo = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+          if (itemTime < thirtyDaysAgo) return false;
+        } else if (historyDatePreset === 'THIS_YEAR') {
+          const firstDayOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+          if (itemTime < firstDayOfYear) return false;
+        } else if (historyDatePreset === 'CUSTOM') {
+          if (historyStartDate && item.date < historyStartDate) return false;
+          if (historyEndDate && item.date > historyEndDate) return false;
+        }
+      }
+
+      // Search Query
+      if (historySearchTerm.trim()) {
+        const q = historySearchTerm.toLowerCase();
+        const doc = (item.docNumber || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        const pmt = (item.paymentMethod || '').toLowerCase();
+        const stat = (item.status || '').toLowerCase();
+        if (!doc.includes(q) && !desc.includes(q) && !pmt.includes(q) && !stat.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [customerHistoryLedger, historyTypeFilter, historyDatePreset, historyStartDate, historyEndDate, historySearchTerm]);
+
+  // Export Customer Statement CSV
+  const handleExportCustomerStatementCSV = () => {
+    if (!selectedHistoryCustomer) {
+      addToast('Please select a customer first', 'error');
+      return;
+    }
+
+    const headers = ['Date', 'Type', 'Document No', 'Description', 'Payment Method', 'Debit (Total)', 'Credit (Paid)', 'Balance', 'Status'];
+    const rows = filteredCustomerLedger.map((row) => [
+      `"${row.displayDate || row.date}"`,
+      `"${row.type}"`,
+      `"${row.docNumber}"`,
+      `"${(row.description || '').replace(/"/g, '""')}"`,
+      `"${row.paymentMethod || '—'}"`,
+      row.debit.toFixed(2),
+      row.credit.toFixed(2),
+      row.balance.toFixed(2),
+      `"${row.status}"`,
+    ]);
+
+    const titleRows = [
+      `"STATEMENT OF ACCOUNT - ${selectedHistoryCustomer.name.toUpperCase()}"`,
+      `"Customer Code: ${selectedHistoryCustomer.code || selectedHistoryCustomer.customerCode || '—'}"`,
+      `"Credit Limit: LKR ${customerHistoryMetrics.creditLimit.toFixed(2)}"`,
+      `"Outstanding Balance: LKR ${customerHistoryMetrics.outstandingBalance.toFixed(2)}"`,
+      `"Total Invoiced: LKR ${customerHistoryMetrics.totalInvoiced.toFixed(2)}"`,
+      `"Total Paid: LKR ${customerHistoryMetrics.totalPaid.toFixed(2)}"`,
+      `"Export Date: ${new Date().toLocaleDateString()}"`,
+      '',
+    ];
+
+    const csvContent = [...titleRows, headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = (selectedHistoryCustomer.name || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+    link.setAttribute('download', `Customer_Statement_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Customer statement exported to CSV', 'success');
+  };
+
   // Helper to find all routes a customer belongs to
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
@@ -248,6 +630,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       return true;
     });
   }, [customers, statusFilter, searchTerm, routes]);
+
+  // Filtered Routes based on route search term
+  const filteredRoutes = useMemo(() => {
+    const q = routeSearchTerm.trim().toLowerCase();
+    if (!q) return routes;
+    return routes.filter((r) => {
+      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId));
+      const repName = (r.salesmanName || assignedSalesman?.name || '').toLowerCase();
+      const name = (r.name || '').toLowerCase();
+      const desc = (r.description || '').toLowerCase();
+      return name.includes(q) || repName.includes(q) || desc.includes(q);
+    });
+  }, [routes, routeSearchTerm, salesmen]);
 
   // Customer Toggle Active
   const handleToggleCustomerActive = async (id, currentStatus) => {
@@ -566,6 +961,38 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     addToast('Customer list exported to CSV', 'success');
   };
 
+  // Export Routes to CSV
+  const handleExportRoutesCSV = () => {
+    if (routes.length === 0) {
+      addToast('No routes to export', 'error');
+      return;
+    }
+    const headers = ['Route Name', 'Assigned Representative', 'Total Customers', 'Description', 'Created Date'];
+    const rows = (filteredRoutes.length > 0 ? filteredRoutes : routes).map((r) => {
+      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId));
+      const repName = r.salesmanName || assignedSalesman?.name || 'Unassigned';
+      const count = r.customerIds?.length || 0;
+      const createdDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—';
+      return [
+        `"${(r.name || '').replace(/"/g, '""')}"`,
+        `"${repName.replace(/"/g, '""')}"`,
+        count,
+        `"${(r.description || '').replace(/"/g, '""')}"`,
+        `"${createdDate}"`,
+      ];
+    });
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `customer_routes_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Routes exported to CSV', 'success');
+  };
+
   const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ALL');
   const handleResetFilters = () => {
     setSearchTerm('');
@@ -610,33 +1037,78 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               letterSpacing: '-0.02em',
             }}
           >
-            Customers
+            Customer Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
-            Create and manage customer records, credit limits, and delivery routes.
+            Create and manage customer records, credit limits, delivery routes, and transaction history.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenAddCustomer}
-          style={{
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-            padding: '9px 18px',
-            borderRadius: '6px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <Plus size={17} /> Add Customer
-        </button>
+        {activeTab === 'history' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleExportCustomerStatementCSV}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                padding: '9px 16px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                cursor: 'pointer',
+              }}
+            >
+              <Download size={16} /> Export Statement
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              style={{
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                padding: '9px 16px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <Printer size={16} /> Print
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleOpenAddCustomer}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={17} /> Add Customer
+          </button>
+        )}
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
@@ -690,6 +1162,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           }}
         >
           <Users size={16} /> Groups & Routes
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('history')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'history' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'history' ? 700 : 500,
+            color: activeTab === 'history' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <History size={16} /> Customer History
         </button>
       </div>
 
@@ -1132,6 +1625,31 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleViewCustomerHistory(c);
+                                }}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                title="View Customer History & Ledger"
+                              >
+                                <History size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleOpenEditCustomer(c);
                                 }}
                                 style={{
@@ -1250,6 +1768,123 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </button>
           </div>
 
+          {/* Routes Toolbar: Search Input + Export CSV Icon */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              flexWrap: 'wrap',
+              flexShrink: 0,
+            }}
+          >
+            {/* Search bar filling width */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <Search
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '11px',
+                  color: '#94a3b8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search routes by name, representative, description..."
+                value={routeSearchTerm}
+                onChange={(e) => setRouteSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 32px 0 38px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                }}
+              />
+              {routeSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setRouteSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '2px',
+                  }}
+                  title="Clear search text"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+
+            {/* Right Controls: Export CSV Icon */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={handleExportRoutesCSV}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+                title="Export routes to CSV"
+              >
+                <Download size={15} />
+              </button>
+            </div>
+          </div>
+
           {/* Routes Cards Grid Scroll Container (Only cards scroll) */}
           <div
             style={{
@@ -1267,7 +1902,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 paddingBottom: '16px',
               }}
             >
-            {routes.map((route) => {
+            {filteredRoutes.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '48px 20px',
+                  color: '#64748b',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.875rem',
+                }}
+              >
+                No customer routes or groups found matching current search.
+              </div>
+            ) : (
+              filteredRoutes.map((route) => {
               const count = route.customerIds?.length || 0;
               const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.salesmanId));
               const repName = route.salesmanName || assignedSalesman?.name;
@@ -1369,7 +2020,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   </div>
                 </div>
               );
-            })}
+            }))}
             </div>
           </div>
         </div>
@@ -2142,6 +2793,932 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       )}
 
       {/* ------------------------------------------------------------- */}
+      {/* TAB 3: Customer History & 360° Financial Ledger View          */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'history' && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            paddingBottom: '24px',
+          }}
+        >
+          {customers.length === 0 ? (
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                padding: '60px 24px',
+                textAlign: 'center',
+              }}
+            >
+              <Users size={48} color="#94a3b8" style={{ margin: '0 auto 16px auto', display: 'block' }} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+                No Customers in System
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '16px' }}>
+                Create customer accounts first to access their financial history and ledger statements.
+              </p>
+              <button
+                type="button"
+                onClick={handleOpenAddCustomer}
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  padding: '9px 18px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Add Customer
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Customer Selector & Profile Overview Banner */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  padding: '18px 22px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                  }}
+                >
+                  {/* Left: Searchable Customer Dropdown & Quick Indicator */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '8px',
+                        backgroundColor: '#e0f2fe',
+                        color: '#0284c7',
+                        border: '1px solid #bae6fd',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: '1.15rem',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(selectedHistoryCustomer?.name || 'C').slice(0, 1).toUpperCase()}
+                    </div>
+
+                    <div style={{ minWidth: '280px', flex: '0 1 380px' }}>
+                      <label
+                        style={{
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          color: '#64748b',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          display: 'block',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Select Customer For History
+                      </label>
+                      <select
+                        value={selectedHistoryCustomer ? String(selectedHistoryCustomer.id) : ''}
+                        onChange={(e) => setSelectedHistoryCustomerId(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1.5px solid #0284c7',
+                          backgroundColor: '#ffffff',
+                          color: '#0f172a',
+                          fontSize: '0.92rem',
+                          fontWeight: 600,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 2px rgba(2, 132, 199, 0.1)',
+                        }}
+                      >
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.code || c.customerCode || 'NO CODE'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedHistoryCustomer && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            fontSize: '0.82rem',
+                            backgroundColor: '#f1f5f9',
+                            color: '#334155',
+                            padding: '4px 10px',
+                            borderRadius: '5px',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          {selectedHistoryCustomer.code || selectedHistoryCustomer.customerCode || 'NO CODE'}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            padding: '4px 10px',
+                            borderRadius: '9999px',
+                            backgroundColor: isCustomerActive(selectedHistoryCustomer) ? '#dcfce7' : '#fee2e2',
+                            color: isCustomerActive(selectedHistoryCustomer) ? '#15803d' : '#b91c1c',
+                            border: isCustomerActive(selectedHistoryCustomer) ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                          }}
+                        >
+                          {isCustomerActive(selectedHistoryCustomer) ? 'Active Customer' : 'Inactive Customer'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Quick actions for this customer */}
+                  {selectedHistoryCustomer && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => setViewingCustomer(selectedHistoryCustomer)}
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '7px 14px',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      >
+                        <Users size={14} /> Full Profile
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditCustomer(selectedHistoryCustomer)}
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '7px 14px',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      >
+                        <Edit2 size={14} /> Edit Customer
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-strip: Contact & Route Metadata */}
+                {selectedHistoryCustomer && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '20px',
+                      flexWrap: 'wrap',
+                      paddingTop: '12px',
+                      borderTop: '1px solid #f1f5f9',
+                      fontSize: '0.82rem',
+                      color: '#475569',
+                    }}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Phone size={13} color="#0284c7" />
+                      <span>{selectedHistoryCustomer.phone || 'No phone recorded'}</span>
+                    </div>
+
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Mail size={13} color="#0284c7" />
+                      <span>{selectedHistoryCustomer.email || 'No email recorded'}</span>
+                    </div>
+
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Building size={13} color="#0284c7" />
+                      <span>{selectedHistoryCustomer.address || 'No physical address'}</span>
+                    </div>
+
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={13} color="#2563eb" />
+                      <strong style={{ color: '#0f172a' }}>
+                        {getCustomerRoute(selectedHistoryCustomer.id)?.name || 'Unassigned Route'}
+                      </strong>
+                      {getCustomerRoute(selectedHistoryCustomer.id)?.salesmanName && (
+                        <span style={{ color: '#64748b' }}>
+                          (Rep: {getCustomerRoute(selectedHistoryCustomer.id).salesmanName})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4 KPI Financial Metric Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '14px',
+                  flexShrink: 0,
+                }}
+              >
+                {/* 1: Total Invoiced */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    padding: '16px 18px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Total Invoiced
+                    </span>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: '#eff6ff',
+                        color: '#0284c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <FileText size={16} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                    LKR {customerHistoryMetrics.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                    {customerHistoryMetrics.invoiceCount} commercial invoices billed
+                  </div>
+                </div>
+
+                {/* 2: Total Paid */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    padding: '16px 18px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Total Paid & Receipts
+                    </span>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: '#f0fdf4',
+                        color: '#16a34a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CheckCircle size={16} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#16a34a', fontFamily: 'monospace' }}>
+                    LKR {customerHistoryMetrics.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                    {customerHistoryMetrics.paymentCount} payments & receipts received
+                  </div>
+                </div>
+
+                {/* 3: Outstanding Balance */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: customerHistoryMetrics.outstandingBalance > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                    padding: '16px 18px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Outstanding Receivables
+                    </span>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: customerHistoryMetrics.outstandingBalance > 0 ? '#fee2e2' : '#f0fdf4',
+                        color: customerHistoryMetrics.outstandingBalance > 0 ? '#dc2626' : '#16a34a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <DollarSign size={16} />
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.45rem',
+                      fontWeight: 800,
+                      color: customerHistoryMetrics.outstandingBalance > 0 ? '#dc2626' : '#16a34a',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    LKR {customerHistoryMetrics.outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: customerHistoryMetrics.outstandingBalance > 0 ? '#b91c1c' : '#15803d', fontWeight: 500 }}>
+                    {customerHistoryMetrics.outstandingBalance > 0 ? 'Payment collection pending' : 'Zero outstanding balance'}
+                  </div>
+                </div>
+
+                {/* 4: Credit Limit & Utilization */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    padding: '16px 18px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Credit Limit & Status
+                    </span>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: '#faf5ff',
+                        color: '#7c3aed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CreditCard size={16} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                    LKR {customerHistoryMetrics.creditLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div style={{ width: '100%', height: '6px', borderRadius: '9999px', backgroundColor: '#e2e8f0', marginTop: '2px', overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${customerHistoryMetrics.creditUtilization}%`,
+                        height: '100%',
+                        backgroundColor:
+                          customerHistoryMetrics.creditUtilization > 90
+                            ? '#ef4444'
+                            : customerHistoryMetrics.creditUtilization > 70
+                            ? '#f59e0b'
+                            : '#10b981',
+                        borderRadius: '9999px',
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.76rem', color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{customerHistoryMetrics.creditUtilization}% utilized</span>
+                    <span>
+                      LKR {customerHistoryMetrics.creditAvailable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} avail.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transactions Ledger Toolbar */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  padding: '12px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  flexShrink: 0,
+                }}
+              >
+                {/* Type Filter Pills */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'ALL', label: `All (${customerHistoryLedger.length})` },
+                    { id: 'INVOICES', label: `Invoices (${customerHistoryLedger.filter((i) => i.type === 'INVOICE').length})` },
+                    { id: 'PAYMENTS', label: `Payments (${customerHistoryLedger.filter((i) => i.type === 'PAYMENT').length})` },
+                    { id: 'ADVANCES', label: `Advances (${customerHistoryLedger.filter((i) => i.type === 'ADVANCE').length})` },
+                    { id: 'QUOTATIONS', label: `Quotes & Orders (${customerHistoryLedger.filter((i) => i.type === 'QUOTATION' || i.type === 'ORDER').length})` },
+                  ].map((tab) => {
+                    const isSel = historyTypeFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setHistoryTypeFilter(tab.id)}
+                        style={{
+                          border: isSel ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                          backgroundColor: isSel ? '#0284c7' : '#ffffff',
+                          color: isSel ? '#ffffff' : '#475569',
+                          fontWeight: isSel ? 700 : 500,
+                          fontSize: '0.8rem',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Right: Date filter presets & Search input */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {[
+                      { id: 'ALL', label: 'All Time' },
+                      { id: 'THIS_MONTH', label: 'This Month' },
+                      { id: 'LAST_30', label: '30 Days' },
+                      { id: 'THIS_YEAR', label: 'This Year' },
+                    ].map((dp) => {
+                      const isSel = historyDatePreset === dp.id;
+                      return (
+                        <button
+                          key={dp.id}
+                          type="button"
+                          onClick={() => setHistoryDatePreset(dp.id)}
+                          style={{
+                            border: isSel ? '1px solid #334155' : '1px solid #e2e8f0',
+                            backgroundColor: isSel ? '#334155' : '#f8fafc',
+                            color: isSel ? '#ffffff' : '#64748b',
+                            fontWeight: isSel ? 600 : 500,
+                            fontSize: '0.74rem',
+                            padding: '4px 8px',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {dp.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Search bar */}
+                  <div style={{ position: 'relative', width: '220px' }}>
+                    <Search
+                      size={14}
+                      style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '10px',
+                        color: '#94a3b8',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search doc #, notes..."
+                      value={historySearchTerm}
+                      onChange={(e) => setHistorySearchTerm(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '34px',
+                        padding: '0 28px 0 32px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {historySearchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setHistorySearchTerm('')}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '8px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#94a3b8',
+                          padding: 0,
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Ledger Table */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                <div style={{ overflowX: 'auto', flex: 1, overflowY: 'auto' }}>
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      fontSize: '0.85rem',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <thead
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        borderBottom: '1px solid #e2e8f0',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10,
+                      }}
+                    >
+                      <tr>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '0.78rem' }}>
+                          Date
+                        </th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '0.78rem' }}>
+                          Type
+                        </th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '0.78rem' }}>
+                          Doc Ref #
+                        </th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '0.78rem' }}>
+                          Description / Reference Note
+                        </th>
+                        <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontSize: '0.78rem' }}>
+                          Method
+                        </th>
+                        <th
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            textAlign: 'right',
+                          }}
+                        >
+                          Debit (Total)
+                        </th>
+                        <th
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            textAlign: 'right',
+                          }}
+                        >
+                          Credit (Paid)
+                        </th>
+                        <th
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            textAlign: 'right',
+                          }}
+                        >
+                          Balance
+                        </th>
+                        <th
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Status
+                        </th>
+                        <th
+                          style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            textAlign: 'center',
+                          }}
+                        >
+                          View
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCustomerLedger.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                            <History size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                            No transactions found for {selectedHistoryCustomer?.name || 'this customer'} matching the current criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCustomerLedger.map((tx) => {
+                          const typeStyle =
+                            tx.type === 'INVOICE'
+                              ? { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }
+                              : tx.type === 'PAYMENT'
+                              ? { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' }
+                              : tx.type === 'ADVANCE'
+                              ? { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff' }
+                              : tx.type === 'QUOTATION'
+                              ? { bg: '#fffbeb', color: '#b45309', border: '#fde68a' }
+                              : { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' };
+
+                          const statusUpper = (tx.status || '').toUpperCase();
+                          const statusStyle =
+                            statusUpper === 'PAID' || statusUpper === 'CLEARED' || statusUpper === 'ACCEPTED'
+                              ? { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' }
+                              : statusUpper === 'PARTIAL' || statusUpper === 'SENT' || statusUpper === 'PROCESSING'
+                              ? { bg: '#fef3c7', color: '#b45309', border: '#fde68a' }
+                              : statusUpper === 'ACTIVE' || statusUpper === 'CONFIRMED'
+                              ? { bg: '#e0f2fe', color: '#0284c7', border: '#bae6fd' }
+                              : { bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' };
+
+                          return (
+                            <tr
+                              key={tx.id}
+                              style={{
+                                borderBottom: '1px solid #f1f5f9',
+                                transition: 'background-color 0.12s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              {/* Date */}
+                              <td style={{ padding: '12px 16px', color: '#0f172a', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                {tx.displayDate || tx.date}
+                              </td>
+
+                              {/* Type */}
+                              <td style={{ padding: '12px 16px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    padding: '3px 8px',
+                                    borderRadius: '4px',
+                                    backgroundColor: typeStyle.bg,
+                                    color: typeStyle.color,
+                                    border: `1px solid ${typeStyle.border}`,
+                                    letterSpacing: '0.02em',
+                                  }}
+                                >
+                                  {tx.type}
+                                </span>
+                              </td>
+
+                              {/* Doc Number */}
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                                {tx.docNumber}
+                              </td>
+
+                              {/* Description */}
+                              <td style={{ padding: '12px 16px', color: '#334155', maxWidth: '280px' }}>
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {tx.description}
+                                </div>
+                              </td>
+
+                              {/* Method */}
+                              <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.8rem' }}>
+                                {tx.paymentMethod || '—'}
+                              </td>
+
+                              {/* Debit */}
+                              <td
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 600,
+                                  color: tx.debit > 0 ? '#0f172a' : '#94a3b8',
+                                }}
+                              >
+                                {tx.debit > 0 ? `LKR ${tx.debit.toFixed(2)}` : '—'}
+                              </td>
+
+                              {/* Credit */}
+                              <td
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 600,
+                                  color: tx.credit > 0 ? '#16a34a' : '#94a3b8',
+                                }}
+                              >
+                                {tx.credit > 0 ? `LKR ${tx.credit.toFixed(2)}` : '—'}
+                              </td>
+
+                              {/* Balance */}
+                              <td
+                                style={{
+                                  padding: '12px 16px',
+                                  textAlign: 'right',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 700,
+                                  color: tx.balance > 0 ? '#dc2626' : '#64748b',
+                                }}
+                              >
+                                {tx.balance > 0 ? `LKR ${tx.balance.toFixed(2)}` : 'LKR 0.00'}
+                              </td>
+
+                              {/* Status */}
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: '9999px',
+                                    backgroundColor: statusStyle.bg,
+                                    color: statusStyle.color,
+                                    border: `1px solid ${statusStyle.border}`,
+                                  }}
+                                >
+                                  {tx.status}
+                                </span>
+                              </td>
+
+                              {/* Action */}
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedLedgerDoc(tx)}
+                                  style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '5px',
+                                    color: '#475569',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                  title="View document details"
+                                >
+                                  <FileText size={12} color="#0284c7" /> View
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Ledger Footer Summary */}
+                <div
+                  style={{
+                    padding: '12px 20px',
+                    backgroundColor: '#f8fafc',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.82rem',
+                    color: '#64748b',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div>
+                    Showing <strong style={{ color: '#0f172a' }}>{filteredCustomerLedger.length}</strong> of{' '}
+                    <strong style={{ color: '#0f172a' }}>{customerHistoryLedger.length}</strong> entries
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <span>
+                      Total Debit:{' '}
+                      <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>
+                        LKR{' '}
+                        {filteredCustomerLedger
+                          .reduce((acc, c) => acc + c.debit, 0)
+                          .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </span>
+                    <span>
+                      Total Credit:{' '}
+                      <strong style={{ color: '#16a34a', fontFamily: 'monospace' }}>
+                        LKR{' '}
+                        {filteredCustomerLedger
+                          .reduce((acc, c) => acc + c.credit, 0)
+                          .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </span>
+                    <span>
+                      Net Receivables:{' '}
+                      <strong style={{ color: '#dc2626', fontFamily: 'monospace' }}>
+                        LKR{' '}
+                        {filteredCustomerLedger
+                          .reduce((acc, c) => acc + c.balance, 0)
+                          .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* MODAL: Customer Profile View Popup (When clicking any row)   */}
       {/* ------------------------------------------------------------- */}
       {viewingCustomer && (
@@ -2420,7 +3997,32 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const cust = viewingCustomer;
+                  setViewingCustomer(null);
+                  handleViewCustomerHistory(cust);
+                }}
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '7px 16px',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
+                }}
+              >
+                <History size={14} /> View Financial History
+              </button>
+
               <button
                 type="button"
                 onClick={() => setViewingCustomer(null)}
@@ -2430,6 +4032,145 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: '7px 16px',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Transaction Details Preview Modal                      */}
+      {/* ------------------------------------------------------------- */}
+      {selectedLedgerDoc && (
+        <div className="modal-backdrop" onClick={() => setSelectedLedgerDoc(null)}>
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '560px',
+              padding: '24px 28px',
+              borderRadius: '12px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingBottom: '14px',
+                borderBottom: '1px solid #e2e8f0',
+                marginBottom: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: '#eff6ff',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                    {selectedLedgerDoc.type} Details
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
+                    Ref: {selectedLedgerDoc.docNumber}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedLedgerDoc(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: '4px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                <span style={{ color: '#64748b' }}>Date:</span>
+                <strong style={{ color: '#0f172a' }}>{selectedLedgerDoc.displayDate || selectedLedgerDoc.date}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                <span style={{ color: '#64748b' }}>Transaction Type:</span>
+                <strong style={{ color: '#0284c7' }}>{selectedLedgerDoc.type}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                <span style={{ color: '#64748b' }}>Description:</span>
+                <strong style={{ color: '#0f172a' }}>{selectedLedgerDoc.description}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                <span style={{ color: '#64748b' }}>Payment Method:</span>
+                <strong style={{ color: '#0f172a' }}>{selectedLedgerDoc.paymentMethod || '—'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+                <span style={{ color: '#64748b' }}>Status:</span>
+                <strong style={{ color: '#16a34a' }}>{selectedLedgerDoc.status}</strong>
+              </div>
+
+              <div
+                style={{
+                  marginTop: '8px',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: '#f1f5f9',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Total Debit / Invoiced:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>LKR {selectedLedgerDoc.debit.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Total Credit / Paid:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>LKR {selectedLedgerDoc.credit.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>
+                  <strong style={{ color: '#0f172a' }}>Balance Due:</strong>
+                  <strong style={{ fontFamily: 'monospace', color: selectedLedgerDoc.balance > 0 ? '#dc2626' : '#16a34a' }}>
+                    LKR {selectedLedgerDoc.balance.toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedLedgerDoc(null)}
+                style={{
+                  padding: '7px 18px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
                   fontWeight: 600,
                   fontSize: '0.84rem',
                   cursor: 'pointer',

@@ -36,14 +36,17 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
   const { addToast } = useToast();
 
-  // Active sub-tab state: 'list' | 'roles' | 'attendance' | 'payroll' | 'commissions'
+  // Active sub-tab state: 'list' | 'roles' | 'pending-approvals' | 'attendance' | 'payroll' | 'commissions'
   const [activeTab, setActiveTab] = useState(() => {
     if (activeSubTab === 'roles' || activeSubTab === 'groups') return 'roles';
+    if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') return 'pending-approvals';
+    if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') return activeSubTab;
     return 'list';
   });
 
   // Pending approvals card toggle
   const [hidePending, setHidePending] = useState(false);
+  const [pendingSearchQuery, setPendingSearchQuery] = useState('');
 
   // Data states
   const [employees, setEmployees] = useState([]);
@@ -80,8 +83,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   useEffect(() => {
     if (activeSubTab === 'roles' || activeSubTab === 'groups') {
       setActiveTab('roles');
+    } else if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') {
+      setActiveTab('pending-approvals');
     } else if (activeSubTab === 'users' || activeSubTab === 'list') {
       setActiveTab('list');
+    } else if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') {
+      setActiveTab(activeSubTab);
     }
   }, [activeSubTab]);
 
@@ -165,6 +172,19 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       return nameMatch || userMatch || emailMatch || phoneMatch || roleMatch;
     });
   }, [employees, searchQuery, statusFilter]);
+
+  // Filtered pending approvals
+  const filteredPendingList = useMemo(() => {
+    if (!pendingSearchQuery.trim()) return pendingApprovals;
+    const q = pendingSearchQuery.toLowerCase().trim();
+    return pendingApprovals.filter(
+      (u) =>
+        (u.username && u.username.toLowerCase().includes(q)) ||
+        (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.phone && u.phone.includes(q))
+    );
+  }, [pendingApprovals, pendingSearchQuery]);
 
   // Export CSV
   const handleExportCSV = () => {
@@ -381,10 +401,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       >
         <div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
-            Employees
+            Employee Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Create and manage employee records for this branch.
+            Create and manage employee records, role assignments, branch attendance, and payroll.
           </p>
         </div>
 
@@ -441,6 +461,42 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           }}
         >
           <ListFilter size={16} /> Employee List
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('pending-approvals')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'pending-approvals' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'pending-approvals' ? 700 : 500,
+            color: activeTab === 'pending-approvals' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <UserCheck size={16} /> Pending Approvals & Roles
+          {pendingApprovals.length > 0 && (
+            <span
+              style={{
+                backgroundColor: activeTab === 'pending-approvals' ? '#0284c7' : '#f59e0b',
+                color: '#ffffff',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '1px 7px',
+                borderRadius: '9999px',
+                lineHeight: 1.2,
+              }}
+            >
+              {pendingApprovals.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -540,130 +596,47 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             overflow: 'hidden',
           }}
         >
-          {/* Pending Employee Approvals Banner (Styled exactly like image) */}
+          {/* Compact Notification for Pending Approvals */}
           {pendingApprovals.length > 0 && (
             <div
               style={{
                 backgroundColor: '#fffbeb',
                 border: '1px solid #fef08a',
-                borderRadius: '10px',
-                padding: '14px 20px',
+                borderRadius: '8px',
+                padding: '10px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
                 flexShrink: 0,
               }}
             >
-              <div
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', color: '#854d0e' }}>
+                <span style={{ backgroundColor: '#f59e0b', color: '#ffffff', borderRadius: '9999px', padding: '1px 8px', fontWeight: 700, fontSize: '0.75rem' }}>
+                  {pendingApprovals.length}
+                </span>
+                <span>You have <strong>{pendingApprovals.length} pending employee registration{pendingApprovals.length > 1 ? 's' : ''}</strong> waiting for role assignment and approval.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleTabChange('pending-approvals')}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
                   alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 3px rgba(2, 132, 199, 0.2)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.98rem', color: '#1e293b' }}>
-                    Pending employee approvals
-                  </span>
-                  <span
-                    style={{
-                      backgroundColor: '#fef08a',
-                      color: '#854d0e',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      borderRadius: '9999px',
-                      padding: '2px 8px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {pendingApprovals.length}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setHidePending(!hidePending)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  {hidePending ? 'Show' : 'Hide'} {hidePending ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-                </button>
-              </div>
-
-              <div style={{ fontSize: '0.82rem', color: '#78350f', marginTop: '4px', marginBottom: hidePending ? 0 : '14px' }}>
-                Branch users become employees only after you complete their details and approve them. Super administrators are never included.
-              </div>
-
-              {!hidePending && (
-                <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #fef08a' }}>
-                  {pendingApprovals.map((pUser) => (
-                    <div
-                      key={pUser.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '12px 0',
-                        borderBottom: '1px solid rgba(254, 240, 138, 0.6)',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
-                          {pUser.fullName || pUser.username}
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
-                          {pUser.roles?.length ? pUser.roles.map(formatRoleName).join(', ') : 'Admin / Staff'}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenApprove(pUser)}
-                          style={{
-                            backgroundColor: '#0284c7',
-                            color: '#ffffff',
-                            fontWeight: 600,
-                            fontSize: '0.84rem',
-                            padding: '7px 16px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          Complete & approve
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(pUser)}
-                          style={{
-                            backgroundColor: 'transparent',
-                            color: '#ef4444',
-                            fontWeight: 500,
-                            fontSize: '0.8rem',
-                            padding: '6px 10px',
-                            border: '1px solid #fecaca',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                          }}
-                          title="Reject Request"
-                        >
-                          <UserX size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                Review & Assign Roles &rarr;
+              </button>
             </div>
           )}
 
@@ -1104,6 +1077,219 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* Tab: Pending Approvals & Role Assignments                      */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'pending-approvals' && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
+          {/* Top Info & Search Bar */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '12px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a', fontWeight: 700 }}>
+                  Pending Employee Registrations & Role Assignments
+                </h3>
+                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                  Branch users become active employees only after role assignment and confirmation.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ position: 'relative', width: '260px' }}>
+                <Search size={15} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search pending users..."
+                  value={pendingSearchQuery}
+                  onChange={(e) => setPendingSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px 0 32px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={loadData}
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Pending List or Empty State */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filteredPendingList.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  padding: '60px 20px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle size={32} />
+                </div>
+                <h4 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 700 }}>
+                  {pendingSearchQuery ? 'No matching pending registrations' : 'All registrations are up to date!'}
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', maxWidth: '440px' }}>
+                  {pendingSearchQuery
+                    ? 'Try searching by a different name, username, or email.'
+                    : 'There are currently no new employee registrations awaiting approval for this branch.'}
+                </p>
+              </div>
+            ) : (
+              filteredPendingList.map((pUser) => (
+                <div
+                  key={pUser.id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div
+                        style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '10px',
+                          backgroundColor: '#e0f2fe',
+                          color: '#0284c7',
+                          fontWeight: 800,
+                          fontSize: '1.2rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>
+                            {pUser.fullName || pUser.username}
+                          </span>
+                          <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
+                            PENDING APPROVAL
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', fontSize: '0.82rem', color: '#64748b' }}>
+                          <span>Username: <strong style={{ color: '#334155' }}>{pUser.username}</strong></span>
+                          {pUser.email && <span>Email: <strong style={{ color: '#334155' }}>{pUser.email}</strong></span>}
+                          {pUser.phone && <span>Phone: <strong style={{ color: '#334155' }}>{pUser.phone}</strong></span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenApprove(pUser)}
+                        style={{
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          padding: '8px 18px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                        }}
+                      >
+                        <ShieldCheck size={16} /> Assign Roles & Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(pUser)}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          padding: '8px 14px',
+                          border: '1px solid #fecaca',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <UserX size={15} /> Reject
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', color: '#64748b' }}>
+                    <div>
+                      Assigned Branch: <strong style={{ color: '#0f172a' }}>{pUser.branchName || currentUser?.branchName || 'Main Branch'}</strong>
+                    </div>
+                    <div>
+                      Requested Roles: <strong style={{ color: '#0284c7' }}>{pUser.roles?.length ? pUser.roles.map(formatRoleName).join(', ') : 'Default / Standard Access'}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

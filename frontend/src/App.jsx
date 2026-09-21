@@ -122,6 +122,7 @@ export default function App() {
         subItems: [
           { id: 'list', label: 'Customer List', permission: 'CUSTOMER_MANAGE' },
           { id: 'groups', label: 'Groups & Routes', permission: 'CUSTOMER_MANAGE' },
+          { id: 'history', label: 'Customer History', permission: 'CUSTOMER_MANAGE' },
         ],
       },
       {
@@ -131,6 +132,7 @@ export default function App() {
         permissions: ['USER_MANAGE', 'ROLE_MANAGE'],
         subItems: [
           { id: 'list', label: 'Employee List', permission: 'USER_MANAGE' },
+          { id: 'pending-approvals', label: 'Pending Approvals & Roles', permission: 'USER_MANAGE' },
           { id: 'roles', label: 'Roles', permission: 'ROLE_MANAGE' },
           { id: 'attendance', label: 'Attendance', permission: 'USER_MANAGE' },
           { id: 'payroll', label: 'Payroll', permission: 'USER_MANAGE' },
@@ -143,8 +145,10 @@ export default function App() {
         icon: Boxes,
         permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST'],
         subItems: [
-          { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
+          { id: 'inventory-list', label: 'Inventory List', permission: 'INVENTORY_VIEW' },
           { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
+          { id: 'brands', label: 'Brands', permission: 'PRODUCT_MANAGE' },
+          { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
           { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
           { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
         ],
@@ -248,15 +252,24 @@ export default function App() {
     } else if (view === 'admin' || view === 'users' || view === 'employees') {
       setCurrentView('employees');
       setSubTab(sub || 'list');
+    } else if (view === 'brands') {
+      setCurrentView('inventory');
+      setSubTab('brands');
     } else if (view === 'roles' || view === 'groups') {
       setCurrentView('employees');
       setSubTab('roles');
+    } else if (view === 'pending-approvals' || view === 'pending_approvals') {
+      setCurrentView('employees');
+      setSubTab('pending-approvals');
     } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
       setCurrentView('purchasing');
       setSubTab(view);
     } else if (view === 'inventory') {
       setCurrentView('inventory');
-      setSubTab(sub || 'warehouses');
+      setSubTab(sub || 'inventory-list');
+    } else if (view === 'inventory-list') {
+      setCurrentView('inventory');
+      setSubTab('inventory-list');
     } else if (view === 'warehouses') {
       setCurrentView('inventory');
       setSubTab('warehouses');
@@ -272,6 +285,9 @@ export default function App() {
     } else if (view === 'customers') {
       setCurrentView('customers');
       setSubTab(sub || 'list');
+    } else if (view === 'customer-history' || view === 'customer_history') {
+      setCurrentView('customers');
+      setSubTab('history');
     } else if (view === 'customer-groups' || view === 'routes') {
       setCurrentView('customers');
       setSubTab('groups');
@@ -625,7 +641,7 @@ export default function App() {
                 <EmployeesHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
               {currentView === 'inventory' && (
-                <InventoryHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+                <InventoryHub activeSubTab={subTab} onSubTabChange={setSubTab} onNavigate={navigateTo} />
               )}
               {currentView === 'purchasing' && (
                 <PurchasingHub activeSubTab={subTab} onSubTabChange={setSubTab} />

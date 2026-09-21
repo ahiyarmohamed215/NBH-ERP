@@ -355,17 +355,22 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
           flexShrink: 0,
         }}
       >
-        <h1
-          style={{
-            fontSize: '1.65rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.02em',
-            margin: 0,
-          }}
-        >
-          {PRIMARY_TABS.find((t) => t.id === currentPrimaryTab)?.title || 'Customer Reports'}
-        </h1>
+        <div>
+          <h1
+            style={{
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 4px 0',
+            }}
+          >
+            Reports Management
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+            {PRIMARY_TABS.find((t) => t.id === currentPrimaryTab)?.title || 'Customer Reports'} • Financial and analytical reporting across branch operations.
+          </p>
+        </div>
 
         <button
           type="button"

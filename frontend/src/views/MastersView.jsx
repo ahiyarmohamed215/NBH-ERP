@@ -24,16 +24,28 @@ import {
   Trash2,
   Package,
   Download,
+  Award,
 } from 'lucide-react';
 
-export default function MastersView({
+const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
+const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
+const INITIAL_BRANDS = [
+  { id: 'brd-1', code: 'PRIMA', name: 'Prima', description: 'Flour, noodles & bakery essentials', isActive: true },
+  { id: 'brd-2', code: 'MALIBAN', name: 'Maliban', description: 'Biscuits, crackers & confectionery', isActive: true },
+  { id: 'brd-3', code: 'MUNCHEE', name: 'Munchee', description: 'CBL biscuits, snacks & wafers', isActive: true },
+  { id: 'brd-4', code: 'NESTLE', name: 'Nestle', description: 'Dairy, Milo & nutritional foods', isActive: true },
+  { id: 'brd-5', code: 'DEFAULT', name: 'General Brand', description: 'Standard / Unbranded items', isActive: true },
+];
+
+const MastersView = React.forwardRef(function MastersView({
   activeSubTab,
   onSubTabChange,
   isStandalone = false,
   allowedTabs = null,
   title = '',
   subtitle = '',
-}) {
+  hideHeader = false,
+}, ref) {
   const [activeTab, setActiveTab] = useState(() => activeSubTab || 'products');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
   const [loading, setLoading] = useState(false);
@@ -41,10 +53,39 @@ export default function MastersView({
 
   // Data lists
   const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_BRANDS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_BRANDS;
+  });
+  const [productBrandsMap, setProductBrandsMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return {};
+  });
   const [warehouses, setWarehouses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+
+  const getBrandForProduct = (p) => {
+    if (!p) return 'General';
+    const bId = productBrandsMap[p.id] || productBrandsMap[p.sku] || p.brandId || p.brand;
+    if (bId) {
+      const found = brands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
+      if (found) return found.name;
+      return bId;
+    }
+    return 'General';
+  };
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -57,6 +98,11 @@ export default function MastersView({
   const [deletingId, setDeletingId] = useState(null);
 
   const { addToast } = useToast();
+
+  React.useImperativeHandle(ref, () => ({
+    openAdd: handleOpenAdd,
+    refresh: loadTabData,
+  }));
 
   useEffect(() => {
     if (activeSubTab) {
@@ -140,11 +186,14 @@ export default function MastersView({
       setModalForm({
         sku: '',
         name: '',
+        brandId: brands.length > 0 ? brands[0].id : '',
         categoryId: categories.length > 0 ? categories[0].id : '',
         unitOfMeasure: 'PCS',
         minStockLevel: '5',
         description: '',
       });
+    } else if (activeTab === 'brands') {
+      setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'warehouses') {
       setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '', isPrimary: false });
     } else if (activeTab === 'categories') {
@@ -163,9 +212,16 @@ export default function MastersView({
       setModalForm({
         sku: item.sku || '',
         name: item.name || '',
+        brandId: productBrandsMap[item.id] || productBrandsMap[item.sku] || item.brandId || item.brand || (brands[0]?.id || ''),
         categoryId: item.categoryId || (categories.find((c) => c.name === item.categoryName)?.id || ''),
         unitOfMeasure: item.unitOfMeasure || 'PCS',
         minStockLevel: item.minStockLevel?.toString() || '0',
+        description: item.description || '',
+      });
+    } else if (activeTab === 'brands') {
+      setModalForm({
+        code: item.code || '',
+        name: item.name || '',
         description: item.description || '',
       });
     } else {
@@ -201,9 +257,52 @@ export default function MastersView({
         };
         if (editingItem) {
           await productApi.update(editingItem.id, payload);
+          if (modalForm.brandId) {
+            const updatedMap = { ...productBrandsMap, [editingItem.id]: modalForm.brandId, [payload.sku]: modalForm.brandId };
+            setProductBrandsMap(updatedMap);
+            localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
+          }
         } else {
-          await productApi.create(payload);
+          const res = await productApi.create(payload);
+          const newId = res.data?.id || res.data?.content?.id || payload.sku;
+          if (modalForm.brandId) {
+            const updatedMap = { ...productBrandsMap, [newId]: modalForm.brandId, [payload.sku]: modalForm.brandId };
+            setProductBrandsMap(updatedMap);
+            localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
+          }
         }
+      } else if (activeTab === 'brands') {
+        if (!modalForm.name?.trim()) {
+          addToast('Brand name is required', 'error');
+          setSaving(false);
+          return;
+        }
+        const bCode = modalForm.code?.trim().toUpperCase() || modalForm.name.trim().toUpperCase().slice(0, 10);
+        if (editingItem) {
+          const updated = brands.map((b) =>
+            b.id === editingItem.id
+              ? { ...b, code: bCode, name: modalForm.name.trim(), description: modalForm.description || '' }
+              : b
+          );
+          setBrands(updated);
+          localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
+          addToast('Brand updated successfully!', 'success');
+        } else {
+          const newBrand = {
+            id: `brd-${Date.now()}`,
+            code: bCode,
+            name: modalForm.name.trim(),
+            description: modalForm.description || '',
+            isActive: true,
+          };
+          const updated = [newBrand, ...brands];
+          setBrands(updated);
+          localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
+          addToast('Brand created successfully!', 'success');
+        }
+        setShowModal(false);
+        setSaving(false);
+        return;
       } else if (activeTab === 'warehouses') {
         const payload = {
           ...modalForm,
@@ -262,10 +361,17 @@ export default function MastersView({
   const handleToggleActive = async (id, currentStatus) => {
     try {
       if (activeTab === 'products') await productApi.toggleActive(id);
-      if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
-      if (activeTab === 'categories') await categoryApi.toggleActive(id);
-      if (activeTab === 'customers') await customerApi.toggleActive(id);
-      if (activeTab === 'suppliers') await supplierApi.toggleActive(id);
+      else if (activeTab === 'brands') {
+        const updated = brands.map((b) => (b.id === id ? { ...b, isActive: !b.isActive } : b));
+        setBrands(updated);
+        localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
+        addToast(`Brand status updated`, 'success');
+        return;
+      }
+      else if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
+      else if (activeTab === 'categories') await categoryApi.toggleActive(id);
+      else if (activeTab === 'customers') await customerApi.toggleActive(id);
+      else if (activeTab === 'suppliers') await supplierApi.toggleActive(id);
 
       addToast(`Status changed to ${currentStatus ? 'Inactive' : 'Active'}`, 'success');
       loadTabData();
@@ -282,6 +388,13 @@ export default function MastersView({
     try {
       setDeletingId(item.id);
       if (activeTab === 'products') await productApi.delete(item.id);
+      else if (activeTab === 'brands') {
+        const updated = brands.filter((b) => b.id !== item.id);
+        setBrands(updated);
+        localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
+        addToast(`Brand "${itemName}" deleted successfully`, 'success');
+        return;
+      }
       else if (activeTab === 'warehouses') await warehouseApi.delete(item.id);
       else if (activeTab === 'categories') await categoryApi.delete(item.id);
       else if (activeTab === 'customers') await customerApi.delete(item.id);
@@ -300,6 +413,7 @@ export default function MastersView({
   const getCurrentItems = () => {
     switch (activeTab) {
       case 'products': return products;
+      case 'brands': return brands;
       case 'warehouses': return warehouses;
       case 'categories': return categories;
       case 'customers': return customers;
@@ -328,6 +442,7 @@ export default function MastersView({
   };
 
   const filteredProducts = filterList(products, ['name', 'sku', 'categoryName', 'description']);
+  const filteredBrands = filterList(brands, ['code', 'name', 'description']);
   const filteredWarehouses = filterList(warehouses, ['name', 'code', 'contactNumber', 'phone', 'address']);
   const filteredCategories = filterList(categories, ['code', 'name', 'description']);
   const filteredCustomers = filterList(customers, ['name', 'code', 'customerCode', 'phone', 'contactPerson', 'email']);
@@ -355,7 +470,7 @@ export default function MastersView({
 
     if (activeTab === 'products') {
       itemsToExport = filteredProducts;
-      headers = ['SKU', 'Name', 'Category', 'Unit', 'Selling Price', 'Min Stock', 'Status'];
+      headers = ['SKU', 'Name', 'Description / Note', 'Brand', 'Category', 'Unit', 'Min Stock', 'Status'];
       if (itemsToExport.length === 0) {
         addToast('No products to export', 'error');
         return;
@@ -363,16 +478,31 @@ export default function MastersView({
       const rows = itemsToExport.map((p) => [
         `"${p.sku || ''}"`,
         `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${(p.description || p.notes || p.note || '').replace(/"/g, '""')}"`,
+        `"${getBrandForProduct(p)}"`,
         `"${p.categoryName || 'General'}"`,
         `"${p.unitOfMeasure || 'PCS'}"`,
-        p.sellingPrice || 0,
         p.minStockLevel || 0,
         isItemActive(p) ? 'Active' : 'Inactive',
       ]);
       downloadCSV(headers, rows, filename);
+    } else if (activeTab === 'brands') {
+      itemsToExport = filteredBrands;
+      headers = ['Brand Code', 'Brand Name', 'Description', 'Status'];
+      if (itemsToExport.length === 0) {
+        addToast('No brands to export', 'error');
+        return;
+      }
+      const rows = itemsToExport.map((b) => [
+        `"${b.code || ''}"`,
+        `"${(b.name || '').replace(/"/g, '""')}"`,
+        `"${(b.description || '').replace(/"/g, '""')}"`,
+        isItemActive(b) ? 'Active' : 'Inactive',
+      ]);
+      downloadCSV(headers, rows, filename);
     } else if (activeTab === 'warehouses') {
       itemsToExport = filteredWarehouses;
-      headers = ['Code', 'Name', 'Address', 'Contact Number', 'Type', 'Status'];
+      headers = ['Code', 'Name', 'Address', 'Contact Number', 'Status'];
       if (itemsToExport.length === 0) {
         addToast('No warehouses to export', 'error');
         return;
@@ -382,7 +512,6 @@ export default function MastersView({
         `"${(w.name || '').replace(/"/g, '""')}"`,
         `"${(w.address || '').replace(/"/g, '""')}"`,
         `"${w.contactNumber || w.phone || ''}"`,
-        w.isPrimary ? 'Primary Warehouse' : 'Standard Branch',
         isItemActive(w) ? 'Active' : 'Inactive',
       ]);
       downloadCSV(headers, rows, filename);
@@ -421,8 +550,9 @@ export default function MastersView({
 
   const allTabs = [
     { id: 'products', label: 'Products', count: products.length, icon: Package },
-    { id: 'warehouses', label: 'Warehouses', count: warehouses.length, icon: Building2 },
+    { id: 'brands', label: 'Brands', count: brands.length, icon: Award },
     { id: 'categories', label: 'Categories', count: categories.length, icon: FolderTree },
+    { id: 'warehouses', label: 'Warehouses', count: warehouses.length, icon: Building2 },
     { id: 'customers', label: 'Customers', count: customers.length, icon: Users },
     { id: 'suppliers', label: 'Suppliers', count: suppliers.length, icon: Truck },
   ];
@@ -482,53 +612,55 @@ export default function MastersView({
       }}
     >
       {/* Header (Fixed / Sticky at Top) */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
-          flexShrink: 0,
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
-          >
-            {displayTitle}
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
-            {displaySubtitle}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleOpenAdd}
+      {!hideHeader && (
+        <div
           style={{
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-            padding: '9px 18px',
-            borderRadius: '8px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-            border: 'none',
-            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '16px',
+            flexShrink: 0,
           }}
         >
-          <Plus size={17} /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab === 'warehouses' ? 'Warehouse' : activeTab === 'customers' ? 'Customer' : activeTab === 'suppliers' ? 'Supplier' : activeTab.slice(0, -1)}
-        </button>
-      </div>
+          <div>
+            <h1
+              style={{
+                fontSize: '1.65rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+                margin: '0 0 4px 0',
+              }}
+            >
+              {displayTitle}
+            </h1>
+            <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+              {displaySubtitle}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={17} /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab === 'warehouses' ? 'Warehouse' : activeTab === 'customers' ? 'Customer' : activeTab === 'suppliers' ? 'Supplier' : activeTab.slice(0, -1)}
+          </button>
+        </div>
+      )}
 
       {/* Directory Tabs (only if more than 1 tab visible) */}
       {visibleTabs.length > 1 && (
@@ -818,9 +950,10 @@ export default function MastersView({
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>UNIT</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>MIN STOCK</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
@@ -829,7 +962,7 @@ export default function MastersView({
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No products found matching current criteria.
                     </td>
                   </tr>
@@ -851,6 +984,35 @@ export default function MastersView({
                       >
                         <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{p.sku}</td>
                         <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                        <td
+                          style={{
+                            padding: '12px 18px',
+                            fontSize: '0.85rem',
+                            color: '#475569',
+                            maxWidth: '220px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                          title={p.description || p.notes || p.note || ''}
+                        >
+                          {p.description || p.notes || p.note || '—'}
+                        </td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span
+                            style={{
+                              backgroundColor: '#f1f5f9',
+                              color: '#334155',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            {getBrandForProduct(p)}
+                          </span>
+                        </td>
                         <td style={{ padding: '12px 18px' }}>
                           <span
                             style={{
@@ -866,9 +1028,6 @@ export default function MastersView({
                           </span>
                         </td>
                         <td style={{ padding: '12px 18px', fontWeight: 500, color: '#475569' }}>{p.unitOfMeasure || 'PCS'}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 700, color: '#0f172a' }}>
-                          Rs. {Number(p.sellingPrice || 0).toFixed(2)}
-                        </td>
                         <td style={{ padding: '12px 18px' }}>
                           <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#16a34a' : '#d97706' }}>
                             {p.minStockLevel || 0}
@@ -986,6 +1145,131 @@ export default function MastersView({
             </table>
           )}
 
+          {!loading && activeTab === 'brands' && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTES</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBrands.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      No brands found matching current criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBrands.map((b) => {
+                    const active = isItemActive(b);
+                    return (
+                      <tr
+                        key={b.id}
+                        onClick={() => setViewingItem({ ...b, type: 'brands' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view brand details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{b.code}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{b.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{b.description || '—'}</td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(b.id, active);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          >
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                              }}
+                            />
+                            {active ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(b)}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Edit Brand"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(b)}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Delete Brand"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+
           {!loading && activeTab === 'warehouses' && (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -994,7 +1278,6 @@ export default function MastersView({
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE NAME</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT NUMBER</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TYPE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
@@ -1002,7 +1285,7 @@ export default function MastersView({
               <tbody>
                 {filteredWarehouses.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No warehouses found matching current criteria.
                     </td>
                   </tr>
@@ -1027,24 +1310,6 @@ export default function MastersView({
                         <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{w.name}</td>
                         <td style={{ padding: '12px 18px', color: '#64748b' }}>{w.address || '—'}</td>
                         <td style={{ padding: '12px 18px', fontWeight: 500, color: '#334155' }}>{contact}</td>
-                        <td style={{ padding: '12px 18px' }}>
-                          {w.isPrimary ? (
-                            <span
-                              style={{
-                                backgroundColor: '#e0f2fe',
-                                color: '#0369a1',
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.78rem',
-                                fontWeight: 600,
-                              }}
-                            >
-                              Primary
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Standard</span>
-                          )}
-                        </td>
                         <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
@@ -1879,12 +2144,31 @@ export default function MastersView({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        CATEGORY
+                        BRAND *
+                      </label>
+                      <select
+                        className="input-glass"
+                        value={modalForm.brandId || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, brandId: e.target.value })}
+                        required
+                      >
+                        <option value="">Select Brand...</option>
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        CATEGORY *
                       </label>
                       <select
                         className="input-glass"
                         value={modalForm.categoryId || ''}
                         onChange={(e) => setModalForm({ ...modalForm, categoryId: e.target.value })}
+                        required
                       >
                         <option value="">Select Category...</option>
                         {categories.map((c) => (
@@ -1894,6 +2178,9 @@ export default function MastersView({
                         ))}
                       </select>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                         UNIT OF MEASURE
@@ -1908,9 +2195,6 @@ export default function MastersView({
                         ))}
                       </select>
                     </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                         MIN STOCK ALERT LEVEL
@@ -1923,32 +2207,64 @@ export default function MastersView({
                         onChange={(e) => setModalForm({ ...modalForm, minStockLevel: e.target.value })}
                       />
                     </div>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                      DESCRIPTION / NOTE
+                    </label>
+                    <textarea
+                      className="input-glass"
+                      rows="2"
+                      placeholder="Optional notes or product specifications"
+                      value={modalForm.description || ''}
+                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'brands' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        DESCRIPTION / NOTES
+                        BRAND CODE (ID) *
                       </label>
                       <input
                         type="text"
                         className="input-glass"
-                        placeholder="Specifications, size, packaging details..."
-                        value={modalForm.description || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                        placeholder="e.g. PRIMA"
+                        value={modalForm.code || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        BRAND NAME *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        placeholder="e.g. Prima Flour & Mills"
+                        value={modalForm.name || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
+                        required
                       />
                     </div>
                   </div>
-
-                  <div
-                    style={{
-                      padding: '10px 14px',
-                      background: 'rgba(37, 99, 235, 0.05)',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(37, 99, 235, 0.15)',
-                      fontSize: '0.8rem',
-                      color: '#2563eb',
-                      marginBottom: '20px',
-                    }}
-                  >
-                    <strong>Pricing & Stock:</strong> Managed automatically via Goods Received Notes (Inward GRN). Base selling price is recorded upon inventory intake.
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                      DESCRIPTION / NOTES
+                    </label>
+                    <input
+                      type="text"
+                      className="input-glass"
+                      placeholder="e.g. Wheat flour, bakery supplies, noodles and pre-mixes"
+                      value={modalForm.description || ''}
+                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
+                    />
                   </div>
                 </>
               )}
@@ -2224,4 +2540,6 @@ export default function MastersView({
       )}
     </div>
   );
-}
+});
+
+export default MastersView;

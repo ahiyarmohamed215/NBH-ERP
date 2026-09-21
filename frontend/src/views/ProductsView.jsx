@@ -14,9 +14,37 @@ import {
   Trash2,
 } from 'lucide-react';
 
+const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
+const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
+const INITIAL_BRANDS = [
+  { id: 'brd-1', code: 'PRIMA', name: 'Prima', description: 'Flour, noodles & bakery essentials', isActive: true },
+  { id: 'brd-2', code: 'MALIBAN', name: 'Maliban', description: 'Biscuits, crackers & confectionery', isActive: true },
+  { id: 'brd-3', code: 'MUNCHEE', name: 'Munchee', description: 'CBL biscuits, snacks & wafers', isActive: true },
+  { id: 'brd-4', code: 'NESTLE', name: 'Nestle', description: 'Dairy, Milo & nutritional foods', isActive: true },
+  { id: 'brd-5', code: 'DEFAULT', name: 'General Brand', description: 'Standard / Unbranded items', isActive: true },
+];
+
 export default function ProductsView({ isEmbedded = false }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_BRANDS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return INITIAL_BRANDS;
+  });
+  const [productBrandsMap, setProductBrandsMap] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return {};
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
@@ -27,6 +55,7 @@ export default function ProductsView({ isEmbedded = false }) {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
+    brandId: '',
     categoryId: '',
     unitOfMeasure: 'PCS',
     costPrice: '0',
@@ -64,11 +93,23 @@ export default function ProductsView({ isEmbedded = false }) {
 
   const isProductActive = (p) => Boolean(p?.isActive ?? p?.active ?? false);
 
+  const getBrandForProduct = (p) => {
+    if (!p) return 'General';
+    const bId = productBrandsMap[p.id] || productBrandsMap[p.sku] || p.brandId;
+    if (bId) {
+      const found = brands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
+      if (found) return found.name;
+      return bId;
+    }
+    return 'General';
+  };
+
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setFormData({
       sku: '',
       name: '',
+      brandId: brands[0]?.id || '',
       categoryId: categories.length > 0 ? categories[0].id : '',
       unitOfMeasure: 'PCS',
       costPrice: '0',
@@ -84,11 +125,12 @@ export default function ProductsView({ isEmbedded = false }) {
     setFormData({
       sku: prod.sku,
       name: prod.name,
+      brandId: productBrandsMap[prod.id] || productBrandsMap[prod.sku] || prod.brandId || brands[0]?.id || '',
       categoryId: prod.categoryId || (categories.find((c) => c.name === prod.categoryName)?.id || ''),
       unitOfMeasure: prod.unitOfMeasure || 'PCS',
       costPrice: prod.costPrice?.toString() || '0',
       sellingPrice: prod.sellingPrice?.toString() || '0',
-      minStockLevel: prod.minStockLevel?.toString() || '0',
+      minStockLevel: prod.minStockLevel?.toString() || '5',
       description: prod.description || '',
     });
     setShowModal(true);
@@ -117,9 +159,20 @@ export default function ProductsView({ isEmbedded = false }) {
 
       if (editingProduct) {
         await productApi.update(editingProduct.id, payload);
+        if (formData.brandId) {
+          const updatedMap = { ...productBrandsMap, [editingProduct.id]: formData.brandId, [payload.sku]: formData.brandId };
+          setProductBrandsMap(updatedMap);
+          localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
+        }
         addToast(`Product "${payload.name}" updated successfully!`, 'success');
       } else {
-        await productApi.create(payload);
+        const res = await productApi.create(payload);
+        const newId = res.data?.id || res.data?.content?.id || payload.sku;
+        if (formData.brandId) {
+          const updatedMap = { ...productBrandsMap, [newId]: formData.brandId, [payload.sku]: formData.brandId };
+          setProductBrandsMap(updatedMap);
+          localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
+        }
         addToast(`Product "${payload.name}" created successfully!`, 'success');
       }
       setShowModal(false);
@@ -248,9 +301,10 @@ export default function ProductsView({ isEmbedded = false }) {
               <tr>
                 <th>Code / SKU</th>
                 <th>Product Name</th>
+                <th>Description / Note</th>
+                <th>Brand</th>
                 <th>Category</th>
                 <th>Unit</th>
-                <th>Selling Price</th>
                 <th>Min Stock</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -259,13 +313,13 @@ export default function ProductsView({ isEmbedded = false }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                     Loading product catalog...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                     No products found matching the criteria.
                   </td>
                 </tr>
@@ -276,13 +330,38 @@ export default function ProductsView({ isEmbedded = false }) {
                     <tr key={p.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{p.sku}</td>
                       <td style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                      <td
+                        style={{
+                          fontSize: '0.85rem',
+                          color: '#475569',
+                          maxWidth: '220px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={p.description || p.notes || p.note || ''}
+                      >
+                        {p.description || p.notes || p.note || '—'}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            backgroundColor: '#f1f5f9',
+                            color: '#334155',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          {getBrandForProduct(p)}
+                        </span>
+                      </td>
                       <td>
                         <span className="badge badge-info">{p.categoryName || 'General'}</span>
                       </td>
                       <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
-                      <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                        Rs. {Number(p.sellingPrice || 0).toFixed(2)}
-                      </td>
                       <td>
                         <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
                           {p.minStockLevel || 0}
@@ -516,14 +595,33 @@ export default function ProductsView({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    CATEGORY
+                    BRAND *
+                  </label>
+                  <select
+                    className="input-glass"
+                    value={formData.brandId}
+                    onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
+                    required
+                  >
+                    <option value="">-- Select Brand --</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    CATEGORY *
                   </label>
                   <select
                     className="input-glass"
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    required
                   >
-                    <option value="">-- Uncategorized --</option>
+                    <option value="">-- Select Category --</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -531,6 +629,7 @@ export default function ProductsView({ isEmbedded = false }) {
                     ))}
                   </select>
                 </div>
+              </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     UNIT OF MEASURE

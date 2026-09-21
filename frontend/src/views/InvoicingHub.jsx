@@ -454,7 +454,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               margin: 0,
             }}
           >
-            Invoicing
+            Invoicing Management
           </h1>
         </div>
 

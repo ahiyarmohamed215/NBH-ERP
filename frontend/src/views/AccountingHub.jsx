@@ -160,7 +160,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
               margin: 0,
             }}
           >
-            {activeTabMeta.title}
+            Accounting Management
           </h1>
           <span
             style={{
@@ -179,7 +179,7 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
             }}
           >
             <Clock size={12} />
-            Feature Coming Soon
+            {activeTabMeta.title}
           </span>
         </div>
         <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '4px 0 0 0' }}>

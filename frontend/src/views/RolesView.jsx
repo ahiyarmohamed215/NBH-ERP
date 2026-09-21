@@ -205,7 +205,7 @@ export default function RolesView() {
       {/* Search Bar (Sticky / Fixed at Top) */}
       <div
         style={{
-          padding: '12px 18px',
+          padding: '10px 16px',
           marginBottom: '16px',
           backgroundColor: '#ffffff',
           borderRadius: '8px',
@@ -218,7 +218,7 @@ export default function RolesView() {
           gap: '12px',
         }}
       >
-        <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
           <input
             type="text"
@@ -233,6 +233,15 @@ export default function RolesView() {
               backgroundColor: '#ffffff',
               color: '#0f172a',
               boxSizing: 'border-box',
+              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = 'none';
             }}
             placeholder="Search roles by title, permissions..."
             value={searchQuery}
