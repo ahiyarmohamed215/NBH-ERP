@@ -23,6 +23,7 @@ import {
   Eye,
   Trash2,
   Package,
+  Download,
 } from 'lucide-react';
 
 export default function MastersView({
@@ -335,6 +336,89 @@ export default function MastersView({
   const activeCount = currentItems.filter(isItemActive).length;
   const inactiveCount = currentItems.length - activeCount;
 
+  const downloadCSV = (headers, rows, filename) => {
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Records exported to CSV', 'success');
+  };
+
+  const handleExportCSV = () => {
+    let itemsToExport = [];
+    let headers = [];
+    let filename = `${activeTab}_export_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    if (activeTab === 'products') {
+      itemsToExport = filteredProducts;
+      headers = ['SKU', 'Name', 'Category', 'Unit', 'Selling Price', 'Min Stock', 'Status'];
+      if (itemsToExport.length === 0) {
+        addToast('No products to export', 'error');
+        return;
+      }
+      const rows = itemsToExport.map((p) => [
+        `"${p.sku || ''}"`,
+        `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${p.categoryName || 'General'}"`,
+        `"${p.unitOfMeasure || 'PCS'}"`,
+        p.sellingPrice || 0,
+        p.minStockLevel || 0,
+        isItemActive(p) ? 'Active' : 'Inactive',
+      ]);
+      downloadCSV(headers, rows, filename);
+    } else if (activeTab === 'warehouses') {
+      itemsToExport = filteredWarehouses;
+      headers = ['Code', 'Name', 'Address', 'Contact Number', 'Type', 'Status'];
+      if (itemsToExport.length === 0) {
+        addToast('No warehouses to export', 'error');
+        return;
+      }
+      const rows = itemsToExport.map((w) => [
+        `"${w.code || ''}"`,
+        `"${(w.name || '').replace(/"/g, '""')}"`,
+        `"${(w.address || '').replace(/"/g, '""')}"`,
+        `"${w.contactNumber || w.phone || ''}"`,
+        w.isPrimary ? 'Primary Warehouse' : 'Standard Branch',
+        isItemActive(w) ? 'Active' : 'Inactive',
+      ]);
+      downloadCSV(headers, rows, filename);
+    } else if (activeTab === 'categories') {
+      itemsToExport = filteredCategories;
+      headers = ['Code', 'Name', 'Description', 'Status'];
+      if (itemsToExport.length === 0) {
+        addToast('No categories to export', 'error');
+        return;
+      }
+      const rows = itemsToExport.map((c) => [
+        `"${c.code || ''}"`,
+        `"${(c.name || '').replace(/"/g, '""')}"`,
+        `"${(c.description || '').replace(/"/g, '""')}"`,
+        isItemActive(c) ? 'Active' : 'Inactive',
+      ]);
+      downloadCSV(headers, rows, filename);
+    } else if (activeTab === 'suppliers') {
+      itemsToExport = filteredSuppliers;
+      headers = ['Code', 'Name', 'Contact Person', 'Phone', 'Email', 'Status'];
+      if (itemsToExport.length === 0) {
+        addToast('No suppliers to export', 'error');
+        return;
+      }
+      const rows = itemsToExport.map((s) => [
+        `"${s.code || s.supplierCode || ''}"`,
+        `"${(s.name || '').replace(/"/g, '""')}"`,
+        `"${(s.contactPerson || '').replace(/"/g, '""')}"`,
+        `"${s.phone || ''}"`,
+        `"${s.email || ''}"`,
+        isItemActive(s) ? 'Active' : 'Inactive',
+      ]);
+      downloadCSV(headers, rows, filename);
+    }
+  };
+
   const allTabs = [
     { id: 'products', label: 'Products', count: products.length, icon: Package },
     { id: 'warehouses', label: 'Warehouses', count: warehouses.length, icon: Building2 },
@@ -397,24 +481,53 @@ export default function MastersView({
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', flexShrink: 0 }}>
+      {/* Header (Fixed / Sticky at Top) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '16px',
+          flexShrink: 0,
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '1.8rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            {getHeaderIcon()} {displayTitle}
+          <h1
+            style={{
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 4px 0',
+            }}
+          >
+            {displayTitle}
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '6px 0 0 0' }}>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
             {displaySubtitle}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-glass" onClick={loadTabData} title="Refresh data">
-            <RefreshCw size={16} /> Refresh
-          </button>
-          <button className="btn btn-primary" onClick={handleOpenAdd}>
-            <Plus size={18} /> Add New {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab.slice(0, -1)}
-          </button>
-        </div>
+
+        <button
+          type="button"
+          onClick={handleOpenAdd}
+          style={{
+            backgroundColor: '#0284c7',
+            color: '#ffffff',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            padding: '9px 18px',
+            borderRadius: '8px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+            border: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <Plus size={17} /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab === 'warehouses' ? 'Warehouse' : activeTab === 'customers' ? 'Customer' : activeTab === 'suppliers' ? 'Supplier' : activeTab.slice(0, -1)}
+        </button>
       </div>
 
       {/* Directory Tabs (only if more than 1 tab visible) */}
@@ -439,51 +552,260 @@ export default function MastersView({
         </div>
       )}
 
-      {/* Search & Status Filters Bar */}
-      <div className="glass-card" style={{ padding: '14px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
-        <div style={{ flex: '1 1 300px', position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: '#94a3b8' }} />
+      {/* Search Bar & Action Buttons (Fixed / Sticky - Customer/Employee Look) */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          flexWrap: 'wrap',
+          flexShrink: 0,
+        }}
+      >
+        {/* Left Control: Search Input */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+          <Search
+            size={17}
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '11px',
+              color: '#94a3b8',
+              pointerEvents: 'none',
+            }}
+          />
           <input
             type="text"
-            className="input-glass"
-            style={{ paddingLeft: '42px' }}
-            placeholder={activeTab === 'products' ? 'Search products by SKU, name, category...' : `Search ${activeTab} by name, code, contact...`}
+            placeholder={
+              activeTab === 'products'
+                ? 'Search products by SKU, name, category...'
+                : activeTab === 'warehouses'
+                ? 'Search warehouses by code, name, address, contact...'
+                : activeTab === 'categories'
+                ? 'Search categories by code, name, description...'
+                : `Search ${activeTab} by name, code, contact...`
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 32px 0 38px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.88rem',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+            }}
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '2px',
+              }}
+              title="Clear search text"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            STATUS:
-          </span>
+        {/* Right Controls: Status Filter, Reset, Export CSV (icon only), & Refresh (icon only) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          {/* Status Filter Dropdown */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              height: '38px',
+              padding: '0 30px 0 12px',
+              width: '140px',
+              minWidth: '120px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.86rem',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              color: '#334155',
+              backgroundColor: '#ffffff',
+              cursor: 'pointer',
+              outline: 'none',
+              flexShrink: 0,
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 10px center',
+              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
+            }}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">Active Only</option>
+            <option value="INACTIVE">Inactive Only</option>
+          </select>
+
+          {/* Reset Filters button */}
+          {(statusFilter !== 'ALL' || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('ALL');
+                setSearchTerm('');
+              }}
+              style={{
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                backgroundColor: '#f1f5f9',
+                color: '#64748b',
+                fontSize: '0.85rem',
+                fontFamily: 'inherit',
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+              }}
+              title="Reset all filters to default"
+            >
+              <X size={13} /> Reset
+            </button>
+          )}
+
+          {/* Export CSV - Icon only */}
           <button
             type="button"
-            className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setStatusFilter('ALL')}
+            onClick={handleExportCSV}
+            style={{
+              height: '38px',
+              width: '38px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: 0,
+              color: '#64748b',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f8fafc';
+              e.currentTarget.style.borderColor = '#94a3b8';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#64748b';
+            }}
+            title={`Export ${activeTab} to CSV`}
           >
-            All ({currentItems.length})
+            <Download size={15} />
           </button>
+
+          {/* Refresh Records - Icon only */}
           <button
             type="button"
-            className={`btn btn-sm ${statusFilter === 'ACTIVE' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setStatusFilter('ACTIVE')}
+            onClick={loadTabData}
+            style={{
+              height: '38px',
+              width: '38px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: 0,
+              color: '#64748b',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f8fafc';
+              e.currentTarget.style.borderColor = '#94a3b8';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#64748b';
+            }}
+            title="Refresh records"
           >
-            Active ({activeCount})
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${statusFilter === 'INACTIVE' ? 'btn-primary' : 'btn-glass'}`}
-            onClick={() => setStatusFilter('INACTIVE')}
-          >
-            Inactive ({inactiveCount})
+            <RefreshCw size={15} />
           </button>
         </div>
       </div>
 
-      {/* Master Data Tables */}
-      <div className="glass-card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
+      {/* Master Data Tables (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
               Loading {activeTab} data...
@@ -491,23 +813,23 @@ export default function MastersView({
           )}
 
           {!loading && activeTab === 'products' && (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Code / SKU</th>
-                  <th>Product Name</th>
-                  <th>Category</th>
-                  <th>Unit</th>
-                  <th>Selling Price</th>
-                  <th>Min Stock</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>UNIT</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>MIN STOCK</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No products found matching current criteria.
                     </td>
                   </tr>
@@ -515,65 +837,144 @@ export default function MastersView({
                   filteredProducts.map((p) => {
                     const active = isItemActive(p);
                     return (
-                      <tr key={p.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{p.sku}</td>
-                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
-                        <td>
-                          <span className="badge badge-info">{p.categoryName || 'General'}</span>
+                      <tr
+                        key={p.id}
+                        onClick={() => setViewingItem({ ...p, type: 'products' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view product details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{p.sku}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span
+                            style={{
+                              backgroundColor: '#e0f2fe',
+                              color: '#0369a1',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {p.categoryName || 'General'}
+                          </span>
                         </td>
-                        <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
-                        <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                        <td style={{ padding: '12px 18px', fontWeight: 500, color: '#475569' }}>{p.unitOfMeasure || 'PCS'}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 700, color: '#0f172a' }}>
                           Rs. {Number(p.sellingPrice || 0).toFixed(2)}
                         </td>
-                        <td>
-                          <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#059669' : '#d97706' }}>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#16a34a' : '#d97706' }}>
                             {p.minStockLevel || 0}
                           </span>
                         </td>
-                        <td>
+                        <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
-                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(p.id, active);
+                            }}
                             style={{
-                              cursor: 'pointer',
+                              background: 'none',
                               border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              padding: '5px 10px',
-                              transition: 'all 0.15s ease-in-out',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
                             }}
-                            onClick={() => handleToggleActive(p.id, active)}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => setViewingItem({ ...p, type: 'products' })}
-                              title="View Details"
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                            <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => handleOpenEdit(p)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(p);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.color = '#0f172a';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.color = '#475569';
+                              }}
                               title="Edit Product"
                             >
-                              <Edit2 size={14} /> Edit
+                              <Edit2 size={13} />
                             </button>
+
                             <button
-                              className="btn btn-glass btn-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => handleDelete(p)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(p);
+                              }}
                               disabled={deletingId === p.id}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#f87171';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
                               title="Delete Product"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -586,22 +987,22 @@ export default function MastersView({
           )}
 
           {!loading && activeTab === 'warehouses' && (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Warehouse Name</th>
-                  <th>Address</th>
-                  <th>Contact Number</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT NUMBER</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TYPE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredWarehouses.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No warehouses found matching current criteria.
                     </td>
                   </tr>
@@ -610,62 +1011,141 @@ export default function MastersView({
                     const active = isItemActive(w);
                     const contact = w.contactNumber || w.phone || '—';
                     return (
-                      <tr key={w.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{w.code}</td>
-                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{w.name}</td>
-                        <td style={{ color: '#64748b' }}>{w.address || '—'}</td>
-                        <td style={{ fontWeight: 500 }}>{contact}</td>
-                        <td>
+                      <tr
+                        key={w.id}
+                        onClick={() => setViewingItem({ ...w, type: 'warehouses' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view warehouse details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{w.code}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{w.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{w.address || '—'}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 500, color: '#334155' }}>{contact}</td>
+                        <td style={{ padding: '12px 18px' }}>
                           {w.isPrimary ? (
-                            <span className="badge badge-info">Primary</span>
+                            <span
+                              style={{
+                                backgroundColor: '#e0f2fe',
+                                color: '#0369a1',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Primary
+                            </span>
                           ) : (
-                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Standard</span>
+                            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Standard</span>
                           )}
                         </td>
-                        <td>
+                        <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
-                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(w.id, active);
+                            }}
                             style={{
-                              cursor: 'pointer',
+                              background: 'none',
                               border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              padding: '5px 10px',
-                              transition: 'all 0.15s ease-in-out',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
                             }}
-                            onClick={() => handleToggleActive(w.id, active)}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => setViewingItem({ ...w, type: 'warehouses' })}
-                              title="View Details"
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                            <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => handleOpenEdit(w)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(w);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.color = '#0f172a';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.color = '#475569';
+                              }}
                               title="Edit Warehouse"
                             >
-                              <Edit2 size={14} /> Edit
+                              <Edit2 size={13} />
                             </button>
+
                             <button
-                              className="btn btn-glass btn-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => handleDelete(w)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(w);
+                              }}
                               disabled={deletingId === w.id}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#f87171';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
                               title="Delete Warehouse"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -678,20 +1158,20 @@ export default function MastersView({
           )}
 
           {!loading && activeTab === 'categories' && (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Category Name</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCategories.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No categories found matching current criteria.
                     </td>
                   </tr>
@@ -699,54 +1179,122 @@ export default function MastersView({
                   filteredCategories.map((c) => {
                     const active = isItemActive(c);
                     return (
-                      <tr key={c.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{c.code}</td>
-                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
-                        <td style={{ color: '#64748b' }}>{c.description || '—'}</td>
-                        <td>
+                      <tr
+                        key={c.id}
+                        onClick={() => setViewingItem({ ...c, type: 'categories' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view category details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{c.code}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{c.description || '—'}</td>
+                        <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
-                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(c.id, active);
+                            }}
                             style={{
-                              cursor: 'pointer',
+                              background: 'none',
                               border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              padding: '5px 10px',
-                              transition: 'all 0.15s ease-in-out',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
                             }}
-                            onClick={() => handleToggleActive(c.id, active)}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => setViewingItem({ ...c, type: 'categories' })}
-                              title="View Details"
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                            <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => handleOpenEdit(c)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(c);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.color = '#0f172a';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.color = '#475569';
+                              }}
                               title="Edit Category"
                             >
-                              <Edit2 size={14} /> Edit
+                              <Edit2 size={13} />
                             </button>
+
                             <button
-                              className="btn btn-glass btn-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => handleDelete(c)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(c);
+                              }}
                               disabled={deletingId === c.id}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#f87171';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
                               title="Delete Category"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -759,23 +1307,23 @@ export default function MastersView({
           )}
 
           {!loading && activeTab === 'customers' && (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Customer Name</th>
-                  <th>Contact Person</th>
-                  <th>Phone / Email</th>
-                  <th>Credit Limit</th>
-                  <th>Current Balance</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CREDIT LIMIT</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CURRENT BALANCE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No customers found matching current criteria.
                     </td>
                   </tr>
@@ -784,59 +1332,127 @@ export default function MastersView({
                     const active = isItemActive(c);
                     const code = c.code || c.customerCode;
                     return (
-                      <tr key={c.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{code}</td>
-                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
-                        <td>{c.contactPerson || '—'}</td>
-                        <td>{c.phone || c.email || '—'}</td>
-                        <td style={{ fontWeight: 600 }}>${Number(c.creditLimit || 0).toFixed(2)}</td>
-                        <td style={{ color: (c.currentBalance || c.currentCredit) > 0 ? '#dc2626' : '#059669', fontWeight: 600 }}>
-                          ${Number(c.currentBalance || c.currentCredit || 0).toFixed(2)}
+                      <tr
+                        key={c.id}
+                        onClick={() => setViewingItem({ ...c, code, type: 'customers' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view customer details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>{c.contactPerson || '—'}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>{c.phone || c.email || '—'}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#334155' }}>Rs. {Number(c.creditLimit || 0).toFixed(2)}</td>
+                        <td style={{ padding: '12px 18px', color: (c.currentBalance || c.currentCredit) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                          Rs. {Number(c.currentBalance || c.currentCredit || 0).toFixed(2)}
                         </td>
-                        <td>
+                        <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
-                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(c.id, active);
+                            }}
                             style={{
-                              cursor: 'pointer',
+                              background: 'none',
                               border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              padding: '5px 10px',
-                              transition: 'all 0.15s ease-in-out',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
                             }}
-                            onClick={() => handleToggleActive(c.id, active)}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => setViewingItem({ ...c, code, type: 'customers' })}
-                              title="View Details"
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                            <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => handleOpenEdit({ ...c, code })}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit({ ...c, code });
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.color = '#0f172a';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.color = '#475569';
+                              }}
                               title="Edit Customer"
                             >
-                              <Edit2 size={14} /> Edit
+                              <Edit2 size={13} />
                             </button>
+
                             <button
-                              className="btn btn-glass btn-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => handleDelete(c)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(c);
+                              }}
                               disabled={deletingId === c.id}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#f87171';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
                               title="Delete Customer"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -849,22 +1465,22 @@ export default function MastersView({
           )}
 
           {!loading && activeTab === 'suppliers' && (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Supplier Name</th>
-                  <th>Contact Person</th>
-                  <th>Phone / Email</th>
-                  <th>Address</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No suppliers found matching current criteria.
                     </td>
                   </tr>
@@ -873,56 +1489,124 @@ export default function MastersView({
                     const active = isItemActive(s);
                     const code = s.code || s.supplierCode;
                     return (
-                      <tr key={s.id}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{code}</td>
-                        <td style={{ fontWeight: 600, color: '#0f172a' }}>{s.name}</td>
-                        <td>{s.contactPerson || '—'}</td>
-                        <td>{s.phone || s.email || '—'}</td>
-                        <td style={{ color: '#64748b' }}>{s.address || '—'}</td>
-                        <td>
+                      <tr
+                        key={s.id}
+                        onClick={() => setViewingItem({ ...s, code, type: 'suppliers' })}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view supplier details"
+                      >
+                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{s.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>{s.contactPerson || '—'}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>{s.phone || s.email || '—'}</td>
+                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{s.address || '—'}</td>
+                        <td style={{ padding: '12px 18px' }}>
                           <button
                             type="button"
-                            className={`badge ${active ? 'badge-success' : 'badge-danger'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleActive(s.id, active);
+                            }}
                             style={{
-                              cursor: 'pointer',
+                              background: 'none',
                               border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              padding: '5px 10px',
-                              transition: 'all 0.15s ease-in-out',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              color: active ? '#16a34a' : '#dc2626',
+                              whiteSpace: 'nowrap',
                             }}
-                            onClick={() => handleToggleActive(s.id, active)}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: active ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => setViewingItem({ ...s, code, type: 'suppliers' })}
-                              title="View Details"
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                            <button
-                              className="btn btn-glass btn-sm"
-                              onClick={() => handleOpenEdit({ ...s, code })}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit({ ...s, code });
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.color = '#0f172a';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.color = '#475569';
+                              }}
                               title="Edit Supplier"
                             >
-                              <Edit2 size={14} /> Edit
+                              <Edit2 size={13} />
                             </button>
+
                             <button
-                              className="btn btn-glass btn-sm"
-                              style={{ color: '#dc2626' }}
-                              onClick={() => handleDelete(s)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(s);
+                              }}
                               disabled={deletingId === s.id}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#f87171';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
                               title="Delete Supplier"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>

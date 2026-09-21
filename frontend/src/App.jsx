@@ -143,12 +143,10 @@ export default function App() {
         icon: Boxes,
         permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST'],
         subItems: [
-          { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
           { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
           { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
-          { id: 'brands', label: 'Brands', permission: 'PRODUCT_MANAGE' },
           { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
-          { id: 'reserved', label: 'Reserved', permission: 'INVENTORY_VIEW' },
+          { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
         ],
       },
       {
@@ -258,25 +256,19 @@ export default function App() {
       setSubTab(view);
     } else if (view === 'inventory') {
       setCurrentView('inventory');
-      setSubTab(sub || 'adjustments');
-    } else if (view === 'stock' || view === 'adjustments') {
-      setCurrentView('inventory');
-      setSubTab('adjustments');
+      setSubTab(sub || 'warehouses');
     } else if (view === 'warehouses') {
       setCurrentView('inventory');
       setSubTab('warehouses');
     } else if (view === 'products') {
       setCurrentView('inventory');
       setSubTab('products');
-    } else if (view === 'brands') {
-      setCurrentView('inventory');
-      setSubTab('brands');
     } else if (view === 'categories') {
       setCurrentView('inventory');
       setSubTab('categories');
-    } else if (view === 'reserved') {
+    } else if (view === 'stock' || view === 'adjustments') {
       setCurrentView('inventory');
-      setSubTab('reserved');
+      setSubTab('adjustments');
     } else if (view === 'customers') {
       setCurrentView('customers');
       setSubTab(sub || 'list');
