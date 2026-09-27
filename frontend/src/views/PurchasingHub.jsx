@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import MastersView from './MastersView';
 import GrnView from './GrnView';
 import GtnView from './GtnView';
 import PrnView from './PrnView';
+import PurchaseOrdersView from './PurchaseOrdersView';
 import {
   Truck,
   FileCheck,
   ArrowRightLeft,
   RotateCcw,
   ShoppingBag,
-  Clock,
+  Plus,
 } from 'lucide-react';
 
 export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
@@ -18,10 +19,16 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
   const userPermissions = user?.permissions || [];
 
+  const mastersRef = useRef(null);
+  const grnRef = useRef(null);
+  const gtnRef = useRef(null);
+  const prnRef = useRef(null);
+  const poRef = useRef(null);
+
   const subTabs = [
     {
       id: 'suppliers',
-      label: 'Suppliers Directory',
+      label: 'Supplier List',
       icon: Truck,
       permission: 'SUPPLIER_MANAGE',
     },
@@ -84,17 +91,48 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
+  const handleHeaderAction = () => {
+    if (currentTab === 'suppliers') {
+      mastersRef.current?.openAdd();
+    } else if (currentTab === 'grn') {
+      if (grnRef.current?.openCreate) grnRef.current.openCreate();
+      else grnRef.current?.openIntake?.();
+    } else if (currentTab === 'gtn') {
+      if (gtnRef.current?.openCreate) gtnRef.current.openCreate();
+      else gtnRef.current?.focusForm?.();
+    } else if (currentTab === 'prn') {
+      if (prnRef.current?.openCreate) prnRef.current.openCreate();
+      else prnRef.current?.focusForm?.();
+    } else if (currentTab === 'purchase-orders') {
+      poRef.current?.openCreate?.();
+    }
+  };
+
   return (
-    <div style={{ flex: 1, height: '100%', maxHeight: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Page Header (Fixed / Sticky at Top) - Standardized across Hubs */}
+    <div
+      style={{
+        padding: '24px 32px',
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        backgroundColor: '#f8fafc',
+        fontFamily: "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)",
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Page Header (Fixed / Sticky to Desktop Screen - Exact CustomerHub Look) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
-          padding: '24px 32px 14px 32px',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
+          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
@@ -114,47 +152,173 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
             Manage registered procurement vendors, purchase orders, goods receipts (GRN), and stock transfers (GTN).
           </p>
         </div>
+
+        {/* Dynamic Action Button (CustomerHub Styled Button) */}
+        {currentTab === 'suppliers' ? (
+          <button
+            type="button"
+            onClick={handleHeaderAction}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <Plus size={17} /> Add Supplier
+          </button>
+        ) : currentTab === 'grn' ? (
+          <button
+            type="button"
+            onClick={handleHeaderAction}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <Plus size={17} /> Create GRN
+          </button>
+        ) : currentTab === 'gtn' ? (
+          <button
+            type="button"
+            onClick={handleHeaderAction}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <ArrowRightLeft size={16} /> New Stock Transfer
+          </button>
+        ) : currentTab === 'prn' ? (
+          <button
+            type="button"
+            onClick={handleHeaderAction}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <RotateCcw size={16} /> New Purchase Return
+          </button>
+        ) : currentTab === 'purchase-orders' ? (
+          <button
+            type="button"
+            onClick={handleHeaderAction}
+            style={{
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.88rem',
+              padding: '9px 18px',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <Plus size={17} /> Create Purchase Order
+          </button>
+        ) : null}
       </div>
 
-      {/* Sub-navigation Header Bar (Fixed / Sticky at Top) */}
+      {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
       <div
-        className="glass-sub-header"
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: '#ffffff',
-          borderBottom: '1px solid #e2e8f0',
-          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.05)',
-          padding: '12px 32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
+          gap: '24px',
+          borderBottom: '1px solid #e2e8f0',
+          marginBottom: '16px',
           overflowX: 'auto',
           flexShrink: 0,
         }}
       >
-        <div className="glass-pill-bar">
-          {allowedTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabClick(tab.id)}
-                className={`glass-pill-btn ${isActive ? 'active' : ''}`}
-                style={{
-                  fontWeight: isActive ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <Icon size={17} color={isActive ? '#1d4ed8' : '#64748b'} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        {allowedTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = currentTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabClick(tab.id)}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: isActive ? '2.5px solid #0284c7' : '2.5px solid transparent',
+                padding: '10px 4px',
+                fontSize: '0.92rem',
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? '#0284c7' : '#64748b',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '-1px',
+                whiteSpace: 'nowrap',
+                transition: 'color 0.15s ease, border-color 0.15s ease',
+              }}
+            >
+              <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}
@@ -162,68 +326,32 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
         {visitedTabs.has('suppliers') && (
           <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
             <MastersView
+              ref={mastersRef}
               activeSubTab="suppliers"
               isStandalone={true}
               allowedTabs={['suppliers']}
-              title="Supplier Directory"
-              subtitle="Manage registered procurement vendors, contact personnel, and addresses"
+              hideHeader={true}
             />
           </div>
         )}
         {visitedTabs.has('grn') && (
-          <div style={{ display: currentTab === 'grn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            <GrnView />
+          <div style={{ display: currentTab === 'grn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <GrnView ref={grnRef} />
           </div>
         )}
         {visitedTabs.has('gtn') && (
-          <div style={{ display: currentTab === 'gtn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            <GtnView />
+          <div style={{ display: currentTab === 'gtn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <GtnView ref={gtnRef} />
           </div>
         )}
         {visitedTabs.has('prn') && (
-          <div style={{ display: currentTab === 'prn' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            <PrnView />
+          <div style={{ display: currentTab === 'prn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <PrnView ref={prnRef} />
           </div>
         )}
         {visitedTabs.has('purchase-orders') && (
-          <div style={{ display: currentTab === 'purchase-orders' ? 'block' : 'none', flex: 1, minHeight: 0, overflowY: 'auto', padding: '60px 24px' }}>
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '48px 24px',
-                maxWidth: '520px',
-                margin: '0 auto',
-                textAlign: 'center',
-              }}
-            >
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: '#eff6ff',
-                  color: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 16px auto',
-                }}
-              >
-                <ShoppingBag size={28} />
-              </div>
-              <h2 style={{ fontSize: '1.25rem', color: '#0f172a', marginBottom: '8px' }}>
-                Purchase Orders (PO) Workflow
-              </h2>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '20px' }}>
-                Purchase Order creation, supplier approvals, and automatic conversion to GRN upon delivery
-                will be available soon.
-              </p>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', backgroundColor: '#dbeafe', padding: '4px 12px', borderRadius: '9999px' }}>
-                COMING SOON
-              </span>
-            </div>
+          <div style={{ display: currentTab === 'purchase-orders' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <PurchaseOrdersView ref={poRef} />
           </div>
         )}
       </div>

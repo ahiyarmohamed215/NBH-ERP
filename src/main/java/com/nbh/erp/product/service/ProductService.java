@@ -14,6 +14,7 @@ import com.nbh.erp.product.repository.ProductRepository;
 import com.nbh.erp.supplier.entity.Supplier;
 import com.nbh.erp.supplier.repository.SupplierRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
@@ -171,10 +173,8 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
-        if (stockBalanceRepository.existsByProductId(id)) {
-            throw new BusinessException("Cannot delete product '" + product.getName() + "' because inventory stock records exist for it. Please deactivate it instead.");
-        }
-
-        productRepository.delete(product);
+        product.setIsActive(false);
+        productRepository.save(product);
+        log.info("Product ID {} ('{}') soft-deleted (deactivated).", id, product.getName());
     }
 }

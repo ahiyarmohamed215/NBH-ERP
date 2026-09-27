@@ -126,10 +126,7 @@ public class CustomerService {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
 
-        if (invoiceRepository.existsByCustomerId(id)) {
-            throw new BusinessException("Cannot delete customer '" + customer.getName() + "' because historical invoices exist for this customer. Please deactivate the customer instead.");
-        }
-
-        customerRepository.delete(customer);
+        customer.setIsActive(false);
+        customerRepository.save(customer);
     }
 }

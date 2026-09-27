@@ -1,5 +1,6 @@
 package com.nbh.erp.grn.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
@@ -37,6 +38,7 @@ public class GrnService {
     private final ProductRepository productRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public PagedResponse<GrnDto> searchGrns(
@@ -141,6 +143,14 @@ public class GrnService {
 
         grn.setStatus("PROCESSED");
         Grn updated = grnRepository.save(grn);
+
+        auditLogService.log(
+                "GRN_PROCESS",
+                "Grn",
+                grn.getGrnNumber(),
+                String.format("GRN %s processed for supplier '%s'. Total: %s",
+                        grn.getGrnNumber(), grn.getSupplier().getName(), grn.getTotalAmount())
+        );
 
         log.info("GRN '{}' processed successfully. Total: {}", grn.getGrnNumber(), grn.getTotalAmount());
         return GrnDto.from(updated);

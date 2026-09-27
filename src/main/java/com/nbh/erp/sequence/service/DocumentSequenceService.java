@@ -68,4 +68,8 @@ public class DocumentSequenceService {
     public String generateCreditNoteNumber() {
         return getNextNumber("CRN");
     }
+
+    public String generatePaymentNumber() {
+        return getNextNumber("REC");
+    }
 }

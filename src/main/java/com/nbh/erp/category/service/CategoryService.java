@@ -93,11 +93,8 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
-        if (productRepository.existsByCategoryId(id)) {
-            throw new BusinessException("Cannot delete category '" + category.getName() + "' because products belong to it. Please reassign products or deactivate the category.");
-        }
-
-        categoryRepository.delete(category);
+        category.setIsActive(false);
+        categoryRepository.save(category);
     }
 }
 

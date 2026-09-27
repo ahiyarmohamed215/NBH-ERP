@@ -181,4 +181,79 @@ public class ReportService {
             throw new RuntimeException("Excel export failure", e);
         }
     }
+
+    @Transactional(readOnly = true)
+    public List<ReportDto.OutstandingCustomerReport> getOutstandingPayments() {
+        LocalDate today = LocalDate.now();
+
+        List<Invoice> unpaidInvoices = invoiceRepository.findAll().stream()
+                .filter(i -> !"VOIDED".equalsIgnoreCase(i.getStatus())
+                        && !"CANCELLED".equalsIgnoreCase(i.getStatus())
+                        && !"HELD".equalsIgnoreCase(i.getStatus()))
+                .filter(i -> i.getBalanceAmount() != null && i.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toList());
+
+        Map<Long, List<Invoice>> byCustomer = unpaidInvoices.stream()
+                .filter(i -> i.getCustomer() != null)
+                .collect(Collectors.groupingBy(i -> i.getCustomer().getId()));
+
+        List<ReportDto.OutstandingCustomerReport> result = new ArrayList<>();
+
+        for (Map.Entry<Long, List<Invoice>> entry : byCustomer.entrySet()) {
+            List<Invoice> custInvoices = entry.getValue();
+            Invoice first = custInvoices.get(0);
+            var customer = first.getCustomer();
+
+            BigDecimal totalOut = BigDecimal.ZERO;
+            BigDecimal b0to7 = BigDecimal.ZERO;
+            BigDecimal b8to21 = BigDecimal.ZERO;
+            BigDecimal b22Plus = BigDecimal.ZERO;
+
+            List<ReportDto.OutstandingInvoiceItem> items = new ArrayList<>();
+
+            for (Invoice inv : custInvoices) {
+                BigDecimal bal = inv.getBalanceAmount();
+                totalOut = totalOut.add(bal);
+
+                long days = java.time.temporal.ChronoUnit.DAYS.between(inv.getInvoiceDate(), today);
+                if (days < 0) days = 0;
+
+                if (days <= 7) {
+                    b0to7 = b0to7.add(bal);
+                } else if (days <= 21) {
+                    b8to21 = b8to21.add(bal);
+                } else {
+                    b22Plus = b22Plus.add(bal);
+                }
+
+                items.add(ReportDto.OutstandingInvoiceItem.builder()
+                        .invoiceNo(inv.getInvoiceNumber())
+                        .date(inv.getInvoiceDate().toString())
+                        .total(inv.getNetTotal())
+                        .paid(inv.getPaidAmount())
+                        .balance(bal)
+                        .days(days)
+                        .build());
+            }
+
+            result.add(ReportDto.OutstandingCustomerReport.builder()
+                    .id("cust-" + customer.getId())
+                    .customerId(customer.getId())
+                    .name(customer.getName())
+                    .phone(customer.getPhone())
+                    .email(customer.getEmail())
+                    .group("Standard")
+                    .postedBy(first.getCreatedBy() != null ? first.getCreatedBy() : "system")
+                    .totalOutstanding(totalOut)
+                    .days0to7(b0to7)
+                    .days8to21(b8to21)
+                    .days22Plus(b22Plus)
+                    .invoicesCount(custInvoices.size())
+                    .invoices(items)
+                    .build());
+        }
+
+        result.sort((a, b) -> b.getTotalOutstanding().compareTo(a.getTotalOutstanding()));
+        return result;
+    }
 }

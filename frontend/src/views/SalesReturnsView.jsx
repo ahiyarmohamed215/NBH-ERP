@@ -15,7 +15,7 @@ import {
   Package,
 } from 'lucide-react';
 
-export default function SalesReturnsView() {
+export default function SalesReturnsView({ embedded = false }) {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,23 +182,25 @@ export default function SalesReturnsView() {
   const totalCredit = calculateReturnTotal();
 
   return (
-    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ padding: embedded ? 0 : '24px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.7rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <Undo2 size={26} color="#2563eb" /> Customer Sales Returns & Credit Notes
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
-            Process invoice returns, credit notes, and restock inventory directly on the left while monitoring return logs on the right
-          </p>
+      {!embedded && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+          <div>
+            <h1 style={{ fontSize: '1.7rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+              <Undo2 size={26} color="#2563eb" /> Customer Sales Returns & Credit Notes
+            </h1>
+            <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
+              Process invoice returns, credit notes, and restock inventory directly on the left while monitoring return logs on the right
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn btn-glass" onClick={loadData} title="Refresh records">
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-glass" onClick={loadData} title="Refresh records">
-            <RefreshCw size={15} /> Refresh
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Split View Container: Left Form + Right Table */}
       <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>

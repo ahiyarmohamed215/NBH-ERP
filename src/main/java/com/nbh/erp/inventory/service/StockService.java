@@ -3,6 +3,7 @@ package com.nbh.erp.inventory.service;
 import com.nbh.erp.common.exception.InsufficientStockException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.inventory.dto.StockDto;
+import com.nbh.erp.inventory.dto.StockMovementDto;
 import com.nbh.erp.inventory.entity.StockBalance;
 import com.nbh.erp.inventory.entity.StockMovement;
 import com.nbh.erp.inventory.repository.StockBalanceRepository;
@@ -14,10 +15,14 @@ import com.nbh.erp.warehouse.entity.Warehouse;
 import com.nbh.erp.warehouse.repository.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -293,5 +298,37 @@ public class StockService {
                 .build();
 
         stockMovementRepository.save(movement);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StockDto> searchBalances(Long warehouseId, String query, Pageable pageable) {
+        return stockBalanceRepository.searchBalances(warehouseId, query, pageable).map(StockDto::from);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockDto> findLowStock(Long warehouseId) {
+        return (warehouseId != null
+                ? stockBalanceRepository.findLowStockInWarehouse(warehouseId)
+                : stockBalanceRepository.findAllLowStock())
+                .stream()
+                .map(StockDto::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<StockMovementDto> getLedger(
+            Long warehouseId,
+            Long productId,
+            String movementType,
+            LocalDate startDate,
+            LocalDate endDate,
+            Pageable pageable
+    ) {
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59) : null;
+
+        return stockMovementRepository
+                .findLedger(warehouseId, productId, movementType, startDateTime, endDateTime, pageable)
+                .map(StockMovementDto::from);
     }
 }

@@ -1,5 +1,6 @@
 package com.nbh.erp.sales.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
@@ -11,6 +12,7 @@ import com.nbh.erp.product.repository.ProductRepository;
 import com.nbh.erp.sales.dto.CashierAccountingDto;
 import com.nbh.erp.sales.dto.CreateInvoiceRequest;
 import com.nbh.erp.sales.dto.InvoiceDto;
+import com.nbh.erp.sales.dto.UpdateInvoiceRequest;
 import com.nbh.erp.sales.entity.Invoice;
 import com.nbh.erp.sales.entity.InvoiceItem;
 import com.nbh.erp.sales.repository.InvoiceRepository;
@@ -49,6 +51,7 @@ public class InvoiceService {
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
 
     public String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -171,7 +174,17 @@ public class InvoiceService {
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
 
-            BigDecimal lineGross = itemReq.getQuantity().multiply(itemReq.getUnitPrice());
+            BigDecimal catalogPrice = product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO;
+            BigDecimal unitPrice = itemReq.getUnitPrice();
+            if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                unitPrice = catalogPrice;
+            } else if (catalogPrice.compareTo(BigDecimal.ZERO) > 0 && unitPrice.compareTo(catalogPrice) != 0) {
+                log.warn("Price mismatch on SKU {}: requested {}, catalog {}. Enforcing catalog selling price.",
+                        product.getSku(), unitPrice, catalogPrice);
+                unitPrice = catalogPrice;
+            }
+
+            BigDecimal lineGross = itemReq.getQuantity().multiply(unitPrice);
             BigDecimal itemDisc = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
             if (itemReq.getDiscountRate() != null && itemReq.getDiscountRate().compareTo(BigDecimal.ZERO) > 0) {
                 itemDisc = lineGross.multiply(itemReq.getDiscountRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -187,7 +200,7 @@ public class InvoiceService {
                     .invoice(invoice)
                     .product(product)
                     .quantity(itemReq.getQuantity())
-                    .unitPrice(itemReq.getUnitPrice())
+                    .unitPrice(unitPrice)
                     .costPrice(product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO)
                     .discountRate(itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO)
                     .discountAmount(itemDisc)
@@ -248,6 +261,14 @@ public class InvoiceService {
             log.info("Invoice '{}' saved as HELD cart.", saved.getInvoiceNumber());
         }
 
+        auditLogService.log(
+                request.isHold() ? "INVOICE_HOLD" : "INVOICE_CREATE",
+                "Invoice",
+                saved.getInvoiceNumber(),
+                String.format("Invoice %s created for customer '%s' with net total %s (Payment: %s)",
+                        saved.getInvoiceNumber(), customer.getName(), saved.getNetTotal(), saved.getPaymentType())
+        );
+
         return InvoiceDto.from(saved);
     }
 
@@ -277,8 +298,11 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
 
-        if (!"HELD".equals(invoice.getStatus())) {
-            throw new BusinessException("Only HELD invoices can be cancelled. Completed invoices require Sales Return.");
+        if (!"HELD".equalsIgnoreCase(invoice.getStatus()) 
+                && !"SENT_TO_WAREHOUSE".equalsIgnoreCase(invoice.getStatus()) 
+                && !"STOCK_ADJUSTED".equalsIgnoreCase(invoice.getStatus())
+                && !"CANCELLED".equalsIgnoreCase(invoice.getStatus())) {
+            throw new BusinessException("Only held or in-progress invoices can be cancelled. Completed invoices require Sales Return.");
         }
 
         // Ownership check: regular salespersons can ONLY cancel their own held carts
@@ -289,6 +313,274 @@ public class InvoiceService {
 
         invoice.setStatus("CANCELLED");
         invoiceRepository.save(invoice);
+    }
+
+    public static final Set<String> VALID_STATUSES = Set.of(
+            "HELD", "COMPLETED", "PAID", "PARTIAL", "VOIDED", "CANCELLED"
+    );
+
+    @Transactional
+    public void deleteInvoice(Long id) {
+        log.warn("Direct deletion request for invoice ID {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", id);
+        voidInvoice(id, "Voided via delete endpoint");
+    }
+
+    @Transactional
+    public void deleteInvoiceByNumber(String invoiceNumber) {
+        log.warn("Direct deletion request for invoice {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", invoiceNumber);
+        voidInvoiceByNumber(invoiceNumber, "Voided via delete endpoint");
+    }
+
+    @Transactional
+    public InvoiceDto voidInvoice(Long id, String reason) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
+        return performVoidInvoice(invoice, reason);
+    }
+
+    @Transactional
+    public InvoiceDto voidInvoiceByNumber(String invoiceNumber, String reason) {
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
+        return performVoidInvoice(invoice, reason);
+    }
+
+    private InvoiceDto performVoidInvoice(Invoice invoice, String reason) {
+        String currentStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
+        if ("VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
+            throw new BusinessException("Invoice " + invoice.getInvoiceNumber() + " is already " + currentStatus);
+        }
+
+        // If invoice was completed/paid/partial and deducted stock, revert stock back to warehouse
+        if (!"HELD".equals(currentStatus)) {
+            if (invoice.getWarehouse() != null && invoice.getItems() != null) {
+                Long whId = invoice.getWarehouse().getId();
+                for (InvoiceItem item : invoice.getItems()) {
+                    if (item.getProduct() != null && item.getQuantity() != null && item.getQuantity().compareTo(BigDecimal.ZERO) > 0) {
+                        stockService.increaseStock(
+                                whId,
+                                item.getProduct().getId(),
+                                item.getQuantity(),
+                                item.getCostPrice() != null ? item.getCostPrice() : BigDecimal.ZERO,
+                                "VOID_SALE",
+                                invoice.getInvoiceNumber(),
+                                "Stock restored due to voiding of invoice " + invoice.getInvoiceNumber() + (reason != null ? " (" + reason + ")" : "")
+                        );
+                    }
+                }
+            }
+
+            // Revert customer balance if credit sale
+            Customer customer = invoice.getCustomer();
+            if (customer != null && invoice.getBalanceAmount() != null && invoice.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
+                if (customer.getCurrentBalance() != null) {
+                    BigDecimal newBal = customer.getCurrentBalance().subtract(invoice.getBalanceAmount());
+                    customer.setCurrentBalance(newBal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBal);
+                    customerRepository.save(customer);
+                }
+            }
+            invoice.setStatus("VOIDED");
+        } else {
+            invoice.setStatus("CANCELLED");
+        }
+
+        String voidInfo = String.format(" [VOIDED on %s by %s: %s]",
+                LocalDate.now(), getCurrentUsername(), reason != null && !reason.isBlank() ? reason.trim() : "Manual void");
+        invoice.setNotes(invoice.getNotes() != null ? invoice.getNotes() + voidInfo : voidInfo);
+
+        Invoice saved = invoiceRepository.save(invoice);
+        log.info("Invoice {} (ID {}) has been VOIDED. Stock and customer balances restored atomically.",
+                saved.getInvoiceNumber(), saved.getId());
+
+        auditLogService.log(
+                "INVOICE_VOID",
+                "Invoice",
+                saved.getInvoiceNumber(),
+                String.format("Invoice %s voided by %s. Reason: %s",
+                        saved.getInvoiceNumber(), getCurrentUsername(), reason != null ? reason : "Manual void")
+        );
+
+        return InvoiceDto.from(saved);
+    }
+
+    @Transactional
+    public InvoiceDto updateInvoice(Long id, UpdateInvoiceRequest request) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
+        return performUpdateInvoice(invoice, request);
+    }
+
+    @Transactional
+    public InvoiceDto updateInvoiceByNumber(String invoiceNumber, UpdateInvoiceRequest request) {
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
+        return performUpdateInvoice(invoice, request);
+    }
+
+    private InvoiceDto performUpdateInvoice(Invoice invoice, UpdateInvoiceRequest request) {
+        String currentStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
+        if ("VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
+            throw new BusinessException("Cannot update invoice " + invoice.getInvoiceNumber() + " with terminal status " + currentStatus);
+        }
+
+        String targetStatus = null;
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            targetStatus = request.getStatus().trim().toUpperCase();
+            if (!VALID_STATUSES.contains(targetStatus)) {
+                throw new BusinessException("Invalid invoice status: " + request.getStatus() + ". Valid statuses are: " + VALID_STATUSES);
+            }
+            if ("HELD".equals(currentStatus) && "VOIDED".equals(targetStatus)) {
+                throw new BusinessException("Held bills cannot be voided; cancel them instead.");
+            }
+            if (!"HELD".equals(currentStatus) && "HELD".equals(targetStatus)) {
+                throw new BusinessException("Finalized invoices cannot be reverted to HELD status.");
+            }
+            if (!"HELD".equals(currentStatus) && "VOIDED".equals(targetStatus)) {
+                return performVoidInvoice(invoice, request.getNotes() != null ? request.getNotes() : "Voided via status update");
+            }
+        }
+
+        // Customer
+        if (request.getCustomerId() != null) {
+            customerRepository.findById(request.getCustomerId()).ifPresent(invoice::setCustomer);
+        } else if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
+            List<Customer> matching = customerRepository.searchCustomers(request.getCustomerName().trim());
+            if (!matching.isEmpty()) {
+                invoice.setCustomer(matching.get(0));
+            }
+        }
+
+        // Salesman
+        if (request.getSalesmanId() != null) {
+            salesmanRepository.findById(request.getSalesmanId()).ifPresent(invoice::setSalesman);
+        }
+
+        // Warehouse
+        if (request.getWarehouseId() != null) {
+            warehouseRepository.findById(request.getWarehouseId()).ifPresent(invoice::setWarehouse);
+        }
+
+        // Line Items update: only permitted for HELD invoices
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            if (!"HELD".equals(currentStatus)) {
+                throw new BusinessException("Cannot modify line items on finalized invoice (" + currentStatus + "). Void the invoice and create a new one instead.");
+            }
+
+            invoice.getItems().clear();
+            BigDecimal calculatedSubtotal = BigDecimal.ZERO;
+
+            for (UpdateInvoiceRequest.UpdateInvoiceItemRequest itemReq : request.getItems()) {
+                Product product = null;
+                if (itemReq.getProductId() != null) {
+                    product = productRepository.findById(itemReq.getProductId()).orElse(null);
+                } else if (itemReq.getSku() != null && !itemReq.getSku().isBlank()) {
+                    product = productRepository.findBySku(itemReq.getSku()).orElse(null);
+                }
+                if (product == null) continue;
+
+                BigDecimal qty = itemReq.getQuantity() != null && itemReq.getQuantity().compareTo(BigDecimal.ZERO) > 0
+                        ? itemReq.getQuantity()
+                        : BigDecimal.ONE;
+                BigDecimal unitPrice = product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO;
+
+                BigDecimal lineGross = qty.multiply(unitPrice);
+                BigDecimal discRate = itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO;
+                BigDecimal discAmt = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
+                if (discRate.compareTo(BigDecimal.ZERO) > 0 && discAmt.compareTo(BigDecimal.ZERO) == 0) {
+                    discAmt = lineGross.multiply(discRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                }
+
+                BigDecimal lineNet = lineGross.subtract(discAmt);
+                if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
+                calculatedSubtotal = calculatedSubtotal.add(lineNet);
+
+                InvoiceItem newItem = InvoiceItem.builder()
+                        .invoice(invoice)
+                        .product(product)
+                        .quantity(qty)
+                        .unitPrice(unitPrice)
+                        .costPrice(product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO)
+                        .discountRate(discRate)
+                        .discountAmount(discAmt)
+                        .totalPrice(lineNet)
+                        .build();
+
+                invoice.getItems().add(newItem);
+            }
+
+            invoice.setSubtotal(calculatedSubtotal);
+
+            // If finalizing from HELD to COMPLETED/PAID, deduct inventory atomically
+            if ("COMPLETED".equals(targetStatus) || "PAID".equals(targetStatus) || "PARTIAL".equals(targetStatus)) {
+                Long whId = invoice.getWarehouse() != null ? invoice.getWarehouse().getId() : 1L;
+                for (InvoiceItem item : invoice.getItems()) {
+                    stockService.decreaseStock(
+                            whId,
+                            item.getProduct().getId(),
+                            item.getQuantity(),
+                            "SALE",
+                            invoice.getInvoiceNumber(),
+                            "Sale finalized from held bill " + invoice.getInvoiceNumber()
+                    );
+                }
+            }
+        }
+
+        if (request.getDiscountAmount() != null) {
+            invoice.setDiscountAmount(request.getDiscountAmount());
+        }
+        if (request.getTaxRate() != null) {
+            invoice.setTaxRate(request.getTaxRate());
+        }
+        if (request.getTaxAmount() != null) {
+            invoice.setTaxAmount(request.getTaxAmount());
+        }
+
+        if ("HELD".equals(currentStatus)) {
+            BigDecimal taxable = invoice.getSubtotal().subtract(invoice.getDiscountAmount());
+            if (taxable.compareTo(BigDecimal.ZERO) < 0) taxable = BigDecimal.ZERO;
+            BigDecimal tax = taxable.multiply(invoice.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            invoice.setTaxAmount(tax);
+            invoice.setNetTotal(taxable.add(tax));
+        } else if (request.getTotalAmount() != null) {
+            invoice.setNetTotal(request.getTotalAmount());
+        }
+
+        BigDecimal paid = request.getPaidAmount() != null ? request.getPaidAmount() : invoice.getPaidAmount();
+        invoice.setPaidAmount(paid);
+
+        BigDecimal balance = request.getBalanceAmount() != null
+                ? request.getBalanceAmount()
+                : invoice.getNetTotal().subtract(paid);
+        if (balance.compareTo(BigDecimal.ZERO) < 0) balance = BigDecimal.ZERO;
+        invoice.setBalanceAmount(balance);
+
+        if (targetStatus != null) {
+            invoice.setStatus(targetStatus);
+        } else if (!"HELD".equals(currentStatus)) {
+            if (paid.compareTo(invoice.getNetTotal()) >= 0 && invoice.getNetTotal().compareTo(BigDecimal.ZERO) > 0) {
+                invoice.setStatus("PAID");
+            } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
+                invoice.setStatus("PARTIAL");
+            } else {
+                invoice.setStatus("COMPLETED");
+            }
+        }
+
+        if (request.getPaymentType() != null) {
+            invoice.setPaymentType(request.getPaymentType().toUpperCase());
+        }
+        if (request.getInvoiceDate() != null) {
+            invoice.setInvoiceDate(request.getInvoiceDate());
+        }
+        if (request.getNotes() != null) {
+            invoice.setNotes(request.getNotes());
+        }
+
+        Invoice saved = invoiceRepository.save(invoice);
+        log.info("Invoice {} (ID {}) updated successfully in DB. Status: {}, Net Total: {}",
+                saved.getInvoiceNumber(), saved.getId(), saved.getStatus(), saved.getNetTotal());
+        return InvoiceDto.from(saved);
     }
 
     @Transactional(readOnly = true)

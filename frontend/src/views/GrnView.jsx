@@ -22,6 +22,7 @@ import {
   History,
   Info,
   Download,
+  Eye,
 } from 'lucide-react';
 
 const GRN_TYPES = [
@@ -33,7 +34,9 @@ const GRN_TYPES = [
   'Sample / Promotional',
 ];
 
-export default function GrnView() {
+const GrnView = React.forwardRef(function GrnView(props, ref) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [grns, setGrns] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
@@ -42,6 +45,19 @@ export default function GrnView() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
+
+  React.useImperativeHandle(ref, () => ({
+    openCreate: () => {
+      resetAll();
+      setShowCreateModal(true);
+    },
+    openIntake: () => {
+      resetAll();
+      setShowCreateModal(true);
+    },
+    openList: () => setShowCreateModal(false),
+    refresh: loadData,
+  }));
 
   // Split-view Left Panel: GRN Header Form State
   const [formData, setFormData] = useState({
@@ -458,6 +474,7 @@ export default function GrnView() {
 
       resetAll();
       loadData();
+      setShowCreateModal(false);
     } catch (err) {
       addToast(err.message || 'Failed to save GRN', 'error');
     } finally {
@@ -612,52 +629,639 @@ export default function GrnView() {
 
   const filteredGrns = grns.filter((g) => {
     const q = searchTerm.toLowerCase();
-    return (
+    const matchSearch =
+      !q ||
       g.grnNumber?.toLowerCase().includes(q) ||
       g.supplierName?.toLowerCase().includes(q) ||
       g.warehouseName?.toLowerCase().includes(q) ||
-      g.supplierInvoiceNumber?.toLowerCase().includes(q)
-    );
+      g.supplierInvoiceNumber?.toLowerCase().includes(q);
+
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'PROCESSED' && g.status === 'PROCESSED') ||
+      (statusFilter === 'DRAFT' && g.status === 'DRAFT');
+
+    return matchSearch && matchStatus;
   });
+
+  const handleExportCSV = () => {
+    if (filteredGrns.length === 0) {
+      addToast('No GRN records to export', 'warning');
+      return;
+    }
+    const headers = 'GRN Number,Supplier,Warehouse,Status,Total Cost,Date,Invoice Number\n';
+    const rows = filteredGrns.map((g) =>
+      `"${g.grnNumber || ''}","${g.supplierName || ''}","${g.warehouseName || ''}","${g.status || ''}",${Number(g.totalAmount || 0).toFixed(2)},"${g.receivedDate || ''}","${g.supplierInvoiceNumber || ''}"`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `grn_records_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('GRN records exported to CSV', 'success');
+  };
 
   const totals = calculateGrandTotals();
 
   return (
-    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.7rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <FileCheck size={26} color="#2563eb" /> Goods Received Notes (GRN)
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
-            Inward inventory intake — record new stock intake with comprehensive quantity and price economics above, and view or print recorded GRNs below
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-glass"
-            onClick={() => setShowUploadModal(true)}
-            title="Upload Excel or CSV Sheet"
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
+    >
+          {/* Top Filter & Actions Bar (Sticky Toolbar Card - Exact CustomersHub Look) */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              flexWrap: 'wrap',
+              flexShrink: 0,
+            }}
           >
-            <FileSpreadsheet size={16} color="#16a34a" /> Upload Excel Sheet
-          </button>
-          <button className="btn btn-glass" onClick={loadData} title="Refresh records">
-            <RefreshCw size={15} /> Refresh
-          </button>
-        </div>
-      </div>
+            {/* Left Control: Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <Search
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '11px',
+                  color: '#94a3b8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search GRNs by #, supplier, warehouse, invoice..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 32px 0 38px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '2px',
+                  }}
+                  title="Clear search text"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
 
-      {/* Vertical Stack: GRN Intake UP, View GRNs DOWN */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-        {/* TOP SECTION: Comprehensive GRN Intake Workstation (Full Width) */}
+            {/* Right Controls: Filters, Upload, Export, Refresh */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  height: '38px',
+                  padding: '0 30px 0 12px',
+                  width: '140px',
+                  minWidth: '120px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.86rem',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  color: '#334155',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 10px center',
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PROCESSED">Processed Only</option>
+                <option value="DRAFT">Draft Only</option>
+              </select>
+
+              {(statusFilter !== 'ALL' || searchTerm) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('ALL');
+                    setSearchTerm('');
+                  }}
+                  style={{
+                    height: '38px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#f1f5f9',
+                    color: '#64748b',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    boxSizing: 'border-box',
+                  }}
+                  title="Reset all filters to default"
+                >
+                  <X size={13} /> Reset
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetAll();
+                  setShowCreateModal(true);
+                }}
+                style={{
+                  height: '38px',
+                  padding: '0 16px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                <Plus size={16} /> + Create GRN
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(true)}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  color: '#16a34a',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0fdf4')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                title="Upload Excel or CSV Sheet"
+              >
+                <FileSpreadsheet size={15} /> Upload Sheet
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  color: '#334155',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Export GRNs to CSV"
+              >
+                <Download size={14} /> Export
+              </button>
+
+              <button
+                type="button"
+                onClick={loadData}
+                style={{
+                  height: '38px',
+                  padding: '0 14px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  color: '#334155',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Refresh records"
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* GRN Table (Fixed Table Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      GRN NUMBER
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      SUPPLIER
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      WAREHOUSE
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                      TOTAL COST
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      DATE
+                    </th>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ACTIONS
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        Loading GRN records...
+                      </td>
+                    </tr>
+                  ) : filteredGrns.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        No GRN records found. Click <strong>+ New Inward GRN Intake</strong> to create a new intake.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredGrns.map((g) => (
+                      <tr
+                        key={g.id}
+                        onClick={() => handleInspectGrn(g.id)}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view complete GRN details"
+                      >
+                        <td style={{ padding: '12px 18px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                            {g.grnNumber}
+                          </span>
+                          {g.supplierInvoiceNumber && (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                              Inv: {g.supplierInvoiceNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                          {g.supplierName || '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                          {g.warehouseName || '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: g.status === 'PROCESSED' ? '#dcfce7' : '#fef3c7',
+                              color: g.status === 'PROCESSED' ? '#16a34a' : '#d97706',
+                              border: g.status === 'PROCESSED' ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: g.status === 'PROCESSED' ? '#16a34a' : '#d97706',
+                                display: 'inline-block',
+                              }}
+                            />
+                            {g.status || 'DRAFT'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontSize: '0.85rem' }}>
+                          ${Number(g.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                          {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInspectGrn(g.id);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="Inspect GRN Details"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintPdf(g.id);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="Print GRN PDF"
+                            >
+                              <Printer size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+      {/* FULL WIDTH & HEIGHT CREATE GRN MODAL POPUP */}
+      {showCreateModal && (
         <div
-          className="glass-card"
           style={{
-            width: '100%',
-            padding: '24px',
-            background: '#ffffff',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreateModal(false);
+          }}
+        >
+          <div
+            style={{
+              width: '96vw',
+              maxWidth: '1440px',
+              height: '92vh',
+              maxHeight: '92vh',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <FileCheck size={22} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Create Goods Received Note (GRN)
+                  </h2>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                    Inward delivery workstation — stock updates, unit pricing & consignment verification
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(true)}
+                  style={{
+                    height: '34px',
+                    padding: '0 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#16a34a',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <FileSpreadsheet size={15} /> Upload Spreadsheet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Scrollable Workstation */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          <div
+            className="glass-card"
+            style={{
+              width: '100%',
+              padding: '24px',
+              background: '#ffffff',
             borderRadius: '12px',
             border: '1px solid #e2e8f0',
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
@@ -1351,161 +1955,96 @@ export default function GrnView() {
               </div>
             </div>
           </div>
+            </div>
+          </div>
 
-          {/* Submission Action Buttons */}
-          <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ flex: 2, height: '46px', fontSize: '0.95rem', fontWeight: 800, justifyContent: 'center', background: '#2563eb' }}
-              onClick={() => handleSaveGrn(true)}
-              disabled={saving}
-              title="Processes inventory intake immediately and posts stock to warehouse"
+            {/* Modal Footer: Sticky Totals & Action Buttons */}
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
             >
-              <CheckCircle size={17} />
-              {saving ? 'Processing...' : 'Process to Stock & Ledger'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-glass"
-              style={{ flex: 1, height: '46px', fontSize: '0.92rem', fontWeight: 700, justifyContent: 'center' }}
-              onClick={() => handleSaveGrn(false)}
-              disabled={saving}
-              title="Save as pending draft"
-            >
-              Save as Draft
-            </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>GROSS:</span>{' '}
+                  <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>${totals.grossValue.toFixed(2)}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>DISC:</span>{' '}
+                  <strong style={{ fontSize: '0.92rem', color: '#16a34a' }}>-${totals.totalDiscount.toFixed(2)}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>NET PAYABLE:</span>{' '}
+                  <strong style={{ fontSize: '1.2rem', color: '#0284c7', fontWeight: 900 }}>${totals.netPayable.toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveGrn(false)}
+                  disabled={saving}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveGrn(true)}
+                  disabled={saving}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  }}
+                >
+                  <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                  {saving ? 'Processing...' : 'Direct GRN Intake & Post Inventory'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* BOTTOM SECTION: View Recorded GRNs (Full Width Down Below) */}
-        <div
-          className="glass-card"
-          style={{
-            width: '100%',
-            padding: '24px',
-            background: '#ffffff',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.25rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <FileCheck size={22} color="#2563eb" /> View Recorded Goods Received Notes (GRN)
-              </h2>
-              <p style={{ color: '#475569', fontSize: '0.84rem', margin: '3px 0 0 0' }}>
-                Click on any GRN row below to open and view its full item breakdown, or click the printer icon to print PDF directly
-              </p>
-            </div>
-            <button className="btn btn-glass btn-sm" onClick={loadData} title="Refresh records" style={{ height: '36px', padding: '6px 14px', fontSize: '0.84rem' }}>
-              <RefreshCw size={14} /> Refresh List
-            </button>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ position: 'relative', flex: '1 1 340px', maxWidth: '520px' }}>
-              <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="input-glass"
-                style={{ paddingLeft: '38px', width: '100%', fontSize: '0.88rem', height: '40px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                placeholder="Search GRNs by #, supplier, warehouse, invoice..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 700 }}>
-              Showing {filteredGrns.length} records
-            </span>
-          </div>
-
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-            <table className="glass-table" style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '12px 14px' }}>GRN Number</th>
-                  <th style={{ padding: '12px 14px' }}>Supplier</th>
-                  <th style={{ padding: '12px 14px' }}>Warehouse</th>
-                  <th style={{ padding: '12px 14px' }}>Status</th>
-                  <th style={{ padding: '12px 14px' }}>Total Cost</th>
-                  <th style={{ padding: '12px 14px' }}>Date</th>
-                  <th style={{ textAlign: 'right', padding: '12px 14px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                      Loading GRN records...
-                    </td>
-                  </tr>
-                ) : filteredGrns.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                      No GRN records found. Fill the intake form above to add a GRN.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredGrns.map((g) => (
-                    <tr
-                      key={g.id}
-                      onClick={() => handleInspectGrn(g.id)}
-                      style={{ cursor: 'pointer', transition: 'background 0.15s ease' }}
-                      title="Click row to view complete GRN details"
-                    >
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>
-                          {g.grnNumber}
-                        </span>
-                        {g.supplierInvoiceNumber && (
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                            Inv: {g.supplierInvoiceNumber}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{g.supplierName}</td>
-                      <td>{g.warehouseName}</td>
-                      <td>
-                        {g.status === 'PROCESSED' ? (
-                          <span className="badge badge-success">Processed</span>
-                        ) : g.status === 'DRAFT' ? (
-                          <span className="badge badge-warning">Draft</span>
-                        ) : (
-                          <span className="badge badge-danger">{g.status}</span>
-                        )}
-                      </td>
-                      <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                        ${Number(g.totalAmount || 0).toFixed(2)}
-                      </td>
-                      <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                        {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn btn-glass btn-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrintPdf(g.id);
-                          }}
-                          title="Print / View GRN PDF"
-                          style={{ padding: '5px 9px' }}
-                        >
-                          <Printer size={15} color="#2563eb" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* EXCEL / CSV UPLOAD MODAL */}
       {showUploadModal && (
@@ -1791,4 +2330,6 @@ export default function GrnView() {
       )}
     </div>
   );
-}
+});
+
+export default GrnView;

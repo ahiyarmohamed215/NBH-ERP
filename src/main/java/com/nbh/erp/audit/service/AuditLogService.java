@@ -35,6 +35,11 @@ public class AuditLogService {
     }
 
     @Transactional
+    public void log(String action, String entityName, String entityId, String details) {
+        log(action, entityName, entityId, details, null);
+    }
+
+    @Transactional
     public void log(String action, String entityName, String entityId, String details, String ipAddress) {
         String username = SecurityUtils.getCurrentUsername().orElse("system");
 

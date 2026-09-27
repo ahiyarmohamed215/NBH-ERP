@@ -1,5 +1,6 @@
 package com.nbh.erp.stockadjustment.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
@@ -36,6 +37,7 @@ public class StockAdjustmentService {
     private final ProductRepository productRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public PagedResponse<StockAdjustmentDto> searchAdjustments(
@@ -134,6 +136,14 @@ public class StockAdjustmentService {
         adjustment.setApprovedBy(currentUsername);
         adjustment.setApprovedAt(LocalDateTime.now());
         StockAdjustment updated = adjustmentRepository.save(adjustment);
+
+        auditLogService.log(
+                "STOCK_ADJUSTMENT",
+                "StockAdjustment",
+                adjustment.getAdjustmentNumber(),
+                String.format("Stock adjustment %s processed by %s for warehouse %s. Reason: %s",
+                        adjustment.getAdjustmentNumber(), currentUsername, adjustment.getWarehouse().getName(), adjustment.getReason())
+        );
 
         log.info("Stock Adjustment '{}' processed successfully by {}", adjustment.getAdjustmentNumber(), currentUsername);
         return StockAdjustmentDto.from(updated);

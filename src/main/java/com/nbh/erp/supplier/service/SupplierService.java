@@ -122,14 +122,7 @@ public class SupplierService {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
 
-        if (grnRepository.existsBySupplierId(id)) {
-            throw new BusinessException("Cannot delete supplier '" + supplier.getName() + "' because Goods Received Notes (GRN) exist for this supplier. Please deactivate it instead.");
-        }
-
-        if (productRepository.existsByDefaultSupplierId(id)) {
-            throw new BusinessException("Cannot delete supplier '" + supplier.getName() + "' because products are linked to it as default supplier. Please reassign products or deactivate it instead.");
-        }
-
-        supplierRepository.delete(supplier);
+        supplier.setIsActive(false);
+        supplierRepository.save(supplier);
     }
 }

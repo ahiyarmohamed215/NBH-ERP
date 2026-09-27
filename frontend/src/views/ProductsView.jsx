@@ -16,13 +16,7 @@ import {
 
 const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
 const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
-const INITIAL_BRANDS = [
-  { id: 'brd-1', code: 'PRIMA', name: 'Prima', description: 'Flour, noodles & bakery essentials', isActive: true },
-  { id: 'brd-2', code: 'MALIBAN', name: 'Maliban', description: 'Biscuits, crackers & confectionery', isActive: true },
-  { id: 'brd-3', code: 'MUNCHEE', name: 'Munchee', description: 'CBL biscuits, snacks & wafers', isActive: true },
-  { id: 'brd-4', code: 'NESTLE', name: 'Nestle', description: 'Dairy, Milo & nutritional foods', isActive: true },
-  { id: 'brd-5', code: 'DEFAULT', name: 'General Brand', description: 'Standard / Unbranded items', isActive: true },
-];
+const INITIAL_BRANDS = [];
 
 export default function ProductsView({ isEmbedded = false }) {
   const [products, setProducts] = useState([]);

@@ -129,6 +129,7 @@ export const inventoryApi = {
   getWarehouseStock: (whId) => api.get(`/inventory/warehouse/${whId}`),
   getLowStock: (whId) => api.get('/inventory/low-stock', { params: { warehouseId: whId } }),
   getLedger: (params) => api.get('/inventory/ledger', { params }),
+  getProductStock: (whId, prodId) => api.get(`/inventory/warehouse/${whId}/product/${prodId}`),
 };
 
 export const grnApi = {
@@ -172,6 +173,12 @@ export const salesApi = {
   create: (data) => api.post('/invoices', data),
   resumeHeld: (id, data) => api.post(`/invoices/held/${id}/resume`, data),
   cancelHeld: (id) => api.post(`/invoices/held/${id}/cancel`),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  updateByNumber: (number, data) => api.put(`/invoices/number/${number}`, data),
+  void: (id, reason) => api.post(`/invoices/${id}/void`, null, { params: { reason } }),
+  voidByNumber: (number, reason) => api.post(`/invoices/number/${number}/void`, null, { params: { reason } }),
+  delete: (id) => api.delete(`/invoices/${id}`),
+  deleteByNumber: (number) => api.delete(`/invoices/number/${number}`),
 };
 
 export const salesReturnApi = {
@@ -180,11 +187,24 @@ export const salesReturnApi = {
   create: (data) => api.post('/sales-returns', data),
 };
 
+export const paymentApi = {
+  search: (params) => api.get('/payments', { params }),
+  getById: (id) => api.get(`/payments/${id}`),
+  create: (data) => api.post('/payments', data),
+  void: (id, reason) => api.post(`/payments/${id}/void`, null, { params: { reason } }),
+};
+
+export const auditApi = {
+  search: (params) => api.get('/audit-logs', { params }),
+};
+
 export const reportApi = {
   getSalesSummary: (startDate, endDate) =>
     api.get('/reports/sales-summary', { params: { startDate, endDate } }),
   getInventoryValuation: (warehouseId) =>
     api.get('/reports/inventory-valuation', { params: { warehouseId } }),
+  getOutstandingPayments: () =>
+    api.get('/reports/outstanding-payments'),
   getExcelDownloadUrl: (warehouseId) =>
     `/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
 };

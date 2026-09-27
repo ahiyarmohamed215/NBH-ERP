@@ -102,16 +102,17 @@ export default function App() {
       },
       {
         id: 'invoicing',
-        label: 'Invoicing',
+        label: 'Sales',
         icon: FileText,
         permissions: ['SALES_CREATE', 'SALES_RETURN'],
         subItems: [
-          { id: 'quotations', label: 'Quotations', permission: 'SALES_CREATE' },
-          { id: 'orders', label: 'Orders', permission: 'SALES_CREATE' },
-          { id: 'sales', label: 'Sales', permission: 'SALES_CREATE' },
+          { id: 'sales', label: 'Sales List', permission: 'SALES_CREATE' },
+          { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
+          { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
           { id: 'payments', label: 'Payments', permission: 'SALES_CREATE' },
           { id: 'advance-payments', label: 'Advance Payments', permission: 'SALES_CREATE' },
-          { id: 'refunds', label: 'Refunds', permission: 'SALES_RETURN' },
+          { id: 'outstanding-payments', label: 'Outstanding Payments', permission: 'SALES_CREATE' },
+          { id: 'quotations', label: 'Quotations', permission: 'SALES_CREATE' },
         ],
       },
       {
@@ -234,9 +235,12 @@ export default function App() {
     } else if (view === 'quotations') {
       setCurrentView('invoicing');
       setSubTab('quotations');
+    } else if (view === 'hold-bills' || view === 'held-bills' || view === 'held') {
+      setCurrentView('invoicing');
+      setSubTab('hold-bills');
     } else if (view === 'orders') {
       setCurrentView('invoicing');
-      setSubTab('orders');
+      setSubTab('sales');
     } else if (view === 'payments') {
       setCurrentView('invoicing');
       setSubTab('payments');
@@ -389,15 +393,18 @@ export default function App() {
     );
   }
 
+  const isPosMode = (currentView === 'invoicing' && subTab === 'pos') || currentView === 'pos';
+
   return (
     <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-      {/* Sidebar Navigation */}
-      <aside
-        className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
-        style={{
-          width: isSidebarCollapsed ? '64px' : '235px',
-          minWidth: isSidebarCollapsed ? '64px' : '235px',
-          height: '100vh',
+      {/* Sidebar Navigation - Hidden in POS Mode */}
+      {!isPosMode && (
+        <aside
+          className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
+          style={{
+            width: isSidebarCollapsed ? '64px' : '235px',
+            minWidth: isSidebarCollapsed ? '64px' : '235px',
+            height: '100vh',
           maxHeight: '100vh',
           position: 'sticky',
           top: 0,
@@ -578,6 +585,7 @@ export default function App() {
           onOpenShortcuts={() => setShowShortcutsModal(true)}
         />
       </aside>
+      )}
 
       {/* Main Workspace Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
@@ -655,10 +663,11 @@ export default function App() {
         </main>
       </div>
 
-      {/* Floating Bottom-Right Fullscreen Trigger Button */}
-      <button
-        type="button"
-        onClick={toggleFullscreen}
+      {/* Floating Bottom-Right Fullscreen Trigger Button (Hidden in POS mode) */}
+      {!isPosMode && (
+        <button
+          type="button"
+          onClick={toggleFullscreen}
         title={isFullscreen ? 'Exit Full Screen (F11 or Alt+Enter)' : 'Enter Full Screen (F11 or Alt+Enter)'}
         style={{
           position: 'fixed',
@@ -689,6 +698,7 @@ export default function App() {
       >
         {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
       </button>
+      )}
 
       {/* Standard ERP Keyboard Shortcuts Help Modal */}
       <KeyboardShortcutsModal

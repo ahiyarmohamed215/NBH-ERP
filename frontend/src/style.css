@@ -619,4 +619,16 @@ textarea:disabled {
     color: #000000 !important;
     padding: 6px 10px !important;
   }
+
+  .warehouse-print-slip {
+    page-break-after: always !important;
+    break-after: page !important;
+    margin-bottom: 20mm !important;
+  }
+
+  .warehouse-print-slip:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 0 !important;
+  }
 }

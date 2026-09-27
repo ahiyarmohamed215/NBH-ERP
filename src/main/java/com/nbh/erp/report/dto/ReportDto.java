@@ -50,4 +50,37 @@ public class ReportDto {
         private BigDecimal totalRetailValuation;
         private long lowStockAlertCount;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OutstandingCustomerReport {
+        private String id;
+        private Long customerId;
+        private String name;
+        private String phone;
+        private String email;
+        private String group;
+        private String postedBy;
+        private BigDecimal totalOutstanding;
+        private BigDecimal days0to7;
+        private BigDecimal days8to21;
+        private BigDecimal days22Plus;
+        private int invoicesCount;
+        private List<OutstandingInvoiceItem> invoices;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OutstandingInvoiceItem {
+        private String invoiceNo;
+        private String date;
+        private BigDecimal total;
+        private BigDecimal paid;
+        private BigDecimal balance;
+        private long days;
+    }
 }

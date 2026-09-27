@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,6 +19,7 @@ public class PdfController {
     private final PdfGenerationService pdfService;
 
     @GetMapping("/invoices/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Generate and stream or download PDF for sales invoice")
     public ResponseEntity<byte[]> getInvoicePdf(
             @PathVariable Long id,
@@ -34,6 +36,7 @@ public class PdfController {
     }
 
     @GetMapping("/grns/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
     @Operation(summary = "Generate and stream or download PDF for GRN intake")
     public ResponseEntity<byte[]> getGrnPdf(
             @PathVariable Long id,
@@ -50,6 +53,7 @@ public class PdfController {
     }
 
     @GetMapping("/gtns/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GTN_PROCESS')")
     @Operation(summary = "Generate and stream or download PDF for GTN transfer")
     public ResponseEntity<byte[]> getGtnPdf(
             @PathVariable Long id,

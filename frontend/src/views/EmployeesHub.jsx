@@ -404,7 +404,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             Employee Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Create and manage employee records, role assignments, branch attendance, and payroll.
+            Create and manage employee records, role assignments, attendance, and payroll.
           </p>
         </div>
 
@@ -796,24 +796,27 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </button>
               )}
 
-              {/* Export CSV - Icon only matching Customer page */}
+              {/* Export CSV */}
               <button
                 type="button"
                 onClick={handleExportCSV}
                 style={{
                   height: '38px',
-                  width: '38px',
+                  padding: '0 14px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
+                  color: '#334155',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -824,31 +827,34 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
+                  e.currentTarget.style.color = '#334155';
                 }}
                 title="Export employees to CSV"
               >
-                <Download size={15} />
+                <Download size={14} /> Export
               </button>
 
-              {/* Refresh Employee Records - Icon only */}
+              {/* Refresh Employee Records */}
               <button
                 type="button"
                 onClick={loadData}
                 style={{
                   height: '38px',
-                  width: '38px',
+                  padding: '0 14px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
+                  color: '#334155',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -859,11 +865,11 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
+                  e.currentTarget.style.color = '#334155';
                 }}
                 title="Refresh employee records"
               >
-                <RefreshCw size={15} />
+                <RefreshCw size={14} /> Refresh
               </button>
             </div>
           </div>
@@ -1109,7 +1115,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   Pending Employee Registrations & Role Assignments
                 </h3>
                 <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  Branch users become active employees only after role assignment and confirmation.
+                  Newly registered users become active employees once assigned roles and approved.
                 </span>
               </div>
             </div>
@@ -1183,7 +1189,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', maxWidth: '440px' }}>
                   {pendingSearchQuery
                     ? 'Try searching by a different name, username, or email.'
-                    : 'There are currently no new employee registrations awaiting approval for this branch.'}
+                    : 'There are currently no new employee registrations awaiting approval.'}
                 </p>
               </div>
             ) : (
@@ -1224,14 +1230,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>
                             {pUser.fullName || pUser.username}
                           </span>
-                          <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 9px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
                             PENDING APPROVAL
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', fontSize: '0.82rem', color: '#64748b' }}>
-                          <span>Username: <strong style={{ color: '#334155' }}>{pUser.username}</strong></span>
-                          {pUser.email && <span>Email: <strong style={{ color: '#334155' }}>{pUser.email}</strong></span>}
-                          {pUser.phone && <span>Phone: <strong style={{ color: '#334155' }}>{pUser.phone}</strong></span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '0.84rem', color: '#64748b', flexWrap: 'wrap' }}>
+                          <span>Username: <strong style={{ color: '#0f172a' }}>@{pUser.username}</strong></span>
+                          {pUser.email && <span>Email: <strong style={{ color: '#0f172a' }}>{pUser.email}</strong></span>}
+                          {pUser.phone && <span>Phone: <strong style={{ color: '#0f172a' }}>{pUser.phone}</strong></span>}
+                          {pUser.createdAt && <span>Registered: <strong style={{ color: '#0f172a' }}>{new Date(pUser.createdAt).toLocaleDateString()}</strong></span>}
                         </div>
                       </div>
                     </div>
@@ -1276,15 +1283,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       >
                         <UserX size={15} /> Reject
                       </button>
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', color: '#64748b' }}>
-                    <div>
-                      Assigned Branch: <strong style={{ color: '#0f172a' }}>{pUser.branchName || currentUser?.branchName || 'Main Branch'}</strong>
-                    </div>
-                    <div>
-                      Requested Roles: <strong style={{ color: '#0284c7' }}>{pUser.roles?.length ? pUser.roles.map(formatRoleName).join(', ') : 'Default / Standard Access'}</strong>
                     </div>
                   </div>
                 </div>
@@ -1344,10 +1342,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               <Calendar size={28} />
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              Branch Attendance & Clock-in
+              Staff Attendance & Clock-in
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-              Track daily shifts, check-in timestamps, leave requests, and branch staff work logs.
+              Track daily shifts, check-in timestamps, leave requests, and staff work logs.
             </p>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 12px', borderRadius: '9999px' }}>
               FEATURE IN PROGRESS
@@ -1431,7 +1429,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               Sales Commission Templates
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-              Configure commission tiers for POS cashiers, managers, and branch sales representatives.
+              Configure commission tiers for POS cashiers, managers, and sales representatives.
             </p>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#d97706', backgroundColor: '#fef3c7', padding: '4px 12px', borderRadius: '9999px' }}>
               FEATURE IN PROGRESS
@@ -1752,7 +1750,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   Complete & Approve Employee
                 </h2>
                 <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  Assign branch roles and approve registration for {selectedEmployee.fullName || selectedEmployee.username}
+                  Assign roles and approve registration for {selectedEmployee.fullName || selectedEmployee.username}
                 </div>
               </div>
               <button

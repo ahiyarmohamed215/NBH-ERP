@@ -11,6 +11,7 @@ import {
   Eye,
   X,
   Package,
+  Download,
 } from 'lucide-react';
 
 const COMMON_REASONS = [
@@ -22,14 +23,29 @@ const COMMON_REASONS = [
   'Other supplier return',
 ];
 
-export default function PrnView() {
+const PrnView = React.forwardRef(function PrnView(props, ref) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [prns, setPrns] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [saving, setSaving] = useState(false);
+  const formRef = React.useRef(null);
+
+  React.useImperativeHandle(ref, () => ({
+    openCreate: () => {
+      resetForm();
+      setShowCreateModal(true);
+    },
+    focusForm: () => {
+      resetForm();
+      setShowCreateModal(true);
+    },
+    refresh: loadData,
+  }));
 
   // Split-view Left Panel Form State
   const [formData, setFormData] = useState({
@@ -182,6 +198,7 @@ export default function PrnView() {
       );
       resetForm();
       loadData();
+      setShowCreateModal(false);
     } catch (err) {
       addToast(err.message || 'Failed to create PRN', 'error');
     } finally {
@@ -210,424 +227,871 @@ export default function PrnView() {
 
   const filteredPrns = prns.filter((p) => {
     const q = searchTerm.toLowerCase();
-    return (
+    const matchSearch =
+      !q ||
       p.prnNumber?.toLowerCase().includes(q) ||
       p.supplierName?.toLowerCase().includes(q) ||
       p.warehouseName?.toLowerCase().includes(q) ||
       p.reason?.toLowerCase().includes(q) ||
-      p.originalGrnNumber?.toLowerCase().includes(q)
-    );
+      p.originalGrnNumber?.toLowerCase().includes(q);
+
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'PROCESSED' && p.status === 'PROCESSED') ||
+      (statusFilter === 'PENDING' && (p.status === 'PENDING' || p.status === 'DRAFT'));
+
+    return matchSearch && matchStatus;
   });
+
+  const handleExportCSV = () => {
+    if (filteredPrns.length === 0) {
+      addToast('No PRN records to export', 'warning');
+      return;
+    }
+    const headers = 'PRN Number,Supplier,Warehouse,Total Value,Reason,Status,Date\n';
+    const rows = filteredPrns.map((p) =>
+      `"${p.prnNumber || ''}","${p.supplierName || ''}","${p.warehouseName || ''}",${Number(p.totalAmount || 0).toFixed(2)},"${p.reason || ''}","${p.status || ''}","${p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ''}"`
+    ).join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `prn_records_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('PRN records exported to CSV', 'success');
+  };
 
   const totalReturnVal = calculateTotal();
 
   return (
-    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.7rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-            <RotateCcw size={26} color="#2563eb" /> Purchase Return Notes (PRN)
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
-            Supplier returns & debit notes — log returns on the left while monitoring return logs on the right
-          </p>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {/* Top Filter & Actions Bar (Sticky Toolbar Card) */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          width: '100%',
+          boxSizing: 'border-box',
+          flexWrap: 'wrap',
+          flexShrink: 0,
+        }}
+      >
+        {/* Search Input */}
+        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+          <Search
+            size={17}
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '11px',
+              color: '#94a3b8',
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search PRNs by #, supplier, warehouse, reason..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              height: '38px',
+              padding: '0 32px 0 38px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.88rem',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#0284c7';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+            }}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '10px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '2px',
+              }}
+              title="Clear search"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-glass" onClick={loadData} title="Refresh records">
-            <RefreshCw size={15} /> Refresh
+
+        {/* Right Controls: Filter, Reset, Export, Refresh */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              height: '38px',
+              padding: '0 30px 0 12px',
+              width: '140px',
+              minWidth: '120px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              fontSize: '0.86rem',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              color: '#334155',
+              backgroundColor: '#ffffff',
+              cursor: 'pointer',
+              outline: 'none',
+              flexShrink: 0,
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 10px center',
+            }}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="PROCESSED">Processed</option>
+            <option value="PENDING">Pending / Draft</option>
+          </select>
+
+          {(statusFilter !== 'ALL' || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('ALL');
+                setSearchTerm('');
+              }}
+              style={{
+                height: '38px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                backgroundColor: '#f1f5f9',
+                color: '#64748b',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+              }}
+              title="Reset all filters"
+            >
+              <X size={13} /> Reset
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setShowCreateModal(true);
+            }}
+            style={{
+              height: '38px',
+              padding: '0 16px',
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '0.86rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+          >
+            <Plus size={16} /> + New Purchase Return
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            style={{
+              height: '38px',
+              padding: '0 14px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              color: '#334155',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f8fafc';
+              e.currentTarget.style.borderColor = '#94a3b8';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#334155';
+            }}
+          >
+            <Download size={15} /> Export CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={loadData}
+            style={{
+              height: '38px',
+              padding: '0 14px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              color: '#334155',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f8fafc';
+              e.currentTarget.style.borderColor = '#94a3b8';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#334155';
+            }}
+            title="Refresh records"
+          >
+            <RefreshCw size={14} /> Refresh
           </button>
         </div>
       </div>
 
-      {/* Split View Container: Left Form + Right Table */}
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* LEFT PANEL: PRN Entry Form */}
-        <div
-          className="glass-card"
-          style={{
-            flex: '1 1 440px',
-            maxWidth: '540px',
-            padding: '22px',
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Plus size={18} color="#2563eb" />
-              <h2 style={{ fontSize: '1.15rem', color: '#0f172a', margin: 0 }}>
-                New Return to Supplier
-              </h2>
-            </div>
-            <button
-              type="button"
-              className="btn btn-glass btn-sm"
-              onClick={() => resetForm()}
-              title="Reset fields"
-            >
-              <RotateCcw size={13} /> Reset
-            </button>
-          </div>
-
-          {/* Warehouse & Supplier */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                RETURN FROM WAREHOUSE *
-              </label>
-              <select
-                className="input-glass"
-                value={formData.warehouseId}
-                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
-              >
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} ({w.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                RETURN TO SUPPLIER *
-              </label>
-              <select
-                className="input-glass"
-                value={formData.supplierId}
-                onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-              >
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code || s.supplierCode})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Original GRN # & Reason */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                ORIGINAL GRN # (OPTIONAL)
-              </label>
-              <input
-                type="text"
-                className="input-glass"
-                placeholder="e.g. GRN-00012"
-                value={formData.originalGrnNumber}
-                onChange={(e) => setFormData({ ...formData, originalGrnNumber: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                RETURN REASON *
-              </label>
-              <select
-                className="input-glass"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              >
-                {COMMON_REASONS.map((r, i) => (
-                  <option key={i} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Remarks */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-              REMARKS / DEBIT NOTE NOTES
-            </label>
-            <input
-              type="text"
-              className="input-glass"
-              placeholder="e.g. Supplier agreed credit note on batch #948..."
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-            />
-          </div>
-
-          {/* Return Item Lines */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                RETURN ITEMS ({formData.items.length})
-              </span>
-              <button
-                type="button"
-                className="btn btn-glass btn-sm"
-                onClick={handleAddItem}
-                style={{ fontSize: '0.75rem', padding: '3px 8px' }}
-              >
-                <Plus size={13} /> Add Line
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
-              {formData.items.map((item, index) => {
-                const lineTotal = (item.quantityReturned || 0) * (item.unitCost || 0);
-                return (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1.2fr 1fr auto',
-                      gap: '8px',
-                      alignItems: 'center',
-                      padding: '8px',
-                      background: '#f8fafc',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                    }}
-                  >
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginBottom: '2px' }}>
-                        Product
-                      </label>
-                      <select
-                        className="input-glass"
-                        style={{ padding: '5px 8px', fontSize: '0.82rem' }}
-                        value={item.productId}
-                        onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                      >
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.sku})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginBottom: '2px' }}>
-                        Return Qty
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        className="input-glass"
-                        style={{ padding: '5px 8px', fontSize: '0.82rem' }}
-                        value={item.quantityReturned}
-                        onChange={(e) => handleItemChange(index, 'quantityReturned', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginBottom: '2px' }}>
-                        Cost ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="input-glass"
-                        style={{ padding: '5px 8px', fontSize: '0.82rem' }}
-                        value={item.unitCost}
-                        onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginBottom: '2px' }}>
-                        Subtotal
-                      </label>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', paddingTop: '6px' }}>
-                        ${lineTotal.toFixed(2)}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: '4px' }}>
-                      {formData.items.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            padding: '4px',
-                          }}
-                          title="Remove line"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      ) : (
-                        <div style={{ width: '23px' }} />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Grand Total Bar */}
+      {/* PRN Table (Fixed Table Frame, Sticky Header - Exact CustomerHub Look) */}
           <div
             style={{
-              padding: '12px 14px',
-              background: '#f1f5f9',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              flex: 1,
+              minHeight: 0,
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              border: '1px solid #cbd5e1',
+              flexDirection: 'column',
             }}
           >
-            <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Total Return Value:</span>
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#dc2626' }}>
-              ${totalReturnVal.toFixed(2)}
-            </span>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ flex: 2, padding: '9px 12px', fontSize: '0.85rem', justifyContent: 'center' }}
-              onClick={() => handleSavePrn(true)}
-              disabled={saving}
-              title="Deducts stock immediately from inventory and marks as PROCESSED"
-            >
-              <CheckCircle size={15} />
-              {saving ? 'Processing...' : 'Process Return to Supplier'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-glass"
-              style={{ flex: 1, padding: '9px 12px', fontSize: '0.85rem', justifyContent: 'center' }}
-              onClick={() => handleSavePrn(false)}
-              disabled={saving}
-              title="Save return note as draft"
-            >
-              Save Draft
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT PANEL: PRN Records Table & Search */}
-        <div
-          className="glass-card"
-          style={{
-            flex: '1 1 540px',
-            minWidth: '340px',
-            padding: '22px',
-            background: '#ffffff',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ position: 'relative', flex: '1 1 260px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="input-glass"
-                style={{ paddingLeft: '36px', width: '100%', fontSize: '0.85rem' }}
-                placeholder="Search PRNs by #, supplier, warehouse, reason..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-              Showing {filteredPrns.length} records
-            </span>
-          </div>
-
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-            <table className="glass-table" style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th>PRN #</th>
-                  <th>Supplier</th>
-                  <th>Warehouse</th>
-                  <th>Total Value</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                      Loading purchase returns...
-                    </td>
+            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      PRN #
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      SUPPLIER
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      WAREHOUSE
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                      TOTAL VALUE
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      REASON
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      DATE
+                    </th>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ACTIONS
+                    </th>
                   </tr>
-                ) : filteredPrns.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
-                      No purchase returns recorded yet. Fill the form on the left to create a return.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPrns.map((p) => (
-                    <tr
-                      key={p.id}
-                      onClick={() => handleInspectPrn(p.id)}
-                      style={{ cursor: 'pointer' }}
-                      title="Click row to view return details"
-                    >
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>
-                          {p.prnNumber}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{p.supplierName}</td>
-                      <td>{p.warehouseName}</td>
-                      <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                        ${Number(p.totalAmount || 0).toFixed(2)}
-                      </td>
-                      <td style={{ fontSize: '0.8rem', color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.reason}
-                      </td>
-                      <td>
-                        {p.status === 'PROCESSED' ? (
-                          <span className="badge badge-success">Processed</span>
-                        ) : p.status === 'DRAFT' || p.status === 'PENDING' ? (
-                          <span className="badge badge-warning">{p.status}</span>
-                        ) : (
-                          <span className="badge badge-danger">{p.status}</span>
-                        )}
-                      </td>
-                      <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {p.status !== 'PROCESSED' && (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleProcessPrn(p.id, p.prnNumber);
-                            }}
-                            title="Process Return"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                          >
-                            <CheckCircle size={13} /> Process
-                          </button>
-                        )}
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        Loading purchase returns...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : filteredPrns.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        No purchase returns recorded yet. Fill the form on the left to create a return.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPrns.map((p) => (
+                      <tr
+                        key={p.id}
+                        onClick={() => handleInspectPrn(p.id)}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        title="Click row to view return details"
+                      >
+                        <td style={{ padding: '12px 18px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                            {p.prnNumber}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                          {p.supplierName}
+                        </td>
+                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                          {p.warehouseName}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontSize: '0.85rem' }}>
+                          ${Number(p.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.reason}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: p.status === 'PROCESSED' ? '#dcfce7' : '#fef3c7',
+                              color: p.status === 'PROCESSED' ? '#16a34a' : '#d97706',
+                              border: p.status === 'PROCESSED' ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: p.status === 'PROCESSED' ? '#16a34a' : '#d97706',
+                                display: 'inline-block',
+                              }}
+                            />
+                            {p.status || 'DRAFT'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInspectPrn(p.id);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="Inspect PRN Details"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            {p.status !== 'PROCESSED' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProcessPrn(p.id, p.prnNumber);
+                                }}
+                                style={{
+                                  height: '30px',
+                                  padding: '0 8px',
+                                  background: '#ffffff',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#16a34a',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0fdf4')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                title="Process Return to Supplier"
+                              >
+                                <CheckCircle size={13} /> Process
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+      {/* FULL WIDTH & HEIGHT PURCHASE RETURN (PRN) MODAL POPUP */}
+      {showCreateModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCreateModal(false);
+          }}
+        >
+          <div
+            style={{
+              width: '96vw',
+              maxWidth: '1200px',
+              height: '90vh',
+              maxHeight: '90vh',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#fee2e2',
+                    color: '#dc2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    New Purchase Return (PRN)
+                  </h2>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                    Issue vendor debit note and deduct returned inventory stock from warehouse
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => resetForm()}
+                  style={{
+                    height: '34px',
+                    padding: '0 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#475569',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RotateCcw size={14} /> Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body (Scrollable Form) */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* Return Supplier & Warehouse Card */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
+                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 14px 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  1. Return Destination & Reason
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                      SUPPLIER / VENDOR *
+                    </label>
+                    <select
+                      className="input-glass"
+                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
+                      value={formData.supplierId}
+                      onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                    >
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.code || 'Vendor'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                      DISPATCH WAREHOUSE *
+                    </label>
+                    <select
+                      className="input-glass"
+                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
+                      value={formData.warehouseId}
+                      onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                    >
+                      {warehouses.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                      ORIGINAL GRN / INVOICE REF #
+                    </label>
+                    <input
+                      type="text"
+                      className="input-glass"
+                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem' }}
+                      placeholder="e.g. GRN-2026-004..."
+                      value={formData.originalGrnNumber}
+                      onChange={(e) => setFormData({ ...formData, originalGrnNumber: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                      RETURN REASON *
+                    </label>
+                    <select
+                      className="input-glass"
+                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
+                      value={formData.reason}
+                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                    >
+                      {COMMON_REASONS.map((r, i) => (
+                        <option key={i} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                    REMARKS / DEBIT NOTE NOTES
+                  </label>
+                  <input
+                    type="text"
+                    className="input-glass"
+                    style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem' }}
+                    placeholder="Debit note reference, supplier contact notes..."
+                    value={formData.remarks}
+                    onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Return Items Card */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    2. Return Items ({formData.items.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    style={{
+                      padding: '6px 14px',
+                      backgroundColor: '#eff6ff',
+                      color: '#0284c7',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '6px',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Plus size={14} /> + Add Another Item Line
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {formData.items.map((item, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '2.5fr 1fr 1fr auto',
+                        gap: '12px',
+                        alignItems: 'center',
+                        padding: '12px',
+                        background: '#f8fafc',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                      }}
+                    >
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
+                          Product (SKU / Name)
+                        </label>
+                        <select
+                          className="input-glass"
+                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.88rem', fontWeight: 600 }}
+                          value={item.productId}
+                          onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
+                        >
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.sku} — {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
+                          Return Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input-glass"
+                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.95rem', fontWeight: 700 }}
+                          value={item.quantityReturned}
+                          onChange={(e) => handleItemChange(index, 'quantityReturned', e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
+                          Unit Cost ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="input-glass"
+                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.95rem', fontWeight: 700 }}
+                          value={item.unitCost}
+                          onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: '2px' }}>
+                        {formData.items.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(index)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '8px',
+                            }}
+                            title="Remove line"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        ) : (
+                          <div style={{ width: '34px' }} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
+                Total Return Debit Value: <strong style={{ color: '#dc2626', fontSize: '1.25rem', fontWeight: 900 }}>${totalReturnVal.toFixed(2)}</strong>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSavePrn(false)}
+                  disabled={saving}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSavePrn(true)}
+                  disabled={saving}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  }}
+                >
+                  <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                  {saving ? 'Processing...' : 'Process Return & Debit Stock'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* PRN Inspection Drawer / Modal */}
       {selectedPrn && (
@@ -730,4 +1194,6 @@ export default function PrnView() {
       )}
     </div>
   );
-}
+});
+
+export default PrnView;

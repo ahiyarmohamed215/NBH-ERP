@@ -121,15 +121,8 @@ public class WarehouseService {
             throw new BusinessException("Primary warehouse cannot be deleted. Please assign another warehouse as primary first.");
         }
 
-        if (stockBalanceRepository.existsByWarehouseId(id)) {
-            throw new BusinessException("Cannot delete warehouse '" + warehouse.getName() + "' because it has stock balances. Please deactivate it instead.");
-        }
-
-        if (invoiceRepository.existsByWarehouseId(id) || grnRepository.existsByWarehouseId(id)) {
-            throw new BusinessException("Cannot delete warehouse '" + warehouse.getName() + "' because it is referenced in transactions. Please deactivate it instead.");
-        }
-
-        warehouseRepository.delete(warehouse);
+        warehouse.setIsActive(false);
+        warehouseRepository.save(warehouse);
     }
 }
 

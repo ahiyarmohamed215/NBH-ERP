@@ -32,85 +32,41 @@ import {
   TrendingUp,
   TrendingDown,
   PlusCircle,
+  MinusCircle,
+  Minus,
   ArrowRightLeft,
   Award,
 } from 'lucide-react';
 
 const STORAGE_KEY_ADJUSTMENTS = 'erp_inventory_adjustments_records_v1';
+const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
+const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
 
-// Seeded adjustments matching user screenshot
-const INITIAL_ADJUSTMENTS = [
-  {
-    id: 'SA-MB-7',
-    recordNo: 'SA-MB-7',
-    date: '8/21/2026',
-    type: 'Addition',
-    warehouse: 'Warehouse 1',
-    warehouseId: '1',
-    sku: '—',
-    productName: 'Board A',
-    batch: 'BN-20260821-71',
-    quantity: 5,
-    reason: 'Opening stock correction',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'SA-MB-6',
-    recordNo: 'SA-MB-6',
-    date: '7/23/2026',
-    type: 'Reduction',
-    warehouse: 'Warehouse 1',
-    warehouseId: '1',
-    sku: '001',
-    productName: 'තිරිඟු 100g',
-    batch: 'BN-20260723-67',
-    quantity: -55,
-    reason: 'Stock count variance',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'SA-MB-5',
-    recordNo: 'SA-MB-5',
-    date: '7/23/2026',
-    type: 'Reduction',
-    warehouse: 'Warehouse 1',
-    warehouseId: '1',
-    sku: '001',
-    productName: 'තිරිඟු 100g',
-    batch: 'BN-20260723-67',
-    quantity: -45,
-    reason: 'Expired stock',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'SA-MB-4',
-    recordNo: 'SA-MB-4',
-    date: '7/23/2026',
-    type: 'Reduction',
-    warehouse: 'Warehouse 1',
-    warehouseId: '1',
-    sku: '001',
-    productName: 'තිරිඟු 100g',
-    batch: 'BN-20260723-67',
-    quantity: -100,
-    reason: 'Damaged stock',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'SA-MB-3',
-    recordNo: 'SA-MB-3',
-    date: '7/23/2026',
-    type: 'Addition',
-    warehouse: 'Warehouse 1',
-    warehouseId: '1',
-    sku: '001',
-    productName: 'තිරිඟු 100g',
-    batch: 'BN-20260723-67',
-    quantity: 200,
-    reason: 'Found stock',
-    status: 'COMPLETED',
-  },
-];
+const getBrandForProduct = (prod) => {
+  if (!prod) return 'General';
+  try {
+    const savedBrands = JSON.parse(localStorage.getItem(STORAGE_KEY_BRANDS) || '[]');
+    const savedMap = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS) || '{}');
+    const bId = savedMap[prod.id] || savedMap[prod.sku] || prod.brandId || prod.brand || prod.brandName;
+    if (bId) {
+      const allBrands = savedBrands.length > 0 ? savedBrands : [
+        { id: 'brd-1', code: 'SAMSUNG', name: 'Samsung' },
+        { id: 'brd-2', code: 'APPLE', name: 'Apple' },
+        { id: 'brd-3', code: 'SONY', name: 'Sony' },
+        { id: 'brd-4', code: 'LG', name: 'LG' },
+        { id: 'brd-5', code: 'DEFAULT', name: 'General Brand' },
+      ];
+      const found = allBrands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
+      if (found) return found.name;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return prod.brandName || prod.brand || 'General';
+};
+
+// Empty initial adjustments - populated live from API
+const INITIAL_ADJUSTMENTS = [];
 
 export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTabChange, onNavigate }) {
   const { user } = useAuth();
@@ -152,17 +108,35 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   };
 
   // -------------------------------------------------------------
-  // STOCK ADJUSTMENTS TAB STATE & LOGIC (Matching user screenshot)
+  // STOCK ADJUSTMENTS TAB STATE & LOGIC (Backed by real REST API)
   // -------------------------------------------------------------
-  const [adjustmentRecords, setAdjustmentRecords] = useState(() => {
+  const [adjustmentRecords, setAdjustmentRecords] = useState([]);
+
+  const loadAdjustments = async () => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_ADJUSTMENTS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+      const res = await adjustmentApi.search({ size: 100 });
+      const content = res.data?.data?.content || res.data?.content || [];
+      const formatted = content.flatMap((adj) =>
+        (adj.items || []).map((it) => ({
+          id: String(adj.id) + '-' + (it.id || it.productId),
+          recordNo: adj.adjustmentNumber,
+          date: adj.adjustmentDate,
+          type: Number(it.differenceQuantity || 0) >= 0 ? 'Addition' : 'Reduction',
+          warehouse: adj.warehouseName,
+          warehouseId: String(adj.warehouseId),
+          sku: it.productSku,
+          productName: it.productName,
+          batch: adj.adjustmentNumber,
+          quantity: Number(it.differenceQuantity || 0),
+          reason: it.reason || adj.reason,
+          status: adj.status || 'COMPLETED',
+        }))
+      );
+      setAdjustmentRecords(formatted);
+    } catch (err) {
+      console.error('Failed to load adjustments from API:', err);
     }
-    return INITIAL_ADJUSTMENTS;
-  });
+  };
 
   const [warehousesList, setWarehousesList] = useState([]);
   const [productsList, setProductsList] = useState([]);
@@ -177,12 +151,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [createForm, setCreateForm] = useState({
-    type: 'Addition',
+    type: '',
     warehouseId: '',
     productId: '',
     batch: '',
     quantity: '',
-    reason: 'Opening stock correction',
+    costPrice: '',
+    reason: '',
     remarks: '',
   });
   const [submittingRecord, setSubmittingRecord] = useState(false);
@@ -227,6 +202,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       if (fetchedBalances.length > 0) {
         items = fetchedBalances.map((b) => {
           const prod = fetchedProducts.find((p) => p.id === b.productId || p.sku === b.productSku);
+          const brandName = getBrandForProduct(prod || b);
           const qty = Number(b.quantity ?? 0);
           const reserved = Number(b.reservedQuantity ?? 0);
           const avail = Number(b.availableQuantity ?? (qty - reserved));
@@ -241,6 +217,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             productId: b.productId || prod?.id,
             sku: b.productSku || prod?.sku || '—',
             productName: b.productName || prod?.name || 'Unknown Product',
+            brandName: brandName,
             categoryName: prod?.categoryName || 'General',
             unitOfMeasure: b.unitOfMeasure || prod?.unitOfMeasure || 'PCS',
             quantity: qty,
@@ -266,6 +243,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           const cost = Number(prod.costPrice || 0);
           const sell = Number(prod.sellingPrice || 0);
           const min = Number(prod.minStockLevel || 5);
+          const brandName = getBrandForProduct(prod);
           items.push({
             id: `prod-bal-${prod.id}`,
             warehouseId: primaryWh.id,
@@ -274,6 +252,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             productId: prod.id,
             sku: prod.sku || '—',
             productName: prod.name || 'Unnamed Product',
+            brandName: brandName,
             categoryName: prod.categoryName || 'General',
             unitOfMeasure: prod.unitOfMeasure || 'PCS',
             quantity: qty,
@@ -300,6 +279,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
   useEffect(() => {
     loadInventoryBalances();
+    loadAdjustments();
   }, []);
 
   // Filtered inventory balances
@@ -322,8 +302,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         const q = invSearchQuery.toLowerCase();
         const matchSku = (item.sku || '').toLowerCase().includes(q);
         const matchName = (item.productName || '').toLowerCase().includes(q);
+        const matchBrand = (item.brandName || '').toLowerCase().includes(q);
         const matchWh = (item.warehouseName || '').toLowerCase().includes(q);
-        if (!matchSku && !matchName && !matchWh) {
+        const matchCat = (item.categoryName || '').toLowerCase().includes(q);
+        if (!matchSku && !matchName && !matchBrand && !matchWh && !matchCat) {
           return false;
         }
       }
@@ -346,6 +328,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     const headers = [
       'SKU',
       'Product Name',
+      'Brand',
       'Warehouse',
       'Category',
       'Unit',
@@ -358,6 +341,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     const rows = filteredInventory.map((item) => [
       `"${item.sku || ''}"`,
       `"${(item.productName || '').replace(/"/g, '""')}"`,
+      `"${(item.brandName || 'General').replace(/"/g, '""')}"`,
       `"${(item.warehouseName || '').replace(/"/g, '""')}"`,
       `"${(item.categoryName || '').replace(/"/g, '""')}"`,
       `"${item.unitOfMeasure || 'PCS'}"`,
@@ -401,14 +385,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     setShowCreateModal(true);
   };
 
-  // Save adjustments to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ADJUSTMENTS, JSON.stringify(adjustmentRecords));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [adjustmentRecords]);
+  // Adjustments are loaded live from backend adjustmentApi
 
   // Unique reasons for filter dropdown
   const uniqueReasons = useMemo(() => {
@@ -448,18 +425,17 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
   const handleOpenCreateRecord = () => {
     setEditingRecord(null);
-    const defaultWh = warehousesList[0]?.id || '';
-    const defaultProd = productsList[0]?.id || '';
     const now = new Date();
     const batchNo = `BN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Math.floor(10 + Math.random() * 90)}`;
 
     setCreateForm({
-      type: 'Addition',
-      warehouseId: defaultWh,
-      productId: defaultProd,
+      type: '', // No action is selected by default
+      warehouseId: '',
+      productId: '',
       batch: batchNo,
-      quantity: '1',
-      reason: 'Opening stock correction',
+      quantity: '',
+      costPrice: '',
+      reason: '',
       remarks: '',
     });
     setShowCreateModal(true);
@@ -471,11 +447,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     const wh = warehousesList.find((w) => w.name === rec.warehouse || String(w.id) === String(rec.warehouseId));
     setCreateForm({
       type: rec.type || 'Addition',
-      warehouseId: String(wh?.id || rec.warehouseId || warehousesList[0]?.id || ''),
-      productId: String(prod?.id || productsList[0]?.id || ''),
+      warehouseId: String(wh?.id || rec.warehouseId || ''),
+      productId: String(prod?.id || ''),
       batch: rec.batch || '',
       quantity: String(Math.abs(rec.quantity || 1)),
-      reason: rec.reason || 'Opening stock correction',
+      costPrice: String(rec.costPrice || prod?.costPrice || '0.00'),
+      reason: rec.reason || '',
       remarks: rec.remarks || '',
     });
     setShowCreateModal(true);
@@ -489,63 +466,66 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     }
   };
 
-  const handleSaveRecord = (e) => {
+  const handleSaveRecord = async (e) => {
     e.preventDefault();
+    if (!createForm.type) {
+      addToast('Please choose whether to Add stock or Reduce stock', 'error');
+      return;
+    }
+    if (!createForm.warehouseId) {
+      addToast('Please select a warehouse', 'error');
+      return;
+    }
+    if (!createForm.productId) {
+      addToast('Please select a product', 'error');
+      return;
+    }
     const qtyNum = parseFloat(createForm.quantity);
     if (!qtyNum || qtyNum <= 0) {
       addToast('Please enter a valid positive quantity', 'error');
       return;
     }
-
-    const selectedWh = warehousesList.find((w) => String(w.id) === String(createForm.warehouseId));
-    const selectedProd = productsList.find((p) => String(p.id) === String(createForm.productId));
-
-    const finalQty = createForm.type === 'Reduction' ? -Math.abs(qtyNum) : Math.abs(qtyNum);
-
-    if (editingRecord) {
-      const updated = adjustmentRecords.map((r) => {
-        if (r.id === editingRecord.id) {
-          return {
-            ...r,
-            type: createForm.type,
-            warehouse: selectedWh?.name || r.warehouse,
-            warehouseId: createForm.warehouseId,
-            sku: selectedProd?.sku || r.sku,
-            productName: selectedProd?.name || r.productName,
-            batch: createForm.batch || r.batch,
-            quantity: finalQty,
-            reason: createForm.reason,
-          };
-        }
-        return r;
-      });
-      setAdjustmentRecords(updated);
-      addToast(`Adjustment record ${editingRecord.recordNo} updated successfully!`, 'success');
-      setEditingRecord(null);
-      setShowCreateModal(false);
+    if (!createForm.reason) {
+      addToast('Please select a valid reason', 'error');
       return;
     }
 
-    const newRecordNo = `SA-MB-${adjustmentRecords.length + 3}`;
+    try {
+      setSubmittingRecord(true);
+      const whId = Number(createForm.warehouseId);
+      const prdId = Number(createForm.productId);
+      const sysBal = inventoryBalances.find(
+        (b) => String(b.productId) === String(prdId) && String(b.warehouseId) === String(whId)
+      );
+      const currentPhysical = sysBal ? Number(sysBal.quantity || 0) : 0;
+      const targetPhysical = createForm.type === 'Reduction'
+        ? Math.max(0, currentPhysical - Math.abs(qtyNum))
+        : currentPhysical + Math.abs(qtyNum);
 
-    const newRecord = {
-      id: newRecordNo,
-      recordNo: newRecordNo,
-      date: new Date().toLocaleDateString(),
-      type: createForm.type,
-      warehouse: selectedWh?.name || 'Warehouse 1',
-      warehouseId: createForm.warehouseId,
-      sku: selectedProd?.sku || '—',
-      productName: selectedProd?.name || 'Custom Item',
-      batch: createForm.batch || `BN-${Date.now().toString().slice(-6)}`,
-      quantity: finalQty,
-      reason: createForm.reason,
-      status: 'COMPLETED',
-    };
+      const payload = {
+        warehouseId: whId,
+        adjustmentDate: new Date().toISOString().split('T')[0],
+        reason: createForm.reason + (createForm.remarks ? `: ${createForm.remarks}` : ''),
+        items: [
+          {
+            productId: prdId,
+            physicalQuantity: targetPhysical,
+            reason: createForm.reason,
+          },
+        ],
+      };
 
-    setAdjustmentRecords([newRecord, ...adjustmentRecords]);
-    addToast(`Adjustment record ${newRecordNo} created successfully!`, 'success');
-    setShowCreateModal(false);
+      await adjustmentApi.create(payload, true);
+      addToast('Stock adjustment successfully submitted and processed to inventory!', 'success');
+      setShowCreateModal(false);
+      setEditingRecord(null);
+      await Promise.all([loadAdjustments(), loadInventoryBalances()]);
+    } catch (err) {
+      console.error('Adjustment API failed:', err);
+      addToast(err?.response?.data?.message || err?.message || 'Failed to submit adjustment', 'error');
+    } finally {
+      setSubmittingRecord(false);
+    }
   };
 
   // Export stock adjustments to CSV
@@ -736,8 +716,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* 1. INVENTORY LIST TAB (Live Stock Balances with Qty, Cost, Selling, Valuation) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'inventory-list' && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
-          {/* Search Bar & Filter Controls (Aligned with Desktop View, Matching Customer Page) */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+          {/* Search Bar & Action Buttons (Matched with Products Table Layout) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -755,7 +735,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               flexShrink: 0,
             }}
           >
-            {/* Left Control: Search Input extending to take remaining space */}
+            {/* Left Control: Search Input matching table width */}
             <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
               <Search
                 size={17}
@@ -769,7 +749,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               />
               <input
                 type="text"
-                placeholder="Search inventory by SKU, product name, warehouse..."
+                placeholder="Search inventory by SKU, product name, brand, warehouse..."
                 value={invSearchQuery}
                 onChange={(e) => setInvSearchQuery(e.target.value)}
                 style={{
@@ -816,20 +796,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
             </div>
 
-            {/* Right Controls: Filters, Reset, Export CSV, & Refresh */}
+            {/* Right Controls: Filter dropdown, Reset Filters, Export CSV, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              {/* Stock Status selector - nicely expanded to prevent text clipping */}
+              {/* Stock Status selector */}
               <select
                 value={invStatusFilter}
                 onChange={(e) => setInvStatusFilter(e.target.value)}
                 style={{
                   height: '38px',
-                  padding: '0 32px 0 14px',
-                  minWidth: '165px',
-                  maxWidth: '185px',
+                  padding: '0 30px 0 12px',
+                  width: '140px',
+                  minWidth: '120px',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
+                  fontSize: '0.86rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
@@ -844,7 +824,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   MozAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 11px center',
+                  backgroundPosition: 'right 10px center',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                 }}
               >
                 <option value="ALL">All Stock Levels</option>
@@ -853,7 +834,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <option value="OUT_OF_STOCK">Out of Stock</option>
               </select>
 
-              {/* Reset Filters */}
+              {/* Reset Filters button */}
               {(invSearchQuery || invStatusFilter !== 'ALL') && (
                 <button
                   type="button"
@@ -865,7 +846,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
+                    fontSize: '0.85rem',
                     fontFamily: 'inherit',
                     fontWeight: 500,
                     cursor: 'pointer',
@@ -887,21 +868,21 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 type="button"
                 onClick={handleExportInventoryCSV}
                 style={{
-                  width: '38px',
                   height: '38px',
-                  padding: 0,
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  width: '38px',
                   backgroundColor: '#ffffff',
-                  color: '#475569',
-                  cursor: 'pointer',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
+                  cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -911,33 +892,33 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#475569';
+                  e.currentTarget.style.color = '#64748b';
                 }}
-                title="Export Inventory to CSV"
+                title="Export inventory to CSV"
               >
                 <Download size={15} />
               </button>
 
-              {/* Refresh - Icon only */}
+              {/* Refresh Records - Icon only */}
               <button
                 type="button"
                 onClick={loadInventoryBalances}
                 style={{
-                  width: '38px',
                   height: '38px',
-                  padding: 0,
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  width: '38px',
                   backgroundColor: '#ffffff',
-                  color: '#475569',
-                  cursor: 'pointer',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
+                  cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -947,9 +928,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#475569';
+                  e.currentTarget.style.color = '#64748b';
                 }}
-                title="Refresh Inventory Data"
+                title="Refresh inventory records"
               >
                 <RefreshCw size={15} className={inventoryLoading ? 'animate-spin' : ''} />
               </button>
@@ -979,6 +960,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUANTITY</th>
@@ -990,13 +972,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <tbody>
                   {inventoryLoading ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading live inventory balances...
                       </td>
                     </tr>
                   ) : filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No inventory records found matching current criteria.
                       </td>
                     </tr>
@@ -1019,6 +1001,23 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
                           {item.productName}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              backgroundColor: '#f8fafc',
+                              color: '#334155',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              border: '1px solid #e2e8f0',
+                              display: 'inline-block',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {item.brandName || 'General'}
+                          </span>
                         </td>
                         <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 500 }}>
                           {item.warehouseName}
@@ -1171,9 +1170,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* 5. STOCK ADJUSTMENT TAB (Last Navigation Item) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'adjustments' && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
-          {/* Search Bar & Filter Controls (Aligned with Desktop View, Matching Customer Page) */}
+          {/* Search Bar & Filter Controls (Matched with Products Table Layout) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1191,8 +1190,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               flexShrink: 0,
             }}
           >
-            {/* Left Control: Search Input extending to take remaining space */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+            {/* Left Control: Search Input matching table width */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
               <Search
                 size={17}
                 style={{
@@ -1205,7 +1204,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               />
               <input
                 type="text"
-                placeholder="Search records by #, product, SKU, batch, warehouse, reason..."
+                placeholder="Search adjustments by #, product, SKU, batch, warehouse, reason..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -1260,12 +1259,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onChange={(e) => setFilterType(e.target.value)}
                 style={{
                   height: '38px',
-                  padding: '0 28px 0 12px',
-                  minWidth: '115px',
-                  maxWidth: '135px',
+                  padding: '0 24px 0 10px',
+                  width: '100px',
+                  minWidth: '95px',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
@@ -1280,7 +1279,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   MozAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 9px center',
+                  backgroundPosition: 'right 8px center',
                   transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                 }}
               >
@@ -1295,12 +1294,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onChange={(e) => setFilterWarehouse(e.target.value)}
                 style={{
                   height: '38px',
-                  padding: '0 28px 0 12px',
-                  minWidth: '120px',
-                  maxWidth: '145px',
+                  padding: '0 24px 0 10px',
+                  width: '115px',
+                  minWidth: '105px',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
@@ -1315,7 +1314,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   MozAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 9px center',
+                  backgroundPosition: 'right 8px center',
                   transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                 }}
               >
@@ -1333,12 +1332,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onChange={(e) => setFilterReason(e.target.value)}
                 style={{
                   height: '38px',
-                  padding: '0 28px 0 12px',
-                  minWidth: '120px',
-                  maxWidth: '145px',
+                  padding: '0 24px 0 10px',
+                  width: '110px',
+                  minWidth: '100px',
                   borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
@@ -1353,7 +1352,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   MozAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 9px center',
+                  backgroundPosition: 'right 8px center',
                   transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                 }}
               >
@@ -1413,6 +1412,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1450,6 +1450,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1486,7 +1487,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECORD #</th>
@@ -1638,7 +1639,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Create Stock Adjustment Record */}
+      {/* MODAL: New Stock Adjustment Record (Exact Matching User Screenshots) */}
       {/* ------------------------------------------------------------- */}
       {showCreateModal && (
         <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
@@ -1646,192 +1647,497 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '560px',
-              padding: '28px',
-              borderRadius: '14px',
+              maxWidth: '720px',
+              padding: '24px 28px',
+              borderRadius: '12px',
               backgroundColor: '#ffffff',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              maxHeight: '92vh',
+              overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <SlidersHorizontal size={18} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a' }}>
-                    {editingRecord ? `Edit Stock Adjustment (${editingRecord.recordNo})` : 'Create Stock Adjustment Record'}
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>Post physical additions or reduction adjustments</p>
-                </div>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                  {editingRecord ? `Edit Stock Adjustment (${editingRecord.recordNo})` : 'New Stock Adjustment'}
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  First choose what should happen to inventory. No action is selected by default.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                title="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRecord} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Type selector */}
+            <form onSubmit={handleSaveRecord} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* What do you want to do? */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Adjustment Type *
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                  What do you want to do? *
                 </label>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setCreateForm({ ...createForm, type: 'Addition', reason: 'Opening stock correction' })}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  {/* Reduce stock card */}
+                  <div
+                    onClick={() => {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        type: 'Reduction',
+                        reason: prev.reason || 'Stock count variance',
+                      }));
+                    }}
                     style={{
-                      flex: 1,
-                      padding: '10px',
+                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
                       borderRadius: '8px',
-                      border: createForm.type === 'Addition' ? '2px solid #16a34a' : '1px solid #cbd5e1',
-                      backgroundColor: createForm.type === 'Addition' ? '#f0fdf4' : '#ffffff',
-                      color: createForm.type === 'Addition' ? '#16a34a' : '#475569',
-                      fontWeight: 700,
+                      padding: '14px 16px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      transition: 'all 0.15s ease',
+                      boxShadow: createForm.type === 'Reduction' ? '0 0 0 1px #ef4444' : 'none',
                     }}
                   >
-                    + Addition (Increase Stock)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCreateForm({ ...createForm, type: 'Reduction', reason: 'Stock count variance' })}
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: createForm.type === 'Reduction' ? '#ef4444' : '#94a3b8',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }}>
+                      <Minus size={13} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
+                        Reduce stock
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', lineHeight: 1.35 }}>
+                        Remove units already held in an existing batch.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add stock card */}
+                  <div
+                    onClick={() => {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        type: 'Addition',
+                        reason: prev.reason || 'Opening stock correction',
+                      }));
+                    }}
                     style={{
-                      flex: 1,
-                      padding: '10px',
+                      border: createForm.type === 'Addition' ? '2px solid #22c55e' : '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
                       borderRadius: '8px',
-                      border: createForm.type === 'Reduction' ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                      backgroundColor: createForm.type === 'Reduction' ? '#fef2f2' : '#ffffff',
-                      color: createForm.type === 'Reduction' ? '#dc2626' : '#475569',
-                      fontWeight: 700,
+                      padding: '14px 16px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      transition: 'all 0.15s ease',
+                      boxShadow: createForm.type === 'Addition' ? '0 0 0 1px #22c55e' : 'none',
                     }}
                   >
-                    - Reduction (Decrease Stock)
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      border: createForm.type === 'Addition' ? '2px solid #22c55e' : '1.5px solid #cbd5e1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: createForm.type === 'Addition' ? '#16a34a' : '#94a3b8',
+                      flexShrink: 0,
+                      marginTop: '1px',
+                    }}>
+                      <Plus size={14} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
+                        Add stock
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', lineHeight: 1.35 }}>
+                        Create new available units and record their cost.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notice Banner */}
+              {!createForm.type ? (
+                <div
+                  style={{
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fef3c7',
+                    borderRadius: '6px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: '#92400e',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                  <span>Select an action above to continue.</span>
+                </div>
+              ) : createForm.type === 'Addition' ? (
+                <div
+                  style={{
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: '#166534',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  You are adding stock. The quantity entered below will be added as new available inventory.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: '#991b1b',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  You are reducing stock. The quantity entered below will be deducted from existing batch inventory.
+                </div>
+              )}
+
+              {/* Form Content only shown when type is selected */}
+              {createForm.type && (
+                <>
+                  {/* Row 1: Warehouse, Product, Quantity */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Warehouse *
+                      </label>
+                      <select
+                        value={createForm.warehouseId}
+                        onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.86rem',
+                          backgroundColor: '#ffffff',
+                          color: createForm.warehouseId ? '#0f172a' : '#94a3b8',
+                          outline: 'none',
+                        }}
+                        required
+                      >
+                        <option value="">Select warehouse</option>
+                        {warehousesList.map((w) => (
+                          <option key={w.id} value={w.id} style={{ color: '#0f172a' }}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Product *
+                      </label>
+                      <select
+                        value={createForm.productId}
+                        onChange={(e) => {
+                          const prod = productsList.find((p) => String(p.id) === e.target.value);
+                          setCreateForm({
+                            ...createForm,
+                            productId: e.target.value,
+                            costPrice: prod?.costPrice ? String(prod.costPrice) : (createForm.costPrice || '0.00'),
+                          });
+                        }}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.86rem',
+                          backgroundColor: '#ffffff',
+                          color: createForm.productId ? '#0f172a' : '#94a3b8',
+                          outline: 'none',
+                        }}
+                        required
+                      >
+                        <option value="">Select product</option>
+                        {productsList.map((p) => (
+                          <option key={p.id} value={p.id} style={{ color: '#0f172a' }}>
+                            {p.name} {p.sku ? `(${p.sku})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Quantity *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="0"
+                        value={createForm.quantity}
+                        onChange={(e) => setCreateForm({ ...createForm, quantity: e.target.value })}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.86rem',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                        }}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Cost price per unit & Reason */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Cost price per unit *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={createForm.costPrice}
+                        onChange={(e) => setCreateForm({ ...createForm, costPrice: e.target.value })}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.86rem',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                        }}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                        Reason *
+                      </label>
+                      <select
+                        value={createForm.reason}
+                        onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
+                        style={{
+                          width: '100%',
+                          height: '38px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.86rem',
+                          backgroundColor: '#ffffff',
+                          color: createForm.reason ? '#0f172a' : '#94a3b8',
+                          outline: 'none',
+                        }}
+                        required
+                      >
+                        <option value="">Select a valid reason</option>
+                        {createForm.type === 'Addition' ? (
+                          <>
+                            <option value="Opening stock correction" style={{ color: '#0f172a' }}>Opening stock correction</option>
+                            <option value="Found stock" style={{ color: '#0f172a' }}>Found stock</option>
+                            <option value="Stock count variance" style={{ color: '#0f172a' }}>Stock count variance</option>
+                            <option value="Physical cycle audit" style={{ color: '#0f172a' }}>Physical cycle audit</option>
+                            <option value="Other adjustment" style={{ color: '#0f172a' }}>Other adjustment</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Stock count variance" style={{ color: '#0f172a' }}>Stock count variance</option>
+                            <option value="Damaged stock" style={{ color: '#0f172a' }}>Damaged stock</option>
+                            <option value="Expired stock" style={{ color: '#0f172a' }}>Expired stock</option>
+                            <option value="Internal consumption" style={{ color: '#0f172a' }}>Internal consumption</option>
+                            <option value="Physical cycle audit" style={{ color: '#0f172a' }}>Physical cycle audit</option>
+                            <option value="Other adjustment" style={{ color: '#0f172a' }}>Other adjustment</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Adjustment summary */}
+                  {(() => {
+                    const selWh = warehousesList.find((w) => String(w.id) === String(createForm.warehouseId));
+                    const selProd = productsList.find((p) => String(p.id) === String(createForm.productId));
+                    const qtyNum = parseFloat(createForm.quantity) || 0;
+                    const costNum = parseFloat(createForm.costPrice) || (selProd?.costPrice || 0);
+                    const totalVal = qtyNum * costNum;
+                    const isAddition = createForm.type === 'Addition';
+
+                    return (
+                      <div
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          padding: '14px 18px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          marginTop: '4px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                            Adjustment summary
+                          </span>
+                          <span
+                            style={{
+                              backgroundColor: isAddition ? '#dcfce7' : '#fee2e2',
+                              color: isAddition ? '#15803d' : '#dc2626',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            {isAddition ? 'Stock addition' : 'Stock reduction'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Warehouse</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
+                              {selWh?.name || 'Not selected'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Product</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selProd?.name}>
+                              {selProd?.name || 'Not selected'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Quantity</div>
+                            <div style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626', fontSize: '0.84rem', marginTop: '2px' }}>
+                              {isAddition ? `+${qtyNum} units` : `-${qtyNum} units`}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Cost per unit</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
+                              {costNum.toFixed(2)}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Total value</div>
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
+                              {totalVal.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+
+              {/* Actions Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+                {!createForm.type ? (
+                  <button
+                    type="button"
+                    disabled
+                    style={{
+                      backgroundColor: '#f1f5f9',
+                      color: '#94a3b8',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '10px 20px',
+                      fontSize: '0.86rem',
+                      fontWeight: 600,
+                      cursor: 'not-allowed',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    + Select an action
                   </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                    Warehouse *
-                  </label>
-                  <select
-                    value={createForm.warehouseId}
-                    onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', backgroundColor: '#ffffff' }}
-                    required
+                ) : createForm.type === 'Addition' ? (
+                  <button
+                    type="submit"
+                    disabled={submittingRecord}
+                    style={{
+                      backgroundColor: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '10px 22px',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#15803d')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#16a34a')}
                   >
-                    {warehousesList.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                    Product *
-                  </label>
-                  <select
-                    value={createForm.productId}
-                    onChange={(e) => setCreateForm({ ...createForm, productId: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', backgroundColor: '#ffffff' }}
-                    required
+                    <Plus size={16} /> Add Stock
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={submittingRecord}
+                    style={{
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '10px 22px',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                      transition: 'background-color 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#b91c1c')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
                   >
-                    {productsList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.sku || 'SKU'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                    Batch Number
-                  </label>
-                  <input
-                    type="text"
-                    value={createForm.batch}
-                    onChange={(e) => setCreateForm({ ...createForm, batch: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                    Adjustment Quantity *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="e.g. 10"
-                    value={createForm.quantity}
-                    onChange={(e) => setCreateForm({ ...createForm, quantity: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Adjustment Reason *
-                </label>
-                <select
-                  value={createForm.reason}
-                  onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', backgroundColor: '#ffffff' }}
-                >
-                  <option value="Opening stock correction">Opening stock correction</option>
-                  <option value="Stock count variance">Stock count variance</option>
-                  <option value="Expired stock">Expired stock</option>
-                  <option value="Damaged stock">Damaged stock</option>
-                  <option value="Found stock">Found stock</option>
-                  <option value="Physical cycle audit">Physical cycle audit</option>
-                  <option value="Other adjustment">Other adjustment</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                  Remarks / Notes (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={createForm.remarks}
-                  onChange={(e) => setCreateForm({ ...createForm, remarks: e.target.value })}
-                  placeholder="Additional audit reference notes..."
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', resize: 'vertical' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass"
-                  onClick={() => setShowCreateModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={submittingRecord}
-                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
-                >
-                  {editingRecord ? 'Update Adjustment Record' : 'Post Adjustment Record'}
-                </button>
+                    <Minus size={16} /> Reduce Stock
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -1923,7 +2229,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: View Stock Item Details */}
+      {/* MODAL: View Stock Item Details (Wide, Scroll-Free Executive View) */}
       {/* ------------------------------------------------------------- */}
       {viewingStockItem && (
         <div className="modal-backdrop" onClick={() => setViewingStockItem(null)}>
@@ -1931,119 +2237,200 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '560px',
-              padding: '28px',
+              maxWidth: '920px',
+              padding: '22px 28px',
               borderRadius: '14px',
               backgroundColor: '#ffffff',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.22)',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Boxes size={22} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>{viewingStockItem.productName}</h3>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                    SKU: <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{viewingStockItem.sku}</strong> • {viewingStockItem.warehouseName}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{viewingStockItem.productName}</h3>
+                    <span
+                      style={{
+                        backgroundColor: '#f1f5f9',
+                        color: '#334155',
+                        border: '1px solid #e2e8f0',
+                        padding: '1px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {viewingStockItem.brandName || 'General'}
+                    </span>
+                    {viewingStockItem.isOutOfStock ? (
+                      <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> Out of Stock
+                      </span>
+                    ) : viewingStockItem.isLowStock ? (
+                      <span style={{ backgroundColor: '#fef3c7', color: '#d97706', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> Low Stock Alert ({Math.max(1, (viewingStockItem.minStockLevel || 5) - viewingStockItem.quantity)} needed)
+                      </span>
+                    ) : (
+                      <span style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle size={12} /> In Stock (Healthy)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>SKU: <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{viewingStockItem.sku}</strong></span>
+                    <span>•</span>
+                    <span>Warehouse: <strong style={{ color: '#334155' }}>{viewingStockItem.warehouseName}</strong> ({viewingStockItem.warehouseCode || 'WH-01'})</span>
+                    <span>•</span>
+                    <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: '3px', fontSize: '0.74rem', fontWeight: 600 }}>
+                      {viewingStockItem.categoryName}
+                    </span>
+                  </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setViewingStockItem(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px' }}
+                title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '18px' }}>
-              <div style={{ backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>On-Hand Stock</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: viewingStockItem.quantity > 0 ? '#0f172a' : '#dc2626', marginTop: '2px' }}>
-                  {viewingStockItem.quantity.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>{viewingStockItem.unitOfMeasure}</span>
+            {/* 2-Column Balanced Grid: Left = Quantities & Placement, Right = Commercial & Valuations */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '16px' }}>
+
+              {/* LEFT COLUMN: Stock Quantities & Attributes */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                    Stock Quantities & Availability
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>On-Hand Physical Stock</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: viewingStockItem.quantity > 0 ? '#0f172a' : '#dc2626', marginTop: '1px' }}>
+                        {viewingStockItem.quantity.toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Total Warehouse Count</div>
+                    </div>
+                    <div style={{ backgroundColor: '#f0fdf4', padding: '10px 12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 600 }}>Available To Sell</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16a34a', marginTop: '1px' }}>
+                        {viewingStockItem.availableQuantity.toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#166534', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#166534' }}>Unallocated & Free</div>
+                    </div>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Reserved / Allocated</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#475569', marginTop: '1px' }}>
+                        {(viewingStockItem.reservedQuantity || 0).toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Committed to Orders</div>
+                    </div>
+                    <div style={{ backgroundColor: '#fffbeb', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 600 }}>Min Reorder Threshold</div>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309', marginTop: '1px' }}>
+                        {viewingStockItem.minStockLevel || 5} <span style={{ fontSize: '0.76rem', color: '#92400e', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#b45309' }}>Alert Trigger Level</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logistics & Placement Info */}
+                <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748b' }}>Brand & Manufacturer</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.brandName || 'General'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748b' }}>Category Group</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.categoryName}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748b' }}>Warehouse Facility</span>
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.warehouseName}</span>
+                  </div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Available Stock</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0284c7', marginTop: '2px' }}>
-                  {viewingStockItem.availableQuantity.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#64748b' }}>{viewingStockItem.unitOfMeasure}</span>
+
+              {/* RIGHT COLUMN: Commercial Pricing & Valuations */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                    Pricing & Profit Margin
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Cost</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#334155', marginTop: '1px' }}>
+                        Rs. {Number(viewingStockItem.costPrice || 0).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Purchase</div>
+                    </div>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Selling</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
+                        Rs. {Number(viewingStockItem.sellingPrice || 0).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Catalog</div>
+                    </div>
+                    <div style={{ backgroundColor: '#f0f9ff', padding: '10px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                      <div style={{ fontSize: '0.70rem', color: '#0369a1', fontWeight: 600 }}>Gross Margin</div>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
+                        Rs. {(Number(viewingStockItem.sellingPrice || 0) - Number(viewingStockItem.costPrice || 0)).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 700 }}>
+                        {Number(viewingStockItem.sellingPrice) > 0
+                          ? (((Number(viewingStockItem.sellingPrice) - Number(viewingStockItem.costPrice)) / Number(viewingStockItem.sellingPrice)) * 100).toFixed(1)
+                          : '0.0'}% margin
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inventory Valuation Breakdown */}
+                <div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                    Asset Valuation & Revenue Potential
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Total Asset Valuation (Cost)</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
+                        Rs. {Number(viewingStockItem.totalCostValue || (viewingStockItem.quantity * viewingStockItem.costPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Cost Price</div>
+                    </div>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Potential Retail Revenue</div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
+                        Rs. {Number(viewingStockItem.quantity * (viewingStockItem.sellingPrice || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Selling Price</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Unit Cost Price</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#334155', marginTop: '2px' }}>
-                  Rs. {Number(viewingStockItem.costPrice || 0).toFixed(2)}
-                </div>
-              </div>
-              <div style={{ backgroundColor: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Unit Selling Price</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                  Rs. {Number(viewingStockItem.sellingPrice || 0).toFixed(2)}
-                </div>
-              </div>
+
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.88rem', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Category</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.categoryName}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Warehouse Location</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.warehouseName} ({viewingStockItem.warehouseCode || '—'})</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Minimum Stock Alert Level</span>
-                <span style={{ fontWeight: 600, color: '#334155' }}>{viewingStockItem.minStockLevel || 5} {viewingStockItem.unitOfMeasure}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Total On-Hand Valuation</span>
-                <span style={{ fontWeight: 800, color: '#0284c7', fontSize: '1rem' }}>
-                  Rs. {Number(viewingStockItem.totalCostValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Stock Status</span>
-                <span>
-                  {viewingStockItem.isOutOfStock ? (
-                    <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
-                      Out of Stock
-                    </span>
-                  ) : viewingStockItem.isLowStock ? (
-                    <span style={{ backgroundColor: '#fef3c7', color: '#d97706', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
-                      Low Stock Alert
-                    </span>
-                  ) : (
-                    <span style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
-                      In Stock
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '14px', borderTop: '1px solid #e2e8f0' }}>
               <button
                 type="button"
                 className="btn btn-glass"
                 onClick={() => setViewingStockItem(null)}
+                style={{ padding: '8px 20px', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600 }}
               >
                 Close
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  const item = viewingStockItem;
-                  setViewingStockItem(null);
-                  handleQuickAdjust(item);
-                }}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              >
-                <SlidersHorizontal size={15} /> Adjust Stock
               </button>
             </div>
           </div>

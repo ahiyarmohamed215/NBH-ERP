@@ -23,108 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-const STORAGE_KEY_OUTSTANDING = 'erp_reports_customer_outstanding_v1';
-
-// Seeded Customer Outstanding Data matching screenshot
-const INITIAL_OUTSTANDING_CUSTOMERS = [
-  {
-    id: 'cust-1',
-    name: 'test 2',
-    phone: '0771234567',
-    email: 'test2@nbh.lk',
-    group: 'Route 1',
-    postedBy: 'Admin User',
-    totalOutstanding: 39795.5,
-    days0to7: 0.0,
-    days8to21: 0.0,
-    days22Plus: 39795.5,
-    invoicesCount: 1,
-    invoices: [
-      { invoiceNo: 'INV-2026-081', date: '2026-08-10', total: 39795.5, paid: 0, balance: 39795.5, days: 41 },
-    ],
-  },
-  {
-    id: 'cust-2',
-    name: 'AIA Insurance',
-    phone: '0112345678',
-    email: 'corp@aia.lk',
-    group: 'Route 1',
-    postedBy: 'Admin User',
-    totalOutstanding: 338.8,
-    days0to7: 0.0,
-    days8to21: 338.8,
-    days22Plus: 0.0,
-    invoicesCount: 2,
-    invoices: [
-      { invoiceNo: '26AUG_MB_:93', date: '2026-08-24', total: 238.8, paid: 10.0, balance: 228.8, days: 19 },
-      { invoiceNo: '26AUG_MB_:92', date: '2026-08-24', total: 128.0, paid: 18.0, balance: 110.0, days: 19 },
-    ],
-  },
-  {
-    id: 'cust-3',
-    name: 'Negombo Motors',
-    phone: '0312224455',
-    email: 'service@negombomotors.lk',
-    group: 'Route 1',
-    postedBy: 'Admin User',
-    totalOutstanding: 28450.0,
-    days0to7: 0.0,
-    days8to21: 0.0,
-    days22Plus: 28450.0,
-    invoicesCount: 8,
-    invoices: [
-      { invoiceNo: '26JUL_MB_:40', date: '2026-07-28', total: 28450.0, paid: 0, balance: 28450.0, days: 54 },
-    ],
-  },
-  {
-    id: 'cust-4',
-    name: 'Apex Supermarket',
-    phone: '0718889900',
-    email: 'orders@apex.com',
-    group: 'City Route',
-    postedBy: 'Cashier 1',
-    totalOutstanding: 12540.0,
-    days0to7: 0.0,
-    days8to21: 0.0,
-    days22Plus: 12540.0,
-    invoicesCount: 5,
-    invoices: [
-      { invoiceNo: '26JUL_MB_:22', date: '2026-07-15', total: 12540.0, paid: 0, balance: 12540.0, days: 67 },
-    ],
-  },
-  {
-    id: 'cust-5',
-    name: 'Lanka Traders',
-    phone: '0754443322',
-    email: 'lankatraders@gmail.com',
-    group: 'Wholesale Route',
-    postedBy: 'Admin User',
-    totalOutstanding: 5837.34,
-    days0to7: 0.0,
-    days8to21: 0.0,
-    days22Plus: 5837.34,
-    invoicesCount: 3,
-    invoices: [
-      { invoiceNo: '26AUG_MB_:12', date: '2026-08-05', total: 5837.34, paid: 0, balance: 5837.34, days: 46 },
-    ],
-  },
-  {
-    id: 'cust-6',
-    name: 'Kandy Distributors',
-    phone: '0812233445',
-    email: 'kandydist@sltnet.lk',
-    group: 'Hill Country Route',
-    postedBy: 'Cashier 2',
-    totalOutstanding: 2000.0,
-    days0to7: 0.0,
-    days8to21: 0.0,
-    days22Plus: 2000.0,
-    invoicesCount: 1,
-    invoices: [
-      { invoiceNo: '26AUG_MB_:08', date: '2026-08-01', total: 2000.0, paid: 0, balance: 2000.0, days: 50 },
-    ],
-  },
-];
+const INITIAL_OUTSTANDING_CUSTOMERS = [];
 
 export default function ReportsView({ activeSubTab = 'customer-reports' }) {
   const { addToast } = useToast();
@@ -171,15 +70,26 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
   });
 
   // Outstanding Customers state
-  const [outstandingList, setOutstandingList] = useState(() => {
+  const [outstandingList, setOutstandingList] = useState([]);
+  const [loadingOutstanding, setLoadingOutstanding] = useState(false);
+
+  const loadOutstandingReport = async () => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_OUTSTANDING);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
+      setLoadingOutstanding(true);
+      const res = await reportApi.getOutstandingPayments();
+      if (res.data && Array.isArray(res.data)) {
+        setOutstandingList(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load outstanding payments report:', err);
+    } finally {
+      setLoadingOutstanding(false);
     }
-    return INITIAL_OUTSTANDING_CUSTOMERS;
-  });
+  };
+
+  useEffect(() => {
+    loadOutstandingReport();
+  }, []);
 
   // Sync subTab
   useEffect(() => {
@@ -187,15 +97,6 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       setCurrentPrimaryTab(activeSubTab);
     }
   }, [activeSubTab]);
-
-  // Persist outstanding list
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_OUTSTANDING, JSON.stringify(outstandingList));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [outstandingList]);
 
   // Unique groups and posters for filter dropdowns
   const uniqueGroups = useMemo(() => {
@@ -227,7 +128,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
     });
   }, [outstandingList, filterPostedBy, filterGroup, customerSearch]);
 
-  // Ageing Totals matching screenshot
+  // Ageing Totals dynamically calculated from live customer records
   const ageingTotals = useMemo(() => {
     let tot0to7 = 0;
     let cnt0to7 = 0;
@@ -237,22 +138,26 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
     let cnt22Plus = 0;
 
     filteredCustomers.forEach((c) => {
-      tot0to7 += c.days0to7 || 0;
-      tot8to21 += c.days8to21 || 0;
-      tot22Plus += c.days22Plus || 0;
+      const d0 = Number(c.days0to7 || 0);
+      const d8 = Number(c.days8to21 || 0);
+      const d22 = Number(c.days22Plus || 0);
 
-      if (c.days0to7 > 0) cnt0to7 += 1;
-      if (c.days8to21 > 0) cnt8to21 += 2;
-      if (c.days22Plus > 0) cnt22Plus += c.invoicesCount || 1;
+      tot0to7 += d0;
+      tot8to21 += d8;
+      tot22Plus += d22;
+
+      if (d0 > 0) cnt0to7 += 1;
+      if (d8 > 0) cnt8to21 += 1;
+      if (d22 > 0) cnt22Plus += (c.invoicesCount || 1);
     });
 
     return {
       tot0to7,
       cnt0to7,
       tot8to21,
-      cnt8to21: 2, // matching user screenshot badge
+      cnt8to21,
       tot22Plus,
-      cnt22Plus: 20, // matching user screenshot badge
+      cnt22Plus,
     };
   }, [filteredCustomers]);
 

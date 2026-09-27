@@ -1,5 +1,6 @@
 package com.nbh.erp.user.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
@@ -28,6 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public PagedResponse<UserDto> getAllUsers(Pageable pageable) {
@@ -143,6 +145,14 @@ public class UserService {
         user.setIsActive(true);
 
         User approvedUser = userRepository.save(user);
+
+        auditLogService.log(
+                "USER_APPROVE",
+                "User",
+                user.getUsername(),
+                String.format("User '%s' approved with roles: %s", user.getUsername(), request.getRoles())
+        );
+
         return UserDto.from(approvedUser);
     }
 
@@ -155,6 +165,14 @@ public class UserService {
         user.setIsActive(false);
 
         User rejectedUser = userRepository.save(user);
+
+        auditLogService.log(
+                "USER_REJECT",
+                "User",
+                user.getUsername(),
+                String.format("User '%s' registration rejected", user.getUsername())
+        );
+
         return UserDto.from(rejectedUser);
     }
 
@@ -163,7 +181,15 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
-        user.getRoles().clear();
-        userRepository.delete(user);
+        user.setIsActive(false);
+        user.setApprovalStatus("REJECTED");
+        userRepository.save(user);
+
+        auditLogService.log(
+                "USER_DEACTIVATE",
+                "User",
+                user.getUsername(),
+                String.format("User '%s' soft-deleted (deactivated)", user.getUsername())
+        );
     }
 }

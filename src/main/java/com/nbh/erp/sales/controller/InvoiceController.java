@@ -5,6 +5,7 @@ import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.sales.dto.CashierAccountingDto;
 import com.nbh.erp.sales.dto.CreateInvoiceRequest;
 import com.nbh.erp.sales.dto.InvoiceDto;
+import com.nbh.erp.sales.dto.UpdateInvoiceRequest;
 import com.nbh.erp.sales.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -104,6 +105,66 @@ public class InvoiceController {
     public ResponseEntity<ApiResponse<Void>> cancelHeldInvoice(@PathVariable Long id) {
         invoiceService.cancelHeldInvoice(id);
         return ResponseEntity.ok(ApiResponse.ok("Held invoice discarded", null));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
+    @Operation(summary = "Update an existing invoice including items, customer, and amounts")
+    public ResponseEntity<ApiResponse<InvoiceDto>> updateInvoice(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateInvoiceRequest request
+    ) {
+        InvoiceDto updated = invoiceService.updateInvoice(id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice updated successfully", updated));
+    }
+
+    @PutMapping("/number/{number}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
+    @Operation(summary = "Update an existing invoice by invoice number")
+    public ResponseEntity<ApiResponse<InvoiceDto>> updateInvoiceByNumber(
+            @PathVariable String number,
+            @Valid @RequestBody UpdateInvoiceRequest request
+    ) {
+        InvoiceDto updated = invoiceService.updateInvoiceByNumber(number, request);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice updated successfully", updated));
+    }
+
+    @PostMapping("/{id}/void")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Void a sales invoice, reverse stock movements and restore customer balance")
+    public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoice(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason
+    ) {
+        InvoiceDto voided = invoiceService.voidInvoice(id, reason);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice voided successfully", voided));
+    }
+
+    @PostMapping("/number/{number}/void")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Void a sales invoice by number, reverse stock movements and restore customer balance")
+    public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoiceByNumber(
+            @PathVariable String number,
+            @RequestParam(required = false) String reason
+    ) {
+        InvoiceDto voided = invoiceService.voidInvoiceByNumber(number, reason);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice voided successfully", voided));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Void an invoice and revert deducted stock (preserves audit trail)")
+    public ResponseEntity<ApiResponse<Void>> deleteInvoice(@PathVariable Long id) {
+        invoiceService.deleteInvoice(id);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice voided successfully", null));
+    }
+
+    @DeleteMapping("/number/{number}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Void an invoice by invoice number and revert deducted stock (preserves audit trail)")
+    public ResponseEntity<ApiResponse<Void>> deleteInvoiceByNumber(@PathVariable String number) {
+        invoiceService.deleteInvoiceByNumber(number);
+        return ResponseEntity.ok(ApiResponse.ok("Invoice voided successfully", null));
     }
 }
 

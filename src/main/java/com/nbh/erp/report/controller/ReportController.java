@@ -59,4 +59,11 @@ public class ReportController {
 
         return ResponseEntity.ok().headers(headers).body(bytes);
     }
+
+    @GetMapping("/outstanding-payments")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('REPORT_VIEW')")
+    @Operation(summary = "Get customer aging analysis and unpaid balances summary")
+    public ResponseEntity<ApiResponse<java.util.List<ReportDto.OutstandingCustomerReport>>> getOutstandingPayments() {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getOutstandingPayments()));
+    }
 }
