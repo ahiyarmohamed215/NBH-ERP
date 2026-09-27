@@ -40,6 +40,13 @@ public class User extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "employee_code", length = 30)
+    private String employeeCode;
+
+    @Column(name = "commission_rate", precision = 5, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal commissionRate = java.math.BigDecimal.ZERO;
+
     @Column(name = "approval_status", nullable = false, length = 20)
     @Builder.Default
     private String approvalStatus = "PENDING";

@@ -46,4 +46,8 @@ public class SalesReturnItem {
     @Column(name = "is_restocked", nullable = false)
     @Builder.Default
     private Boolean isRestocked = true;
+
+    @Column(name = "created_at", updatable = false)
+    @Builder.Default
+    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
 }

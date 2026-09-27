@@ -192,4 +192,12 @@ public class UserService {
                 String.format("User '%s' soft-deleted (deactivated)", user.getUsername())
         );
     }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UserDto> getActiveUsers() {
+        return userRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && "APPROVED".equalsIgnoreCase(u.getApprovalStatus()))
+                .map(UserDto::from)
+                .toList();
+    }
 }

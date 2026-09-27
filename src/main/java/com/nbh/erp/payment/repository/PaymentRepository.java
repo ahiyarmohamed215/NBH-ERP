@@ -26,6 +26,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            "LEFT JOIN p.invoice i " +
            "WHERE (:customerId IS NULL OR c.id = :customerId) " +
            "AND (:invoiceId IS NULL OR i.id = :invoiceId) " +
+           "AND (:paymentType IS NULL OR p.paymentType = :paymentType) " +
            "AND (:paymentMethod IS NULL OR p.paymentMethod = :paymentMethod) " +
            "AND (:status IS NULL OR p.status = :status) " +
            "AND (:startDate IS NULL OR p.paymentDate >= :startDate) " +
@@ -40,6 +41,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Page<Payment> searchPayments(
             @Param("customerId") Long customerId,
             @Param("invoiceId") Long invoiceId,
+            @Param("paymentType") String paymentType,
             @Param("paymentMethod") String paymentMethod,
             @Param("status") String status,
             @Param("startDate") LocalDate startDate,

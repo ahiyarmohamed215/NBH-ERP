@@ -26,6 +26,7 @@ public class CreatePaymentRequest {
     private BigDecimal amount;
 
     private String paymentMethod; // CASH, CARD, BANK_TRANSFER, CHEQUE, ONLINE
+    private String paymentType;   // INVOICE_PAYMENT, ADVANCE
     private String referenceNumber;
     private LocalDate paymentDate;
     private String notes;

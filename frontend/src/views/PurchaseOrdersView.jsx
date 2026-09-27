@@ -17,20 +17,8 @@ import {
   Package,
 } from 'lucide-react';
 
-const STORAGE_KEY_POS = 'erp_purchase_orders_v1';
-
-const INITIAL_POS = [];
-
 const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, ref) {
-  const [purchaseOrders, setPurchaseOrders] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_POS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to load saved POs:', e);
-    }
-    return INITIAL_POS;
-  });
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
@@ -77,11 +65,6 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
   const persistOrders = (orders) => {
     setPurchaseOrders(orders);
-    try {
-      localStorage.setItem(STORAGE_KEY_POS, JSON.stringify(orders));
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const loadData = async () => {

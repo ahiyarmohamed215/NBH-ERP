@@ -4,6 +4,7 @@ import {
   salesmanApi,
   userApi,
   salesApi,
+  routeApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
@@ -43,29 +44,6 @@ import {
   ChevronRight,
   Eye,
 } from 'lucide-react';
-
-const STORAGE_KEY_ROUTES = 'erp_customer_routes_v1';
-const STORAGE_KEY_INVOICES = 'erp_commercial_invoices_v1';
-const STORAGE_KEY_QUOTATIONS = 'erp_quotations_v1';
-const STORAGE_KEY_ORDERS = 'erp_sales_orders_v1';
-const STORAGE_KEY_PAYMENTS = 'erp_customer_payments_v1';
-const STORAGE_KEY_ADVANCES = 'erp_advance_payments_v1';
-const STORAGE_KEY_CHEQUES = 'erp_customer_cheques_v1';
-
-const DEFAULT_SAMPLE_INVOICES = [];
-const DEFAULT_SAMPLE_PAYMENTS = [];
-const DEFAULT_SAMPLE_ADVANCES = [];
-const DEFAULT_SAMPLE_CHEQUES = [];
-
-const DEFAULT_SAMPLE_QUOTATIONS = [
-  { id: 'qt-1', quotationNo: 'QT-2026-001', customerName: 'Negombo Motors', date: '2026-09-18', validUntil: '2026-10-18', totalAmount: 45000.0, status: 'ACCEPTED' },
-  { id: 'qt-2', quotationNo: 'QT-2026-002', customerName: 'AIA Insurance', date: '2026-09-15', validUntil: '2026-10-15', totalAmount: 125000.0, status: 'SENT' },
-];
-
-const DEFAULT_SAMPLE_ORDERS = [
-  { id: 'ord-1', orderNo: 'SO-2026-001', customerName: 'Negombo Motors', orderDate: '2026-09-19', deliveryDate: '2026-09-25', totalAmount: 45000.0, paymentStatus: 'PAID', orderStatus: 'CONFIRMED' },
-  { id: 'ord-2', orderNo: 'SO-2026-002', customerName: 'AIA Insurance', orderDate: '2026-09-16', deliveryDate: '2026-09-22', totalAmount: 125000.0, paymentStatus: 'PARTIAL', orderStatus: 'PROCESSING' },
-];
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { addToast } = useToast();
@@ -132,25 +110,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [previewModalDoc, setPreviewModalDoc] = useState(null);
 
   // Routes / Groups State
-  const [routes, setRoutes] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ROUTES);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return [
-      {
-        id: 'route-1',
-        name: 'Route 1',
-        description: '',
-        salesmanId: '',
-        salesmanName: '',
-        customerIds: [],
-        createdAt: new Date().toISOString(),
-      },
-    ];
-  });
+  const [routes, setRoutes] = useState([]);
 
   // Inline Route View state (replaces all popups for Groups & Routes)
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -179,14 +139,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   }, [activeSubTab]);
 
-  // Persist routes
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ROUTES, JSON.stringify(routes));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [routes]);
 
   // Close customer search dropdown on outside click
   useEffect(() => {
@@ -207,10 +159,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [cRes, sRes, uRes] = await Promise.allSettled([
+      const [cRes, sRes, uRes, rRes] = await Promise.allSettled([
         customerApi.getAll(),
         salesmanApi.getAll(),
         userApi.getAll({ page: 0, size: 200 }),
+        routeApi.getAll(),
       ]);
 
       let loadedCustomers = [];
@@ -246,7 +199,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           combinedReps.push({
             id: String(u.id),
             name: name,
-            salesmanCode: u.username || 'EMP',
+            salesmanCode: u.employeeCode || u.username || 'EMP',
             phone: u.phone || '',
           });
         }
@@ -254,24 +207,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       setSalesmen(combinedReps);
 
-      // If default Route 1 has no customers yet and we have customers, assign first 3
-      setRoutes((prevRoutes) => {
-        if (
-          prevRoutes.length === 1 &&
-          prevRoutes[0].name === 'Route 1' &&
-          prevRoutes[0].customerIds.length === 0 &&
-          loadedCustomers.length > 0
-        ) {
-          const firstThreeIds = loadedCustomers.slice(0, 3).map((c) => String(c.id));
-          return [
-            {
-              ...prevRoutes[0],
-              customerIds: firstThreeIds,
-            },
-          ];
-        }
-        return prevRoutes;
-      });
+      // Load routes from backend
+      if (rRes.status === 'fulfilled') {
+        const rawRoutes = rRes.value.data || rRes.value || [];
+        const loadedRoutes = rawRoutes.map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description || '',
+          salesmanId: r.salesRepId ? String(r.salesRepId) : '',
+          salesmanName: r.salesRepName || '',
+          customerIds: (r.customerIds || []).map(String),
+          createdAt: r.createdAt || new Date().toISOString(),
+        }));
+        setRoutes(loadedRoutes);
+      }
     } catch (err) {
       addToast('Error loading data: ' + err.message, 'error');
     } finally {
@@ -354,20 +303,38 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return false;
   };
 
-  // Raw Customer Invoices
-  const rawCustomerInvoices = useMemo(() => {
-    if (!selectedHistoryCustomer) return [];
-    let invoices = [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_INVOICES);
-      invoices = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_INVOICES;
-    } catch (e) {
-      invoices = DEFAULT_SAMPLE_INVOICES;
+  const [historyInvoices, setHistoryInvoices] = useState([]);
+  const [historyPayments, setHistoryPayments] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (!selectedHistoryCustomer?.id) {
+      setHistoryInvoices([]);
+      setHistoryPayments([]);
+      return;
     }
-    return invoices.filter((inv) =>
-      matchesCustomer(inv.customerId, inv.customerName, inv.customerCode)
-    );
-  }, [selectedHistoryCustomer]);
+    const loadCustomerFinancialHistory = async () => {
+      try {
+        setLoadingHistory(true);
+        const [invRes, pmtRes] = await Promise.all([
+          salesApi.search({ customerId: selectedHistoryCustomer.id, size: 200 }).catch(() => ({ data: [] })),
+          paymentApi.search({ customerId: selectedHistoryCustomer.id, size: 200 }).catch(() => ({ data: [] })),
+        ]);
+        const invList = invRes.data?.content || invRes.data || [];
+        const pmtList = pmtRes.data?.content || pmtRes.data || [];
+        setHistoryInvoices(invList);
+        setHistoryPayments(pmtList);
+      } catch (err) {
+        console.error('Failed to load customer financial history:', err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    loadCustomerFinancialHistory();
+  }, [selectedHistoryCustomer?.id]);
+
+  // Raw Customer Invoices (from real backend API)
+  const rawCustomerInvoices = historyInvoices;
 
   // Filtered Customer Invoices
   const filteredCustomerInvoices = useMemo(() => {
@@ -386,20 +353,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     });
   }, [rawCustomerInvoices, invoiceStatusFilter, invoiceSearchQuery]);
 
-  // Raw Customer Advance Payments
+  // Raw Customer Advance Payments (from real backend payments with ADVANCE type or unallocated)
   const rawCustomerAdvances = useMemo(() => {
-    if (!selectedHistoryCustomer) return [];
-    let advances = [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ADVANCES);
-      advances = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_ADVANCES;
-    } catch (e) {
-      advances = DEFAULT_SAMPLE_ADVANCES;
-    }
-    return advances.filter((adv) =>
-      matchesCustomer(adv.customerId, adv.customerName)
-    );
-  }, [selectedHistoryCustomer]);
+    return historyPayments.filter((p) => p.paymentType === 'ADVANCE' || !p.invoiceNumber);
+  }, [historyPayments]);
 
   // Filtered Customer Advance Payments
   const filteredCustomerAdvances = useMemo(() => {
@@ -409,7 +366,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       }
       if (advanceSearchQuery.trim()) {
         const q = advanceSearchQuery.toLowerCase().trim();
-        const num = (adv.voucherNo || adv.id || '').toLowerCase();
+        const num = (adv.voucherNo || adv.paymentNumber || adv.id || '').toLowerCase();
         const pm = (adv.paymentMethod || '').toLowerCase();
         if (!num.includes(q) && !pm.includes(q)) return false;
       }
@@ -417,20 +374,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     });
   }, [rawCustomerAdvances, advanceStatusFilter, advanceSearchQuery]);
 
-  // Raw Customer Payments
+  // Raw Customer Payments (from real backend payments)
   const rawCustomerPayments = useMemo(() => {
-    if (!selectedHistoryCustomer) return [];
-    let payments = [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PAYMENTS);
-      payments = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_PAYMENTS;
-    } catch (e) {
-      payments = DEFAULT_SAMPLE_PAYMENTS;
-    }
-    return payments.filter((pmt) =>
-      matchesCustomer(pmt.customerId, pmt.customerName)
-    );
-  }, [selectedHistoryCustomer]);
+    return historyPayments.filter((p) => p.paymentType !== 'ADVANCE' && p.invoiceNumber);
+  }, [historyPayments]);
 
   // Filtered Customer Payments
   const filteredCustomerPayments = useMemo(() => {
@@ -440,8 +387,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       }
       if (paymentSearchQuery.trim()) {
         const q = paymentSearchQuery.toLowerCase().trim();
-        const rec = (pmt.receiptNo || pmt.id || '').toLowerCase();
-        const inv = (pmt.invoiceNo || '').toLowerCase();
+        const rec = (pmt.receiptNo || pmt.paymentNumber || pmt.id || '').toLowerCase();
+        const inv = (pmt.invoiceNo || pmt.invoiceNumber || '').toLowerCase();
         const pm = (pmt.paymentMethod || '').toLowerCase();
         if (!rec.includes(q) && !inv.includes(q) && !pm.includes(q)) return false;
       }
@@ -449,20 +396,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     });
   }, [rawCustomerPayments, paymentStatusFilter, paymentSearchQuery]);
 
-  // Raw Customer Cheques
+  // Raw Customer Cheques (from real backend payments with paymentMethod === CHEQUE)
   const rawCustomerCheques = useMemo(() => {
-    if (!selectedHistoryCustomer) return [];
-    let cheques = [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CHEQUES);
-      cheques = saved ? JSON.parse(saved) : DEFAULT_SAMPLE_CHEQUES;
-    } catch (e) {
-      cheques = DEFAULT_SAMPLE_CHEQUES;
-    }
-    return cheques.filter((chq) =>
-      matchesCustomer(chq.customerId, chq.customerName)
-    );
-  }, [selectedHistoryCustomer]);
+    return historyPayments.filter((p) => (p.paymentMethod || '').toUpperCase() === 'CHEQUE');
+  }, [historyPayments]);
 
   // Filtered Customer Cheques
   const filteredCustomerCheques = useMemo(() => {
@@ -829,6 +766,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         loadInitialData();
       } else if (securityModalData.type === 'route') {
         const r = securityModalData.item;
+        if (r.id && !String(r.id).startsWith('route-')) {
+          await routeApi.delete(r.id);
+        }
         setRoutes((prev) => prev.filter((route) => route.id !== r.id));
         addToast(`Route "${r.name}" deleted successfully.`, 'success');
         if (selectedRoute?.id === r.id) {
@@ -884,7 +824,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setAssignCustomerSearch('');
   };
 
-  const handleSaveRouteView = (e) => {
+  const handleSaveRouteView = async (e) => {
     if (e) e.preventDefault();
     if (!routeEditForm.name.trim()) {
       addToast('Route name is required', 'error');
@@ -893,40 +833,49 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
     const assignedSalesman = salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId));
     const salesmanName = assignedSalesman?.name || '';
+    const payload = {
+      name: routeEditForm.name.trim(),
+      description: routeEditForm.description ? routeEditForm.description.trim() : '',
+      salesRepId: routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null,
+      customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
+    };
 
-    if (isCreatingRoute) {
-      const newRoute = {
-        id: 'route-' + Date.now(),
-        name: routeEditForm.name.trim(),
-        description: routeEditForm.description.trim(),
-        salesmanId: routeEditForm.salesmanId || '',
-        salesmanName,
-        customerIds: routeEditForm.selectedCustomerIds || [],
-        createdAt: new Date().toISOString(),
-      };
-
-      setRoutes((prev) => [...prev, newRoute]);
-      addToast(`Route "${newRoute.name}" created successfully!`, 'success');
-    } else if (selectedRoute) {
-      setRoutes((prev) =>
-        prev.map((r) => {
-          if (r.id === selectedRoute.id) {
-            return {
-              ...r,
-              name: routeEditForm.name.trim(),
-              description: routeEditForm.description.trim(),
-              salesmanId: routeEditForm.salesmanId || '',
-              salesmanName,
-              customerIds: routeEditForm.selectedCustomerIds || [],
-            };
-          }
-          return r;
-        })
-      );
-      addToast(`Route "${routeEditForm.name}" updated successfully!`, 'success');
+    try {
+      if (isCreatingRoute) {
+        const res = await routeApi.create(payload);
+        const created = res.data || res;
+        const normalized = {
+          id: created.id,
+          name: created.name,
+          description: created.description || '',
+          salesmanId: created.salesRepId ? String(created.salesRepId) : '',
+          salesmanName: created.salesRepName || salesmanName,
+          customerIds: (created.customerIds || []).map(String),
+          createdAt: created.createdAt || new Date().toISOString(),
+        };
+        setRoutes((prev) => [...prev, normalized]);
+        addToast(`Route "${normalized.name}" created successfully!`, 'success');
+      } else if (selectedRoute) {
+        const res = await routeApi.update(selectedRoute.id, payload);
+        const updated = res.data || res;
+        const normalized = {
+          id: updated.id,
+          name: updated.name,
+          description: updated.description || '',
+          salesmanId: updated.salesRepId ? String(updated.salesRepId) : '',
+          salesmanName: updated.salesRepName || salesmanName,
+          customerIds: (updated.customerIds || []).map(String),
+          createdAt: selectedRoute.createdAt || new Date().toISOString(),
+        };
+        setRoutes((prev) =>
+          prev.map((r) => (r.id === selectedRoute.id ? normalized : r))
+        );
+        addToast(`Route "${normalized.name}" updated successfully!`, 'success');
+      }
+      handleCloseRouteView();
+    } catch (err) {
+      addToast('Error saving route: ' + (err.response?.data?.message || err.message), 'error');
     }
-
-    handleCloseRouteView();
   };
 
   const handleDeleteCurrentRoute = () => {

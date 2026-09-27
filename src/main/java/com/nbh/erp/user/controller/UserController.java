@@ -95,11 +95,25 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("User registration rejected", rejected));
     }
 
+    @GetMapping("/sales-reps")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('CUSTOMER_VIEW') or hasAuthority('USER_VIEW')")
+    @Operation(summary = "Get list of active users for sales rep / cashier assignment")
+    public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getSalesReps() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers()));
+    }
+
+    @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_VIEW') or hasAuthority('USER_MANAGE')")
+    @Operation(summary = "Get list of all active approved users")
+    public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getActiveUsers() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers()));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Delete an existing user")
-    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
-        return ResponseEntity.ok(ApiResponse.ok("User deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

@@ -20,6 +20,8 @@ public class UserDto {
     private String email;
     private String fullName;
     private String phone;
+    private String employeeCode;
+    private java.math.BigDecimal commissionRate;
     private Boolean isActive;
     private String approvalStatus;
     private List<String> roles;
@@ -33,6 +35,8 @@ public class UserDto {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
+                .employeeCode(user.getEmployeeCode())
+                .commissionRate(user.getCommissionRate())
                 .isActive(user.getIsActive())
                 .approvalStatus(user.getApprovalStatus())
                 .roles(user.getRoles().stream().map(r -> r.getName()).collect(Collectors.toList()))

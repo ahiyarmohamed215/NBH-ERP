@@ -83,6 +83,27 @@ export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [subTab, setSubTab] = useState('');
 
+  // Automatic purge of legacy localStorage mock caches
+  useEffect(() => {
+    const LEGACY_STORAGE_KEYS = [
+      'erp_commercial_invoices_v1',
+      'erp_customer_routes_v1',
+      'erp_quotations_v1',
+      'erp_sales_orders_v1',
+      'erp_customer_payments_v1',
+      'erp_advance_payments_v1',
+      'erp_customer_cheques_v1',
+      'erp_held_bills_workflow_v1',
+      'erp_deleted_held_bills_v1',
+      'erp_purchase_orders_v1',
+    ];
+    LEGACY_STORAGE_KEYS.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    });
+  }, []);
+
   // Fullscreen & Distraction-Free States
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);

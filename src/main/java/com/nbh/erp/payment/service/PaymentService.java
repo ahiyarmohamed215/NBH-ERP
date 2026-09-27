@@ -40,6 +40,7 @@ public class PaymentService {
     public PagedResponse<PaymentDto> searchPayments(
             Long customerId,
             Long invoiceId,
+            String paymentType,
             String paymentMethod,
             String status,
             LocalDate startDate,
@@ -48,7 +49,7 @@ public class PaymentService {
             Pageable pageable
     ) {
         Page<PaymentDto> page = paymentRepository
-                .searchPayments(customerId, invoiceId, paymentMethod, status, startDate, endDate, query, pageable)
+                .searchPayments(customerId, invoiceId, paymentType, paymentMethod, status, startDate, endDate, query, pageable)
                 .map(PaymentDto::from);
         return PagedResponse.from(page);
     }
@@ -137,13 +138,21 @@ public class PaymentService {
                             .orElseThrow(() -> new BusinessException("No valid customer found for payment receipt")));
         }
 
-        String paymentNumber = sequenceService.generatePaymentNumber();
+        String pType = request.getPaymentType() != null && !request.getPaymentType().isBlank()
+                ? request.getPaymentType().trim().toUpperCase()
+                : (invoice == null ? "ADVANCE" : "INVOICE_PAYMENT");
+
+        String paymentNumber = "ADVANCE".equals(pType)
+                ? sequenceService.generateAdvanceVoucherNumber()
+                : sequenceService.generatePaymentNumber();
+
         LocalDate paymentDate = request.getPaymentDate() != null ? request.getPaymentDate() : LocalDate.now();
         String method = request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()
                 ? request.getPaymentMethod().trim().toUpperCase() : "CASH";
 
         Payment payment = Payment.builder()
                 .paymentNumber(paymentNumber)
+                .paymentType(pType)
                 .invoice(invoice)
                 .customer(customer)
                 .amount(request.getAmount())

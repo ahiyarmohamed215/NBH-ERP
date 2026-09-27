@@ -2,7 +2,7 @@ package com.nbh.erp.sales.entity;
 
 import com.nbh.erp.common.entity.BaseEntity;
 import com.nbh.erp.customer.entity.Customer;
-import com.nbh.erp.salesman.entity.Salesman;
+import com.nbh.erp.user.entity.User;
 import com.nbh.erp.warehouse.entity.Warehouse;
 import jakarta.persistence.*;
 import lombok.*;
@@ -40,8 +40,16 @@ public class Invoice extends BaseEntity {
     private Warehouse warehouse;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "salesman_id")
-    private Salesman salesman;
+    @JoinColumn(name = "sales_rep_id")
+    private User salesRep;
+
+    public User getSalesman() {
+        return salesRep;
+    }
+
+    public void setSalesman(User salesRep) {
+        this.salesRep = salesRep;
+    }
 
     @Column(nullable = false, length = 30)
     @Builder.Default

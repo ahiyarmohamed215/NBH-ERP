@@ -29,6 +29,8 @@ public class PaymentDto {
     private String referenceNumber;
     private LocalDate paymentDate;
     private String status;
+    private String paymentType;
+    private String voucherNo; // Alias for advance payments
     private String notes;
     private LocalDateTime createdAt;
     private String createdBy;
@@ -54,6 +56,8 @@ public class PaymentDto {
                 .referenceNumber(p.getReferenceNumber())
                 .paymentDate(p.getPaymentDate())
                 .status(p.getStatus())
+                .paymentType(p.getPaymentType())
+                .voucherNo(p.getPaymentNumber())
                 .notes(p.getNotes())
                 .createdAt(p.getCreatedAt())
                 .createdBy(p.getCreatedBy())

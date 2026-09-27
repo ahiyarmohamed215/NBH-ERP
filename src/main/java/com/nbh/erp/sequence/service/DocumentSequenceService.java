@@ -72,4 +72,13 @@ public class DocumentSequenceService {
     public String generatePaymentNumber() {
         return getNextNumber("REC");
     }
+
+    public String generateQuotationNumber() {
+        return getNextNumber("QT");
+    }
+
+    public String generateAdvanceVoucherNumber() {
+        return getNextNumber("ADV");
+    }
 }
+

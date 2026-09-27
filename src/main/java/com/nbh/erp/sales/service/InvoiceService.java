@@ -17,8 +17,6 @@ import com.nbh.erp.sales.dto.UpdateInvoiceRequest;
 import com.nbh.erp.sales.entity.Invoice;
 import com.nbh.erp.sales.entity.InvoiceItem;
 import com.nbh.erp.sales.repository.InvoiceRepository;
-import com.nbh.erp.salesman.entity.Salesman;
-import com.nbh.erp.salesman.repository.SalesmanRepository;
 import com.nbh.erp.sequence.service.DocumentSequenceService;
 import com.nbh.erp.user.entity.User;
 import com.nbh.erp.user.repository.UserRepository;
@@ -47,7 +45,6 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final CustomerRepository customerRepository;
     private final WarehouseRepository warehouseRepository;
-    private final SalesmanRepository salesmanRepository;
     private final ProductRepository productRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
@@ -68,7 +65,9 @@ public class InvoiceService {
             return false;
         }
         return auth.getAuthorities().stream().anyMatch(a ->
-                "ROLE_ADMIN".equals(a.getAuthority()) || "SALES_VIEW_ALL".equals(a.getAuthority())
+                "ROLE_SUPER_ADMIN".equals(a.getAuthority()) ||
+                "ROLE_ADMIN".equals(a.getAuthority()) ||
+                "SALES_VIEW_ALL".equals(a.getAuthority())
         );
     }
 
@@ -148,10 +147,10 @@ public class InvoiceService {
                             .orElseThrow(() -> new BusinessException("No default walk-in customer available")));
         }
 
-        Salesman salesman = null;
+        User salesman = null;
         if (request.getSalesmanId() != null) {
-            salesman = salesmanRepository.findById(request.getSalesmanId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Salesman", "id", request.getSalesmanId()));
+            salesman = userRepository.findById(request.getSalesmanId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getSalesmanId()));
         }
 
         String invoiceNumber = sequenceService.generateInvoiceNumber();
@@ -161,7 +160,6 @@ public class InvoiceService {
                 .invoiceNumber(invoiceNumber)
                 .customer(customer)
                 .warehouse(warehouse)
-                .salesman(salesman)
                 .status(request.isHold() ? "HELD" : "COMPLETED")
                 .paymentType(request.getPaymentType() != null ? request.getPaymentType().toUpperCase() : "CASH")
                 .invoiceDate(invDate)
@@ -312,20 +310,36 @@ public class InvoiceService {
             throw new BusinessException("Access denied: You cannot discard a bill placed on hold by another cashier (" + invoice.getCreatedBy() + ")");
         }
 
-        invoice.setStatus("CANCELLED");
-        invoiceRepository.save(invoice);
+        auditLogService.log(
+                "INVOICE_HELD_DISCARD",
+                "Invoice",
+                invoice.getInvoiceNumber(),
+                String.format("Held invoice %s discarded by %s", invoice.getInvoiceNumber(), currentUser)
+        );
+        invoiceRepository.delete(invoice);
+        log.info("Held invoice {} (ID {}) discarded and removed from DB successfully.", invoice.getInvoiceNumber(), id);
     }
 
     public static final Set<String> VALID_STATUSES = InvoiceStatus.NAMES;
 
     @Transactional
     public void deleteInvoice(Long id) {
+        Invoice invoice = invoiceRepository.findById(id).orElse(null);
+        if (invoice != null && ("HELD".equalsIgnoreCase(invoice.getStatus()) || "CANCELLED".equalsIgnoreCase(invoice.getStatus()))) {
+            cancelHeldInvoice(id);
+            return;
+        }
         log.warn("Direct deletion request for invoice ID {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", id);
         voidInvoice(id, "Voided via delete endpoint");
     }
 
     @Transactional
     public void deleteInvoiceByNumber(String invoiceNumber) {
+        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElse(null);
+        if (invoice != null && ("HELD".equalsIgnoreCase(invoice.getStatus()) || "CANCELLED".equalsIgnoreCase(invoice.getStatus()))) {
+            cancelHeldInvoice(invoice.getId());
+            return;
+        }
         log.warn("Direct deletion request for invoice {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", invoiceNumber);
         voidInvoiceByNumber(invoiceNumber, "Voided via delete endpoint");
     }
@@ -449,9 +463,9 @@ public class InvoiceService {
             }
         }
 
-        // Salesman
+        // Salesman / Sales Rep
         if (request.getSalesmanId() != null) {
-            salesmanRepository.findById(request.getSalesmanId()).ifPresent(invoice::setSalesman);
+            userRepository.findById(request.getSalesmanId()).ifPresent(invoice::setSalesman);
         }
 
         // Warehouse

@@ -47,4 +47,8 @@ public class InvoiceItem {
 
     @Column(name = "total_price", nullable = false)
     private BigDecimal totalPrice;
+
+    @Column(name = "created_at", updatable = false)
+    @Builder.Default
+    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
 }

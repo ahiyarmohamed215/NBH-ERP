@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi } from '../api/apiClient';
+import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi, quotationApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import PosView from './PosView';
 import SalesReturnsView from './SalesReturnsView';
@@ -37,38 +37,6 @@ import {
   ClipboardCheck,
   Check,
 } from 'lucide-react';
-
-const STORAGE_KEY_INVOICES = 'erp_commercial_invoices_v1';
-const STORAGE_KEY_QUOTATIONS = 'erp_quotations_v1';
-const STORAGE_KEY_PAYMENTS = 'erp_customer_payments_v1';
-const STORAGE_KEY_ADVANCES = 'erp_advance_payments_v1';
-const STORAGE_KEY_HELD_BILLS = 'erp_held_bills_workflow_v1';
-const STORAGE_KEY_DELETED_HELD = 'erp_deleted_held_bills_v1';
-
-const getDeletedHeldIds = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_DELETED_HELD);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
-const markHeldAsDeleted = (id, invoiceNumber) => {
-  try {
-    const list = getDeletedHeldIds();
-    if (id) list.push(String(id));
-    if (invoiceNumber) list.push(String(invoiceNumber));
-    localStorage.setItem(STORAGE_KEY_DELETED_HELD, JSON.stringify(Array.from(new Set(list))));
-  } catch (e) {}
-};
-
-// Real-data backed initial arrays
-const INITIAL_INVOICES = [];
-const INITIAL_QUOTATIONS = [];
-const INITIAL_PAYMENTS = [];
-const INITIAL_ADVANCES = [];
-const INITIAL_HELD_BILLS = [];
 
 export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange }) {
   const { addToast } = useToast();
@@ -163,7 +131,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         paidAmount: Number(inv.paidAmount || 0),
         balanceAmount: Number(inv.balanceAmount || 0),
         status: inv.status || (Number(inv.balanceAmount || 0) === 0 ? 'PAID' : 'PARTIAL'),
-        salesman: inv.salesman || inv.salesmanName || (inv.user ? inv.user.fullName : 'Kasun Perera'),
+        salesman: inv.salesman || inv.salesmanName || (inv.user ? inv.user.fullName : (user?.fullName || 'Sales Executive')),
         items: inv.items || inv.invoiceItems || inv.lines || [],
       }));
       setInvoices(formattedLive);
@@ -518,7 +486,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <div class="meta-label">Invoice Details:</div>
                 <div style="font-weight: 800; font-size: 16px; color: #0284c7; font-family: monospace; margin: 3px 0 6px 0;">${inv.invoiceNumber}</div>
                 <div style="color: #475569;">Date: <strong>${inv.displayDate || inv.invoiceDate || new Date().toLocaleDateString()}</strong></div>
-                <div style="color: #475569; margin-top: 2px;">Salesman: <strong>${inv.salesman || 'Kasun Perera'}</strong></div>
+                <div style="color: #475569; margin-top: 2px;">Salesman: <strong>${inv.salesman || 'Sales Executive'}</strong></div>
                 ${inv.odnNumber ? `<div style="color: #475569; margin-top: 2px;">ODN Ref: <strong>${inv.odnNumber}</strong></div>` : ''}
               </div>
             </div>
@@ -616,18 +584,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   // -------------------------------------------------------------
-  // HELD BILLS DATA & WORKFLOW ACTIONS
+  // HELD BILLS DATA & WORKFLOW ACTIONS (100% Backend REST API)
   // -------------------------------------------------------------
-  const [heldBills, setHeldBills] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_HELD_BILLS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_HELD_BILLS;
-  });
-
+  const [heldBills, setHeldBills] = useState([]);
   const [loadingHeldBills, setLoadingHeldBills] = useState(false);
   const [heldSearchQuery, setHeldSearchQuery] = useState('');
   const [heldStatusFilter, setHeldStatusFilter] = useState('ALL');
@@ -652,82 +611,28 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   const [showRecordAdvanceModal, setShowRecordAdvanceModal] = useState(false);
   const [advanceForm, setAdvanceForm] = useState({
-    voucherNo: `ADV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
     customerName: '',
     amount: '',
     paymentMethod: 'Bank Transfer',
-    date: new Date().toISOString().split('T')[0],
-    remarks: '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    notes: '',
   });
 
   const [showCreateQuotationModal, setShowCreateQuotationModal] = useState(false);
   const [quotationForm, setQuotationForm] = useState({
-    quotationNo: `QT-${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`,
     customerName: '',
-    date: new Date().toISOString().split('T')[0],
+    quotationDate: new Date().toISOString().split('T')[0],
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     totalAmount: '',
     notes: '',
   });
 
-  // Save held bills to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_HELD_BILLS, JSON.stringify(heldBills));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [heldBills]);
-
   const loadHeldBills = async () => {
     try {
       setLoadingHeldBills(true);
-      let localItems = [];
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY_HELD_BILLS);
-        if (saved) localItems = JSON.parse(saved);
-      } catch (e) {}
-
-      let apiItems = [];
-      try {
-        const res = await salesApi.getHeld();
-        if (res.data && Array.isArray(res.data)) {
-          apiItems = res.data;
-        }
-      } catch (err) {
-        console.warn('API getHeld fallback:', err);
-      }
-
-      setHeldBills((prev) => {
-        const map = new Map();
-        // Insert local items (including those just created in POS)
-        localItems.forEach((it) => {
-          map.set(String(it.id || it.invoiceNumber), it);
-        });
-        // Insert/merge API items
-        apiItems.forEach((b) => {
-          const key = String(b.id || b.invoiceNumber);
-          const existing = map.get(key) || {};
-          map.set(key, {
-            ...b,
-            ...existing,
-            salesman: b.salesmanName || existing.salesman || b.createdBy || 'Sales Executive',
-            status: existing.status || b.status || 'HELD',
-          });
-        });
-        // Preserve any runtime prev items
-        prev.forEach((p) => {
-          const key = String(p.id || p.invoiceNumber);
-          if (!map.has(key)) {
-            map.set(key, p);
-          }
-        });
-        const finalArr = Array.from(map.values());
-        try {
-          localStorage.setItem(STORAGE_KEY_HELD_BILLS, JSON.stringify(finalArr));
-        } catch (e) {}
-        return finalArr;
-      });
+      const res = await salesApi.getHeld();
+      const list = res.data && Array.isArray(res.data) ? res.data : [];
+      setHeldBills(list);
     } catch (err) {
       console.error('Failed to load held bills:', err);
     } finally {
@@ -741,16 +646,50 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     }
   }, [currentTab]);
 
-  const handleDiscardHeldBill = async (heldId, invoiceNumber) => {
-    if (!window.confirm(`Are you sure you want to discard held bill ${invoiceNumber}?`)) {
+  const handleDiscardHeldBill = async (heldBillOrId, invNum) => {
+    let heldId = heldBillOrId;
+    let invoiceNumber = invNum;
+    if (typeof heldBillOrId === 'object' && heldBillOrId !== null) {
+      heldId = heldBillOrId.id;
+      invoiceNumber = heldBillOrId.invoiceNumber;
+    }
+    const displayName = invoiceNumber || heldId || 'this held bill';
+    if (!window.confirm(`Are you sure you want to discard held bill ${displayName}?`)) {
       return;
     }
     try {
-      await salesApi.cancelHeld(heldId);
-      addToast(`Held bill ${invoiceNumber} discarded`, 'info');
-      setHeldBills((prev) => prev.filter((b) => b.id !== heldId));
+      if (heldId) {
+        await salesApi.deleteHeld(heldId).catch(() => salesApi.cancelHeld(heldId));
+      } else if (invoiceNumber) {
+        await salesApi.deleteHeldByNumber(invoiceNumber).catch(() => {});
+      }
+      addToast(`Held bill ${displayName} discarded successfully`, 'info');
+      setSelectedHeldIds((prev) => prev.filter((id) => String(id) !== String(heldId)));
+      if (selectedHeldDetail && (selectedHeldDetail.id === heldId || selectedHeldDetail.invoiceNumber === invoiceNumber)) {
+        setSelectedHeldDetail(null);
+      }
+      await loadHeldBills();
     } catch (err) {
       addToast('Failed to discard held bill: ' + err.message, 'error');
+    }
+  };
+
+  const handleBulkDiscardHeld = async () => {
+    if (selectedHeldIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to discard all ${selectedHeldIds.length} selected held bills?`)) {
+      return;
+    }
+    const toDeleteIds = [...selectedHeldIds];
+    try {
+      await Promise.allSettled(
+        toDeleteIds.map((id) => salesApi.deleteHeld(id).catch(() => salesApi.cancelHeld(id)))
+      );
+      addToast(`${toDeleteIds.length} held bill(s) discarded successfully`, 'info');
+      setSelectedHeldIds([]);
+      setSelectedHeldDetail(null);
+      await loadHeldBills();
+    } catch (err) {
+      addToast('Failed to discard held bills: ' + err.message, 'error');
     }
   };
 
@@ -868,60 +807,22 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   // Workflow Action 5: Confirm Dispatch Note, mark bills as Dispatched, create Commercial Invoice
-  const handleConfirmDispatch = () => {
+  const handleConfirmDispatch = async () => {
     if (!dispatchNoteData) return;
     const targetIds = dispatchNoteData.sourceBillIds || [];
 
-    // Mark bills as DISPATCHED
-    const updatedHeld = heldBills.map((b) => {
-      if (targetIds.includes(b.id)) {
-        return {
-          ...b,
-          status: 'DISPATCHED',
-          dispatchedAt: new Date().toISOString(),
-          odnNumber: dispatchNoteData.odnNumber,
-        };
-      }
-      return b;
-    });
-    setHeldBills(updatedHeld);
     try {
-      localStorage.setItem(STORAGE_KEY_HELD_BILLS, JSON.stringify(updatedHeld));
-    } catch (e) {
-      console.error(e);
+      await Promise.allSettled(
+        targetIds.map((id) => salesApi.cancelHeld(id))
+      );
+      addToast(`Order Dispatch Note ${dispatchNoteData.odnNumber} confirmed for ${dispatchNoteData.customerName}!`, 'success');
+      setSelectedHeldIds([]);
+      setDispatchNoteData(null);
+      await Promise.all([loadHeldBills(), loadBackendInvoices()]);
+      setCurrentTab('sales');
+    } catch (err) {
+      addToast('Failed to process dispatch: ' + err.message, 'error');
     }
-
-    // Automatically generate commercial invoice with clean invoice number and show in Sales List
-    const newInvoiceNo = `INV-${new Date().getFullYear()}-${String(100 + invoices.length).padStart(4, '0')}`;
-    const newInvoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber: newInvoiceNo,
-      customerName: dispatchNoteData.customerName,
-      customerId: dispatchNoteData.customerId || '1',
-      deliveryStatus: 'Delivered',
-      invoiceDate: new Date().toISOString().split('T')[0],
-      displayDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      paymentType: 'Credit',
-      paymentMethod: 'Pending Payment',
-      totalAmount: dispatchNoteData.totalAmount,
-      paidAmount: 0,
-      balanceAmount: dispatchNoteData.totalAmount,
-      status: 'PENDING',
-      paymentStatus: 'PENDING',
-      odnNumber: dispatchNoteData.odnNumber,
-      items: dispatchNoteData.items || [],
-      salesman: dispatchNoteData.salesman || 'Admin',
-      notes: `Generated from Order Dispatch Note ${dispatchNoteData.odnNumber}`,
-      paymentHistory: [],
-    };
-
-    const updatedInvoices = [newInvoice, ...invoices];
-    setInvoices(updatedInvoices);
-
-    setSelectedHeldIds([]);
-    addToast(`Order Dispatch Note ${dispatchNoteData.odnNumber} confirmed! Commercial Invoice ${newInvoiceNo} generated and added to Sales List.`, 'success');
-    setDispatchNoteData(null);
-    setCurrentTab('sales');
   };
 
   const filteredHeldBills = useMemo(() => {
@@ -970,10 +871,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // -------------------------------------------------------------
   // OTHER TABS DATA (Quotations, Payments, Advances, Outstanding)
   // -------------------------------------------------------------
-  const [quotations, setQuotations] = useState(INITIAL_QUOTATIONS);
-  const [payments, setPayments] = useState(INITIAL_PAYMENTS);
+  const [quotations, setQuotations] = useState([]);
+  const [loadingQuotations, setLoadingQuotations] = useState(false);
+  const [payments, setPayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
-  const [advances, setAdvances] = useState(INITIAL_ADVANCES);
+  const [advances, setAdvances] = useState([]);
+  const [loadingAdvances, setLoadingAdvances] = useState(false);
 
   const loadBackendPayments = async () => {
     try {
@@ -1000,8 +903,61 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     }
   };
 
+  const loadBackendAdvances = async () => {
+    try {
+      setLoadingAdvances(true);
+      const res = await paymentApi.search({ paymentType: 'ADVANCE', size: 100 });
+      const liveList = res.data?.content || res.data || [];
+      const formatted = liveList.map((p) => ({
+        id: p.id,
+        voucherNo: p.voucherNo || p.paymentNumber,
+        paymentNumber: p.paymentNumber,
+        customerName: p.customerName || 'Customer',
+        customerId: p.customerId,
+        date: p.paymentDate || (p.createdAt ? p.createdAt.split('T')[0] : ''),
+        amount: Number(p.amount || 0),
+        balance: Number(p.amount || 0),
+        paymentMethod: p.paymentMethod || 'Bank Transfer',
+        status: p.status || 'ACTIVE',
+      }));
+      setAdvances(formatted);
+    } catch (err) {
+      console.error('Failed to load advances:', err);
+    } finally {
+      setLoadingAdvances(false);
+    }
+  };
+
+  const loadBackendQuotations = async () => {
+    try {
+      setLoadingQuotations(true);
+      const res = await quotationApi.search({ size: 100 });
+      const liveList = res.data?.content || res.data || [];
+      const formatted = liveList.map((q) => ({
+        id: q.id,
+        quotationNo: q.quotationNumber || q.quotationNo,
+        quotationNumber: q.quotationNumber,
+        customerName: q.customerName || 'Customer',
+        customerId: q.customerId,
+        date: q.quotationDate || q.date,
+        validUntil: q.validUntil,
+        totalAmount: Number(q.totalAmount || 0),
+        status: q.status || 'PENDING',
+        notes: q.notes,
+        items: q.items || [],
+      }));
+      setQuotations(formatted);
+    } catch (err) {
+      console.error('Failed to load quotations:', err);
+    } finally {
+      setLoadingQuotations(false);
+    }
+  };
+
   useEffect(() => {
     loadBackendPayments();
+    loadBackendAdvances();
+    loadBackendQuotations();
   }, []);
 
   // Form Submissions
@@ -1055,87 +1011,94 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     }
   };
 
-  const handleSaveAdvance = (e) => {
+  const handleSaveAdvance = async (e) => {
     e.preventDefault();
     if (!advanceForm.customerName || !advanceForm.amount) {
       addToast('Please provide customer name and advance amount', 'error');
       return;
     }
     const amt = parseFloat(advanceForm.amount) || 0;
-    const newAdv = {
-      id: `adv-${Date.now()}`,
-      voucherNo: advanceForm.voucherNo || `ADV-${Date.now().toString().slice(-4)}`,
-      customerName: advanceForm.customerName,
-      date: advanceForm.date || new Date().toISOString().split('T')[0],
-      amount: amt,
-      balance: amt,
-      paymentMethod: advanceForm.paymentMethod || 'Bank Transfer',
-      status: 'ACTIVE',
-    };
-    setAdvances([newAdv, ...advances]);
-    addToast(`Advance deposit voucher ${newAdv.voucherNo} recorded successfully!`, 'success');
-    setShowRecordAdvanceModal(false);
-    setAdvanceForm({
-      voucherNo: `ADV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-      customerName: '',
-      amount: '',
-      paymentMethod: 'Bank Transfer',
-      date: new Date().toISOString().split('T')[0],
-      remarks: '',
-    });
+    try {
+      const payload = {
+        customerName: advanceForm.customerName,
+        amount: amt,
+        paymentMethod: advanceForm.paymentMethod || 'Bank Transfer',
+        paymentDate: advanceForm.paymentDate || new Date().toISOString().split('T')[0],
+        notes: advanceForm.notes || '',
+      };
+      const res = await paymentApi.createAdvance(payload);
+      const created = res.data?.data || res.data;
+      addToast(`Advance deposit voucher ${created?.paymentNumber || created?.receiptNo || 'recorded'} successfully!`, 'success');
+      setShowRecordAdvanceModal(false);
+      setAdvanceForm({
+        customerName: '',
+        amount: '',
+        paymentMethod: 'Bank Transfer',
+        paymentDate: new Date().toISOString().split('T')[0],
+        notes: '',
+      });
+      await loadBackendAdvances();
+    } catch (err) {
+      console.error('Failed to record advance:', err);
+      addToast(err.response?.data?.message || 'Failed to record advance', 'error');
+    }
   };
 
-  const handleSaveQuotation = (e) => {
+  const handleSaveQuotation = async (e) => {
     e.preventDefault();
     if (!quotationForm.customerName || !quotationForm.totalAmount) {
       addToast('Please provide customer name and quotation amount', 'error');
       return;
     }
     const amt = parseFloat(quotationForm.totalAmount) || 0;
-    const newQt = {
-      id: `qt-${Date.now()}`,
-      quotationNo: quotationForm.quotationNo || `QT-${Date.now().toString().slice(-4)}`,
-      customerName: quotationForm.customerName,
-      date: quotationForm.date || new Date().toISOString().split('T')[0],
-      validUntil: quotationForm.validUntil || new Date().toISOString().split('T')[0],
-      totalAmount: amt,
-      status: 'PENDING',
-    };
-    setQuotations([newQt, ...quotations]);
-    addToast(`Quotation ${newQt.quotationNo} created successfully!`, 'success');
-    setShowCreateQuotationModal(false);
-    setQuotationForm({
-      quotationNo: `QT-${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`,
-      customerName: '',
-      date: new Date().toISOString().split('T')[0],
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      totalAmount: '',
-      notes: '',
-    });
+    try {
+      const payload = {
+        customerName: quotationForm.customerName,
+        quotationDate: quotationForm.quotationDate || new Date().toISOString().split('T')[0],
+        validUntil: quotationForm.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        totalAmount: amt,
+        notes: quotationForm.notes || '',
+      };
+      const res = await quotationApi.create(payload);
+      const created = res.data?.data || res.data;
+      addToast(`Quotation ${created?.quotationNumber || created?.quotationNo || 'created'} successfully!`, 'success');
+      setShowCreateQuotationModal(false);
+      setQuotationForm({
+        customerName: '',
+        quotationDate: new Date().toISOString().split('T')[0],
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        totalAmount: '',
+        notes: '',
+      });
+      await loadBackendQuotations();
+    } catch (err) {
+      console.error('Failed to create quotation:', err);
+      addToast(err.response?.data?.message || 'Failed to create quotation', 'error');
+    }
   };
 
-  const handleConvertQuotationToInvoice = (qt) => {
-    const newInvNo = `26SEP_MB_:${100 + invoices.length}`;
-    const newInv = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber: newInvNo,
-      customerName: qt.customerName,
-      customerId: '1',
-      deliveryStatus: 'Not Delivered',
-      invoiceDate: new Date().toISOString().split('T')[0],
-      displayDate: new Date().toLocaleDateString(),
-      paymentType: 'Full Payment',
-      paymentMethod: 'Cash',
-      totalAmount: Number(qt.totalAmount || 0),
-      paidAmount: 0,
-      balanceAmount: Number(qt.totalAmount || 0),
-      status: 'PENDING',
-    };
-    setInvoices([newInv, ...invoices]);
-    setQuotations((prev) =>
-      prev.map((q) => (q.id === qt.id ? { ...q, status: 'ACCEPTED' } : q))
-    );
-    addToast(`Quotation ${qt.quotationNo} converted to Commercial Invoice ${newInvNo}!`, 'success');
+  const handleConvertQuotationToInvoice = async (qt) => {
+    try {
+      const res = await quotationApi.convertToInvoice(qt.id);
+      const inv = res.data?.data || res.data;
+      addToast(`Quotation ${qt.quotationNo || qt.quotationNumber} converted to Commercial Invoice ${inv?.invoiceNumber}!`, 'success');
+      await Promise.all([loadBackendQuotations(), loadBackendInvoices()]);
+    } catch (err) {
+      console.error('Failed to convert quotation to invoice:', err);
+      addToast(err.response?.data?.message || 'Failed to convert quotation', 'error');
+    }
+  };
+
+  const handleDeleteQuotation = async (qt) => {
+    if (!window.confirm(`Are you sure you want to delete quotation ${qt.quotationNo || qt.quotationNumber}?`)) return;
+    try {
+      await quotationApi.delete(qt.id);
+      addToast(`Quotation ${qt.quotationNo || qt.quotationNumber} deleted successfully`, 'success');
+      await loadBackendQuotations();
+    } catch (err) {
+      console.error('Failed to delete quotation:', err);
+      addToast(err.response?.data?.message || 'Failed to delete quotation', 'error');
+    }
   };
 
   const filteredQuotations = useMemo(() => {
@@ -2252,6 +2215,26 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </button>
                 <button
                   type="button"
+                  onClick={handleBulkDiscardHeld}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.82rem',
+                    borderRadius: '6px',
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fee2e2',
+                    color: '#dc2626',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                  title="Discard all selected held bills"
+                >
+                  <Trash2 size={14} /> Discard Selected ({selectedHeldIds.length})
+                </button>
+                <button
+                  type="button"
                   onClick={handleOpenMergeDispatchModal}
                   style={{
                     padding: '6px 16px',
@@ -2313,24 +2296,26 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>HOLD BILL #</th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE / TIME</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SALESMAN</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE & TIME</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ITEMS</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CASHIER / STAFF</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL AMOUNT</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingHeldBills ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading held bills...
                       </td>
                     </tr>
                   ) : filteredHeldBills.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: '#94a3b8' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#94a3b8' }}>
                         <PauseCircle size={34} style={{ opacity: 0.35, marginBottom: '8px' }} />
-                        <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>No bills found</div>
+                        <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>No held bills found</div>
                         <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
                           Bills placed on hold during POS billing or filtered by status will appear here.
                         </div>
@@ -2359,78 +2344,194 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                             }}
                           />
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
-                          {hb.invoiceNumber}
+                        <td style={{ padding: '12px 14px' }}>
+                          <span
+                            style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: '0.88rem' }}
+                            title="Click to inspect items"
+                          >
+                            {hb.invoiceNumber}
+                          </span>
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a' }}>
-                          {hb.customerName || 'Walk-in'}
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                            {hb.customerName || 'Walk-in Customer'}
+                          </div>
+                          {hb.customerPhone && (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '1px' }}>
+                              {hb.customerPhone}
+                            </div>
+                          )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                           {hb.invoiceDate ? new Date(hb.invoiceDate).toLocaleString() : 'Today'}
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
+                            {(hb.items?.length || 1)} items
+                          </span>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}>
                             {hb.salesman || hb.salesmanName || hb.createdBy || 'Staff'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.9rem' }}>
                           Rs. {Number(hb.netTotal || hb.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          {hb.status === 'SENT_TO_WAREHOUSE' ? (
+                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>
+                              Sent to WH
+                            </span>
+                          ) : hb.status === 'STOCK_ADJUSTED' ? (
+                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
+                              Stock Adjusted
+                            </span>
+                          ) : hb.status === 'DISPATCHED' ? (
+                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
+                              Dispatched
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
+                              Held at POS
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            {hb.status === 'HELD' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleSendToWarehouse(hb)}
-                                style={{ padding: '4px 8px', fontSize: '0.74rem', backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 600 }}
-                                title="Send held bill to warehouse for stock check"
-                              >
-                                <Send size={12} /> Send to WH
-                              </button>
-                            ) : hb.status === 'SENT_TO_WAREHOUSE' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenStockAdjustment(hb)}
-                                style={{ padding: '4px 10px', fontSize: '0.74rem', backgroundColor: '#7c3aed', color: '#ffffff', border: 'none', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 600 }}
-                                title="Adjust stock physical counts & verify quantities"
-                              >
-                                <Edit3 size={12} /> Adjust Stock
-                              </button>
-                            ) : hb.status === 'STOCK_ADJUSTED' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenSingleDispatchModal(hb)}
-                                  style={{ padding: '4px 10px', fontSize: '0.74rem', backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 600 }}
-                                  title="Generate Order Dispatch Note"
-                                >
-                                  <Truck size={12} /> Dispatch Note
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenStockAdjustment(hb)}
-                                  style={{ padding: '4px 6px', fontSize: '0.74rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-                                  title="Re-adjust stock quantities"
-                                >
-                                  <Edit3 size={12} />
-                                </button>
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 700, fontFamily: 'monospace' }}>
-                                {hb.odnNumber || 'Dispatched'}
-                              </span>
-                            )}
-
-                            {/* Delete button (View eye icon and Resume button removed) */}
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            {/* 1. Resume in POS (Primary Action) */}
                             <button
                               type="button"
-                              className="btn btn-glass btn-sm"
+                              onClick={() => handleResumeHeldBill(hb)}
+                              style={{
+                                padding: '5px 10px',
+                                fontSize: '0.76rem',
+                                fontWeight: 600,
+                                backgroundColor: '#0284c7',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '5px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
+                                transition: 'background-color 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                              title="Resume billing in POS"
+                            >
+                              <PlayCircle size={13} /> Resume
+                            </button>
+
+                            {/* 2. View details */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedHeldDetail(hb)}
+                              style={{
+                                padding: '5px 8px',
+                                fontSize: '0.76rem',
+                                fontWeight: 600,
+                                backgroundColor: '#ffffff',
+                                color: '#475569',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '5px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#94a3b8';
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                              }}
+                              title="View bill items & details"
+                            >
+                              <Eye size={13} /> View
+                            </button>
+
+                            {/* 3. Delete / Discard */}
+                            <button
+                              type="button"
                               onClick={() => handleDiscardHeldBill(hb.id, hb.invoiceNumber)}
-                              style={{ padding: '4px 7px', color: '#ef4444', borderColor: '#fecaca', borderRadius: '5px' }}
-                              title="Discard held bill"
+                              style={{
+                                padding: '5px 8px',
+                                fontSize: '0.76rem',
+                                fontWeight: 600,
+                                backgroundColor: '#ffffff',
+                                color: '#ef4444',
+                                border: '1px solid #fecaca',
+                                borderRadius: '5px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fef2f2';
+                                e.currentTarget.style.borderColor = '#ef4444';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#fecaca';
+                              }}
+                              title="Delete / discard held bill"
                             >
                               <Trash2 size={13} />
                             </button>
+
+                            {/* Optional Warehouse helper if already in warehouse workflow */}
+                            {hb.status === 'SENT_TO_WAREHOUSE' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenStockAdjustment(hb)}
+                                style={{
+                                  padding: '5px 8px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  backgroundColor: '#f3e8ff',
+                                  color: '#7c3aed',
+                                  border: '1px solid #d8b4fe',
+                                  borderRadius: '5px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  cursor: 'pointer',
+                                }}
+                                title="Adjust warehouse stock quantities"
+                              >
+                                <Edit3 size={11} /> Stock
+                              </button>
+                            )}
+                            {hb.status === 'STOCK_ADJUSTED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSingleDispatchModal(hb)}
+                                style={{
+                                  padding: '5px 8px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  backgroundColor: '#dcfce7',
+                                  color: '#15803d',
+                                  border: '1px solid #86efac',
+                                  borderRadius: '5px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  cursor: 'pointer',
+                                }}
+                                title="Generate Dispatch Note"
+                              >
+                                <Truck size={11} /> Dispatch
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -3473,6 +3574,15 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           >
                             <Printer size={13} />
                           </button>
+                          <button
+                            type="button"
+                            className="btn btn-glass btn-sm"
+                            onClick={() => handleDeleteQuotation(qt)}
+                            style={{ padding: '4px 7px', fontSize: '0.74rem', borderRadius: '5px', color: '#dc2626' }}
+                            title="Delete quotation"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -3636,7 +3746,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   {selectedInvoice.displayDate || selectedInvoice.invoiceDate || new Date().toLocaleDateString()}
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
-                  Salesman: <strong style={{ color: '#334155' }}>{selectedInvoice.salesman || 'Kasun Perera'}</strong>
+                  Salesman: <strong style={{ color: '#334155' }}>{selectedInvoice.salesman || 'Sales Executive'}</strong>
                 </div>
               </div>
               {selectedInvoice.odnNumber && (
@@ -4052,15 +4162,68 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
               <button
                 type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setSelectedHeldDetail(null)}
-                style={{ padding: '6px 18px', backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                onClick={() => {
+                  const bill = selectedHeldDetail;
+                  handleDiscardHeldBill(bill.id, bill.invoiceNumber);
+                }}
+                style={{
+                  padding: '7px 14px',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                }}
+                title="Discard this held bill permanently"
               >
-                Close
+                <Trash2 size={14} /> Discard Bill
               </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-glass btn-sm"
+                  onClick={() => setSelectedHeldDetail(null)}
+                  style={{ padding: '7px 16px' }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bill = selectedHeldDetail;
+                    setSelectedHeldDetail(null);
+                    handleResumeHeldBill(bill);
+                  }}
+                  style={{
+                    padding: '7px 18px',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  title="Load into POS to checkout"
+                >
+                  <PlayCircle size={15} /> Resume in POS
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -4412,7 +4575,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Invoice # (Optional)</label>
                   <input
                     type="text"
-                    placeholder="e.g. 26SEP_MB_:101"
+                    placeholder="e.g. INV-2026-000001"
                     value={paymentForm.invoiceNo}
                     onChange={(e) => setPaymentForm({ ...paymentForm, invoiceNo: e.target.value })}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
@@ -4523,16 +4686,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <input
                     type="text"
                     readOnly
-                    value={advanceForm.voucherNo}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    value="[Auto-generated by backend]"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
                   <input
                     type="date"
-                    value={advanceForm.date}
-                    onChange={(e) => setAdvanceForm({ ...advanceForm, date: e.target.value })}
+                    value={advanceForm.paymentDate}
+                    onChange={(e) => setAdvanceForm({ ...advanceForm, paymentDate: e.target.value })}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
                   />
                 </div>
@@ -4579,12 +4742,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Remarks</label>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes / Remarks</label>
                 <textarea
                   rows={2}
                   placeholder="Deposit notes / project reference..."
-                  value={advanceForm.remarks}
-                  onChange={(e) => setAdvanceForm({ ...advanceForm, remarks: e.target.value })}
+                  value={advanceForm.notes}
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, notes: e.target.value })}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
                 />
               </div>
@@ -4644,16 +4807,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <input
                     type="text"
                     readOnly
-                    value={quotationForm.quotationNo}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    value="[Auto-generated by backend]"
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
                   <input
                     type="date"
-                    value={quotationForm.date}
-                    onChange={(e) => setQuotationForm({ ...quotationForm, date: e.target.value })}
+                    value={quotationForm.quotationDate}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, quotationDate: e.target.value })}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
                   />
                 </div>

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateInvoiceRequest {
@@ -25,10 +27,13 @@ public class CreateInvoiceRequest {
 
     private Long salesmanId;
 
+    @Builder.Default
     private String paymentType = "CASH"; // CASH, CARD, CREDIT, BANK_TRANSFER
 
+    @Builder.Default
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Builder.Default
     private BigDecimal taxRate = BigDecimal.ZERO;
 
     private BigDecimal paidAmount; // If null, defaults to netTotal for cash/card
@@ -37,6 +42,7 @@ public class CreateInvoiceRequest {
 
     private String notes;
 
+    @Builder.Default
     private boolean hold = false; // If true, saved as HELD cart
 
     @NotEmpty(message = "Invoice must contain at least one line item")
@@ -44,6 +50,7 @@ public class CreateInvoiceRequest {
     private List<CreateInvoiceItemRequest> items;
 
     @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CreateInvoiceItemRequest {

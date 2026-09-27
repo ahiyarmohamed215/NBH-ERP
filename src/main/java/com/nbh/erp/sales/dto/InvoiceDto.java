@@ -54,7 +54,7 @@ public class InvoiceDto {
                 .warehouseCode(inv.getWarehouse().getCode())
                 .warehouseName(inv.getWarehouse().getName())
                 .salesmanId(inv.getSalesman() != null ? inv.getSalesman().getId() : null)
-                .salesmanName(inv.getSalesman() != null ? inv.getSalesman().getName() : null)
+                .salesmanName(inv.getSalesman() != null ? (inv.getSalesman().getFullName() != null ? inv.getSalesman().getFullName() : inv.getSalesman().getUsername()) : null)
                 .status(inv.getStatus())
                 .paymentType(inv.getPaymentType())
                 .subtotal(inv.getSubtotal())

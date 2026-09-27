@@ -128,11 +128,11 @@ export const supplierApi = {
 };
 
 export const salesmanApi = {
-  getAll: () => api.get('/salesmen'),
-  getActive: () => api.get('/salesmen/active'),
-  create: (data) => api.post('/salesmen', data),
-  update: (id, data) => api.put(`/salesmen/${id}`, data),
-  toggleActive: (id) => api.patch(`/salesmen/${id}/toggle-active`),
+  getAll: () => api.get('/users/sales-reps'),
+  getActive: () => api.get('/users/sales-reps'),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  toggleActive: (id) => api.delete(`/users/${id}`),
 };
 
 export const inventoryApi = {
@@ -184,6 +184,8 @@ export const salesApi = {
   create: (data) => api.post('/invoices', data),
   resumeHeld: (id, data) => api.post(`/invoices/held/${id}/resume`, data),
   cancelHeld: (id) => api.post(`/invoices/held/${id}/cancel`),
+  deleteHeld: (id) => api.delete(`/invoices/held/${id}`),
+  deleteHeldByNumber: (number) => api.delete(`/invoices/held/number/${number}`),
   update: (id, data) => api.put(`/invoices/${id}`, data),
   updateByNumber: (number, data) => api.put(`/invoices/number/${number}`, data),
   void: (id, reason) => api.post(`/invoices/${id}/void`, null, { params: { reason } }),
@@ -202,7 +204,18 @@ export const paymentApi = {
   search: (params) => api.get('/payments', { params }),
   getById: (id) => api.get(`/payments/${id}`),
   create: (data) => api.post('/payments', data),
+  createAdvance: (data) => api.post('/payments', { ...data, paymentType: 'ADVANCE' }),
   void: (id, reason) => api.post(`/payments/${id}/void`, null, { params: { reason } }),
+};
+
+export const quotationApi = {
+  search: (params) => api.get('/quotations', { params }),
+  getById: (id) => api.get(`/quotations/${id}`),
+  create: (data) => api.post('/quotations', data),
+  update: (id, data) => api.put(`/quotations/${id}`, data),
+  delete: (id) => api.delete(`/quotations/${id}`),
+  convertToInvoice: (id, warehouseId) =>
+    api.post(`/quotations/${id}/convert-to-invoice`, null, { params: warehouseId ? { warehouseId } : {} }),
 };
 
 export const auditApi = {
@@ -282,6 +295,16 @@ export const pdfApi = {
   downloadGtn: (id, num) => downloadPdfDocument(`/api/v1/pdf/gtns/${id}`, `GTN-${num || id}.pdf`),
   printPdf: printPdfDocument,
   downloadPdf: downloadPdfDocument,
+};
+
+export const routeApi = {
+  getAll: () => api.get('/routes'),
+  getActive: () => api.get('/routes/active'),
+  getById: (id) => api.get(`/routes/${id}`),
+  create: (data) => api.post('/routes', data),
+  update: (id, data) => api.put(`/routes/${id}`, data),
+  toggleActive: (id) => api.patch(`/routes/${id}/toggle-active`),
+  delete: (id) => api.delete(`/routes/${id}`),
 };
 
 export default api;

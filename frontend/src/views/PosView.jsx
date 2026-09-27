@@ -123,16 +123,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     try {
       const res = await salesApi.getHeld().catch(() => ({ data: [] }));
       const apiHeld = res.data || [];
-      let localHeld = [];
-      try {
-        const saved = localStorage.getItem('erp_held_bills_workflow_v1');
-        if (saved) localHeld = JSON.parse(saved);
-      } catch (e) {}
-
-      const map = new Map();
-      localHeld.forEach((h) => map.set(String(h.id || h.invoiceNumber), h));
-      apiHeld.forEach((h) => map.set(String(h.id || h.invoiceNumber), { ...h, ...(map.get(String(h.id || h.invoiceNumber)) || {}) }));
-      setHeldInvoices(Array.from(map.values()));
+      setHeldInvoices(apiHeld);
     } catch (e) {
       console.error('Failed to load held bills:', e);
     }
@@ -555,18 +546,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
         })),
       };
 
-      try {
-        const STORAGE_KEY = 'erp_held_bills_workflow_v1';
-        const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        const updated = [normalizedHeld, ...existing.filter((b) => String(b.id) !== String(normalizedHeld.id) && b.invoiceNumber !== normalizedHeld.invoiceNumber)];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Failed to sync to local storage:', e);
-      }
-
       setCart([]);
-      loadHeldInvoices();
+      await loadHeldInvoices();
       loadStaffPerformance();
+      addToast(`Bill placed on hold successfully`, 'success');
     } catch (err) {
       addToast('Failed to hold bill: ' + err.message, 'error');
     }
@@ -613,7 +596,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
   const handleDiscardHeld = async (heldInv) => {
     if (!window.confirm(`Discard held bill ${heldInv.invoiceNumber}?`)) return;
     try {
-      await salesApi.cancelHeld(heldInv.id);
+      if (heldInv.id) {
+        await salesApi.deleteHeld(heldInv.id).catch(() => salesApi.cancelHeld(heldInv.id));
+      }
       addToast(`Held bill ${heldInv.invoiceNumber} discarded`, 'info');
       await loadHeldInvoices();
       loadStaffPerformance();

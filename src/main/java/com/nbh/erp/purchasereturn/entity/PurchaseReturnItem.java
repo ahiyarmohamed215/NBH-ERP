@@ -38,4 +38,8 @@ public class PurchaseReturnItem {
 
     @Column(length = 255)
     private String reason;
+
+    @Column(name = "created_at", updatable = false)
+    @Builder.Default
+    private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
 }

@@ -14,7 +14,8 @@ import java.time.LocalDate;
         @Index(name = "idx_pmt_date", columnList = "payment_date"),
         @Index(name = "idx_pmt_customer", columnList = "customer_id"),
         @Index(name = "idx_pmt_invoice", columnList = "invoice_id"),
-        @Index(name = "idx_pmt_status", columnList = "status")
+        @Index(name = "idx_pmt_status", columnList = "status"),
+        @Index(name = "idx_pmt_type", columnList = "payment_type")
 })
 @Getter
 @Setter
@@ -54,6 +55,10 @@ public class Payment extends BaseEntity {
     @Column(nullable = false, length = 30)
     @Builder.Default
     private String status = "COMPLETED"; // COMPLETED, VOIDED
+
+    @Column(name = "payment_type", length = 30)
+    @Builder.Default
+    private String paymentType = "INVOICE_PAYMENT"; // INVOICE_PAYMENT, ADVANCE
 
     @Column(columnDefinition = "TEXT")
     private String notes;

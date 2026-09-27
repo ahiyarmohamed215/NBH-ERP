@@ -81,7 +81,7 @@ public class InvoiceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Complete a POS sale or place invoice on hold")
     public ResponseEntity<ApiResponse<InvoiceDto>> createInvoice(@Valid @RequestBody CreateInvoiceRequest request) {
         InvoiceDto created = invoiceService.createInvoice(request);
@@ -89,7 +89,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/held/{id}/resume")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Resume and complete a held sales invoice")
     public ResponseEntity<ApiResponse<InvoiceDto>> resumeHeldInvoice(
             @PathVariable Long id,
@@ -100,15 +100,31 @@ public class InvoiceController {
     }
 
     @PostMapping("/held/{id}/cancel")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Discard/cancel a held sales invoice")
     public ResponseEntity<ApiResponse<Void>> cancelHeldInvoice(@PathVariable Long id) {
         invoiceService.cancelHeldInvoice(id);
         return ResponseEntity.ok(ApiResponse.ok("Held invoice discarded", null));
     }
 
+    @DeleteMapping("/held/{id}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Delete/discard a held sales invoice by ID")
+    public ResponseEntity<ApiResponse<Void>> deleteHeldInvoice(@PathVariable Long id) {
+        invoiceService.cancelHeldInvoice(id);
+        return ResponseEntity.ok(ApiResponse.ok("Held invoice discarded", null));
+    }
+
+    @DeleteMapping("/held/number/{number}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @Operation(summary = "Delete/discard a held sales invoice by invoice number")
+    public ResponseEntity<ApiResponse<Void>> deleteHeldInvoiceByNumber(@PathVariable String number) {
+        invoiceService.deleteInvoiceByNumber(number);
+        return ResponseEntity.ok(ApiResponse.ok("Held invoice discarded", null));
+    }
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
     @Operation(summary = "Update an existing invoice including items, customer, and amounts")
     public ResponseEntity<ApiResponse<InvoiceDto>> updateInvoice(
             @PathVariable Long id,
@@ -119,7 +135,7 @@ public class InvoiceController {
     }
 
     @PutMapping("/number/{number}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
     @Operation(summary = "Update an existing invoice by invoice number")
     public ResponseEntity<ApiResponse<InvoiceDto>> updateInvoiceByNumber(
             @PathVariable String number,
@@ -130,7 +146,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/{id}/void")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
     @Operation(summary = "Void a sales invoice, reverse stock movements and restore customer balance")
     public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoice(
             @PathVariable Long id,
@@ -141,7 +157,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/number/{number}/void")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
     @Operation(summary = "Void a sales invoice by number, reverse stock movements and restore customer balance")
     public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoiceByNumber(
             @PathVariable String number,
@@ -152,7 +168,7 @@ public class InvoiceController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
     @Operation(summary = "Void an invoice and revert deducted stock (preserves audit trail)")
     public ResponseEntity<ApiResponse<Void>> deleteInvoice(@PathVariable Long id) {
         invoiceService.deleteInvoice(id);
@@ -160,7 +176,7 @@ public class InvoiceController {
     }
 
     @DeleteMapping("/number/{number}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
     @Operation(summary = "Void an invoice by invoice number and revert deducted stock (preserves audit trail)")
     public ResponseEntity<ApiResponse<Void>> deleteInvoiceByNumber(@PathVariable String number) {
         invoiceService.deleteInvoiceByNumber(number);

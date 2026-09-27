@@ -28,11 +28,12 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Search customer payments and receipts history")
     public ResponseEntity<ApiResponse<PagedResponse<PaymentDto>>> searchPayments(
             @RequestParam(required = false) Long customerId,
             @RequestParam(required = false) Long invoiceId,
+            @RequestParam(required = false) String paymentType,
             @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -41,19 +42,19 @@ public class PaymentController {
             @PageableDefault(size = 20) Pageable pageable
     ) {
         PagedResponse<PaymentDto> response = paymentService.searchPayments(
-                customerId, invoiceId, paymentMethod, status, startDate, endDate, query, pageable);
+                customerId, invoiceId, paymentType, paymentMethod, status, startDate, endDate, query, pageable);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Get single payment receipt by ID")
     public ResponseEntity<ApiResponse<PaymentDto>> getPaymentById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(paymentService.getPaymentById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Record customer payment / invoice settlement")
     public ResponseEntity<ApiResponse<PaymentDto>> processPayment(@Valid @RequestBody CreatePaymentRequest request) {
         PaymentDto payment = paymentService.processPayment(request);
@@ -62,7 +63,7 @@ public class PaymentController {
     }
 
     @PostMapping("/{id}/void")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Void customer payment receipt and restore invoice and customer balances")
     public ResponseEntity<ApiResponse<PaymentDto>> voidPayment(
             @PathVariable Long id,
