@@ -23,6 +23,7 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final InvoiceRepository invoiceRepository;
+    private final com.nbh.erp.route.repository.RouteRepository routeRepository;
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
@@ -69,6 +70,11 @@ public class CustomerService {
             throw new DuplicateResourceException("Customer", "code", code);
         }
 
+        com.nbh.erp.route.entity.Route route = null;
+        if (request.getRouteId() != null) {
+            route = routeRepository.findById(request.getRouteId()).orElse(null);
+        }
+
         Customer customer = Customer.builder()
                 .customerCode(code)
                 .name(request.getName().trim())
@@ -78,6 +84,7 @@ public class CustomerService {
                 .address(request.getAddress())
                 .creditLimit(request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO)
                 .currentBalance(BigDecimal.ZERO)
+                .route(route)
                 .isActive(true)
                 .build();
 
@@ -107,6 +114,13 @@ public class CustomerService {
         customer.setAddress(request.getAddress());
         if (request.getCreditLimit() != null) {
             customer.setCreditLimit(request.getCreditLimit());
+        }
+
+        if (request.getRouteId() != null) {
+            com.nbh.erp.route.entity.Route route = routeRepository.findById(request.getRouteId()).orElse(null);
+            customer.setRoute(route);
+        } else {
+            customer.setRoute(null);
         }
 
         Customer saved = customerRepository.save(customer);

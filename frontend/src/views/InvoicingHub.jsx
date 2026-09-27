@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi, quotationApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import PosView from './PosView';
 import SalesReturnsView from './SalesReturnsView';
 import {
@@ -40,6 +41,7 @@ import {
 
 export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange }) {
   const { addToast } = useToast();
+  const { user } = useAuth();
 
   // Sub-tabs ordered exactly per user workflow specification:
   // sales, hold bills, sales return, payments, advance payments, outstanding payments, quotation
@@ -76,7 +78,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // -------------------------------------------------------------
   // TAB 3: SALES (Commercial Invoices - Matching Screenshot)
   // -------------------------------------------------------------
-  const [invoices, setInvoices] = useState(INITIAL_INVOICES);
+  const [invoices, setInvoices] = useState([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   // Filters matching screenshot
@@ -782,10 +784,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       sourceBillIds: selected.map((b) => b.id),
       items: mergedItems,
       totalAmount: totalVal,
-      vehicleNumber: 'WP-CAD-4290',
-      driverName: 'Saman Kumara',
-      deliveryAddress: 'Main Delivery Route - Central',
-      deliveryNotes: 'Check items against pack list upon handover. Cash/Cheque collection on delivery.',
+      vehicleNumber: '',
+      driverName: '',
+      deliveryAddress: '',
+      deliveryNotes: '',
     });
   };
 
@@ -799,10 +801,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       sourceBillIds: [bill.id],
       items: (bill.items || []).map((it) => ({ ...it, fromInvoice: bill.invoiceNumber })),
       totalAmount: Number(bill.netTotal || bill.totalAmount || 0),
-      vehicleNumber: 'WP-CAD-4290',
-      driverName: 'Saman Kumara',
-      deliveryAddress: 'Main Commercial Branch',
-      deliveryNotes: 'Deliver in good condition.',
+      vehicleNumber: '',
+      driverName: '',
+      deliveryAddress: '',
+      deliveryNotes: '',
     });
   };
 
@@ -2363,7 +2365,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           )}
                         </td>
                         <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                          {hb.invoiceDate ? new Date(hb.invoiceDate).toLocaleString() : 'Today'}
+                          {hb.createdAt ? new Date(hb.createdAt).toLocaleString() : (hb.invoiceDate ? new Date(hb.invoiceDate).toLocaleDateString() : '—')}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                           <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
@@ -2761,7 +2763,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         {p.invoiceNo}
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{p.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{p.paymentDate}</td>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                        {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : '—'}
+                      </td>
                       <td style={{ padding: '12px 16px', color: '#334155' }}>{p.paymentMethod}</td>
                       <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
                         LKR {Number(p.amount || 0).toFixed(2)}
@@ -2989,7 +2993,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         {a.voucherNo}
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{a.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{a.date}</td>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                        {a.date ? new Date(a.date).toLocaleDateString() : '—'}
+                      </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace' }}>
                         LKR {Number(a.amount || 0).toFixed(2)}
                       </td>
@@ -3528,8 +3534,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         {qt.quotationNo}
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{qt.date}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>{qt.validUntil}</td>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                        {qt.date ? new Date(qt.date).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                        {qt.validUntil ? new Date(qt.validUntil).toLocaleDateString() : '—'}
+                      </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {Number(qt.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>

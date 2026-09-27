@@ -109,7 +109,11 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
-  const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
+  const isSuperAdmin = Boolean(
+    user?.roles?.includes('ROLE_SUPER_ADMIN') ||
+    user?.roles?.includes('ROLE_ADMIN') ||
+    (Array.isArray(user?.roles) && user.roles.some((r) => typeof r === 'string' && (r.includes('ADMIN') || r.includes('SUPER'))))
+  );
   const userPermissions = user?.permissions || [];
 
   // Primary module definitions ordered matching user mockup
@@ -125,9 +129,9 @@ export default function App() {
         id: 'invoicing',
         label: 'Sales',
         icon: FileText,
-        permissions: ['SALES_CREATE', 'SALES_RETURN'],
+        permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN'],
         subItems: [
-          { id: 'sales', label: 'Sales List', permission: 'SALES_CREATE' },
+          { id: 'sales', label: 'Sales List', permission: 'SALES_VIEW' },
           { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
           { id: 'payments', label: 'Payments', permission: 'SALES_CREATE' },

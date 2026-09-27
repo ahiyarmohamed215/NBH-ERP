@@ -25,6 +25,9 @@ public class CustomerDto {
     private BigDecimal creditLimit;
     private BigDecimal currentBalance;
     private Boolean isActive;
+    private Long routeId;
+    private String routeName;
+    private String routeCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -45,6 +48,9 @@ public class CustomerDto {
                 .creditLimit(c.getCreditLimit())
                 .currentBalance(c.getCurrentBalance())
                 .isActive(c.getIsActive())
+                .routeId(c.getRoute() != null ? c.getRoute().getId() : null)
+                .routeName(c.getRoute() != null ? c.getRoute().getRouteName() : null)
+                .routeCode(c.getRoute() != null ? c.getRoute().getRouteCode() : null)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

@@ -38,7 +38,7 @@ app:
     refresh-token-expiration-ms: 604800000 # 7 days
   security:
     initial-admin:
-      # Can be overridden via environment variables: APP_SECURITY_INITIAL_ADMIN_USERNAME, etc.
+      enabled: ${INITIAL_ADMIN_ENABLED:true}
       username: ${INITIAL_ADMIN_USERNAME:admin}
       password: ${INITIAL_ADMIN_PASSWORD:admin123}
       email: ${INITIAL_ADMIN_EMAIL:admin@nbh.com}

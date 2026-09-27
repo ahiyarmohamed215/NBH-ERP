@@ -209,10 +209,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       // Load routes from backend
       if (rRes.status === 'fulfilled') {
-        const rawRoutes = rRes.value.data || rRes.value || [];
+        const rawRoutes = Array.isArray(rRes.value?.data)
+          ? rRes.value.data
+          : (Array.isArray(rRes.value) ? rRes.value : []);
         const loadedRoutes = rawRoutes.map((r) => ({
           id: r.id,
-          name: r.name,
+          name: r.routeName || r.name,
+          routeName: r.routeName || r.name,
+          routeCode: r.routeCode || '',
           description: r.description || '',
           salesmanId: r.salesRepId ? String(r.salesRepId) : '',
           salesmanName: r.salesRepName || '',
@@ -238,13 +242,26 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Helper to find all routes a customer belongs to
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
-    return routes.filter((r) => r.customerIds && r.customerIds.includes(cid));
+    const cObj = customers.find((c) => String(c.id) === cid);
+    const routesByArray = routes.filter((r) => r.customerIds && r.customerIds.includes(cid));
+    if (cObj?.routeId) {
+      const directRoute = routes.filter((r) => String(r.id) === String(cObj.routeId));
+      const combined = [...directRoute, ...routesByArray];
+      return Array.from(new Map(combined.map((r) => [r.id, r])).values());
+    }
+    return routesByArray;
   };
 
   // Helper for single route fallback
   const getCustomerRoute = (customerId) => {
     const assigned = getCustomerRoutes(customerId);
-    return assigned[0] || null;
+    if (assigned.length > 0) return assigned[0];
+    const cid = String(customerId);
+    const cObj = customers.find((c) => String(c.id) === cid);
+    if (cObj?.routeName) {
+      return { id: cObj.routeId, name: cObj.routeName, routeCode: cObj.routeCode };
+    }
+    return null;
   };
 
   const isCustomerActive = (c) => Boolean(c?.isActive ?? c?.active ?? false);
@@ -644,6 +661,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: '',
       address: '',
       creditLimit: '0',
+      routeId: '',
       routeIds: [],
     });
     setShowCustomerModal(true);
@@ -653,6 +671,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleOpenEditCustomer = (c) => {
     setEditingCustomer(c);
     const assignedRoutes = getCustomerRoutes(c.id);
+    const primaryRouteId = c.routeId ? String(c.routeId) : (assignedRoutes[0]?.id ? String(assignedRoutes[0].id) : '');
     setCustomerForm({
       code: c.code || c.customerCode || '',
       name: c.name || '',
@@ -661,7 +680,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: c.email || '',
       address: c.address || '',
       creditLimit: c.creditLimit ? String(c.creditLimit) : '0',
-      routeIds: assignedRoutes.map((r) => r.id),
+      routeId: primaryRouteId,
+      routeIds: primaryRouteId ? [primaryRouteId] : assignedRoutes.map((r) => String(r.id)),
     });
     setShowCustomerModal(true);
   };
@@ -677,42 +697,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     try {
       setSavingCustomer(true);
       const payload = {
-        code: customerForm.code.trim().toUpperCase(),
-        customerCode: customerForm.code.trim().toUpperCase(),
+        code: customerForm.code.trim().toUpperCase() || undefined,
+        customerCode: customerForm.code.trim().toUpperCase() || undefined,
         name: customerForm.name.trim(),
         contactPerson: customerForm.contactPerson.trim(),
         phone: customerForm.phone.trim(),
         email: customerForm.email.trim(),
         address: customerForm.address.trim(),
         creditLimit: parseFloat(customerForm.creditLimit) || 0,
+        routeId: customerForm.routeId ? Number(customerForm.routeId) : null,
       };
 
-      let savedCustomerId = null;
       if (editingCustomer) {
         await customerApi.update(editingCustomer.id, payload);
-        savedCustomerId = String(editingCustomer.id);
         addToast('Customer updated successfully', 'success');
       } else {
-        const res = await customerApi.create(payload);
-        savedCustomerId = String(res.data?.id);
+        await customerApi.create(payload);
         addToast('Customer created successfully', 'success');
-      }
-
-      // Update Route assignments
-      if (savedCustomerId) {
-        const selectedRouteIds = customerForm.routeIds || [];
-        setRoutes((prevRoutes) => {
-          return prevRoutes.map((r) => {
-            const hasC = r.customerIds && r.customerIds.includes(savedCustomerId);
-            const shouldHave = selectedRouteIds.includes(r.id);
-            if (shouldHave && !hasC) {
-              return { ...r, customerIds: [...(r.customerIds || []), savedCustomerId] };
-            } else if (!shouldHave && hasC) {
-              return { ...r, customerIds: (r.customerIds || []).filter((id) => id !== savedCustomerId) };
-            }
-            return r;
-          });
-        });
       }
 
       setShowCustomerModal(false);
@@ -792,7 +793,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setSelectedRoute(route);
     setIsCreatingRoute(false);
     setRouteEditForm({
-      name: route.name,
+      name: route.name || route.routeName || '',
+      routeCode: route.routeCode || '',
       description: route.description || '',
       salesmanId: route.salesmanId || '',
       selectedCustomerIds: route.customerIds ? [...route.customerIds] : [],
@@ -806,7 +808,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setSelectedRoute(null);
     setIsCreatingRoute(true);
     setRouteEditForm({
-      name: `Route ${routes.length + 1}`,
+      name: '',
+      routeCode: '',
       description: '',
       salesmanId: '',
       selectedCustomerIds: [],
@@ -834,7 +837,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     const assignedSalesman = salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId));
     const salesmanName = assignedSalesman?.name || '';
     const payload = {
-      name: routeEditForm.name.trim(),
+      routeName: routeEditForm.name.trim(),
+      routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
       salesRepId: routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null,
       customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
@@ -843,10 +847,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     try {
       if (isCreatingRoute) {
         const res = await routeApi.create(payload);
-        const created = res.data || res;
+        const created = res.data?.data || res.data || res;
         const normalized = {
           id: created.id,
-          name: created.name,
+          name: created.routeName || created.name,
+          routeName: created.routeName || created.name,
+          routeCode: created.routeCode || '',
           description: created.description || '',
           salesmanId: created.salesRepId ? String(created.salesRepId) : '',
           salesmanName: created.salesRepName || salesmanName,
@@ -857,10 +863,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         addToast(`Route "${normalized.name}" created successfully!`, 'success');
       } else if (selectedRoute) {
         const res = await routeApi.update(selectedRoute.id, payload);
-        const updated = res.data || res;
+        const updated = res.data?.data || res.data || res;
         const normalized = {
           id: updated.id,
-          name: updated.name,
+          name: updated.routeName || updated.name,
+          routeName: updated.routeName || updated.name,
+          routeCode: updated.routeCode || '',
           description: updated.description || '',
           salesmanId: updated.salesRepId ? String(updated.salesRepId) : '',
           salesmanName: updated.salesRepName || salesmanName,
@@ -873,6 +881,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         addToast(`Route "${normalized.name}" updated successfully!`, 'success');
       }
       handleCloseRouteView();
+      loadInitialData();
     } catch (err) {
       addToast('Error saving route: ' + (err.response?.data?.message || err.message), 'error');
     }
@@ -4871,6 +4880,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
                 />
+              </div>
+
+              {/* Delivery Route / Territory */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Delivery Route / Territory
+                </label>
+                <select
+                  value={customerForm.routeId || ''}
+                  onChange={(e) => setCustomerForm({ ...customerForm, routeId: e.target.value })}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
+                >
+                  <option value="">-- No Route Assigned --</option>
+                  {routes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name || r.routeName} {r.routeCode ? `(${r.routeCode})` : ''} {r.salesmanName ? `— Rep: ${r.salesmanName}` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>

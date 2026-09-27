@@ -24,4 +24,6 @@ public class CreateRouteRequest {
     private Long salesRepId;
 
     private String deliveryDays;
+
+    private java.util.List<Long> customerIds;
 }

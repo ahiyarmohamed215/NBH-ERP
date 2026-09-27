@@ -28,4 +28,6 @@ public class CreateCustomerRequest {
     private String address;
 
     private BigDecimal creditLimit = BigDecimal.ZERO;
+
+    private Long routeId;
 }

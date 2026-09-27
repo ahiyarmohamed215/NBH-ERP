@@ -490,8 +490,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     }
     try {
       const headerWhId = cart[0]?.warehouseId || warehouses[0]?.id;
-      const currentWh = warehouses.find((w) => w.id === headerWhId);
-      const generatedBillNo = `HB-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
       const payload = {
         warehouseId: headerWhId,
         customerId: selectedCustomerId,
@@ -506,52 +504,15 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
         })),
       };
 
-      let resData = null;
-      try {
-        const res = await salesApi.create(payload);
-        resData = res.data;
-        addToast(`Bill ${res.data?.invoiceNumber || generatedBillNo} held successfully!`, 'success');
-      } catch (backendErr) {
-        console.warn('Backend API hold bill error, fallback to local storage:', backendErr);
-        addToast(`Bill ${generatedBillNo} held successfully!`, 'success');
-      }
-
-      // Sync into shared STORAGE_KEY_HELD_BILLS so Hold Bills nav table immediately reflects it
-      const holdNumber = resData?.invoiceNumber || generatedBillNo;
-      const normalizedHeld = {
-        id: resData?.id ? String(resData.id) : `held-${Date.now()}`,
-        invoiceNumber: holdNumber,
-        customerId: selectedCustomerId,
-        customerName: selectedCustomer?.name || 'Walk-in Customer',
-        warehouseId: headerWhId,
-        warehouseCode: currentWh?.code || resData?.warehouseCode || 'WH-01',
-        warehouseName: currentWh?.name || resData?.warehouseName || 'Main Central Warehouse',
-        createdBy: user?.username || 'Staff',
-        salesman: user?.username || 'Sales Executive',
-        salesmanName: user?.username || 'Sales Executive',
-        invoiceDate: new Date().toISOString(),
-        netTotal: Number(cartTotal - discountVal),
-        totalAmount: Number(cartTotal - discountVal),
-        paidAmount: 0,
-        balanceAmount: Number(cartTotal - discountVal),
-        paymentStatus: 'PENDING',
-        status: 'HELD',
-        items: cart.map((it) => ({
-          productId: it.productId,
-          productSku: it.sku || it.productCode || 'SKU',
-          productName: it.productName || it.name || 'Item',
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-          totalPrice: it.total || (it.quantity * it.unitPrice),
-        })),
-      };
+      const res = await salesApi.create(payload);
+      const heldInvoice = res.data?.data || res.data;
+      addToast(`Hold Bill ${heldInvoice?.invoiceNumber || ''} saved successfully!`, 'success');
 
       setCart([]);
       await loadHeldInvoices();
       loadStaffPerformance();
-      addToast(`Bill placed on hold successfully`, 'success');
     } catch (err) {
-      addToast('Failed to hold bill: ' + err.message, 'error');
+      addToast('Failed to hold bill: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 

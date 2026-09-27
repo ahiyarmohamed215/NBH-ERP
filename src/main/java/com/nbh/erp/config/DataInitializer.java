@@ -28,6 +28,9 @@ public class DataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${app.security.initial-admin.enabled:true}")
+    private boolean initialAdminEnabled;
+
     @Value("${app.security.initial-admin.username:admin}")
     private String adminUsername;
 
@@ -40,33 +43,24 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        log.info("Checking system initialization...");
+        log.info("Checking system authorization & permissions initialization...");
 
-        // 1. Seed all system permissions
+        // 1. Seed system permissions (required for @PreAuthorize and frontend Role permission builder)
         Map<String, Permission> permissionMap = seedPermissions();
 
-        // 2. Seed standard system roles with permission assignments
+        // 2. Seed only Super Admin and Enterprise Admin roles with all permissions
         Set<Permission> allPermissions = new HashSet<>(permissionMap.values());
         Role superAdminRole = seedRole("ROLE_SUPER_ADMIN", "Full unrestricted access across all ERP features", allPermissions);
         Role adminRole = seedRole("ROLE_ADMIN", "Enterprise Administrator with all management permissions", allPermissions);
 
-        // Standard operational roles
-        seedRole("ROLE_WAREHOUSE_MANAGER", "Manages warehouse stock, GRN, GTN, PRN, and stock adjustments",
-                filterPermissions(permissionMap, "WAREHOUSE_VIEW", "WAREHOUSE_MANAGE", "INVENTORY_VIEW", "INVENTORY_MANAGE", "INVENTORY_ADJUST", "GRN_VIEW", "GRN_PROCESS", "GTN_VIEW", "GTN_PROCESS", "PRN_VIEW", "PRN_PROCESS", "PRODUCT_VIEW"));
+        // 3. Seed Super Admin User if enabled and absent
+        if (initialAdminEnabled) {
+            seedSuperAdminUser(superAdminRole, adminRole);
+        } else {
+            log.info("Initial super admin user creation is disabled via configuration (initial-admin.enabled=false).");
+        }
 
-        seedRole("ROLE_CASHIER", "POS invoicing, payment collections, and sales returns",
-                filterPermissions(permissionMap, "SALES_CREATE", "SALES_VIEW", "SALES_RETURN", "PAYMENT_CREATE", "PAYMENT_VIEW", "CUSTOMER_VIEW", "PRODUCT_VIEW", "INVENTORY_VIEW", "QUOTATION_VIEW", "QUOTATION_MANAGE"));
-
-        seedRole("ROLE_SALES_REP", "Customer orders, route visits, and stock availability checks",
-                filterPermissions(permissionMap, "SALES_CREATE", "SALES_VIEW", "CUSTOMER_VIEW", "CUSTOMER_MANAGE", "PRODUCT_VIEW", "INVENTORY_VIEW", "QUOTATION_VIEW", "QUOTATION_MANAGE"));
-
-        seedRole("ROLE_AUDITOR", "Read-only access to audit logs and analytical reports",
-                filterPermissions(permissionMap, "REPORT_VIEW", "AUDIT_VIEW", "INVENTORY_VIEW", "SALES_VIEW_ALL", "DASHBOARD_VIEW"));
-
-        // 3. Seed Super Admin User if absent
-        seedSuperAdminUser(superAdminRole, adminRole);
-
-        log.info("System initialization completed successfully. Database is clean and ready.");
+        log.info("System initialization completed successfully.");
     }
 
     private record PermItem(String module, String name, String description) {}
@@ -152,17 +146,6 @@ public class DataInitializer implements ApplicationRunner {
             role = roleRepository.save(role);
         }
         return role;
-    }
-
-    private Set<Permission> filterPermissions(Map<String, Permission> map, String... names) {
-        Set<Permission> set = new HashSet<>();
-        for (String name : names) {
-            Permission p = map.get(name);
-            if (p != null) {
-                set.add(p);
-            }
-        }
-        return set;
     }
 
     private void seedSuperAdminUser(Role superAdminRole, Role adminRole) {

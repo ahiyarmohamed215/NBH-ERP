@@ -22,10 +22,16 @@ public class RouteDto {
     private String salesRepName;
     private String deliveryDays;
     private Boolean isActive;
+    private Integer customerCount;
+    private java.util.List<Long> customerIds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static RouteDto from(Route route) {
+        return from(route, null);
+    }
+
+    public static RouteDto from(Route route, java.util.List<Long> customerIds) {
         if (route == null) return null;
         return RouteDto.builder()
                 .id(route.getId())
@@ -37,6 +43,8 @@ public class RouteDto {
                 .salesRepName(route.getSalesRep() != null ? (route.getSalesRep().getFullName() != null ? route.getSalesRep().getFullName() : route.getSalesRep().getUsername()) : null)
                 .deliveryDays(route.getDeliveryDays())
                 .isActive(route.getIsActive())
+                .customerCount(customerIds != null ? customerIds.size() : 0)
+                .customerIds(customerIds != null ? customerIds : new java.util.ArrayList<>())
                 .createdAt(route.getCreatedAt())
                 .updatedAt(route.getUpdatedAt())
                 .build();

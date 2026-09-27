@@ -24,23 +24,31 @@ public class RouteService {
 
     private final RouteRepository routeRepository;
     private final UserRepository userRepository;
+    private final com.nbh.erp.customer.repository.CustomerRepository customerRepository;
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<RouteDto> getAllRoutes() {
-        return routeRepository.findAll().stream().map(RouteDto::from).toList();
+        return routeRepository.findAll().stream().map(route -> {
+            List<Long> custIds = customerRepository.findByRouteId(route.getId()).stream().map(com.nbh.erp.customer.entity.Customer::getId).toList();
+            return RouteDto.from(route, custIds);
+        }).toList();
     }
 
     @Transactional(readOnly = true)
     public List<RouteDto> getActiveRoutes() {
-        return routeRepository.findByIsActiveTrue().stream().map(RouteDto::from).toList();
+        return routeRepository.findByIsActiveTrue().stream().map(route -> {
+            List<Long> custIds = customerRepository.findByRouteId(route.getId()).stream().map(com.nbh.erp.customer.entity.Customer::getId).toList();
+            return RouteDto.from(route, custIds);
+        }).toList();
     }
 
     @Transactional(readOnly = true)
     public RouteDto getRouteById(Long id) {
         Route route = routeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Route", "id", id));
-        return RouteDto.from(route);
+        List<Long> custIds = customerRepository.findByRouteId(route.getId()).stream().map(com.nbh.erp.customer.entity.Customer::getId).toList();
+        return RouteDto.from(route, custIds);
     }
 
     @Transactional
@@ -73,6 +81,10 @@ public class RouteService {
 
         Route saved = routeRepository.save(route);
 
+        if (request.getCustomerIds() != null && !request.getCustomerIds().isEmpty()) {
+            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> c.setRoute(saved));
+        }
+
         auditLogService.log(
                 "ROUTE_CREATE",
                 "Route",
@@ -80,7 +92,8 @@ public class RouteService {
                 String.format("Delivery route '%s' created with code '%s'", saved.getRouteName(), saved.getRouteCode())
         );
 
-        return RouteDto.from(saved);
+        List<Long> custIds = customerRepository.findByRouteId(saved.getId()).stream().map(com.nbh.erp.customer.entity.Customer::getId).toList();
+        return RouteDto.from(saved, custIds);
     }
 
     @Transactional
@@ -113,6 +126,15 @@ public class RouteService {
 
         Route saved = routeRepository.save(route);
 
+        if (request.getCustomerIds() != null) {
+            customerRepository.findByRouteId(saved.getId()).forEach(c -> {
+                if (!request.getCustomerIds().contains(c.getId())) {
+                    c.setRoute(null);
+                }
+            });
+            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> c.setRoute(saved));
+        }
+
         auditLogService.log(
                 "ROUTE_UPDATE",
                 "Route",
@@ -120,7 +142,8 @@ public class RouteService {
                 String.format("Delivery route '%s' updated", saved.getRouteName())
         );
 
-        return RouteDto.from(saved);
+        List<Long> custIds = customerRepository.findByRouteId(saved.getId()).stream().map(com.nbh.erp.customer.entity.Customer::getId).toList();
+        return RouteDto.from(saved, custIds);
     }
 
     @Transactional
