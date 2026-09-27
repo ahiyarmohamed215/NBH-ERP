@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { productApi, categoryApi } from '../api/apiClient';
+import { productApi, categoryApi, brandApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
   Package,
@@ -14,31 +14,10 @@ import {
   Trash2,
 } from 'lucide-react';
 
-const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
-const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
-const INITIAL_BRANDS = [];
-
 export default function ProductsView({ isEmbedded = false }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_BRANDS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_BRANDS;
-  });
-  const [productBrandsMap, setProductBrandsMap] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return {};
-  });
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
@@ -72,12 +51,14 @@ export default function ProductsView({ isEmbedded = false }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes, brandRes] = await Promise.all([
         productApi.getProducts({ size: 200 }),
         categoryApi.getActive(),
+        brandApi.getActive(),
       ]);
       setProducts(prodRes.data?.content || prodRes.data || []);
       setCategories(catRes.data || []);
+      setBrands(brandRes.data || []);
     } catch (err) {
       addToast('Failed to load products: ' + err.message, 'error');
     } finally {
@@ -89,11 +70,10 @@ export default function ProductsView({ isEmbedded = false }) {
 
   const getBrandForProduct = (p) => {
     if (!p) return 'General';
-    const bId = productBrandsMap[p.id] || productBrandsMap[p.sku] || p.brandId;
-    if (bId) {
-      const found = brands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
+    if (p.brandName) return p.brandName;
+    if (p.brandId) {
+      const found = brands.find((b) => String(b.id) === String(p.brandId));
       if (found) return found.name;
-      return bId;
     }
     return 'General';
   };
@@ -119,7 +99,7 @@ export default function ProductsView({ isEmbedded = false }) {
     setFormData({
       sku: prod.sku,
       name: prod.name,
-      brandId: productBrandsMap[prod.id] || productBrandsMap[prod.sku] || prod.brandId || brands[0]?.id || '',
+      brandId: prod.brandId || (brands.find((b) => b.name === prod.brandName)?.id || (brands[0]?.id || '')),
       categoryId: prod.categoryId || (categories.find((c) => c.name === prod.categoryName)?.id || ''),
       unitOfMeasure: prod.unitOfMeasure || 'PCS',
       costPrice: prod.costPrice?.toString() || '0',
@@ -143,6 +123,7 @@ export default function ProductsView({ isEmbedded = false }) {
         sku: formData.sku.trim().toUpperCase(),
         barcode: null,
         name: formData.name.trim(),
+        brandId: formData.brandId ? Number(formData.brandId) : null,
         categoryId: formData.categoryId ? Number(formData.categoryId) : null,
         unitOfMeasure: formData.unitOfMeasure,
         costPrice: editingProduct ? (parseFloat(editingProduct.costPrice) || 0) : 0,
@@ -153,20 +134,9 @@ export default function ProductsView({ isEmbedded = false }) {
 
       if (editingProduct) {
         await productApi.update(editingProduct.id, payload);
-        if (formData.brandId) {
-          const updatedMap = { ...productBrandsMap, [editingProduct.id]: formData.brandId, [payload.sku]: formData.brandId };
-          setProductBrandsMap(updatedMap);
-          localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
-        }
         addToast(`Product "${payload.name}" updated successfully!`, 'success');
       } else {
-        const res = await productApi.create(payload);
-        const newId = res.data?.id || res.data?.content?.id || payload.sku;
-        if (formData.brandId) {
-          const updatedMap = { ...productBrandsMap, [newId]: formData.brandId, [payload.sku]: formData.brandId };
-          setProductBrandsMap(updatedMap);
-          localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
-        }
+        await productApi.create(payload);
         addToast(`Product "${payload.name}" created successfully!`, 'success');
       }
       setShowModal(false);
@@ -474,6 +444,11 @@ export default function ProductsView({ isEmbedded = false }) {
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>SKU / Item Code</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8', fontSize: '0.95rem' }}>{viewingProduct.sku}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Brand</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{getBrandForProduct(viewingProduct)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>

@@ -5,6 +5,7 @@ import {
   customerApi,
   supplierApi,
   productApi,
+  brandApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
@@ -27,10 +28,6 @@ import {
   Award,
 } from 'lucide-react';
 
-const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
-const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
-const INITIAL_BRANDS = [];
-
 const MastersView = React.forwardRef(function MastersView({
   activeSubTab,
   onSubTabChange,
@@ -47,24 +44,7 @@ const MastersView = React.forwardRef(function MastersView({
 
   // Data lists
   const [products, setProducts] = useState([]);
-  const [brands, setBrands] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_BRANDS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_BRANDS;
-  });
-  const [productBrandsMap, setProductBrandsMap] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-    return {};
-  });
+  const [brands, setBrands] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -72,11 +52,10 @@ const MastersView = React.forwardRef(function MastersView({
 
   const getBrandForProduct = (p) => {
     if (!p) return 'General';
-    const bId = productBrandsMap[p.id] || productBrandsMap[p.sku] || p.brandId || p.brand;
-    if (bId) {
-      const found = brands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
+    if (p.brandName) return p.brandName;
+    if (p.brandId) {
+      const found = brands.find((b) => String(b.id) === String(p.brandId));
       if (found) return found.name;
-      return bId;
     }
     return 'General';
   };
@@ -108,18 +87,20 @@ const MastersView = React.forwardRef(function MastersView({
   useEffect(() => {
     const loadAllCounts = async () => {
       try {
-        const [wRes, cRes, cuRes, sRes, pRes] = await Promise.allSettled([
+        const [wRes, cRes, cuRes, sRes, pRes, bRes] = await Promise.allSettled([
           warehouseApi.getAll(),
           categoryApi.getAll(),
           customerApi.getAll(),
           supplierApi.getAll(),
           productApi.getProducts({ size: 300 }),
+          brandApi.getAll(),
         ]);
         if (wRes.status === 'fulfilled') setWarehouses(wRes.value.data || []);
         if (cRes.status === 'fulfilled') setCategories(cRes.value.data || []);
         if (cuRes.status === 'fulfilled') setCustomers(cuRes.value.data || []);
         if (sRes.status === 'fulfilled') setSuppliers(sRes.value.data || []);
         if (pRes.status === 'fulfilled') setProducts(pRes.value.data?.content || pRes.value.data || []);
+        if (bRes.status === 'fulfilled') setBrands(bRes.value.data || []);
       } catch (e) {
         // silent fallback
       }
@@ -144,14 +125,21 @@ const MastersView = React.forwardRef(function MastersView({
     try {
       setLoading(true);
       if (activeTab === 'products') {
-        const [pRes, cRes] = await Promise.all([
+        const [pRes, cRes, bRes] = await Promise.all([
           productApi.getProducts({ size: 300 }),
           categories.length === 0 ? categoryApi.getAll() : Promise.resolve({ data: categories }),
+          brands.length === 0 ? brandApi.getAll() : Promise.resolve({ data: brands }),
         ]);
         setProducts(pRes.data?.content || pRes.data || []);
         if (categories.length === 0 && cRes.data) {
           setCategories(cRes.data || []);
         }
+        if (brands.length === 0 && bRes.data) {
+          setBrands(bRes.data || []);
+        }
+      } else if (activeTab === 'brands') {
+        const res = await brandApi.getAll();
+        setBrands(res.data || []);
       } else if (activeTab === 'warehouses') {
         const res = await warehouseApi.getAll();
         setWarehouses(res.data || []);
@@ -206,7 +194,7 @@ const MastersView = React.forwardRef(function MastersView({
       setModalForm({
         sku: item.sku || '',
         name: item.name || '',
-        brandId: productBrandsMap[item.id] || productBrandsMap[item.sku] || item.brandId || item.brand || (brands[0]?.id || ''),
+        brandId: item.brandId || (brands.find((b) => b.name === item.brandName)?.id || (brands[0]?.id || '')),
         categoryId: item.categoryId || (categories.find((c) => c.name === item.categoryName)?.id || ''),
         unitOfMeasure: item.unitOfMeasure || 'PCS',
         minStockLevel: item.minStockLevel?.toString() || '0',
@@ -242,6 +230,7 @@ const MastersView = React.forwardRef(function MastersView({
           sku: (modalForm.sku || '').trim().toUpperCase(),
           barcode: null,
           name: (modalForm.name || '').trim(),
+          brandId: modalForm.brandId ? Number(modalForm.brandId) : null,
           categoryId: modalForm.categoryId ? Number(modalForm.categoryId) : null,
           unitOfMeasure: modalForm.unitOfMeasure || 'PCS',
           costPrice: editingItem ? (parseFloat(editingItem.costPrice) || 0) : 0,
@@ -251,19 +240,8 @@ const MastersView = React.forwardRef(function MastersView({
         };
         if (editingItem) {
           await productApi.update(editingItem.id, payload);
-          if (modalForm.brandId) {
-            const updatedMap = { ...productBrandsMap, [editingItem.id]: modalForm.brandId, [payload.sku]: modalForm.brandId };
-            setProductBrandsMap(updatedMap);
-            localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
-          }
         } else {
-          const res = await productApi.create(payload);
-          const newId = res.data?.id || res.data?.content?.id || payload.sku;
-          if (modalForm.brandId) {
-            const updatedMap = { ...productBrandsMap, [newId]: modalForm.brandId, [payload.sku]: modalForm.brandId };
-            setProductBrandsMap(updatedMap);
-            localStorage.setItem(STORAGE_KEY_PRODUCT_BRANDS, JSON.stringify(updatedMap));
-          }
+          await productApi.create(payload);
         }
       } else if (activeTab === 'brands') {
         if (!modalForm.name?.trim()) {
@@ -271,32 +249,17 @@ const MastersView = React.forwardRef(function MastersView({
           setSaving(false);
           return;
         }
-        const bCode = modalForm.code?.trim().toUpperCase() || modalForm.name.trim().toUpperCase().slice(0, 10);
+        const bCode = modalForm.code?.trim().toUpperCase() || modalForm.name.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 10);
+        const payload = {
+          code: bCode,
+          name: modalForm.name.trim(),
+          description: modalForm.description?.trim() || '',
+        };
         if (editingItem) {
-          const updated = brands.map((b) =>
-            b.id === editingItem.id
-              ? { ...b, code: bCode, name: modalForm.name.trim(), description: modalForm.description || '' }
-              : b
-          );
-          setBrands(updated);
-          localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
-          addToast('Brand updated successfully!', 'success');
+          await brandApi.update(editingItem.id, payload);
         } else {
-          const newBrand = {
-            id: `brd-${Date.now()}`,
-            code: bCode,
-            name: modalForm.name.trim(),
-            description: modalForm.description || '',
-            isActive: true,
-          };
-          const updated = [newBrand, ...brands];
-          setBrands(updated);
-          localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
-          addToast('Brand created successfully!', 'success');
+          await brandApi.create(payload);
         }
-        setShowModal(false);
-        setSaving(false);
-        return;
       } else if (activeTab === 'warehouses') {
         const payload = {
           ...modalForm,
@@ -355,13 +318,7 @@ const MastersView = React.forwardRef(function MastersView({
   const handleToggleActive = async (id, currentStatus) => {
     try {
       if (activeTab === 'products') await productApi.toggleActive(id);
-      else if (activeTab === 'brands') {
-        const updated = brands.map((b) => (b.id === id ? { ...b, isActive: !b.isActive } : b));
-        setBrands(updated);
-        localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
-        addToast(`Brand status updated`, 'success');
-        return;
-      }
+      else if (activeTab === 'brands') await brandApi.toggleActive(id);
       else if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
       else if (activeTab === 'categories') await categoryApi.toggleActive(id);
       else if (activeTab === 'customers') await customerApi.toggleActive(id);
@@ -382,13 +339,7 @@ const MastersView = React.forwardRef(function MastersView({
     try {
       setDeletingId(item.id);
       if (activeTab === 'products') await productApi.delete(item.id);
-      else if (activeTab === 'brands') {
-        const updated = brands.filter((b) => b.id !== item.id);
-        setBrands(updated);
-        localStorage.setItem(STORAGE_KEY_BRANDS, JSON.stringify(updated));
-        addToast(`Brand "${itemName}" deleted successfully`, 'success');
-        return;
-      }
+      else if (activeTab === 'brands') await brandApi.delete(item.id);
       else if (activeTab === 'warehouses') await warehouseApi.delete(item.id);
       else if (activeTab === 'categories') await categoryApi.delete(item.id);
       else if (activeTab === 'customers') await customerApi.delete(item.id);

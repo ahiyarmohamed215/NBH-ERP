@@ -24,24 +24,28 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
     @Operation(summary = "List all customers")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers() {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getAllCustomers()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
     @Operation(summary = "List active customers")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> getActiveCustomers() {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getActiveCustomers()));
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
     @Operation(summary = "Search customers by name, code or phone")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> searchCustomers(@RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(ApiResponse.ok(customerService.searchCustomers(query)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
     @Operation(summary = "Get customer by ID")
     public ResponseEntity<ApiResponse<CustomerDto>> getCustomerById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getCustomerById(id)));
@@ -77,8 +81,8 @@ public class CustomerController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE')")
     @Operation(summary = "Delete a customer")
-    public ResponseEntity<ApiResponse<Void>> deleteCustomer(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
         customerService.deleteCustomer(id);
-        return ResponseEntity.ok(ApiResponse.ok("Customer deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

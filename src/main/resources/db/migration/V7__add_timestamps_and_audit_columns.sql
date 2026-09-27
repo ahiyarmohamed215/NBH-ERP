@@ -1,0 +1,10 @@
+-- V7: Add created_at timestamps to all item/detail tables and audit user tracking to credit_notes
+ALTER TABLE invoice_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE grn_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE gtn_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE prn_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE stock_adjustment_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE sales_return_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE credit_notes ADD COLUMN created_by VARCHAR(50) NULL;
+ALTER TABLE credit_notes ADD COLUMN updated_by VARCHAR(50) NULL;

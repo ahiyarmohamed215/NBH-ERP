@@ -27,6 +27,7 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "Paginated product search by query and category")
     public ResponseEntity<ApiResponse<PagedResponse<ProductDto>>> getProducts(
             @RequestParam(required = false) String query,
@@ -38,6 +39,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "Search active products for POS autocomplete and line item selection")
     public ResponseEntity<ApiResponse<List<ProductDto>>> searchActiveProducts(
             @RequestParam(required = false, defaultValue = "") String query
@@ -46,12 +48,14 @@ public class ProductController {
     }
 
     @GetMapping("/barcode/{barcode}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "Find product by exact barcode scan")
     public ResponseEntity<ApiResponse<ProductDto>> getProductByBarcode(@PathVariable String barcode) {
         return ResponseEntity.ok(ApiResponse.ok(productService.getProductByBarcode(barcode)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "Get product details by ID")
     public ResponseEntity<ApiResponse<ProductDto>> getProductById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(productService.getProductById(id)));
@@ -87,8 +91,8 @@ public class ProductController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
     @Operation(summary = "Delete a product")
-    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
-        return ResponseEntity.ok(ApiResponse.ok("Product deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

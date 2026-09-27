@@ -1,5 +1,7 @@
 package com.nbh.erp.product.service;
 
+import com.nbh.erp.brand.entity.Brand;
+import com.nbh.erp.brand.repository.BrandRepository;
 import com.nbh.erp.category.entity.Category;
 import com.nbh.erp.category.repository.CategoryRepository;
 import com.nbh.erp.common.dto.PagedResponse;
@@ -31,6 +33,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
     private final SupplierRepository supplierRepository;
     private final StockBalanceRepository stockBalanceRepository;
 
@@ -83,6 +86,12 @@ public class ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
 
+        Brand brand = null;
+        if (request.getBrandId() != null) {
+            brand = brandRepository.findById(request.getBrandId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", request.getBrandId()));
+        }
+
         Supplier supplier = null;
         if (request.getSupplierId() != null) {
             supplier = supplierRepository.findById(request.getSupplierId())
@@ -95,6 +104,7 @@ public class ProductService {
                 .name(request.getName().trim())
                 .description(request.getDescription())
                 .category(category)
+                .brand(brand)
                 .defaultSupplier(supplier)
                 .unitOfMeasure(StringUtils.hasText(request.getUnitOfMeasure()) ? request.getUnitOfMeasure().trim().toUpperCase() : "PCS")
                 .costPrice(request.getCostPrice())
@@ -137,6 +147,12 @@ public class ProductService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
 
+        Brand brand = null;
+        if (request.getBrandId() != null) {
+            brand = brandRepository.findById(request.getBrandId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", request.getBrandId()));
+        }
+
         Supplier supplier = null;
         if (request.getSupplierId() != null) {
             supplier = supplierRepository.findById(request.getSupplierId())
@@ -146,6 +162,7 @@ public class ProductService {
         product.setName(request.getName().trim());
         product.setDescription(request.getDescription());
         product.setCategory(category);
+        product.setBrand(brand);
         product.setDefaultSupplier(supplier);
         if (StringUtils.hasText(request.getUnitOfMeasure())) {
             product.setUnitOfMeasure(request.getUnitOfMeasure().trim().toUpperCase());

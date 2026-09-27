@@ -24,18 +24,21 @@ public class WarehouseController {
     private final WarehouseService warehouseService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
     @Operation(summary = "List all warehouses")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouses() {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getAllWarehouses()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
     @Operation(summary = "List active warehouses for selection dropdowns")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getActiveWarehouses() {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getActiveWarehouses()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
     @Operation(summary = "Get warehouse by ID")
     public ResponseEntity<ApiResponse<WarehouseDto>> getWarehouseById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getWarehouseById(id)));
@@ -71,8 +74,8 @@ public class WarehouseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_MANAGE')")
     @Operation(summary = "Delete warehouse")
-    public ResponseEntity<ApiResponse<Void>> deleteWarehouse(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteWarehouse(@PathVariable Long id) {
         warehouseService.deleteWarehouse(id);
-        return ResponseEntity.ok(ApiResponse.ok("Warehouse deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,5 +1,6 @@
 package com.nbh.erp.product.entity;
 
+import com.nbh.erp.brand.entity.Brand;
 import com.nbh.erp.category.entity.Category;
 import com.nbh.erp.common.entity.BaseEntity;
 import com.nbh.erp.supplier.entity.Supplier;
@@ -39,6 +40,10 @@ public class Product extends BaseEntity {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "brand_id")
+    private Brand brand;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "supplier_id")

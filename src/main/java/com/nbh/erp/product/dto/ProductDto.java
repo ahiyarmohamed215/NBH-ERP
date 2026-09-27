@@ -21,6 +21,8 @@ public class ProductDto {
     private String description;
     private Long categoryId;
     private String categoryName;
+    private Long brandId;
+    private String brandName;
     private Long supplierId;
     private String supplierName;
     private String unitOfMeasure;
@@ -44,6 +46,8 @@ public class ProductDto {
                 .description(p.getDescription())
                 .categoryId(p.getCategory() != null ? p.getCategory().getId() : null)
                 .categoryName(p.getCategory() != null ? p.getCategory().getName() : null)
+                .brandId(p.getBrand() != null ? p.getBrand().getId() : null)
+                .brandName(p.getBrand() != null ? p.getBrand().getName() : null)
                 .supplierId(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getId() : null)
                 .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getName() : null)
                 .unitOfMeasure(p.getUnitOfMeasure())

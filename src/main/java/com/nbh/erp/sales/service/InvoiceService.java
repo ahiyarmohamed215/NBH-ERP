@@ -2,6 +2,7 @@ package com.nbh.erp.sales.service;
 
 import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.PagedResponse;
+import com.nbh.erp.common.enums.InvoiceStatus;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.customer.entity.Customer;
@@ -315,9 +316,7 @@ public class InvoiceService {
         invoiceRepository.save(invoice);
     }
 
-    public static final Set<String> VALID_STATUSES = Set.of(
-            "HELD", "COMPLETED", "PAID", "PARTIAL", "VOIDED", "CANCELLED"
-    );
+    public static final Set<String> VALID_STATUSES = InvoiceStatus.NAMES;
 
     @Transactional
     public void deleteInvoice(Long id) {

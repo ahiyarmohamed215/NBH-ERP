@@ -83,6 +83,17 @@ export const categoryApi = {
   delete: (id) => api.delete(`/categories/${id}`),
 };
 
+export const brandApi = {
+  getAll: () => api.get('/brands'),
+  getActive: () => api.get('/brands/active'),
+  search: (query) => api.get('/brands/search', { params: { query } }),
+  getById: (id) => api.get(`/brands/${id}`),
+  create: (data) => api.post('/brands', data),
+  update: (id, data) => api.put(`/brands/${id}`, data),
+  toggleActive: (id) => api.patch(`/brands/${id}/toggle-active`),
+  delete: (id) => api.delete(`/brands/${id}`),
+};
+
 export const productApi = {
   getProducts: (params) => api.get('/products', { params }),
   searchActive: (query) => api.get('/products/search', { params: { query } }),

@@ -62,8 +62,8 @@ public class RoleController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Delete a custom role")
-    public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
         roleService.deleteRole(id);
-        return ResponseEntity.ok(ApiResponse.ok("Role deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

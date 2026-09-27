@@ -24,25 +24,28 @@ public class SalesmanController {
     private final SalesmanService salesmanService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_VIEW') or hasAuthority('INVOICE_CREATE') or hasAuthority('USER_VIEW')")
     @Operation(summary = "List all salesmen")
     public ResponseEntity<ApiResponse<List<SalesmanDto>>> getAllSalesmen() {
         return ResponseEntity.ok(ApiResponse.ok(salesmanService.getAllSalesmen()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_VIEW') or hasAuthority('INVOICE_CREATE') or hasAuthority('USER_VIEW')")
     @Operation(summary = "List active salesmen for invoice selection")
     public ResponseEntity<ApiResponse<List<SalesmanDto>>> getActiveSalesmen() {
         return ResponseEntity.ok(ApiResponse.ok(salesmanService.getActiveSalesmen()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_VIEW') or hasAuthority('USER_VIEW')")
     @Operation(summary = "Get salesman by ID")
     public ResponseEntity<ApiResponse<SalesmanDto>> getSalesmanById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(salesmanService.getSalesmanById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_MANAGE') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Create a new salesman")
     public ResponseEntity<ApiResponse<SalesmanDto>> createSalesman(@Valid @RequestBody CreateSalesmanRequest request) {
         SalesmanDto created = salesmanService.createSalesman(request);
@@ -50,7 +53,7 @@ public class SalesmanController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_MANAGE') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Update salesman details")
     public ResponseEntity<ApiResponse<SalesmanDto>> updateSalesman(
             @PathVariable Long id,
@@ -61,7 +64,7 @@ public class SalesmanController {
     }
 
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALESMAN_MANAGE') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Toggle salesman active status")
     public ResponseEntity<ApiResponse<Void>> toggleActive(@PathVariable Long id) {
         salesmanService.toggleActive(id);

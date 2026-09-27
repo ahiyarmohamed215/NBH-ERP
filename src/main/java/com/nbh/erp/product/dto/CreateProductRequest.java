@@ -28,6 +28,8 @@ public class CreateProductRequest {
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
+    private Long brandId;
+
     private Long supplierId;
 
     private String unitOfMeasure = "PCS";

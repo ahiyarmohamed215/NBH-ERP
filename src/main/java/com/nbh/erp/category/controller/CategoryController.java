@@ -24,18 +24,21 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "List all categories")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getAllCategories()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "List active categories for product selection")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getActiveCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getActiveCategories()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
     @Operation(summary = "Get category by ID")
     public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getCategoryById(id)));
@@ -71,8 +74,8 @@ public class CategoryController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
     @Operation(summary = "Delete category")
-    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         categoryService.deleteCategory(id);
-        return ResponseEntity.ok(ApiResponse.ok("Category deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }

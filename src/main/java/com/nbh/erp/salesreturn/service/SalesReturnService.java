@@ -22,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,14 @@ public class SalesReturnService {
     private final CustomerRepository customerRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
+
+    private String getCurrentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            return auth.getName();
+        }
+        return "SYSTEM";
+    }
 
     @Transactional(readOnly = true)
     public PagedResponse<SalesReturnDto> searchSalesReturns(
@@ -133,6 +143,7 @@ public class SalesReturnService {
         // If return type is CREDIT_NOTE, generate a credit note for the customer
         if ("CREDIT_NOTE".equalsIgnoreCase(savedReturn.getReturnType())) {
             String crnNumber = sequenceService.generateCreditNoteNumber();
+            String currentUser = getCurrentUsername();
             CreditNote creditNote = CreditNote.builder()
                     .creditNoteNumber(crnNumber)
                     .salesReturn(savedReturn)
@@ -140,10 +151,12 @@ public class SalesReturnService {
                     .amount(grandTotal)
                     .status("ISSUED")
                     .issueDate(retDate)
+                    .createdBy(currentUser)
+                    .updatedBy(currentUser)
                     .build();
             creditNoteRepository.save(creditNote);
-            log.info("Credit Note '{}' issued for customer '{}' amount: {}",
-                    crnNumber, savedReturn.getCustomer().getName(), grandTotal);
+            log.info("Credit Note '{}' issued for customer '{}' amount: {} by {}",
+                    crnNumber, savedReturn.getCustomer().getName(), grandTotal, currentUser);
         }
 
         // If customer had an outstanding balance, adjust balance if requested

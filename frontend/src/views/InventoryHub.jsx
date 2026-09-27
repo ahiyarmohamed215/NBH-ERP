@@ -38,30 +38,8 @@ import {
   Award,
 } from 'lucide-react';
 
-const STORAGE_KEY_ADJUSTMENTS = 'erp_inventory_adjustments_records_v1';
-const STORAGE_KEY_BRANDS = 'erp_brands_master_v1';
-const STORAGE_KEY_PRODUCT_BRANDS = 'erp_product_brands_map_v1';
-
 const getBrandForProduct = (prod) => {
   if (!prod) return 'General';
-  try {
-    const savedBrands = JSON.parse(localStorage.getItem(STORAGE_KEY_BRANDS) || '[]');
-    const savedMap = JSON.parse(localStorage.getItem(STORAGE_KEY_PRODUCT_BRANDS) || '{}');
-    const bId = savedMap[prod.id] || savedMap[prod.sku] || prod.brandId || prod.brand || prod.brandName;
-    if (bId) {
-      const allBrands = savedBrands.length > 0 ? savedBrands : [
-        { id: 'brd-1', code: 'SAMSUNG', name: 'Samsung' },
-        { id: 'brd-2', code: 'APPLE', name: 'Apple' },
-        { id: 'brd-3', code: 'SONY', name: 'Sony' },
-        { id: 'brd-4', code: 'LG', name: 'LG' },
-        { id: 'brd-5', code: 'DEFAULT', name: 'General Brand' },
-      ];
-      const found = allBrands.find((b) => String(b.id) === String(bId) || b.code === bId || b.name === bId);
-      if (found) return found.name;
-    }
-  } catch (e) {
-    // ignore
-  }
   return prod.brandName || prod.brand || 'General';
 };
 

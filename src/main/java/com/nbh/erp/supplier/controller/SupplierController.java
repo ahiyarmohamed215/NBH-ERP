@@ -24,24 +24,28 @@ public class SupplierController {
     private final SupplierService supplierService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
     @Operation(summary = "List all suppliers")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> getAllSuppliers() {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getAllSuppliers()));
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
     @Operation(summary = "List active suppliers for purchase dropdowns")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> getActiveSuppliers() {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getActiveSuppliers()));
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
     @Operation(summary = "Search suppliers by name or code")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> searchSuppliers(@RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.searchSuppliers(query)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
     @Operation(summary = "Get supplier by ID")
     public ResponseEntity<ApiResponse<SupplierDto>> getSupplierById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getSupplierById(id)));
@@ -77,8 +81,8 @@ public class SupplierController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
     @Operation(summary = "Delete a supplier")
-    public ResponseEntity<ApiResponse<Void>> deleteSupplier(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteSupplier(@PathVariable Long id) {
         supplierService.deleteSupplier(id);
-        return ResponseEntity.ok(ApiResponse.ok("Supplier deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 }
