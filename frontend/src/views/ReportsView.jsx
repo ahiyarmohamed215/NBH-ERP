@@ -734,7 +734,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
                   Monitor hire-purchase installment milestones, overdue cycles, and monthly repayment compliance.
                 </p>
                 <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-                  All customer installment facilities are currently monitored with zero defaults across active branches.
+                  All customer installment plans are currently monitored with zero defaults.
                 </div>
               </div>
             </div>
@@ -930,7 +930,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* MODAL: Customise Ageing Cards */}
       {/* ------------------------------------------------------------- */}
       {showAgeingConfigModal && (
-        <div className="modal-backdrop" onClick={() => setShowAgeingConfigModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -1000,7 +1003,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       {/* MODAL: View Customer Statement */}
       {/* ------------------------------------------------------------- */}
       {selectedStatement && (
-        <div className="modal-backdrop" onClick={() => setSelectedStatement(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

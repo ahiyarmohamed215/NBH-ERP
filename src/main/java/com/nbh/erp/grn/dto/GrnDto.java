@@ -34,6 +34,9 @@ public class GrnDto {
     private List<GrnItemDto> items;
     private String createdBy;
     private LocalDateTime createdAt;
+    private LocalDateTime cancelledAt;
+    private String cancelledBy;
+    private String cancelReason;
 
     public static GrnDto from(Grn grn) {
         return GrnDto.builder()
@@ -52,6 +55,9 @@ public class GrnDto {
                 .notes(grn.getNotes())
                 .createdBy(grn.getCreatedBy())
                 .createdAt(grn.getCreatedAt())
+                .cancelledAt(grn.getCancelledAt())
+                .cancelledBy(grn.getCancelledBy())
+                .cancelReason(grn.getCancelReason())
                 .items(grn.getItems() != null
                         ? grn.getItems().stream().map(GrnItemDto::from).collect(Collectors.toList())
                         : List.of())

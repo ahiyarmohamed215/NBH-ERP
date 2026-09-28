@@ -9,7 +9,7 @@ import {
   Trash2,
   RefreshCw,
   RotateCcw,
-  Eye,
+  Edit2,
   X,
   ArrowRight,
   Package,
@@ -198,6 +198,33 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
       setSelectedGtn(res.data);
     } catch (err) {
       addToast('Failed to load GTN details: ' + err.message, 'error');
+    }
+  };
+
+  const handleEditGtn = async (g) => {
+    if (g.status === 'TRANSFERRED' || g.status === 'COMPLETED') {
+      addToast(`GTN ${g.gtnNumber} is already completed/transferred. Cannot be modified.`, 'info');
+      handleInspectGtn(g.id);
+      return;
+    }
+    try {
+      const res = await gtnApi.getById(g.id);
+      const fullGtn = res.data;
+      setFormData({
+        sourceWarehouseId: fullGtn.sourceWarehouseId || '',
+        destinationWarehouseId: fullGtn.destinationWarehouseId || '',
+        remarks: fullGtn.remarks || '',
+        items: (fullGtn.items || []).map((it) => ({
+          productId: it.productId,
+          productCode: it.productSku || '',
+          productName: it.productName || '',
+          unitOfMeasure: it.unitOfMeasure || 'PCS',
+          quantity: Number(it.quantity || 1),
+        })),
+      });
+      setShowCreateModal(true);
+    } catch (err) {
+      addToast('Failed to load GTN for editing: ' + err.message, 'error');
     }
   };
 
@@ -619,7 +646,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleInspectGtn(g.id);
+                                handleEditGtn(g);
                               }}
                               style={{
                                 width: '30px',
@@ -636,9 +663,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                               }}
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
                               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                              title="Inspect GTN Transfer"
+                              title="Edit GTN Transfer"
                             >
-                              <Eye size={13} />
+                              <Edit2 size={13} />
                             </button>
                             <button
                               type="button"
@@ -716,18 +743,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreateModal(false);
+            padding: '12px',
+            overflowY: 'auto',
           }}
         >
           <div
             style={{
-              width: '96vw',
-              maxWidth: '1200px',
-              height: '90vh',
-              maxHeight: '90vh',
+              width: 'min(1280px, 98vw)',
+              maxWidth: '1280px',
+              height: 'min(95vh, calc(100vh - 24px))',
+              maxHeight: 'calc(100vh - 24px)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -735,6 +760,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               flexDirection: 'column',
               overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div
@@ -1056,10 +1082,21 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
 
       {/* GTN Inspection Drawer / Modal */}
       {selectedGtn && (
-        <div className="modal-backdrop" onClick={() => setSelectedGtn(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
+            style={{
+              width: 'min(1020px, 96vw)',
+              maxWidth: '1020px',
+              maxHeight: 'calc(100vh - 24px)',
+              overflowY: 'auto',
+              padding: '24px',
+              background: '#ffffff',
+              borderRadius: '14px',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>

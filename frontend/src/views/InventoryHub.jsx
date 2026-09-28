@@ -178,73 +178,40 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       let items = [];
 
       if (fetchedBalances.length > 0) {
-        items = fetchedBalances.map((b) => {
-          const prod = fetchedProducts.find((p) => p.id === b.productId || p.sku === b.productSku);
-          const brandName = getBrandForProduct(prod || b);
-          const qty = Number(b.quantity ?? 0);
-          const reserved = Number(b.reservedQuantity ?? 0);
-          const avail = Number(b.availableQuantity ?? (qty - reserved));
-          const cost = Number(b.costPrice ?? prod?.costPrice ?? 0);
-          const sell = Number(b.sellingPrice ?? prod?.sellingPrice ?? 0);
-          const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 5);
-          return {
-            id: b.id || `bal-${b.productId}-${b.warehouseId}`,
-            warehouseId: b.warehouseId || primaryWh.id,
-            warehouseName: b.warehouseName || primaryWh.name,
-            warehouseCode: b.warehouseCode || primaryWh.code,
-            productId: b.productId || prod?.id,
-            sku: b.productSku || prod?.sku || '—',
-            productName: b.productName || prod?.name || 'Unknown Product',
-            brandName: brandName,
-            categoryName: prod?.categoryName || 'General',
-            unitOfMeasure: b.unitOfMeasure || prod?.unitOfMeasure || 'PCS',
-            quantity: qty,
-            reservedQuantity: reserved,
-            availableQuantity: avail,
-            costPrice: cost,
-            sellingPrice: sell,
-            totalCostValue: Number(b.totalCostValue ?? (qty * cost)),
-            minStockLevel: min,
-            isLowStock: qty <= min && qty > 0,
-            isOutOfStock: qty <= 0,
-          };
-        });
-      }
-
-      // If any products are not in balances, synthesize rows so user sees all products in inventory
-      const existingProductIds = new Set(items.map((it) => it.productId));
-      fetchedProducts.forEach((prod) => {
-        if (!existingProductIds.has(prod.id)) {
-          const matchingAdjs = adjustmentRecords.filter((a) => a.sku === prod.sku || a.productName === prod.name);
-          const netAdjQty = matchingAdjs.reduce((acc, curr) => acc + Number(curr.quantity || 0), 0);
-          const qty = Math.max(0, netAdjQty);
-          const cost = Number(prod.costPrice || 0);
-          const sell = Number(prod.sellingPrice || 0);
-          const min = Number(prod.minStockLevel || 5);
-          const brandName = getBrandForProduct(prod);
-          items.push({
-            id: `prod-bal-${prod.id}`,
-            warehouseId: primaryWh.id,
-            warehouseName: primaryWh.name,
-            warehouseCode: primaryWh.code,
-            productId: prod.id,
-            sku: prod.sku || '—',
-            productName: prod.name || 'Unnamed Product',
-            brandName: brandName,
-            categoryName: prod.categoryName || 'General',
-            unitOfMeasure: prod.unitOfMeasure || 'PCS',
-            quantity: qty,
-            reservedQuantity: 0,
-            availableQuantity: qty,
-            costPrice: cost,
-            sellingPrice: sell,
-            totalCostValue: qty * cost,
-            minStockLevel: min,
-            isLowStock: qty <= min && qty > 0,
-            isOutOfStock: qty <= 0,
+        items = fetchedBalances
+          .filter((b) => Number(b.quantity ?? 0) > 0)
+          .map((b) => {
+            const prod = fetchedProducts.find((p) => p.id === b.productId || p.sku === b.productSku);
+            const brandName = getBrandForProduct(prod || b);
+            const qty = Number(b.quantity ?? 0);
+            const reserved = Number(b.reservedQuantity ?? 0);
+            const avail = Number(b.availableQuantity ?? (qty - reserved));
+            const cost = Number(b.costPrice ?? prod?.costPrice ?? 0);
+            const sell = Number(b.sellingPrice ?? prod?.sellingPrice ?? 0);
+            const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 5);
+            return {
+              id: b.id || `bal-${b.productId}-${b.warehouseId}`,
+              warehouseId: b.warehouseId || primaryWh.id,
+              warehouseName: b.warehouseName || primaryWh.name,
+              warehouseCode: b.warehouseCode || primaryWh.code,
+              productId: b.productId || prod?.id,
+              sku: b.productSku || prod?.sku || '—',
+              productName: b.productName || prod?.name || 'Unknown Product',
+              brandName: brandName,
+              categoryName: prod?.categoryName || 'General',
+              unitOfMeasure: b.unitOfMeasure || prod?.unitOfMeasure || 'PCS',
+              quantity: qty,
+              reservedQuantity: reserved,
+              availableQuantity: avail,
+              costPrice: cost,
+              sellingPrice: sell,
+              totalCostValue: Number(b.totalCostValue ?? (qty * cost)),
+              minStockLevel: min,
+              isLowStock: qty <= min && qty > 0,
+              isOutOfStock: qty <= 0,
+            };
           });
-        }
-      });
+      }
 
       setInventoryBalances(items);
     } catch (err) {
@@ -1620,7 +1587,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* MODAL: New Stock Adjustment Record (Exact Matching User Screenshots) */}
       {/* ------------------------------------------------------------- */}
       {showCreateModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -2126,7 +2096,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* MODAL: View Adjustment Record Details */}
       {/* ------------------------------------------------------------- */}
       {viewingRecord && (
-        <div className="modal-backdrop" onClick={() => setViewingRecord(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -2210,7 +2183,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* MODAL: View Stock Item Details (Wide, Scroll-Free Executive View) */}
       {/* ------------------------------------------------------------- */}
       {viewingStockItem && (
-        <div className="modal-backdrop" onClick={() => setViewingStockItem(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -2333,7 +2309,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.categoryName}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Warehouse Facility</span>
+                    <span style={{ color: '#64748b' }}>Warehouse Location</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.warehouseName}</span>
                   </div>
                 </div>

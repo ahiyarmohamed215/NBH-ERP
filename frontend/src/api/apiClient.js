@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_ORIGIN}/api/v1`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -147,8 +149,10 @@ export const grnApi = {
   search: (params) => api.get('/grns', { params }),
   getById: (id) => api.get(`/grns/${id}`),
   create: (data, process = false) => api.post(`/grns?process=${process}`, data),
+  update: (id, data, process = false) => api.put(`/grns/${id}?process=${process}`, data),
   process: (id) => api.post(`/grns/${id}/process`),
-  cancel: (id) => api.post(`/grns/${id}/cancel`),
+  cancel: (id, data) => api.post(`/grns/${id}/cancel`, data),
+  delete: (id) => api.delete(`/grns/${id}`),
 };
 
 export const gtnApi = {
@@ -230,7 +234,7 @@ export const reportApi = {
   getOutstandingPayments: () =>
     api.get('/reports/outstanding-payments'),
   getExcelDownloadUrl: (warehouseId) =>
-    `/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
+    `${API_ORIGIN}/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
 };
 
 export const printPdfDocument = (pdfUrl) => {
@@ -284,15 +288,15 @@ export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pd
 };
 
 export const pdfApi = {
-  getInvoicePdfUrl: (id) => `/api/v1/pdf/invoices/${id}`,
-  getGrnPdfUrl: (id) => `/api/v1/pdf/grns/${id}`,
-  getGtnPdfUrl: (id) => `/api/v1/pdf/gtns/${id}`,
-  printInvoice: (id) => printPdfDocument(`/api/v1/pdf/invoices/${id}`),
-  downloadInvoice: (id, num) => downloadPdfDocument(`/api/v1/pdf/invoices/${id}`, `Invoice-${num || id}.pdf`),
-  printGrn: (id) => printPdfDocument(`/api/v1/pdf/grns/${id}`),
-  downloadGrn: (id, num) => downloadPdfDocument(`/api/v1/pdf/grns/${id}`, `GRN-${num || id}.pdf`),
-  printGtn: (id) => printPdfDocument(`/api/v1/pdf/gtns/${id}`),
-  downloadGtn: (id, num) => downloadPdfDocument(`/api/v1/pdf/gtns/${id}`, `GTN-${num || id}.pdf`),
+  getInvoicePdfUrl: (id) => `${API_ORIGIN}/api/v1/pdf/invoices/${id}`,
+  getGrnPdfUrl: (id) => `${API_ORIGIN}/api/v1/pdf/grns/${id}`,
+  getGtnPdfUrl: (id) => `${API_ORIGIN}/api/v1/pdf/gtns/${id}`,
+  printInvoice: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/invoices/${id}`),
+  downloadInvoice: (id, num) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/invoices/${id}`, `Invoice-${num || id}.pdf`),
+  printGrn: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/grns/${id}`),
+  downloadGrn: (id, num) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/grns/${id}`, `GRN-${num || id}.pdf`),
+  printGtn: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/gtns/${id}`),
+  downloadGtn: (id, num) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/gtns/${id}`, `GTN-${num || id}.pdf`),
   printPdf: printPdfDocument,
   downloadPdf: downloadPdfDocument,
 };

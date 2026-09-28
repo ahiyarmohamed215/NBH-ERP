@@ -84,6 +84,7 @@ export default function InventoryView({ onNavigate }) {
   };
 
   const filteredBalances = balances.filter((b) => {
+    if (Number(b.quantity || 0) <= 0) return false;
     const q = balanceSearch.toLowerCase();
     return (
       b.productName?.toLowerCase().includes(q) ||

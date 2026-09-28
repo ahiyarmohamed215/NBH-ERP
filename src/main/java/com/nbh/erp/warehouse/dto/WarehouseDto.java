@@ -21,7 +21,6 @@ public class WarehouseDto {
     private String contactNumber;
     private String contactPerson;
     private Boolean isActive;
-    private Boolean isPrimary;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,7 +38,6 @@ public class WarehouseDto {
                 .contactNumber(w.getPhone())
                 .contactPerson(w.getContactPerson())
                 .isActive(w.getIsActive())
-                .isPrimary(w.getIsPrimary())
                 .createdAt(w.getCreatedAt())
                 .updatedAt(w.getUpdatedAt())
                 .build();

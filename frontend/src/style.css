@@ -451,7 +451,8 @@ textarea:disabled {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 24px;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 /* Profile Dropdown Menu */

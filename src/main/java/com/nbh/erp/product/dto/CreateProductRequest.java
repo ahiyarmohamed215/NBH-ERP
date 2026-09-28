@@ -32,13 +32,19 @@ public class CreateProductRequest {
 
     private Long supplierId;
 
+    private Long warehouseId;
+
+    private Long defaultWarehouseId;
+
+    public Long getEffectiveWarehouseId() {
+        return warehouseId != null ? warehouseId : defaultWarehouseId;
+    }
+
     private String unitOfMeasure = "PCS";
 
-    @NotNull(message = "Cost price is required")
     @PositiveOrZero(message = "Cost price cannot be negative")
     private BigDecimal costPrice;
 
-    @NotNull(message = "Selling price is required")
     @PositiveOrZero(message = "Selling price cannot be negative")
     private BigDecimal sellingPrice;
 

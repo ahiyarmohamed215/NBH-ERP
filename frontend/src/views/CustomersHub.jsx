@@ -175,37 +175,42 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       const rawSalesmen = sRes.status === 'fulfilled' ? (sRes.value.data || sRes.value || []) : [];
       const rawUsers = uRes.status === 'fulfilled' ? (uRes.value.data?.content || uRes.value.data || uRes.value || []) : [];
 
-      // Combine sales representatives and staff members so all sales reps show up
-      const combinedReps = [];
+      // Combine all employees and staff members so ANY responsible staff (sales reps, delivery officers, drivers, managers, etc.) can be assigned
+      const combinedStaff = [];
       const seen = new Set();
-
-      rawSalesmen.forEach((s) => {
-        const name = s.name || s.fullName;
-        if (name && !seen.has(name.toLowerCase())) {
-          seen.add(name.toLowerCase());
-          combinedReps.push({
-            id: String(s.id),
-            name: name,
-            salesmanCode: s.salesmanCode || s.code || 'REP',
-            phone: s.phone || '',
-          });
-        }
-      });
 
       rawUsers.forEach((u) => {
         const name = u.fullName || u.username;
-        if (name && !seen.has(name.toLowerCase())) {
-          seen.add(name.toLowerCase());
-          combinedReps.push({
+        if (name && !seen.has(String(u.id))) {
+          seen.add(String(u.id));
+          const roles = Array.isArray(u.roles)
+            ? u.roles.map((r) => (typeof r === 'string' ? r.replace('ROLE_', '') : r?.name?.replace('ROLE_', ''))).join(', ')
+            : '';
+          combinedStaff.push({
             id: String(u.id),
             name: name,
             salesmanCode: u.employeeCode || u.username || 'EMP',
+            role: roles || 'Staff Member',
             phone: u.phone || '',
           });
         }
       });
 
-      setSalesmen(combinedReps);
+      rawSalesmen.forEach((s) => {
+        const name = s.name || s.fullName;
+        if (name && !seen.has(String(s.id))) {
+          seen.add(String(s.id));
+          combinedStaff.push({
+            id: String(s.id),
+            name: name,
+            salesmanCode: s.salesmanCode || s.code || 'REP',
+            role: 'Sales Representative',
+            phone: s.phone || '',
+          });
+        }
+      });
+
+      setSalesmen(combinedStaff);
 
       // Load routes from backend
       if (rRes.status === 'fulfilled') {
@@ -218,8 +223,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           routeName: r.routeName || r.name,
           routeCode: r.routeCode || '',
           description: r.description || '',
-          salesmanId: r.salesRepId ? String(r.salesRepId) : '',
-          salesmanName: r.salesRepName || '',
+          salesmanId: r.assignedStaffId || r.salesRepId ? String(r.assignedStaffId || r.salesRepId) : '',
+          salesmanName: r.assignedStaffName || r.salesRepName || '',
+          assignedStaffId: r.assignedStaffId || r.salesRepId ? String(r.assignedStaffId || r.salesRepId) : '',
+          assignedStaffName: r.assignedStaffName || r.salesRepName || '',
           customerIds: (r.customerIds || []).map(String),
           createdAt: r.createdAt || new Date().toISOString(),
         }));
@@ -631,8 +638,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     const q = routeSearchTerm.trim().toLowerCase();
     if (!q) return routes;
     return routes.filter((r) => {
-      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId));
-      const repName = (r.salesmanName || assignedSalesman?.name || '').toLowerCase();
+      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId || r.assignedStaffId));
+      const repName = (r.assignedStaffName || r.salesmanName || assignedSalesman?.name || '').toLowerCase();
       const name = (r.name || '').toLowerCase();
       const desc = (r.description || '').toLowerCase();
       return name.includes(q) || repName.includes(q) || desc.includes(q);
@@ -836,11 +843,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
     const assignedSalesman = salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId));
     const salesmanName = assignedSalesman?.name || '';
+    const staffIdNum = routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null;
     const payload = {
       routeName: routeEditForm.name.trim(),
       routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
-      salesRepId: routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null,
+      salesRepId: staffIdNum,
+      assignedStaffId: staffIdNum,
       customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
     };
 
@@ -848,14 +857,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       if (isCreatingRoute) {
         const res = await routeApi.create(payload);
         const created = res.data?.data || res.data || res;
+        const assignedId = created.assignedStaffId || created.salesRepId;
         const normalized = {
           id: created.id,
           name: created.routeName || created.name,
           routeName: created.routeName || created.name,
           routeCode: created.routeCode || '',
           description: created.description || '',
-          salesmanId: created.salesRepId ? String(created.salesRepId) : '',
-          salesmanName: created.salesRepName || salesmanName,
+          salesmanId: assignedId ? String(assignedId) : '',
+          salesmanName: created.assignedStaffName || created.salesRepName || salesmanName,
+          assignedStaffId: assignedId ? String(assignedId) : '',
+          assignedStaffName: created.assignedStaffName || created.salesRepName || salesmanName,
           customerIds: (created.customerIds || []).map(String),
           createdAt: created.createdAt || new Date().toISOString(),
         };
@@ -864,14 +876,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       } else if (selectedRoute) {
         const res = await routeApi.update(selectedRoute.id, payload);
         const updated = res.data?.data || res.data || res;
+        const assignedId = updated.assignedStaffId || updated.salesRepId;
         const normalized = {
           id: updated.id,
           name: updated.routeName || updated.name,
           routeName: updated.routeName || updated.name,
           routeCode: updated.routeCode || '',
           description: updated.description || '',
-          salesmanId: updated.salesRepId ? String(updated.salesRepId) : '',
-          salesmanName: updated.salesRepName || salesmanName,
+          salesmanId: assignedId ? String(assignedId) : '',
+          salesmanName: updated.assignedStaffName || updated.salesRepName || salesmanName,
+          assignedStaffId: assignedId ? String(assignedId) : '',
+          assignedStaffName: updated.assignedStaffName || updated.salesRepName || salesmanName,
           customerIds: (updated.customerIds || []).map(String),
           createdAt: selectedRoute.createdAt || new Date().toISOString(),
         };
@@ -966,10 +981,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast('No routes to export', 'error');
       return;
     }
-    const headers = ['Route Name', 'Assigned Representative', 'Total Customers', 'Description', 'Created Date'];
+    const headers = ['Route Name', 'Assigned Staff', 'Total Customers', 'Description', 'Created Date'];
     const rows = (filteredRoutes.length > 0 ? filteredRoutes : routes).map((r) => {
-      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId));
-      const repName = r.salesmanName || assignedSalesman?.name || 'Unassigned';
+      const assignedStaff = salesmen.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
+      const repName = r.assignedStaffName || r.salesmanName || assignedStaff?.name || 'Unassigned';
       const count = r.customerIds?.length || 0;
       const createdDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—';
       return [
@@ -1882,8 +1897,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             ) : (
               filteredRoutes.map((route) => {
               const count = route.customerIds?.length || 0;
-              const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.salesmanId));
-              const repName = route.salesmanName || assignedSalesman?.name;
+              const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.assignedStaffId || route.salesmanId));
+              const repName = route.assignedStaffName || route.salesmanName || assignedSalesman?.name;
 
               return (
                 <div
@@ -1949,7 +1964,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       {route.description || 'No description added'}
                     </p>
 
-                    {/* Sales Representative */}
+                    {/* Responsible Staff */}
                     <p
                       style={{
                         color: repName ? '#0369a1' : '#64748b',
@@ -1962,7 +1977,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                     >
                       <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
-                      {repName ? `Sales Rep: ${repName}` : 'No sales representative assigned'}
+                      {repName ? `Responsible Staff: ${repName}` : 'No responsible staff assigned'}
                     </p>
                   </div>
 
@@ -1992,7 +2007,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* MODAL: Customer Group & Route View Popup (Split 2 Columns)   */}
       {/* ------------------------------------------------------------- */}
       {(selectedRoute || isCreatingRoute) && (
-        <div className="modal-backdrop" onClick={handleCloseRouteView}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -2107,10 +2125,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     />
                   </div>
 
-                  {/* Sales Rep Dropdown */}
+                  {/* Responsible Staff Dropdown */}
                   <div style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Assigned Sales Representative
+                      Assigned Responsible Staff / Officer
                     </label>
                     <select
                       value={routeEditForm.salesmanId}
@@ -2133,7 +2151,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       <option value="">None (Unassigned)</option>
                       {salesmen.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} ({s.salesmanCode || 'Sales Rep'})
+                          {s.name} {s.role ? `— ${s.role}` : (s.salesmanCode ? `(${s.salesmanCode})` : '')}
                         </option>
                       ))}
                     </select>
@@ -2501,8 +2519,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {showAssignCustomerModal && (
         <div
           className="modal-backdrop"
-          style={{ zIndex: 1100, backgroundColor: 'rgba(15, 23, 42, 0.55)' }}
-          onClick={() => setShowAssignCustomerModal(false)}
+          style={{ padding: '12px', zIndex: 1100, backgroundColor: 'rgba(15, 23, 42, 0.55)', overflowY: 'auto' }}
         >
           <div
             className="glass-modal"
@@ -4243,7 +4260,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* MODAL: Customer Profile View Popup (When clicking any row)   */}
       {/* ------------------------------------------------------------- */}
       {viewingCustomer && (
-        <div className="modal-backdrop" onClick={() => setViewingCustomer(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4499,11 +4519,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     })()}
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Sales Representative(s)</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Responsible Staff / Officer</span>
                     <span style={{ fontWeight: 500, color: '#0f172a' }}>
                       {(() => {
                         const cRoutes = getCustomerRoutes(viewingCustomer.id);
-                        const reps = [...new Set(cRoutes.map((r) => r.salesmanName).filter(Boolean))];
+                        const reps = [...new Set(cRoutes.map((r) => r.assignedStaffName || r.salesmanName).filter(Boolean))];
                         return reps.length > 0 ? reps.join(', ') : 'None assigned';
                       })()}
                     </span>
@@ -4569,7 +4589,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* MODAL: Customer History Document Preview Modal                */}
       {/* ------------------------------------------------------------- */}
       {previewModalDoc && (
-        <div className="modal-backdrop" onClick={() => setPreviewModalDoc(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4743,7 +4766,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* MODAL: Add / Edit Customer */}
       {/* ------------------------------------------------------------- */}
       {showCustomerModal && (
-        <div className="modal-backdrop" onClick={() => setShowCustomerModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4895,7 +4921,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   <option value="">-- No Route Assigned --</option>
                   {routes.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name || r.routeName} {r.routeCode ? `(${r.routeCode})` : ''} {r.salesmanName ? `— Rep: ${r.salesmanName}` : ''}
+                      {r.name || r.routeName} {r.routeCode ? `(${r.routeCode})` : ''} {(r.assignedStaffName || r.salesmanName) ? `— Staff: ${r.assignedStaffName || r.salesmanName}` : ''}
                     </option>
                   ))}
                 </select>
@@ -4952,8 +4978,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {securityModalData && (
         <div
           className="modal-backdrop"
-          style={{ zIndex: 1200 }}
-          onClick={() => !isExecutingDelete && setSecurityModalData(null)}
+          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
         >
           <div
             className="glass-modal"

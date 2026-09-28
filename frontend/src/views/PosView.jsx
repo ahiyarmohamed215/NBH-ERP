@@ -250,12 +250,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     // 1. Filter warehouses that have available stock for this product
     const whsWithStock = warehouses.filter((wh) => getProductStockInWarehouse(product.id, wh.id) > 0);
 
-    // 2. If product has warehouses with stock, use those; otherwise fallback to assigned/primary
+    // 2. If product has warehouses with stock, use those; otherwise fallback to assigned warehouse or first warehouse
     const availableWhs = whsWithStock.length > 0
       ? whsWithStock
       : (product.warehouseId
           ? warehouses.filter((w) => w.id === product.warehouseId)
-          : (warehouses.filter((w) => w.isPrimary) || [warehouses[0]]));
+          : (warehouses.length > 0 ? [warehouses[0]] : []));
 
     const autoWarehouse = availableWhs[0] || warehouses[0] || null;
     const realQty = autoWarehouse ? getProductStockInWarehouse(product.id, autoWarehouse.id) : 0;
@@ -1644,10 +1644,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       
       {/* POPUP 1: My Billing Details Modal */}
       {activeCircleModal === 'my' && (
-        <div className="modal-backdrop" onClick={() => setActiveCircleModal(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '720px', padding: '26px', borderRadius: '14px', maxHeight: '88vh', overflowY: 'auto' }}
+            style={{ width: 'min(720px, 96vw)', maxWidth: '720px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1789,10 +1792,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
       {/* POPUP 2: Max Record / Top Performer Benchmark Modal */}
       {activeCircleModal === 'max' && (
-        <div className="modal-backdrop" onClick={() => setActiveCircleModal(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '640px', padding: '26px', borderRadius: '14px' }}
+            style={{ width: 'min(640px, 96vw)', maxWidth: '640px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1891,10 +1897,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
       {/* POPUP 3: All Staffs Performance & Bills Details Modal */}
       {activeCircleModal === 'all' && (
-        <div className="modal-backdrop" onClick={() => setActiveCircleModal(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '880px', padding: '26px', borderRadius: '14px', maxHeight: '88vh', overflowY: 'auto' }}
+            style={{ width: 'min(880px, 96vw)', maxWidth: '880px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -2079,10 +2088,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
       {/* POPUP: Bill Detail Inspection Modal (Shows all products/details in any bill) */}
       {selectedInvoiceDetail && (
-        <div className="modal-backdrop" onClick={() => setSelectedInvoiceDetail(null)} style={{ zIndex: 1200 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '640px', padding: '24px', borderRadius: '12px' }}
+            style={{ width: 'min(640px, 96vw)', maxWidth: '640px', padding: '24px', borderRadius: '12px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -2160,10 +2172,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           HELD CARTS MODAL
          ───────────────────────────────────────────────────────────── */}
       {showHeldModal && (
-        <div className="modal-backdrop" onClick={() => setShowHeldModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '800px', padding: '24px', borderRadius: '12px' }}
+            style={{ width: 'min(800px, 96vw)', maxWidth: '800px', padding: '24px', borderRadius: '12px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>

@@ -22,8 +22,13 @@ public class CreateRouteRequest {
     private String description;
 
     private Long salesRepId;
+    private Long assignedStaffId;
 
     private String deliveryDays;
 
     private java.util.List<Long> customerIds;
+
+    public Long getEffectiveStaffId() {
+        return assignedStaffId != null ? assignedStaffId : salesRepId;
+    }
 }

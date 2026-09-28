@@ -25,6 +25,11 @@ public class ProductDto {
     private String brandName;
     private Long supplierId;
     private String supplierName;
+    private Long warehouseId;
+    private String warehouseName;
+    private String warehouseCode;
+    private Long defaultWarehouseId;
+    private String defaultWarehouseName;
     private String unitOfMeasure;
     private BigDecimal costPrice;
     private BigDecimal sellingPrice;
@@ -50,6 +55,11 @@ public class ProductDto {
                 .brandName(p.getBrand() != null ? p.getBrand().getName() : null)
                 .supplierId(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getId() : null)
                 .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getName() : null)
+                .warehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)
+                .warehouseName(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getName() : null)
+                .warehouseCode(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getCode() : null)
+                .defaultWarehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)
+                .defaultWarehouseName(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getName() : null)
                 .unitOfMeasure(p.getUnitOfMeasure())
                 .costPrice(p.getCostPrice())
                 .sellingPrice(p.getSellingPrice())

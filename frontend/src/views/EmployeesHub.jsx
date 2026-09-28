@@ -1440,10 +1440,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
       {/* Add Employee Modal */}
       {showAddModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '620px', padding: '28px' }}
+            style={{ width: 'min(620px, 96vw)', maxWidth: '620px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1592,10 +1595,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
       {/* Edit Employee Modal */}
       {showEditModal && selectedEmployee && (
-        <div className="modal-backdrop" onClick={() => setShowEditModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '620px', padding: '28px' }}
+            style={{ width: 'min(620px, 96vw)', maxWidth: '620px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1738,10 +1744,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
       {/* Complete & Approve Modal */}
       {showApproveModal && selectedEmployee && (
-        <div className="modal-backdrop" onClick={() => setShowApproveModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '540px', padding: '28px' }}
+            style={{ width: 'min(540px, 96vw)', maxWidth: '540px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
@@ -1855,7 +1864,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {/* MODAL: Employee Profile View Popup (When clicking row / View)  */}
       {/* ------------------------------------------------------------- */}
       {viewingEmployee && (
-        <div className="modal-backdrop" onClick={() => setViewingEmployee(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -2184,7 +2196,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {/* MODAL: Delete Employee Confirmation Dialog                     */}
       {/* ------------------------------------------------------------- */}
       {employeeToDelete && (
-        <div className="modal-backdrop" onClick={() => !deletingId && setEmployeeToDelete(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

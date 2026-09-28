@@ -51,7 +51,7 @@ export default function AdjustmentsView() {
   }, []);
 
   const resetForm = (whList = warehouses, prodList = products, stockMap = warehouseStock) => {
-    const defaultWh = whList.find((w) => w.isPrimary)?.id || (whList.length > 0 ? whList[0].id : '');
+    const defaultWh = whList.length > 0 ? whList[0].id : '';
     const defaultProd = prodList.length > 0 ? prodList[0] : null;
     const sysQty = defaultProd ? stockMap[defaultProd.id] || 0 : 0;
 
@@ -105,7 +105,7 @@ export default function AdjustmentsView() {
       setWarehouses(whList);
       setProducts(prodList);
 
-      const targetWh = formData.warehouseId || (whList.find((w) => w.isPrimary)?.id || (whList.length > 0 ? whList[0].id : ''));
+      const targetWh = formData.warehouseId || (whList.length > 0 ? whList[0].id : '');
       const stockMap = await loadStockForWarehouse(targetWh);
 
       if (formData.items.length === 0) {
@@ -325,7 +325,7 @@ export default function AdjustmentsView() {
               >
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} {w.isPrimary ? '(Primary)' : ''}
+                    {w.name}
                   </option>
                 ))}
               </select>
@@ -671,10 +671,13 @@ export default function AdjustmentsView() {
 
       {/* Inspection Drawer / Modal */}
       {selectedAdj && (
-        <div className="modal-backdrop" onClick={() => setSelectedAdj(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
+            style={{ width: 'min(1020px, 96vw)', maxWidth: '1020px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px', background: '#ffffff', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>

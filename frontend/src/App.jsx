@@ -131,7 +131,7 @@ export default function App() {
         icon: FileText,
         permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN'],
         subItems: [
-          { id: 'sales', label: 'Sales List', permission: 'SALES_VIEW' },
+          { id: 'sales', label: 'Sales Invoices', permission: 'SALES_VIEW' },
           { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
           { id: 'payments', label: 'Payments', permission: 'SALES_CREATE' },

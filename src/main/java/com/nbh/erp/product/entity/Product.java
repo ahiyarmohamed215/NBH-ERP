@@ -4,6 +4,7 @@ import com.nbh.erp.brand.entity.Brand;
 import com.nbh.erp.category.entity.Category;
 import com.nbh.erp.common.entity.BaseEntity;
 import com.nbh.erp.supplier.entity.Supplier;
+import com.nbh.erp.warehouse.entity.Warehouse;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -48,6 +49,10 @@ public class Product extends BaseEntity {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "supplier_id")
     private Supplier defaultSupplier;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse defaultWarehouse;
 
     @Column(name = "unit_of_measure", nullable = false, length = 20)
     @Builder.Default

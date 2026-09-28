@@ -2,6 +2,7 @@ package com.nbh.erp.grn.controller;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.common.dto.PagedResponse;
+import com.nbh.erp.grn.dto.CancelGrnRequest;
 import com.nbh.erp.grn.dto.CreateGrnRequest;
 import com.nbh.erp.grn.dto.GrnDto;
 import com.nbh.erp.grn.service.GrnService;
@@ -62,11 +63,35 @@ public class GrnController {
         return ResponseEntity.ok(ApiResponse.ok("GRN processed and inventory updated", processed));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
+    @Operation(summary = "Update an existing draft Goods Received Note (pass ?process=true to auto-process)")
+    public ResponseEntity<ApiResponse<GrnDto>> updateGrn(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateGrnRequest request,
+            @RequestParam(required = false, defaultValue = "false") boolean process
+    ) {
+        GrnDto updated = grnService.updateGrn(id, request, process);
+        return ResponseEntity.ok(ApiResponse.ok("GRN updated successfully", updated));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
+    @Operation(summary = "Delete an un-processed draft GRN")
+    public ResponseEntity<ApiResponse<Void>> deleteGrn(@PathVariable Long id) {
+        grnService.deleteGrn(id);
+        return ResponseEntity.ok(ApiResponse.ok("Draft GRN deleted successfully", null));
+    }
+
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
-    @Operation(summary = "Cancel an un-processed draft GRN")
-    public ResponseEntity<ApiResponse<Void>> cancelGrn(@PathVariable Long id) {
-        grnService.cancelGrn(id);
-        return ResponseEntity.ok(ApiResponse.ok("GRN cancelled successfully", null));
+    @Operation(summary = "Cancel a processed or draft GRN and reverse stock balances")
+    public ResponseEntity<ApiResponse<GrnDto>> cancelGrn(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) CancelGrnRequest request
+    ) {
+        String reason = (request != null) ? request.getReason() : null;
+        GrnDto cancelled = grnService.cancelGrn(id, reason);
+        return ResponseEntity.ok(ApiResponse.ok("GRN cancelled and inventory reversed successfully", cancelled));
     }
 }

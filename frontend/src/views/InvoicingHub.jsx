@@ -46,7 +46,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // Sub-tabs ordered exactly per user workflow specification:
   // sales, hold bills, sales return, payments, advance payments, outstanding payments, quotation
   const INVOICING_TABS = [
-    { id: 'sales', label: 'Sales List', icon: FileText },
+    { id: 'sales', label: 'Sales Invoices', icon: FileText },
     { id: 'hold-bills', label: 'Hold Bills', icon: PauseCircle },
     { id: 'refunds', label: 'Sales Returns', icon: RotateCcw },
     { id: 'payments', label: 'Payments', icon: DollarSign },
@@ -3615,7 +3615,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Customise Columns */}
       {/* ------------------------------------------------------------- */}
       {showColumnModal && (
-        <div className="modal-backdrop" onClick={() => setShowColumnModal(false)} style={{ zIndex: 1050 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1050, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -3687,7 +3690,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: View Invoice Details */}
       {/* ------------------------------------------------------------- */}
       {selectedInvoice && (
-        <div className="modal-backdrop" onClick={() => setSelectedInvoice(null)} style={{ zIndex: 1200 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -3898,7 +3904,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Edit Commercial Invoice */}
       {/* ------------------------------------------------------------- */}
       {editingInvoice && (
-        <div className="modal-backdrop" onClick={() => setEditingInvoice(null)} style={{ zIndex: 1200 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4106,7 +4115,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Held Bill Inspection */}
       {/* ------------------------------------------------------------- */}
       {selectedHeldDetail && (
-        <div className="modal-backdrop" onClick={() => setSelectedHeldDetail(null)} style={{ zIndex: 1050 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1050, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{ width: '100%', maxWidth: '680px', padding: '24px', borderRadius: '14px', backgroundColor: '#ffffff' }}
@@ -4243,7 +4255,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Warehouse Stock Adjustment */}
       {/* ------------------------------------------------------------- */}
       {adjustingHeldBill && (
-        <div className="modal-backdrop" onClick={() => setAdjustingHeldBill(null)} style={{ zIndex: 1100 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4394,7 +4409,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Order Dispatch Note (ODN) & Merge */}
       {/* ------------------------------------------------------------- */}
       {dispatchNoteData && (
-        <div className="modal-backdrop" onClick={() => setDispatchNoteData(null)} style={{ zIndex: 1150 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1150, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4544,7 +4562,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Record Payment Receipt */}
       {/* ------------------------------------------------------------- */}
       {showRecordPaymentModal && (
-        <div className="modal-backdrop" onClick={() => setShowRecordPaymentModal(false)} style={{ zIndex: 1100 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4666,7 +4687,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Record Advance Payment */}
       {/* ------------------------------------------------------------- */}
       {showRecordAdvanceModal && (
-        <div className="modal-backdrop" onClick={() => setShowRecordAdvanceModal(false)} style={{ zIndex: 1100 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -4787,7 +4811,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Create Quotation */}
       {/* ------------------------------------------------------------- */}
       {showCreateQuotationModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateQuotationModal(false)} style={{ zIndex: 1100 }}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

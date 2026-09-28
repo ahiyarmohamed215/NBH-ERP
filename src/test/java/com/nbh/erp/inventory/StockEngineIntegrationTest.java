@@ -60,14 +60,12 @@ class StockEngineIntegrationTest {
                 .orElseGet(() -> warehouseRepository.save(Warehouse.builder()
                         .code("WH-TEST1")
                         .name("Test Warehouse 1")
-                        .isPrimary(true)
                         .build()));
 
         wh2 = warehouseRepository.findByCode("WH-SECONDARY")
                 .orElseGet(() -> warehouseRepository.save(Warehouse.builder()
                         .code("WH-TEST2")
                         .name("Test Warehouse 2")
-                        .isPrimary(false)
                         .build()));
 
         testProduct = productRepository.findBySku("TEST-PRD-001")

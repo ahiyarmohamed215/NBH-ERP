@@ -12,5 +12,4 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     Optional<Warehouse> findByCode(String code);
     boolean existsByCode(String code);
     List<Warehouse> findByIsActiveTrue();
-    Optional<Warehouse> findByIsPrimaryTrue();
 }

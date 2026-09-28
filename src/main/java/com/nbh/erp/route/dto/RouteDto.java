@@ -20,6 +20,8 @@ public class RouteDto {
     private String description;
     private Long salesRepId;
     private String salesRepName;
+    private Long assignedStaffId;
+    private String assignedStaffName;
     private String deliveryDays;
     private Boolean isActive;
     private Integer customerCount;
@@ -33,14 +35,19 @@ public class RouteDto {
 
     public static RouteDto from(Route route, java.util.List<Long> customerIds) {
         if (route == null) return null;
+        Long staffId = route.getSalesRep() != null ? route.getSalesRep().getId() : null;
+        String staffName = route.getSalesRep() != null ? (route.getSalesRep().getFullName() != null ? route.getSalesRep().getFullName() : route.getSalesRep().getUsername()) : null;
+
         return RouteDto.builder()
                 .id(route.getId())
                 .routeCode(route.getRouteCode())
                 .routeName(route.getRouteName())
                 .area(route.getArea())
                 .description(route.getDescription())
-                .salesRepId(route.getSalesRep() != null ? route.getSalesRep().getId() : null)
-                .salesRepName(route.getSalesRep() != null ? (route.getSalesRep().getFullName() != null ? route.getSalesRep().getFullName() : route.getSalesRep().getUsername()) : null)
+                .salesRepId(staffId)
+                .salesRepName(staffName)
+                .assignedStaffId(staffId)
+                .assignedStaffName(staffName)
                 .deliveryDays(route.getDeliveryDays())
                 .isActive(route.getIsActive())
                 .customerCount(customerIds != null ? customerIds.size() : 0)

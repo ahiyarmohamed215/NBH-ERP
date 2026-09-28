@@ -8,13 +8,15 @@ import com.nbh.erp.common.dto.PagedResponse;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
-import com.nbh.erp.inventory.repository.StockBalanceRepository;
+
 import com.nbh.erp.product.dto.CreateProductRequest;
 import com.nbh.erp.product.dto.ProductDto;
 import com.nbh.erp.product.entity.Product;
 import com.nbh.erp.product.repository.ProductRepository;
 import com.nbh.erp.supplier.entity.Supplier;
 import com.nbh.erp.supplier.repository.SupplierRepository;
+import com.nbh.erp.warehouse.entity.Warehouse;
+import com.nbh.erp.warehouse.repository.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,7 +38,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final SupplierRepository supplierRepository;
-    private final StockBalanceRepository stockBalanceRepository;
+    private final WarehouseRepository warehouseRepository;
 
     @Transactional(readOnly = true)
     public PagedResponse<ProductDto> getProductsPaginated(String query, Long categoryId, Pageable pageable) {
@@ -98,6 +101,13 @@ public class ProductService {
                     .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
         }
 
+        Warehouse warehouse = null;
+        Long targetWarehouseId = request.getEffectiveWarehouseId();
+        if (targetWarehouseId != null) {
+            warehouse = warehouseRepository.findById(targetWarehouseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", targetWarehouseId));
+        }
+
         Product product = Product.builder()
                 .sku(sku)
                 .barcode(StringUtils.hasText(request.getBarcode()) ? request.getBarcode().trim() : null)
@@ -106,9 +116,10 @@ public class ProductService {
                 .category(category)
                 .brand(brand)
                 .defaultSupplier(supplier)
+                .defaultWarehouse(warehouse)
                 .unitOfMeasure(StringUtils.hasText(request.getUnitOfMeasure()) ? request.getUnitOfMeasure().trim().toUpperCase() : "PCS")
-                .costPrice(request.getCostPrice())
-                .sellingPrice(request.getSellingPrice())
+                .costPrice(request.getCostPrice() != null ? request.getCostPrice() : BigDecimal.ZERO)
+                .sellingPrice(request.getSellingPrice() != null ? request.getSellingPrice() : BigDecimal.ZERO)
                 .minStockLevel(request.getMinStockLevel() != null ? request.getMinStockLevel() : 5)
                 .isActive(true)
                 .build();
@@ -159,6 +170,13 @@ public class ProductService {
                     .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
         }
 
+        Long targetWarehouseId = request.getEffectiveWarehouseId();
+        if (targetWarehouseId != null) {
+            Warehouse warehouse = warehouseRepository.findById(targetWarehouseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", targetWarehouseId));
+            product.setDefaultWarehouse(warehouse);
+        }
+
         product.setName(request.getName().trim());
         product.setDescription(request.getDescription());
         product.setCategory(category);
@@ -167,8 +185,12 @@ public class ProductService {
         if (StringUtils.hasText(request.getUnitOfMeasure())) {
             product.setUnitOfMeasure(request.getUnitOfMeasure().trim().toUpperCase());
         }
-        product.setCostPrice(request.getCostPrice());
-        product.setSellingPrice(request.getSellingPrice());
+        if (request.getCostPrice() != null) {
+            product.setCostPrice(request.getCostPrice());
+        }
+        if (request.getSellingPrice() != null) {
+            product.setSellingPrice(request.getSellingPrice());
+        }
         if (request.getMinStockLevel() != null) {
             product.setMinStockLevel(request.getMinStockLevel());
         }

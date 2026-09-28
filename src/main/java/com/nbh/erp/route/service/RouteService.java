@@ -64,9 +64,10 @@ public class RouteService {
             throw new DuplicateResourceException("Route", "code", code);
         }
 
-        User salesRep = null;
-        if (request.getSalesRepId() != null) {
-            salesRep = userRepository.findById(request.getSalesRepId()).orElse(null);
+        User assignedStaff = null;
+        Long staffId = request.getEffectiveStaffId();
+        if (staffId != null) {
+            assignedStaff = userRepository.findById(staffId).orElse(null);
         }
 
         Route route = Route.builder()
@@ -74,7 +75,7 @@ public class RouteService {
                 .routeName(request.getRouteName().trim())
                 .area(request.getArea())
                 .description(request.getDescription())
-                .salesRep(salesRep)
+                .salesRep(assignedStaff)
                 .deliveryDays(request.getDeliveryDays())
                 .isActive(true)
                 .build();
@@ -117,9 +118,10 @@ public class RouteService {
         route.setDescription(request.getDescription());
         route.setDeliveryDays(request.getDeliveryDays());
 
-        if (request.getSalesRepId() != null) {
-            User salesRep = userRepository.findById(request.getSalesRepId()).orElse(null);
-            route.setSalesRep(salesRep);
+        Long staffId = request.getEffectiveStaffId();
+        if (staffId != null) {
+            User assignedStaff = userRepository.findById(staffId).orElse(null);
+            route.setSalesRep(assignedStaff);
         } else {
             route.setSalesRep(null);
         }

@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +42,15 @@ public class Grn extends BaseEntity {
     @Column(nullable = false, length = 30)
     @Builder.Default
     private String status = "DRAFT"; // DRAFT, PROCESSED, CANCELLED
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by", length = 100)
+    private String cancelledBy;
+
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    private String cancelReason;
 
     @Column(name = "total_amount", nullable = false)
     @Builder.Default

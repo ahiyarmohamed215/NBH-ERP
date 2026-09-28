@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: nbh-erp-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon # or frankfurt / singapore
+    autoDeploy: true
+    healthCheckPath: /api/v1/auth/me # or /v3/api-docs
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DB_URL
+        sync: false
+        # Example Aiven JDBC URL:
+        # jdbc:mysql://<HOST>:<PORT>/defaultdb?sslMode=REQUIRED&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - key: DB_USERNAME
+        sync: false
+        # Example: avnadmin
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+        # Set to your Vercel URL, e.g.: https://your-erp.vercel.app,https://*.vercel.app
+      - key: INITIAL_ADMIN_ENABLED
+        value: "true"
+      - key: INITIAL_ADMIN_USERNAME
+        value: "admin"
+      - key: INITIAL_ADMIN_PASSWORD
+        value: "admin123"
+      - key: INITIAL_ADMIN_EMAIL
+        value: "admin@nbh.com"

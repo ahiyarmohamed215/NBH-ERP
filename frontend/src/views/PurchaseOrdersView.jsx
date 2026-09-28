@@ -8,7 +8,7 @@ import {
   CheckCircle,
   Trash2,
   RefreshCw,
-  Eye,
+  Edit2,
   X,
   Printer,
   Download,
@@ -27,8 +27,8 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Modal State for Creating PO (Full-Width & Full-Height)
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingPoId, setEditingPoId] = useState(null);
   // Modal State for Inspecting PO
   const [selectedPo, setSelectedPo] = useState(null);
 
@@ -109,6 +109,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     const wId = warehouses.length > 0 ? warehouses[0].id : '';
     const p = products.length > 0 ? products[0] : null;
 
+    setEditingPoId(null);
     setFormData({
       supplierId: sId,
       warehouseId: wId,
@@ -126,6 +127,20 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         unitCost: p.costPrice || 0,
       });
     }
+  };
+
+  const handleEditPo = (po) => {
+    setEditingPoId(po.id);
+    setFormData({
+      supplierId: po.supplierId || '',
+      warehouseId: po.warehouseId || '',
+      orderDate: po.orderDate || new Date().toISOString().split('T')[0],
+      expectedDate: po.expectedDate || '',
+      terms: po.terms || 'Net 30 Days',
+      notes: po.notes || '',
+      items: po.items || [],
+    });
+    setShowCreateModal(true);
   };
 
   const handleProductSelectChange = (productId) => {
@@ -188,6 +203,32 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     }
     if (formData.items.length === 0) {
       addToast('Add at least one product item to the purchase order', 'error');
+      return;
+    }
+
+    if (editingPoId) {
+      const updated = purchaseOrders.map((p) =>
+        p.id === editingPoId
+          ? {
+              ...p,
+              supplierId: formData.supplierId,
+              supplierName: sup ? sup.name : p.supplierName,
+              warehouseId: formData.warehouseId,
+              warehouseName: wh ? wh.name : p.warehouseName,
+              orderDate: formData.orderDate,
+              expectedDate: formData.expectedDate,
+              terms: formData.terms,
+              notes: formData.notes,
+              status: status,
+              totalAmount: calculateGrandTotal(),
+              items: formData.items,
+            }
+          : p
+      );
+      persistOrders(updated);
+      addToast(`Purchase Order updated successfully!`, 'success');
+      setShowCreateModal(false);
+      resetForm();
       return;
     }
 
@@ -658,7 +699,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedPo(po);
+                            handleEditPo(po);
                           }}
                           style={{
                             width: '30px',
@@ -675,9 +716,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                          title="View PO Details"
+                          title="Edit Purchase Order"
                         >
-                          <Eye size={13} />
+                          <Edit2 size={13} />
                         </button>
                         <button
                           type="button"
@@ -726,18 +767,16 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreateModal(false);
+            padding: '12px',
+            overflowY: 'auto',
           }}
         >
           <div
             style={{
-              width: '96vw',
-              maxWidth: '1440px',
-              height: '92vh',
-              maxHeight: '92vh',
+              width: 'min(1380px, 98vw)',
+              maxWidth: '1380px',
+              height: 'min(95vh, calc(100vh - 24px))',
+              maxHeight: 'calc(100vh - 24px)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -745,6 +784,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               flexDirection: 'column',
               overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div
@@ -775,7 +815,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Create Purchase Order (PO)
+                    {editingPoId ? 'Edit Purchase Order (PO)' : 'Create Purchase Order (PO)'}
                   </h2>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
                     Generate procurement order with approved supplier and line items
@@ -838,7 +878,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     >
                       {warehouses.map((w) => (
                         <option key={w.id} value={w.id}>
-                          {w.name} {w.isPrimary ? '★ Primary' : ''}
+                          {w.name}
                         </option>
                       ))}
                     </select>
@@ -1113,17 +1153,15 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedPo(null);
+            padding: '12px',
+            overflowY: 'auto',
           }}
         >
           <div
             style={{
-              width: '90vw',
+              width: 'min(960px, 96vw)',
               maxWidth: '960px',
-              maxHeight: '85vh',
+              maxHeight: 'calc(100vh - 24px)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -1131,6 +1169,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               flexDirection: 'column',
               overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>

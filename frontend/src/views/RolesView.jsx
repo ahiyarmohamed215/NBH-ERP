@@ -478,7 +478,10 @@ export default function RolesView() {
 
       {/* View Role Full Details Popup Modal */}
       {viewingRole && (
-        <div className="modal-backdrop" onClick={() => setViewingRole(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -758,7 +761,10 @@ export default function RolesView() {
 
       {/* Create / Edit Role Modal */}
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

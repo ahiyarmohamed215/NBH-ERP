@@ -165,11 +165,13 @@ const MastersView = React.forwardRef(function MastersView({
   const handleOpenAdd = () => {
     setEditingItem(null);
     if (activeTab === 'products') {
+      const defaultWh = warehouses[0];
       setModalForm({
         sku: '',
         name: '',
         brandId: brands.length > 0 ? brands[0].id : '',
         categoryId: categories.length > 0 ? categories[0].id : '',
+        warehouseId: defaultWh ? defaultWh.id : '',
         unitOfMeasure: 'PCS',
         minStockLevel: '5',
         description: '',
@@ -177,7 +179,7 @@ const MastersView = React.forwardRef(function MastersView({
     } else if (activeTab === 'brands') {
       setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'warehouses') {
-      setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '', isPrimary: false });
+      setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '' });
     } else if (activeTab === 'categories') {
       setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'customers') {
@@ -191,11 +193,13 @@ const MastersView = React.forwardRef(function MastersView({
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     if (activeTab === 'products') {
+      const matchedWh = warehouses.find((w) => String(w.id) === String(item.warehouseId || item.defaultWarehouseId) || w.name === item.warehouseName) || warehouses[0];
       setModalForm({
         sku: item.sku || '',
         name: item.name || '',
         brandId: item.brandId || (brands.find((b) => b.name === item.brandName)?.id || (brands[0]?.id || '')),
         categoryId: item.categoryId || (categories.find((c) => c.name === item.categoryName)?.id || ''),
+        warehouseId: item.warehouseId || item.defaultWarehouseId || (matchedWh ? matchedWh.id : ''),
         unitOfMeasure: item.unitOfMeasure || 'PCS',
         minStockLevel: item.minStockLevel?.toString() || '0',
         description: item.description || '',
@@ -232,6 +236,8 @@ const MastersView = React.forwardRef(function MastersView({
           name: (modalForm.name || '').trim(),
           brandId: modalForm.brandId ? Number(modalForm.brandId) : null,
           categoryId: modalForm.categoryId ? Number(modalForm.categoryId) : null,
+          warehouseId: modalForm.warehouseId ? Number(modalForm.warehouseId) : null,
+          defaultWarehouseId: modalForm.warehouseId ? Number(modalForm.warehouseId) : null,
           unitOfMeasure: modalForm.unitOfMeasure || 'PCS',
           costPrice: editingItem ? (parseFloat(editingItem.costPrice) || 0) : 0,
           sellingPrice: editingItem ? (parseFloat(editingItem.sellingPrice) || 0) : 0,
@@ -898,6 +904,7 @@ const MastersView = React.forwardRef(function MastersView({
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>UNIT</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>MIN STOCK</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
@@ -907,13 +914,14 @@ const MastersView = React.forwardRef(function MastersView({
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td colSpan="10" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No products found matching current criteria.
                     </td>
                   </tr>
                 ) : (
                   filteredProducts.map((p) => {
                     const active = isItemActive(p);
+                    const pWhName = p.warehouseName || p.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(p.warehouseId || p.defaultWarehouseId))?.name);
                     return (
                       <tr
                         key={p.id}
@@ -970,6 +978,21 @@ const MastersView = React.forwardRef(function MastersView({
                             }}
                           >
                             {p.categoryName || 'General'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 18px' }}>
+                          <span
+                            style={{
+                              backgroundColor: pWhName ? '#f0fdf4' : '#f8fafc',
+                              color: pWhName ? '#15803d' : '#64748b',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              border: pWhName ? '1px solid #dcfce7' : '1px solid #e2e8f0',
+                            }}
+                          >
+                            {pWhName || 'Main Warehouse'}
                           </span>
                         </td>
                         <td style={{ padding: '12px 18px', fontWeight: 500, color: '#475569' }}>{p.unitOfMeasure || 'PCS'}</td>
@@ -1832,10 +1855,13 @@ const MastersView = React.forwardRef(function MastersView({
 
       {/* View Details Modal */}
       {viewingItem && (
-        <div className="modal-backdrop" onClick={() => setViewingItem(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            style={{ width: 'min(820px, 96vw)', maxWidth: '820px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
@@ -1909,15 +1935,9 @@ const MastersView = React.forwardRef(function MastersView({
                     <span style={{ fontWeight: 600 }}>{viewingItem.unitOfMeasure || 'PCS'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Selling Price</span>
-                    <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '1.05rem' }}>
-                      Rs. {Number(viewingItem.sellingPrice || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Cost Price</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                      Rs. {Number(viewingItem.costPrice || 0).toFixed(2)}
+                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Default Warehouse</span>
+                    <span style={{ fontWeight: 600, color: '#15803d' }}>
+                      {viewingItem.warehouseName || viewingItem.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(viewingItem.warehouseId || viewingItem.defaultWarehouseId))?.name) || 'Main Warehouse'}
                     </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -1925,10 +1945,6 @@ const MastersView = React.forwardRef(function MastersView({
                     <span style={{ fontWeight: 700, color: viewingItem.minStockLevel > 10 ? '#059669' : '#d97706' }}>
                       {viewingItem.minStockLevel || 0} {viewingItem.unitOfMeasure || 'PCS'}
                     </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Price Protocol</span>
-                    <span style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>Dynamic GRN Inward</span>
                   </div>
                   <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Description</span>
@@ -1946,10 +1962,6 @@ const MastersView = React.forwardRef(function MastersView({
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Address</span>
                     <span>{viewingItem.address || '—'}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Primary Facility</span>
-                    <span>{viewingItem.isPrimary ? 'Yes (Primary Enterprise Warehouse)' : 'No (Standard Branch)'}</span>
                   </div>
                 </>
               )}
@@ -2036,10 +2048,13 @@ const MastersView = React.forwardRef(function MastersView({
 
       {/* Add / Edit Form Modal */}
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            style={{ width: 'min(820px, 96vw)', maxWidth: '820px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
@@ -2086,7 +2101,7 @@ const MastersView = React.forwardRef(function MastersView({
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                         BRAND *
@@ -2123,9 +2138,27 @@ const MastersView = React.forwardRef(function MastersView({
                         ))}
                       </select>
                     </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                        WAREHOUSE *
+                      </label>
+                      <select
+                        className="input-glass"
+                        value={modalForm.warehouseId || ''}
+                        onChange={(e) => setModalForm({ ...modalForm, warehouseId: e.target.value })}
+                        required
+                      >
+                        <option value="">Select Warehouse...</option>
+                        {warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} {w.code ? `(${w.code})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                         UNIT OF MEASURE
@@ -2259,7 +2292,7 @@ const MastersView = React.forwardRef(function MastersView({
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        FACILITY ADDRESS
+                        WAREHOUSE ADDRESS
                       </label>
                       <input
                         type="text"

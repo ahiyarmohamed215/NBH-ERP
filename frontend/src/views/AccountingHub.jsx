@@ -647,7 +647,10 @@ export default function AccountingHub({ activeSubTab, onSubTabChange }) {
 
       {/* Account Details Preview Modal */}
       {selectedAccount && (
-        <div className="modal-backdrop" onClick={() => setSelectedAccount(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

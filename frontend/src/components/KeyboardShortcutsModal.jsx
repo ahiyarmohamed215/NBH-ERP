@@ -52,7 +52,10 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
   ];
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+    >
       <div
         className="glass-modal"
         style={{

@@ -8,7 +8,8 @@ import {
   CheckCircle,
   Trash2,
   RefreshCw,
-  Eye,
+  Edit2,
+  Printer,
   X,
   Package,
   Download,
@@ -68,7 +69,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
 
   const resetForm = (supList = suppliers, whList = warehouses, prodList = products) => {
     const defaultSup = supList.length > 0 ? supList[0].id : '';
-    const defaultWh = whList.find((w) => w.isPrimary)?.id || (whList.length > 0 ? whList[0].id : '');
+    const defaultWh = whList.length > 0 ? whList[0].id : '';
     const defaultProd = prodList.length > 0 ? prodList[0] : null;
 
     setFormData({
@@ -223,6 +224,41 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     } catch (err) {
       addToast('Failed to load PRN details: ' + err.message, 'error');
     }
+  };
+
+  const handleEditPrn = async (p) => {
+    if (p.status === 'PROCESSED' || p.status === 'COMPLETED') {
+      addToast(`PRN ${p.prnNumber} is already processed. Cannot be modified.`, 'info');
+      handleInspectPrn(p.id);
+      return;
+    }
+    try {
+      const res = await prnApi.getById(p.id);
+      const fullPrn = res.data;
+      setFormData({
+        supplierId: fullPrn.supplierId || '',
+        warehouseId: fullPrn.warehouseId || '',
+        originalGrnNumber: fullPrn.originalGrnNumber || '',
+        reason: fullPrn.reason || COMMON_REASONS[0],
+        remarks: fullPrn.remarks || '',
+        items: (fullPrn.items || []).map((it) => ({
+          productId: it.productId,
+          productCode: it.productSku || '',
+          productName: it.productName || '',
+          unitOfMeasure: it.unitOfMeasure || 'PCS',
+          quantity: Number(it.quantity || 1),
+          unitCost: Number(it.unitCost || 0),
+          reason: it.reason || 'Defective batch / Damaged on arrival',
+        })),
+      });
+      setShowCreateModal(true);
+    } catch (err) {
+      addToast('Failed to load PRN for editing: ' + err.message, 'error');
+    }
+  };
+
+  const handlePrintPrn = (p) => {
+    window.print();
   };
 
   const filteredPrns = prns.filter((p) => {
@@ -642,7 +678,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleInspectPrn(p.id);
+                                handleEditPrn(p);
                               }}
                               style={{
                                 width: '30px',
@@ -659,9 +695,34 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                               }}
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
                               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                              title="Inspect PRN Details"
+                              title="Edit PRN"
                             >
-                              <Eye size={13} />
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintPrn(p);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="Print PRN"
+                            >
+                              <Printer size={13} />
                             </button>
                             {p.status !== 'PROCESSED' && (
                               <button
@@ -714,18 +775,16 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreateModal(false);
+            padding: '12px',
+            overflowY: 'auto',
           }}
         >
           <div
             style={{
-              width: '96vw',
-              maxWidth: '1200px',
-              height: '90vh',
-              maxHeight: '90vh',
+              width: 'min(1280px, 98vw)',
+              maxWidth: '1280px',
+              height: 'min(95vh, calc(100vh - 24px))',
+              maxHeight: 'calc(100vh - 24px)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -733,6 +792,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               flexDirection: 'column',
               overflow: 'hidden',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div
@@ -1095,10 +1155,21 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
 
       {/* PRN Inspection Drawer / Modal */}
       {selectedPrn && (
-        <div className="modal-backdrop" onClick={() => setSelectedPrn(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
+            style={{
+              width: 'min(1020px, 96vw)',
+              maxWidth: '1020px',
+              maxHeight: 'calc(100vh - 24px)',
+              overflowY: 'auto',
+              padding: '24px',
+              background: '#ffffff',
+              borderRadius: '14px',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>

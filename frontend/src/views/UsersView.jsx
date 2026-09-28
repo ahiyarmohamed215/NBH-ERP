@@ -467,7 +467,10 @@ export default function UsersView() {
 
       {/* Approval & Role Assignment Modal */}
       {approvingUser && (
-        <div className="modal-backdrop" onClick={() => setApprovingUser(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{
@@ -591,7 +594,10 @@ export default function UsersView() {
 
       {/* User Create / Edit Modal */}
       {showUserModal && (
-        <div className="modal-backdrop" onClick={() => setShowUserModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
             style={{

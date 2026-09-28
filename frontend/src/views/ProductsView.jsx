@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { productApi, categoryApi, brandApi } from '../api/apiClient';
+import { productApi, categoryApi, brandApi, warehouseApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
   Package,
@@ -18,6 +18,7 @@ export default function ProductsView({ isEmbedded = false }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
@@ -30,9 +31,8 @@ export default function ProductsView({ isEmbedded = false }) {
     name: '',
     brandId: '',
     categoryId: '',
+    warehouseId: '',
     unitOfMeasure: 'PCS',
-    costPrice: '0',
-    sellingPrice: '0',
     minStockLevel: '5',
     description: '',
   });
@@ -51,14 +51,16 @@ export default function ProductsView({ isEmbedded = false }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [prodRes, catRes, brandRes] = await Promise.all([
+      const [prodRes, catRes, brandRes, whRes] = await Promise.all([
         productApi.getProducts({ size: 200 }),
         categoryApi.getActive(),
         brandApi.getActive(),
+        warehouseApi.getAll(),
       ]);
       setProducts(prodRes.data?.content || prodRes.data || []);
       setCategories(catRes.data || []);
       setBrands(brandRes.data || []);
+      setWarehouses(whRes.data || []);
     } catch (err) {
       addToast('Failed to load products: ' + err.message, 'error');
     } finally {
@@ -80,14 +82,14 @@ export default function ProductsView({ isEmbedded = false }) {
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
+    const defaultWh = warehouses[0];
     setFormData({
       sku: '',
       name: '',
       brandId: brands[0]?.id || '',
       categoryId: categories.length > 0 ? categories[0].id : '',
+      warehouseId: defaultWh ? defaultWh.id : '',
       unitOfMeasure: 'PCS',
-      costPrice: '0',
-      sellingPrice: '0',
       minStockLevel: '5',
       description: '',
     });
@@ -96,14 +98,14 @@ export default function ProductsView({ isEmbedded = false }) {
 
   const handleOpenEdit = (prod) => {
     setEditingProduct(prod);
+    const matchedWh = warehouses.find((w) => String(w.id) === String(prod.warehouseId || prod.defaultWarehouseId) || w.name === prod.warehouseName) || warehouses[0];
     setFormData({
       sku: prod.sku,
       name: prod.name,
       brandId: prod.brandId || (brands.find((b) => b.name === prod.brandName)?.id || (brands[0]?.id || '')),
       categoryId: prod.categoryId || (categories.find((c) => c.name === prod.categoryName)?.id || ''),
+      warehouseId: prod.warehouseId || prod.defaultWarehouseId || (matchedWh ? matchedWh.id : ''),
       unitOfMeasure: prod.unitOfMeasure || 'PCS',
-      costPrice: prod.costPrice?.toString() || '0',
-      sellingPrice: prod.sellingPrice?.toString() || '0',
       minStockLevel: prod.minStockLevel?.toString() || '5',
       description: prod.description || '',
     });
@@ -125,9 +127,9 @@ export default function ProductsView({ isEmbedded = false }) {
         name: formData.name.trim(),
         brandId: formData.brandId ? Number(formData.brandId) : null,
         categoryId: formData.categoryId ? Number(formData.categoryId) : null,
+        warehouseId: formData.warehouseId ? Number(formData.warehouseId) : null,
+        defaultWarehouseId: formData.warehouseId ? Number(formData.warehouseId) : null,
         unitOfMeasure: formData.unitOfMeasure,
-        costPrice: editingProduct ? (parseFloat(editingProduct.costPrice) || 0) : 0,
-        sellingPrice: editingProduct ? (parseFloat(editingProduct.sellingPrice) || 0) : 0,
         minStockLevel: parseInt(formData.minStockLevel, 10) || 0,
         description: formData.description?.trim() || null,
       };
@@ -268,6 +270,7 @@ export default function ProductsView({ isEmbedded = false }) {
                 <th>Description / Note</th>
                 <th>Brand</th>
                 <th>Category</th>
+                <th>Warehouse</th>
                 <th>Unit</th>
                 <th>Min Stock</th>
                 <th>Status</th>
@@ -277,19 +280,20 @@ export default function ProductsView({ isEmbedded = false }) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                     Loading product catalog...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                     No products found matching the criteria.
                   </td>
                 </tr>
               ) : (
                 filteredProducts.map((p) => {
                   const active = isProductActive(p);
+                  const pWhName = p.warehouseName || p.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(p.warehouseId || p.defaultWarehouseId))?.name);
                   return (
                     <tr key={p.id}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>{p.sku}</td>
@@ -324,6 +328,21 @@ export default function ProductsView({ isEmbedded = false }) {
                       </td>
                       <td>
                         <span className="badge badge-info">{p.categoryName || 'General'}</span>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            backgroundColor: pWhName ? '#f0fdf4' : '#f8fafc',
+                            color: pWhName ? '#15803d' : '#64748b',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            border: pWhName ? '1px solid #dcfce7' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          {pWhName || 'Main Warehouse'}
+                        </span>
                       </td>
                       <td style={{ fontWeight: 500 }}>{p.unitOfMeasure || 'PCS'}</td>
                       <td>
@@ -389,10 +408,13 @@ export default function ProductsView({ isEmbedded = false }) {
 
       {/* View Product Details Modal */}
       {viewingProduct && (
-        <div className="modal-backdrop" onClick={() => setViewingProduct(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            style={{ width: 'min(820px, 96vw)', maxWidth: '820px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
@@ -462,15 +484,10 @@ export default function ProductsView({ isEmbedded = false }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Selling Price</span>
-                <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '1.15rem' }}>
-                  Rs. {Number(viewingProduct.sellingPrice || 0).toFixed(2)}
+                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Default Warehouse</span>
+                <span style={{ fontWeight: 600, color: '#15803d' }}>
+                  {viewingProduct.warehouseName || viewingProduct.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(viewingProduct.warehouseId || viewingProduct.defaultWarehouseId))?.name) || 'Main Warehouse'}
                 </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Standard Cost</span>
-                <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.05rem' }}>Rs. {Number(viewingProduct.costPrice || 0).toFixed(2)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
@@ -478,11 +495,6 @@ export default function ProductsView({ isEmbedded = false }) {
                 <span style={{ fontWeight: 700, color: viewingProduct.minStockLevel > 10 ? '#059669' : '#d97706' }}>
                   {viewingProduct.minStockLevel || 0} {viewingProduct.unitOfMeasure || 'PCS'}
                 </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Price Protocol</span>
-                <span style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600 }}>Dynamic GRN Inward</span>
               </div>
 
               <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -513,10 +525,13 @@ export default function ProductsView({ isEmbedded = false }) {
 
       {/* Add / Edit Product Modal */}
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '820px', padding: '30px' }}
+            style={{ width: 'min(820px, 96vw)', maxWidth: '820px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
@@ -561,7 +576,7 @@ export default function ProductsView({ isEmbedded = false }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     BRAND *
@@ -598,7 +613,27 @@ export default function ProductsView({ isEmbedded = false }) {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                    WAREHOUSE *
+                  </label>
+                  <select
+                    className="input-glass"
+                    value={formData.warehouseId}
+                    onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                    required
+                  >
+                    <option value="">-- Select Warehouse --</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} {w.code ? `(${w.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     UNIT OF MEASURE
@@ -616,9 +651,6 @@ export default function ProductsView({ isEmbedded = false }) {
                     <option value="SET">SET (Sets)</option>
                   </select>
                 </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
                     MIN STOCK ALERT LEVEL
@@ -632,47 +664,22 @@ export default function ProductsView({ isEmbedded = false }) {
                     onChange={(e) => setFormData({ ...formData, minStockLevel: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    DESCRIPTION / NOTES
-                  </label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    placeholder="e.g. Heavy-duty construction grade, Shelf A-1"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
               </div>
 
-              {/* Pricing & Stock Details: Read-Only (Managed dynamically via GRN) */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
-                <div>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                    VALUATION & PRICING
-                  </span>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0 0' }}>
-                    Cost price and selling price are established dynamically via <strong>Inward GRN</strong>.
-                  </p>
-                </div>
-                {editingProduct ? (
-                  <div style={{ display: 'flex', gap: '18px', textAlign: 'right' }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>COST PRICE</span>
-                      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>${Number(formData.costPrice || 0).toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>SELLING PRICE</span>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>${Number(formData.sellingPrice || 0).toFixed(2)}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="badge badge-info" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                    Managed via Inward GRN
-                  </span>
-                )}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
+                  DESCRIPTION / NOTES
+                </label>
+                <input
+                  type="text"
+                  className="input-glass"
+                  placeholder="e.g. Heavy-duty construction grade, Shelf A-1"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
               </div>
+
+
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button

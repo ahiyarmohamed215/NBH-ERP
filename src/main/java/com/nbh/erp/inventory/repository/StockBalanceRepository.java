@@ -26,7 +26,8 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
             @Param("productId") Long productId
     );
 
-    List<StockBalance> findByWarehouseId(Long warehouseId);
+    @Query("SELECT sb FROM StockBalance sb WHERE sb.warehouse.id = :warehouseId AND sb.quantity > 0")
+    List<StockBalance> findByWarehouseId(@Param("warehouseId") Long warehouseId);
 
     List<StockBalance> findByProductId(Long productId);
 
@@ -44,6 +45,7 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
     List<StockBalance> findAllLowStock();
 
     @Query("SELECT sb FROM StockBalance sb WHERE " +
+            "sb.quantity > 0 AND " +
             "(:warehouseId IS NULL OR sb.warehouse.id = :warehouseId) AND " +
             "(:query IS NULL OR :query = '' OR LOWER(sb.product.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(sb.product.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR sb.product.barcode LIKE CONCAT('%', :query, '%'))")

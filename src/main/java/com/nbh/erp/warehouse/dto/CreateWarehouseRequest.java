@@ -27,8 +27,6 @@ public class CreateWarehouseRequest {
 
     private String contactPerson;
 
-    private Boolean isPrimary = false;
-
     public String getContactNumber() {
         return phone;
     }

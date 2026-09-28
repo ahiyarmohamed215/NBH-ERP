@@ -556,10 +556,13 @@ export default function SalesReturnsView({ embedded = false }) {
 
       {/* Inspection Drawer / Modal */}
       {selectedReturn && (
-        <div className="modal-backdrop" onClick={() => setSelectedReturn(null)}>
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
           <div
             className="glass-modal"
-            style={{ width: '100%', maxWidth: '1020px', padding: '30px', background: '#ffffff', borderRadius: '14px' }}
+            style={{ width: 'min(1020px, 96vw)', maxWidth: '1020px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px', background: '#ffffff', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>

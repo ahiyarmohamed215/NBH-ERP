@@ -53,20 +53,12 @@ public class WarehouseService {
             throw new DuplicateResourceException("Warehouse", "code", request.getCode());
         }
 
-        if (Boolean.TRUE.equals(request.getIsPrimary())) {
-            warehouseRepository.findByIsPrimaryTrue().ifPresent(currentPrimary -> {
-                currentPrimary.setIsPrimary(false);
-                warehouseRepository.save(currentPrimary);
-            });
-        }
-
         Warehouse warehouse = Warehouse.builder()
                 .code(request.getCode().trim().toUpperCase())
                 .name(request.getName().trim())
                 .address(request.getAddress())
                 .phone(request.getPhone())
                 .contactPerson(request.getContactPerson())
-                .isPrimary(Boolean.TRUE.equals(request.getIsPrimary()))
                 .isActive(true)
                 .build();
 
@@ -86,19 +78,11 @@ public class WarehouseService {
                     }
                 });
 
-        if (Boolean.TRUE.equals(request.getIsPrimary()) && !warehouse.getIsPrimary()) {
-            warehouseRepository.findByIsPrimaryTrue().ifPresent(currentPrimary -> {
-                currentPrimary.setIsPrimary(false);
-                warehouseRepository.save(currentPrimary);
-            });
-        }
-
         warehouse.setCode(request.getCode().trim().toUpperCase());
         warehouse.setName(request.getName().trim());
         warehouse.setAddress(request.getAddress());
         warehouse.setPhone(request.getPhone());
         warehouse.setContactPerson(request.getContactPerson());
-        warehouse.setIsPrimary(Boolean.TRUE.equals(request.getIsPrimary()));
 
         Warehouse saved = warehouseRepository.save(warehouse);
         return WarehouseDto.from(saved);
@@ -116,10 +100,6 @@ public class WarehouseService {
     public void deleteWarehouse(Long id) {
         Warehouse warehouse = warehouseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
-
-        if (Boolean.TRUE.equals(warehouse.getIsPrimary())) {
-            throw new BusinessException("Primary warehouse cannot be deleted. Please assign another warehouse as primary first.");
-        }
 
         warehouse.setIsActive(false);
         warehouseRepository.save(warehouse);
