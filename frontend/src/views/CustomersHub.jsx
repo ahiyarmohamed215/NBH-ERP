@@ -4,6 +4,7 @@ import {
   salesmanApi,
   userApi,
   salesApi,
+  customerGroupApi,
   routeApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -163,7 +164,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         customerApi.getAll(),
         salesmanApi.getAll(),
         userApi.getAll({ page: 0, size: 200 }),
-        routeApi.getAll(),
+        customerGroupApi.getAll(),
       ]);
 
       let loadedCustomers = [];
@@ -212,16 +213,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       setSalesmen(combinedStaff);
 
-      // Load routes from backend
+      // Load customer groups from backend
       if (rRes.status === 'fulfilled') {
-        const rawRoutes = Array.isArray(rRes.value?.data)
+        const rawGroups = Array.isArray(rRes.value?.data)
           ? rRes.value.data
           : (Array.isArray(rRes.value) ? rRes.value : []);
-        const loadedRoutes = rawRoutes.map((r) => ({
+        const loadedGroups = rawGroups.map((r) => ({
           id: r.id,
-          name: r.routeName || r.name,
-          routeName: r.routeName || r.name,
-          routeCode: r.routeCode || '',
+          name: r.groupName || r.routeName || r.name,
+          groupName: r.groupName || r.routeName || r.name,
+          routeName: r.groupName || r.routeName || r.name,
+          groupCode: r.groupCode || r.routeCode || '',
+          routeCode: r.groupCode || r.routeCode || '',
           description: r.description || '',
           salesmanId: r.assignedStaffId || r.salesRepId ? String(r.assignedStaffId || r.salesRepId) : '',
           salesmanName: r.assignedStaffName || r.salesRepName || '',
@@ -230,7 +233,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           customerIds: (r.customerIds || []).map(String),
           createdAt: r.createdAt || new Date().toISOString(),
         }));
-        setRoutes(loadedRoutes);
+        setRoutes(loadedGroups);
       }
     } catch (err) {
       addToast('Error loading data: ' + err.message, 'error');
@@ -246,27 +249,29 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
-  // Helper to find all routes a customer belongs to
+  // Helper to find all customer groups a customer belongs to
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
     const cObj = customers.find((c) => String(c.id) === cid);
     const routesByArray = routes.filter((r) => r.customerIds && r.customerIds.includes(cid));
-    if (cObj?.routeId) {
-      const directRoute = routes.filter((r) => String(r.id) === String(cObj.routeId));
+    const directGroupId = cObj?.customerGroupId || cObj?.routeId;
+    if (directGroupId) {
+      const directRoute = routes.filter((r) => String(r.id) === String(directGroupId));
       const combined = [...directRoute, ...routesByArray];
       return Array.from(new Map(combined.map((r) => [r.id, r])).values());
     }
     return routesByArray;
   };
 
-  // Helper for single route fallback
+  // Helper for single customer group fallback
   const getCustomerRoute = (customerId) => {
     const assigned = getCustomerRoutes(customerId);
     if (assigned.length > 0) return assigned[0];
     const cid = String(customerId);
     const cObj = customers.find((c) => String(c.id) === cid);
-    if (cObj?.routeName) {
-      return { id: cObj.routeId, name: cObj.routeName, routeCode: cObj.routeCode };
+    const groupName = cObj?.customerGroupName || cObj?.routeName;
+    if (groupName) {
+      return { id: cObj.customerGroupId || cObj.routeId, name: groupName, groupName: groupName, groupCode: cObj.customerGroupCode || cObj.routeCode || '', routeCode: cObj.customerGroupCode || cObj.routeCode || '' };
     }
     return null;
   };
@@ -712,6 +717,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         email: customerForm.email.trim(),
         address: customerForm.address.trim(),
         creditLimit: parseFloat(customerForm.creditLimit) || 0,
+        customerGroupId: customerForm.routeId ? Number(customerForm.routeId) : null,
         routeId: customerForm.routeId ? Number(customerForm.routeId) : null,
       };
 
@@ -772,13 +778,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           setViewingCustomer(null);
         }
         loadInitialData();
-      } else if (securityModalData.type === 'route') {
+      } else if (securityModalData.type === 'route' || securityModalData.type === 'group') {
         const r = securityModalData.item;
-        if (r.id && !String(r.id).startsWith('route-')) {
-          await routeApi.delete(r.id);
+        if (r.id && !String(r.id).startsWith('route-') && !String(r.id).startsWith('group-')) {
+          await customerGroupApi.delete(r.id);
         }
         setRoutes((prev) => prev.filter((route) => route.id !== r.id));
-        addToast(`Route "${r.name}" deleted successfully.`, 'success');
+        addToast(`Customer group "${r.name}" deleted successfully.`, 'success');
         if (selectedRoute?.id === r.id) {
           setSelectedRoute(null);
           setIsCreatingRoute(false);
@@ -837,7 +843,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleSaveRouteView = async (e) => {
     if (e) e.preventDefault();
     if (!routeEditForm.name.trim()) {
-      addToast('Route name is required', 'error');
+      addToast('Customer group name is required', 'error');
       return;
     }
 
@@ -845,24 +851,28 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     const salesmanName = assignedSalesman?.name || '';
     const staffIdNum = routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null;
     const payload = {
+      groupName: routeEditForm.name.trim(),
       routeName: routeEditForm.name.trim(),
+      groupCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
-      salesRepId: staffIdNum,
       assignedStaffId: staffIdNum,
+      salesRepId: staffIdNum,
       customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
     };
 
     try {
       if (isCreatingRoute) {
-        const res = await routeApi.create(payload);
+        const res = await customerGroupApi.create(payload);
         const created = res.data?.data || res.data || res;
         const assignedId = created.assignedStaffId || created.salesRepId;
         const normalized = {
           id: created.id,
-          name: created.routeName || created.name,
-          routeName: created.routeName || created.name,
-          routeCode: created.routeCode || '',
+          name: created.groupName || created.routeName || created.name,
+          groupName: created.groupName || created.routeName || created.name,
+          routeName: created.groupName || created.routeName || created.name,
+          groupCode: created.groupCode || created.routeCode || '',
+          routeCode: created.groupCode || created.routeCode || '',
           description: created.description || '',
           salesmanId: assignedId ? String(assignedId) : '',
           salesmanName: created.assignedStaffName || created.salesRepName || salesmanName,
@@ -872,16 +882,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           createdAt: created.createdAt || new Date().toISOString(),
         };
         setRoutes((prev) => [...prev, normalized]);
-        addToast(`Route "${normalized.name}" created successfully!`, 'success');
+        addToast(`Customer group "${normalized.name}" created successfully!`, 'success');
       } else if (selectedRoute) {
-        const res = await routeApi.update(selectedRoute.id, payload);
+        const res = await customerGroupApi.update(selectedRoute.id, payload);
         const updated = res.data?.data || res.data || res;
         const assignedId = updated.assignedStaffId || updated.salesRepId;
         const normalized = {
           id: updated.id,
-          name: updated.routeName || updated.name,
-          routeName: updated.routeName || updated.name,
-          routeCode: updated.routeCode || '',
+          name: updated.groupName || updated.routeName || updated.name,
+          groupName: updated.groupName || updated.routeName || updated.name,
+          routeName: updated.groupName || updated.routeName || updated.name,
+          groupCode: updated.groupCode || updated.routeCode || '',
+          routeCode: updated.groupCode || updated.routeCode || '',
           description: updated.description || '',
           salesmanId: assignedId ? String(assignedId) : '',
           salesmanName: updated.assignedStaffName || updated.salesRepName || salesmanName,
@@ -893,12 +905,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         setRoutes((prev) =>
           prev.map((r) => (r.id === selectedRoute.id ? normalized : r))
         );
-        addToast(`Route "${normalized.name}" updated successfully!`, 'success');
+        addToast(`Customer group "${normalized.name}" updated successfully!`, 'success');
       }
       handleCloseRouteView();
       loadInitialData();
     } catch (err) {
-      addToast('Error saving route: ' + (err.response?.data?.message || err.message), 'error');
+      addToast('Error saving customer group: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
@@ -947,7 +959,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast('No customers to export', 'error');
       return;
     }
-    const headers = ['Code', 'Name', 'Routes', 'Contact Person', 'Phone', 'Email', 'Credit Limit', 'Current Balance', 'Status'];
+    const headers = ['Code', 'Name', 'Customer Group', 'Contact Person', 'Phone', 'Email', 'Credit Limit', 'Current Balance', 'Status'];
     const rows = customers.map((c) => {
       const assignedRoutes = getCustomerRoutes(c.id);
       const routeNames = assignedRoutes.map((r) => r.name).join('; ') || 'Unassigned';
@@ -975,13 +987,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     addToast('Customer list exported to CSV', 'success');
   };
 
-  // Export Routes to CSV
+  // Export Customer Groups to CSV
   const handleExportRoutesCSV = () => {
     if (routes.length === 0) {
-      addToast('No routes to export', 'error');
+      addToast('No customer groups to export', 'error');
       return;
     }
-    const headers = ['Route Name', 'Assigned Staff', 'Total Customers', 'Description', 'Created Date'];
+    const headers = ['Group Name', 'Group Code', 'Assigned Staff', 'Total Customers', 'Description', 'Created Date'];
     const rows = (filteredRoutes.length > 0 ? filteredRoutes : routes).map((r) => {
       const assignedStaff = salesmen.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
       const repName = r.assignedStaffName || r.salesmanName || assignedStaff?.name || 'Unassigned';
@@ -989,6 +1001,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       const createdDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—';
       return [
         `"${(r.name || '').replace(/"/g, '""')}"`,
+        `"${(r.groupCode || r.routeCode || '').replace(/"/g, '""')}"`,
         `"${repName.replace(/"/g, '""')}"`,
         count,
         `"${(r.description || '').replace(/"/g, '""')}"`,
@@ -1000,11 +1013,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `customer_routes_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `customer_groups_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    addToast('Routes exported to CSV', 'success');
+    addToast('Customer groups exported to CSV', 'success');
   };
 
   const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ALL');
@@ -1054,7 +1067,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             Customer Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
-            Create and manage customer records, credit limits, delivery routes, and transaction history.
+            Create and manage customer records, credit limits, customer groups, and transaction history.
           </p>
         </div>
 
@@ -1132,7 +1145,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             marginBottom: '-1px',
           }}
         >
-          <Users size={16} /> Groups & Routes
+          <Users size={16} /> Customer Groups
         </button>
 
         <button
@@ -1431,7 +1444,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       CUSTOMER
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      ROUTE / GROUP
+                      CUSTOMER GROUP
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CONTACT PERSON
@@ -1535,7 +1548,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         whiteSpace: 'nowrap',
                                       }}
                                     >
-                                      <MapPin size={11} color="#2563eb" /> {r.name}
+                                      <Users size={11} color="#2563eb" /> {r.name}
                                     </span>
                                   ))}
                                 </div>
@@ -1713,10 +1726,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           >
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
-                Customer Groups & Routes
+                Customer Groups
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
-                Organize customers into targeted delivery routes, pricing groups, or sales territories.
+                Organize customers into groups and assign a dedicated staff member to manage each customer group.
               </p>
             </div>
 
@@ -1741,7 +1754,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
             >
-              <Plus size={16} /> Create Group / Route
+              <Plus size={16} /> Create Customer Group
             </button>
           </div>
 
@@ -1777,7 +1790,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               />
               <input
                 type="text"
-                placeholder="Search routes by name, representative, description..."
+                placeholder="Search customer groups by name, assigned staff, description..."
                 value={routeSearchTerm}
                 onChange={(e) => setRouteSearchTerm(e.target.value)}
                 style={{
@@ -1855,7 +1868,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#64748b';
                 }}
-                title="Export routes to CSV"
+                title="Export customer groups to CSV"
               >
                 <Download size={15} />
               </button>
@@ -1892,7 +1905,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   fontSize: '0.875rem',
                 }}
               >
-                No customer routes or groups found matching current search.
+                No customer groups found matching current search.
               </div>
             ) : (
               filteredRoutes.map((route) => {
@@ -1977,7 +1990,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                     >
                       <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
-                      {repName ? `Responsible Staff: ${repName}` : 'No responsible staff assigned'}
+                      {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
                     </p>
                   </div>
 
@@ -1992,7 +2005,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     }}
                   >
                     <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Manage Group / Route →
+                      Manage Customer Group →
                     </span>
                   </div>
                 </div>
@@ -2041,7 +2054,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
-                  {isCreatingRoute ? 'Create Group / Route' : `Manage Route: ${routeEditForm.name}`}
+                  {isCreatingRoute ? 'Create Customer Group' : `Manage Customer Group: ${routeEditForm.name}`}
                 </h3>
                 <span
                   style={{
@@ -2099,17 +2112,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               >
                 <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
-                    Route Details
+                    Customer Group Details
                   </div>
 
                   {/* Route Name Input */}
                   <div style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Route / Group Name *
+                      Customer Group Name *
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Route 1 - Colombo Central"
+                      placeholder="e.g. Wholesale Tier A, Corporate Accounts"
                       value={routeEditForm.name}
                       onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
                       style={{
@@ -2128,7 +2141,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* Responsible Staff Dropdown */}
                   <div style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Assigned Responsible Staff / Officer
+                      Assigned Staff Member
                     </label>
                     <select
                       value={routeEditForm.salesmanId}
@@ -2160,11 +2173,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* Description Input */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Description / Territory Notes
+                      Group Description / Notes
                     </label>
                     <textarea
                       rows="3"
-                      placeholder="e.g. Daily retail delivery route covering Central Business District"
+                      placeholder="e.g. Group of wholesale and corporate client accounts"
                       value={routeEditForm.description}
                       onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
                       style={{
@@ -2213,7 +2226,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         e.currentTarget.style.borderColor = '#fecaca';
                       }}
                     >
-                      <Trash2 size={14} /> Delete this Route
+                      <Trash2 size={14} /> Delete this Customer Group
                     </button>
                   </div>
                 )}
@@ -2234,7 +2247,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* Small Route Summary */}
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                      Route Summary:
+                      Group Summary:
                     </span>
                     <span
                       style={{
@@ -2442,7 +2455,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     padding: '3px 6px',
                                     borderRadius: '4px',
                                   }}
-                                  title="Remove customer from route"
+                                  title="Remove customer from group"
                                 >
                                   Remove
                                 </button>
@@ -2506,7 +2519,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
               >
-                <Check size={16} /> {isCreatingRoute ? 'Save New Route' : 'Update Route'}
+                <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Update Customer Group'}
               </button>
             </div>
           </div>
@@ -2549,10 +2562,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             >
               <div>
                 <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-                  Assign Customers
+                  Assign Customers to Group
                 </h4>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Search and add customers to {routeEditForm.name || 'this route'}.
+                  Search and add customers to {routeEditForm.name || 'this customer group'}.
                 </p>
               </div>
               <button
@@ -2998,7 +3011,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       borderRadius: '4px',
                                     }}
                                   >
-                                    🗺️ {route.name}
+                                    👥 {route.name}
                                   </span>
                                 )}
                               </div>
@@ -3191,7 +3204,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           gap: '4px',
                         }}
                       >
-                        <MapPin size={12} color="#94a3b8" /> Route: <strong style={{ color: '#0f172a' }}>{getCustomerRoute(selectedHistoryCustomer.id)?.name || 'Unassigned'}</strong>
+                        <Users size={12} color="#94a3b8" /> Group: <strong style={{ color: '#0f172a' }}>{getCustomerRoute(selectedHistoryCustomer.id)?.name || 'Unassigned'}</strong>
                       </span>
                     </div>
 
@@ -4347,11 +4360,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     {(() => {
                       const cRoutes = getCustomerRoutes(viewingCustomer.id);
                       if (cRoutes.length === 0) {
-                        return <span>Route: <strong style={{ color: '#334155' }}>Unassigned</strong></span>;
+                        return <span>Group: <strong style={{ color: '#334155' }}>Unassigned</strong></span>;
                       }
                       return (
                         <span>
-                          Routes: <strong style={{ color: '#334155' }}>{cRoutes.map((r) => r.name).join(', ')}</strong>
+                          Customer Group: <strong style={{ color: '#334155' }}>{cRoutes.map((r) => r.name).join(', ')}</strong>
                         </span>
                       );
                     })()}
@@ -4481,12 +4494,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
-                  Route & Logistics
+                  Customer Group & Assigned Staff
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                   <div>
                     <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block', marginBottom: '4px' }}>
-                      Assigned Route(s)
+                      Assigned Customer Group(s)
                     </span>
                     {(() => {
                       const cRoutes = getCustomerRoutes(viewingCustomer.id);
@@ -4511,7 +4524,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 fontWeight: 500,
                               }}
                             >
-                              <MapPin size={11} color="#2563eb" /> {r.name}
+                              <Users size={11} color="#2563eb" /> {r.name}
                             </span>
                           ))}
                         </div>
@@ -4519,7 +4532,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     })()}
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Responsible Staff / Officer</span>
+                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Assigned Staff Member</span>
                     <span style={{ fontWeight: 500, color: '#0f172a' }}>
                       {(() => {
                         const cRoutes = getCustomerRoutes(viewingCustomer.id);
@@ -4908,20 +4921,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 />
               </div>
 
-              {/* Delivery Route / Territory */}
+              {/* Customer Group */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Delivery Route / Territory
+                  Customer Group
                 </label>
                 <select
                   value={customerForm.routeId || ''}
                   onChange={(e) => setCustomerForm({ ...customerForm, routeId: e.target.value })}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
                 >
-                  <option value="">-- No Route Assigned --</option>
+                  <option value="">-- No Customer Group Assigned --</option>
                   {routes.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name || r.routeName} {r.routeCode ? `(${r.routeCode})` : ''} {(r.assignedStaffName || r.salesmanName) ? `— Staff: ${r.assignedStaffName || r.salesmanName}` : ''}
+                      {r.name || r.groupName || r.routeName} {r.groupCode || r.routeCode ? `(${r.groupCode || r.routeCode})` : ''} {(r.assignedStaffName || r.salesmanName) ? `— Staff: ${r.assignedStaffName || r.salesmanName}` : ''}
                     </option>
                   ))}
                 </select>

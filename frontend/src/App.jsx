@@ -100,7 +100,7 @@ export default function App() {
     LEGACY_STORAGE_KEYS.forEach((key) => {
       try {
         localStorage.removeItem(key);
-      } catch (e) {}
+      } catch (e) { }
     });
   }, []);
 
@@ -430,187 +430,187 @@ export default function App() {
             width: isSidebarCollapsed ? '64px' : '235px',
             minWidth: isSidebarCollapsed ? '64px' : '235px',
             height: '100vh',
-          maxHeight: '100vh',
-          position: 'sticky',
-          top: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          zIndex: 40,
-          backgroundColor: '#ffffff',
-          borderRight: '1px solid #e2e8f0',
-        }}
-      >
-        <div style={{ padding: isSidebarCollapsed ? '16px 8px' : '16px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {/* Logo & Brand Header */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-              padding: isSidebarCollapsed ? '0' : '4px 6px',
-              marginBottom: '20px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '7px',
-                  backgroundColor: '#0284c7',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  cursor: isSidebarCollapsed ? 'pointer' : 'default',
-                }}
-                onClick={isSidebarCollapsed ? toggleSidebar : undefined}
-                title="NBH ERP"
-              >
-                <Package size={17} />
-              </div>
-              {!isSidebarCollapsed && (
-                <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
-                  NBH ERP
+            maxHeight: '100vh',
+            position: 'sticky',
+            top: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            zIndex: 40,
+            backgroundColor: '#ffffff',
+            borderRight: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ padding: isSidebarCollapsed ? '16px 8px' : '16px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            {/* Logo & Brand Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                padding: isSidebarCollapsed ? '0' : '4px 6px',
+                marginBottom: '20px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '7px',
+                    backgroundColor: '#0284c7',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    cursor: isSidebarCollapsed ? 'pointer' : 'default',
+                  }}
+                  onClick={isSidebarCollapsed ? toggleSidebar : undefined}
+                  title="NBH ERP"
+                >
+                  <Package size={17} />
                 </div>
+                {!isSidebarCollapsed && (
+                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
+                    NBH ERP
+                  </div>
+                )}
+              </div>
+
+              {/* Minimize button inside sidebar */}
+              {!isSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  title="Minimize Sidebar (Ctrl+B)"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '4px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                >
+                  <PanelLeftClose size={16} />
+                </button>
               )}
             </div>
 
-            {/* Minimize button inside sidebar */}
-            {!isSidebarCollapsed && (
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="Minimize Sidebar (Ctrl+B)"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8',
-                  padding: '4px',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
-              >
-                <PanelLeftClose size={16} />
-              </button>
+            {/* When collapsed, show small expand button right below logo */}
+            {isSidebarCollapsed && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  title="Expand Sidebar (Ctrl+B)"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    padding: '5px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0284c7')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+                >
+                  <PanelLeftOpen size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Standard Navigation Buttons */}
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {accessibleModules.map((mod) => {
+                const Icon = mod.icon;
+                const isCurrentModule = currentView === mod.id;
+
+                return (
+                  <button
+                    key={mod.id}
+                    type="button"
+                    title={isSidebarCollapsed ? mod.label : undefined}
+                    onClick={() => {
+                      navigateTo(mod.id, mod.subItems?.[0]?.id || '');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                      width: '100%',
+                      padding: isSidebarCollapsed ? '10px 0' : '9px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
+                      color: isCurrentModule ? '#0284c7' : '#475569',
+                      fontWeight: isCurrentModule ? 600 : 500,
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isCurrentModule) e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                      <Icon
+                        size={18}
+                        color={isCurrentModule ? '#0284c7' : '#64748b'}
+                        style={{ flexShrink: 0 }}
+                      />
+                      {!isSidebarCollapsed && (
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {mod.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {!isSidebarCollapsed && isCurrentModule && (
+                      <span
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: '#0284c7',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* If no modules permitted */}
+            {accessibleModules.length === 0 && (
+              <div style={{ padding: '28px 14px', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+                <Lock size={24} style={{ margin: '0 auto 10px auto', display: 'block', color: '#94a3b8' }} />
+                No modules assigned to your role.
+              </div>
             )}
           </div>
 
-          {/* When collapsed, show small expand button right below logo */}
-          {isSidebarCollapsed && (
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="Expand Sidebar (Ctrl+B)"
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  padding: '5px',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#0284c7')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
-              >
-                <PanelLeftOpen size={14} />
-              </button>
-            </div>
-          )}
-
-          {/* Standard Navigation Buttons */}
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {accessibleModules.map((mod) => {
-              const Icon = mod.icon;
-              const isCurrentModule = currentView === mod.id;
-
-              return (
-                <button
-                  key={mod.id}
-                  type="button"
-                  title={isSidebarCollapsed ? mod.label : undefined}
-                  onClick={() => {
-                    navigateTo(mod.id, mod.subItems?.[0]?.id || '');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                    width: '100%',
-                    padding: isSidebarCollapsed ? '10px 0' : '9px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
-                    color: isCurrentModule ? '#0284c7' : '#475569',
-                    fontWeight: isCurrentModule ? 600 : 500,
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isCurrentModule) e.currentTarget.style.backgroundColor = '#f8fafc';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-                    <Icon
-                      size={18}
-                      color={isCurrentModule ? '#0284c7' : '#64748b'}
-                      style={{ flexShrink: 0 }}
-                    />
-                    {!isSidebarCollapsed && (
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {mod.label}
-                      </span>
-                    )}
-                  </div>
-
-                  {!isSidebarCollapsed && isCurrentModule && (
-                    <span
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: '#0284c7',
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* If no modules permitted */}
-          {accessibleModules.length === 0 && (
-            <div style={{ padding: '28px 14px', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
-              <Lock size={24} style={{ margin: '0 auto 10px auto', display: 'block', color: '#94a3b8' }} />
-              No modules assigned to your role.
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
-        <SidebarProfile
-          isCollapsed={isSidebarCollapsed}
-          onNavigate={navigateTo}
-          onOpenShortcuts={() => setShowShortcutsModal(true)}
-        />
-      </aside>
+          {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
+          <SidebarProfile
+            isCollapsed={isSidebarCollapsed}
+            onNavigate={navigateTo}
+            onOpenShortcuts={() => setShowShortcutsModal(true)}
+          />
+        </aside>
       )}
 
       {/* Main Workspace Area */}
@@ -694,36 +694,36 @@ export default function App() {
         <button
           type="button"
           onClick={toggleFullscreen}
-        title={isFullscreen ? 'Exit Full Screen (F11 or Alt+Enter)' : 'Enter Full Screen (F11 or Alt+Enter)'}
-        style={{
-          position: 'fixed',
-          bottom: '18px',
-          right: '18px',
-          zIndex: 80,
-          width: '36px',
-          height: '36px',
-          borderRadius: '50%',
-          backgroundColor: '#ffffff',
-          border: '1px solid #cbd5e1',
-          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          color: '#2563eb',
-          padding: 0,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#f1f5f9';
-          e.currentTarget.style.borderColor = '#94a3b8';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#ffffff';
-          e.currentTarget.style.borderColor = '#cbd5e1';
-        }}
-      >
-        {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
-      </button>
+          title={isFullscreen ? 'Exit Full Screen (F11 or Alt+Enter)' : 'Enter Full Screen (F11 or Alt+Enter)'}
+          style={{
+            position: 'fixed',
+            bottom: '18px',
+            right: '18px',
+            zIndex: 80,
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            backgroundColor: '#ffffff',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: '#2563eb',
+            padding: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f1f5f9';
+            e.currentTarget.style.borderColor = '#94a3b8';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.borderColor = '#cbd5e1';
+          }}
+        >
+          {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
+        </button>
       )}
 
       {/* Standard ERP Keyboard Shortcuts Help Modal */}

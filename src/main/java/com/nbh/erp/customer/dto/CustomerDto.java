@@ -25,6 +25,9 @@ public class CustomerDto {
     private BigDecimal creditLimit;
     private BigDecimal currentBalance;
     private Boolean isActive;
+    private Long customerGroupId;
+    private String customerGroupName;
+    private String customerGroupCode;
     private Long routeId;
     private String routeName;
     private String routeCode;
@@ -36,6 +39,10 @@ public class CustomerDto {
     }
 
     public static CustomerDto from(Customer c) {
+        Long groupId = c.getCustomerGroup() != null ? c.getCustomerGroup().getId() : null;
+        String groupName = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupName() : null;
+        String groupCode = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupCode() : null;
+
         return CustomerDto.builder()
                 .id(c.getId())
                 .customerCode(c.getCustomerCode())
@@ -48,9 +55,12 @@ public class CustomerDto {
                 .creditLimit(c.getCreditLimit())
                 .currentBalance(c.getCurrentBalance())
                 .isActive(c.getIsActive())
-                .routeId(c.getRoute() != null ? c.getRoute().getId() : null)
-                .routeName(c.getRoute() != null ? c.getRoute().getRouteName() : null)
-                .routeCode(c.getRoute() != null ? c.getRoute().getRouteCode() : null)
+                .customerGroupId(groupId)
+                .customerGroupName(groupName)
+                .customerGroupCode(groupCode)
+                .routeId(groupId)
+                .routeName(groupName)
+                .routeCode(groupCode)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

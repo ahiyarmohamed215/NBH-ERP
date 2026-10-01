@@ -303,15 +303,17 @@ export const pdfApi = {
   downloadPdf: downloadPdfDocument,
 };
 
-export const routeApi = {
-  getAll: () => api.get('/routes'),
-  getActive: () => api.get('/routes/active'),
-  getById: (id) => api.get(`/routes/${id}`),
-  create: (data) => api.post('/routes', data),
-  update: (id, data) => api.put(`/routes/${id}`, data),
-  toggleActive: (id) => api.patch(`/routes/${id}/toggle-active`),
-  delete: (id) => api.delete(`/routes/${id}`),
+export const customerGroupApi = {
+  getAll: () => api.get('/customer-groups'),
+  getActive: () => api.get('/customer-groups/active'),
+  getById: (id) => api.get(`/customer-groups/${id}`),
+  create: (data) => api.post('/customer-groups', data),
+  update: (id, data) => api.put(`/customer-groups/${id}`, data),
+  toggleActive: (id) => api.patch(`/customer-groups/${id}/toggle-active`),
+  delete: (id) => api.delete(`/customer-groups/${id}`),
 };
+
+export const routeApi = customerGroupApi;
 
 export default api;
 

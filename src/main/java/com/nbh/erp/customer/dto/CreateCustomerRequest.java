@@ -29,5 +29,11 @@ public class CreateCustomerRequest {
 
     private BigDecimal creditLimit = BigDecimal.ZERO;
 
+    private Long customerGroupId;
+
     private Long routeId;
+
+    public Long getEffectiveCustomerGroupId() {
+        return customerGroupId != null ? customerGroupId : routeId;
+    }
 }

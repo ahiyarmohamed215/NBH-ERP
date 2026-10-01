@@ -50,6 +50,15 @@ public class Customer extends BaseEntity {
     private Boolean isActive = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id")
-    private com.nbh.erp.route.entity.Route route;
+    @JoinColumn(name = "customer_group_id")
+    private com.nbh.erp.customergroup.entity.CustomerGroup customerGroup;
+
+    // Backward compatibility accessors
+    public com.nbh.erp.customergroup.entity.CustomerGroup getRoute() {
+        return customerGroup;
+    }
+
+    public void setRoute(com.nbh.erp.customergroup.entity.CustomerGroup group) {
+        this.customerGroup = group;
+    }
 }

@@ -14,7 +14,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();
-    List<Customer> findByRouteId(Long routeId);
+    List<Customer> findByCustomerGroupId(Long customerGroupId);
+
+    default List<Customer> findByRouteId(Long routeId) {
+        return findByCustomerGroupId(routeId);
+    }
 
     @Query("SELECT c FROM Customer c WHERE LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :query, '%')) " +

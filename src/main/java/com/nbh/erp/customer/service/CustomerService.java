@@ -23,7 +23,7 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final InvoiceRepository invoiceRepository;
-    private final com.nbh.erp.route.repository.RouteRepository routeRepository;
+    private final com.nbh.erp.customergroup.repository.CustomerGroupRepository customerGroupRepository;
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
@@ -70,9 +70,10 @@ public class CustomerService {
             throw new DuplicateResourceException("Customer", "code", code);
         }
 
-        com.nbh.erp.route.entity.Route route = null;
-        if (request.getRouteId() != null) {
-            route = routeRepository.findById(request.getRouteId()).orElse(null);
+        com.nbh.erp.customergroup.entity.CustomerGroup group = null;
+        Long groupId = request.getEffectiveCustomerGroupId();
+        if (groupId != null) {
+            group = customerGroupRepository.findById(groupId).orElse(null);
         }
 
         Customer customer = Customer.builder()
@@ -84,7 +85,7 @@ public class CustomerService {
                 .address(request.getAddress())
                 .creditLimit(request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO)
                 .currentBalance(BigDecimal.ZERO)
-                .route(route)
+                .customerGroup(group)
                 .isActive(true)
                 .build();
 
@@ -116,11 +117,12 @@ public class CustomerService {
             customer.setCreditLimit(request.getCreditLimit());
         }
 
-        if (request.getRouteId() != null) {
-            com.nbh.erp.route.entity.Route route = routeRepository.findById(request.getRouteId()).orElse(null);
-            customer.setRoute(route);
+        Long groupId = request.getEffectiveCustomerGroupId();
+        if (groupId != null) {
+            com.nbh.erp.customergroup.entity.CustomerGroup group = customerGroupRepository.findById(groupId).orElse(null);
+            customer.setCustomerGroup(group);
         } else {
-            customer.setRoute(null);
+            customer.setCustomerGroup(null);
         }
 
         Customer saved = customerRepository.save(customer);
