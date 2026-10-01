@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Package, Lock, User, ArrowRight } from 'lucide-react';
+import { Package, Lock, User, ArrowRight, Clock, X } from 'lucide-react';
 
 export default function LoginView({ onSwitchToSignup }) {
   const { login } = useAuth();
@@ -9,6 +9,15 @@ export default function LoginView({ onSwitchToSignup }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(() => {
+    return sessionStorage.getItem('nbh_session_expired') || null;
+  });
+
+  useEffect(() => {
+    if (sessionExpiredNotice) {
+      sessionStorage.removeItem('nbh_session_expired');
+    }
+  }, [sessionExpiredNotice]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -65,6 +74,47 @@ export default function LoginView({ onSwitchToSignup }) {
           <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>NBH ERP</h2>
           <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Sign in to your enterprise account</p>
         </div>
+
+        {sessionExpiredNotice && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              padding: '12px 14px',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: '8px',
+              color: '#92400e',
+              fontSize: '0.84rem',
+              marginBottom: '20px',
+              lineHeight: 1.4,
+            }}
+          >
+            <Clock size={18} style={{ flexShrink: 0, color: '#d97706', marginTop: '1px' }} />
+            <div style={{ flex: 1 }}>
+              <strong style={{ display: 'block', color: '#78350f', marginBottom: '2px' }}>Session Expired</strong>
+              {sessionExpiredNotice}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSessionExpiredNotice(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#b45309',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '4px',
+              }}
+              title="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '16px' }}>

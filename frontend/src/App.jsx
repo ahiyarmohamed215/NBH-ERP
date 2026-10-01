@@ -606,6 +606,7 @@ export default function App() {
 
         {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
         <SidebarProfile
+          isCollapsed={isSidebarCollapsed}
           onNavigate={navigateTo}
           onOpenShortcuts={() => setShowShortcutsModal(true)}
         />

@@ -23,11 +23,13 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // If unauthorized and not on login endpoint, clear token
-      if (!window.location.pathname.includes('/login') && !error.config.url.includes('/auth/login')) {
+      const requestUrl = error.config?.url || '';
+      // If unauthorized and not an explicit login attempt, signal session expiration
+      if (!requestUrl.includes('/auth/login')) {
         localStorage.removeItem('nbh_token');
         localStorage.removeItem('nbh_user');
-        window.location.reload();
+        sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
+        window.dispatchEvent(new CustomEvent('nbh:session_expired'));
       }
     }
     const message = error.response?.data?.message || error.message || 'An error occurred';

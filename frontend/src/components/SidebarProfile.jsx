@@ -17,7 +17,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 
-export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
+export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpenShortcuts }) {
   const { user, logout, updateUser } = useAuth();
   const { addToast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -142,8 +142,9 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
           style={{
             position: 'absolute',
             bottom: 'calc(100% + 6px)',
-            left: '8px',
-            right: '8px',
+            left: isCollapsed ? '10px' : '8px',
+            right: isCollapsed ? 'auto' : '8px',
+            width: isCollapsed ? '250px' : 'auto',
             backgroundColor: '#ffffff',
             border: '1px solid #cbd5e1',
             borderRadius: '8px',
@@ -160,7 +161,7 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
             <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px', wordBreak: 'break-all' }}>
               {user?.email}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                 {user?.roles?.map((r) => (
                   <span
@@ -178,7 +179,6 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
                   </span>
                 ))}
               </div>
-              <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>v1.2 ERP</span>
             </div>
           </div>
 
@@ -273,12 +273,13 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
       <div
         onClick={() => setMenuOpen(!menuOpen)}
         style={{
-          padding: '12px 14px',
+          padding: isCollapsed ? '12px 0' : '10px 14px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
           cursor: 'pointer',
           backgroundColor: menuOpen ? '#f1f5f9' : 'transparent',
+          transition: 'background-color 0.15s ease',
         }}
         onMouseEnter={(e) => {
           if (!menuOpen) e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -286,10 +287,19 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
         onMouseLeave={(e) => {
           if (!menuOpen) e.currentTarget.style.backgroundColor = 'transparent';
         }}
-        title="Click for profile settings & sign out"
+        title={isCollapsed ? `${user?.fullName || user?.username || 'User'} (Connected)` : 'Click for profile settings & sign out'}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-          {/* Avatar Circle with Online Connected Indicator Badge */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isCollapsed ? '0' : '10px',
+            minWidth: 0,
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            width: isCollapsed ? '100%' : 'auto',
+          }}
+        >
+          {/* Avatar Circle */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div
               style={{
@@ -303,49 +313,120 @@ export default function SidebarProfile({ onNavigate, onOpenShortcuts }) {
                 justifyContent: 'center',
                 fontWeight: 700,
                 fontSize: '0.88rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
               }}
             >
               {initials}
             </div>
-            {/* Green Connected Indicator Dot */}
-            <span
-              style={{
-                position: 'absolute',
-                bottom: '-1px',
-                right: '-1px',
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: '#10b981',
-                border: '2px solid #ffffff',
-                display: 'block',
-              }}
-              title="System Connected"
-            />
+            {/* Green Connected Indicator Dot: Shown ONLY when the sidebar is collapsed/hidden */}
+            {isCollapsed && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: '-1px',
+                  right: '-1px',
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  border: '2px solid #ffffff',
+                  display: 'block',
+                  boxShadow: '0 0 5px rgba(16, 185, 129, 0.7)',
+                }}
+                title="System Connected"
+              />
+            )}
           </div>
 
-          <div className="profile-details" style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                color: '#0f172a',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {user?.fullName || user?.username}
+          {/* Profile Name & Connected Status (Shown when sidebar is expanded) */}
+          {!isCollapsed && (
+            <div className="profile-details" style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  color: '#0f172a',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  lineHeight: 1.25,
+                }}
+              >
+                {user?.fullName || user?.username}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginTop: '3px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '1.5px 7px',
+                    borderRadius: '10px',
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #d1fae5',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#10b981',
+                      display: 'inline-block',
+                      boxShadow: '0 0 3px rgba(16, 185, 129, 0.5)',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: '#047857',
+                      fontWeight: 600,
+                      fontSize: '0.72rem',
+                      letterSpacing: '0.01em',
+                    }}
+                  >
+                    Connected
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    color: '#64748b',
+                    fontWeight: 600,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    lineHeight: '1.3',
+                  }}
+                  title="ERP System Version"
+                >
+                  v1.2
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b' }}>
-              <span>{user?.roles?.[0]?.replace('ROLE_', '') || 'User'}</span>
-              <span style={{ color: '#cbd5e1' }}>•</span>
-              <span style={{ color: '#059669', fontWeight: 600 }}>Connected</span>
-            </div>
-          </div>
+          )}
         </div>
 
-        <ChevronUp size={16} color="#64748b" className="profile-details" style={{ flexShrink: 0 }} />
+        {!isCollapsed && (
+          <ChevronUp
+            size={16}
+            color="#64748b"
+            className="profile-details"
+            style={{
+              flexShrink: 0,
+              transform: menuOpen ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        )}
       </div>
 
       {/* Edit Profile Modal */}
