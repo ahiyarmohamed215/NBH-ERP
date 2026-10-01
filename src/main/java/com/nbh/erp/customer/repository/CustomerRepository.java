@@ -15,6 +15,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();
     List<Customer> findByCustomerGroupId(Long customerGroupId);
+    List<Customer> findByDeliveryRouteId(Long deliveryRouteId);
 
     default List<Customer> findByRouteId(Long routeId) {
         return findByCustomerGroupId(routeId);

@@ -30,6 +30,15 @@ public class InvoiceDto {
     private String salesmanName;
     private String status;
     private String paymentType;
+    private String deliveryStatus;
+    private Long deliveryId;
+    private String deliveryNumber;
+    private String deliveryRouteName;
+    private String vehicleNumber;
+    private String driverName;
+    private String assistantStaffName;
+    private LocalDate deliveryDate;
+    private String deliveryNotes;
     private BigDecimal subtotal;
     private BigDecimal discountAmount;
     private BigDecimal taxRate;
@@ -44,6 +53,15 @@ public class InvoiceDto {
     private LocalDateTime createdAt;
 
     public static InvoiceDto from(Invoice inv) {
+        Long delId = inv.getDelivery() != null ? inv.getDelivery().getId() : null;
+        String delNumber = inv.getDelivery() != null ? inv.getDelivery().getDeliveryNumber() : null;
+        String delRouteName = inv.getDelivery() != null && inv.getDelivery().getRoute() != null ? inv.getDelivery().getRoute().getRouteName() : null;
+        String vehNum = inv.getDelivery() != null ? inv.getDelivery().getVehicleNumber() : null;
+        String driver = inv.getDelivery() != null && inv.getDelivery().getDriver() != null
+                ? (inv.getDelivery().getDriver().getFullName() != null ? inv.getDelivery().getDriver().getFullName() : inv.getDelivery().getDriver().getUsername()) : null;
+        String assistant = inv.getDelivery() != null && inv.getDelivery().getAssistantStaff() != null
+                ? (inv.getDelivery().getAssistantStaff().getFullName() != null ? inv.getDelivery().getAssistantStaff().getFullName() : inv.getDelivery().getAssistantStaff().getUsername()) : null;
+
         return InvoiceDto.builder()
                 .id(inv.getId())
                 .invoiceNumber(inv.getInvoiceNumber())
@@ -57,6 +75,15 @@ public class InvoiceDto {
                 .salesmanName(inv.getSalesman() != null ? (inv.getSalesman().getFullName() != null ? inv.getSalesman().getFullName() : inv.getSalesman().getUsername()) : null)
                 .status(inv.getStatus())
                 .paymentType(inv.getPaymentType())
+                .deliveryStatus(inv.getDeliveryStatus() != null ? inv.getDeliveryStatus() : "PENDING")
+                .deliveryId(delId)
+                .deliveryNumber(delNumber)
+                .deliveryRouteName(delRouteName)
+                .vehicleNumber(vehNum)
+                .driverName(driver)
+                .assistantStaffName(assistant)
+                .deliveryDate(inv.getDeliveryDate())
+                .deliveryNotes(inv.getDeliveryNotes())
                 .subtotal(inv.getSubtotal())
                 .discountAmount(inv.getDiscountAmount())
                 .taxRate(inv.getTaxRate())

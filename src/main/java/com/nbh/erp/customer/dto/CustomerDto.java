@@ -28,6 +28,9 @@ public class CustomerDto {
     private Long customerGroupId;
     private String customerGroupName;
     private String customerGroupCode;
+    private Long deliveryRouteId;
+    private String deliveryRouteName;
+    private String deliveryRouteCode;
     private Long routeId;
     private String routeName;
     private String routeCode;
@@ -42,6 +45,10 @@ public class CustomerDto {
         Long groupId = c.getCustomerGroup() != null ? c.getCustomerGroup().getId() : null;
         String groupName = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupName() : null;
         String groupCode = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupCode() : null;
+
+        Long delRouteId = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getId() : null;
+        String delRouteName = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getRouteName() : null;
+        String delRouteCode = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getRouteCode() : null;
 
         return CustomerDto.builder()
                 .id(c.getId())
@@ -58,6 +65,9 @@ public class CustomerDto {
                 .customerGroupId(groupId)
                 .customerGroupName(groupName)
                 .customerGroupCode(groupCode)
+                .deliveryRouteId(delRouteId)
+                .deliveryRouteName(delRouteName)
+                .deliveryRouteCode(delRouteCode)
                 .routeId(groupId)
                 .routeName(groupName)
                 .routeCode(groupCode)

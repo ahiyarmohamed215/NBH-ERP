@@ -90,6 +90,20 @@ public class Invoice extends BaseEntity {
     @Column(name = "invoice_date", nullable = false)
     private LocalDate invoiceDate;
 
+    @Column(name = "delivery_status", length = 30)
+    @Builder.Default
+    private String deliveryStatus = "PENDING"; // PENDING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_id")
+    private com.nbh.erp.delivery.entity.Delivery delivery;
+
+    @Column(name = "delivery_date")
+    private LocalDate deliveryDate;
+
+    @Column(name = "delivery_notes", columnDefinition = "TEXT")
+    private String deliveryNotes;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 

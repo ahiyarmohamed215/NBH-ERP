@@ -53,6 +53,10 @@ public class Customer extends BaseEntity {
     @JoinColumn(name = "customer_group_id")
     private com.nbh.erp.customergroup.entity.CustomerGroup customerGroup;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_route_id")
+    private com.nbh.erp.delivery.entity.DeliveryRoute deliveryRoute;
+
     // Backward compatibility accessors
     public com.nbh.erp.customergroup.entity.CustomerGroup getRoute() {
         return customerGroup;

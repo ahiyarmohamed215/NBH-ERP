@@ -315,5 +315,35 @@ export const customerGroupApi = {
 
 export const routeApi = customerGroupApi;
 
+export const vehicleApi = {
+  getAll: () => api.get('/vehicles'),
+  getAvailable: () => api.get('/vehicles/available'),
+  getById: (id) => api.get(`/vehicles/${id}`),
+  create: (data) => api.post('/vehicles', data),
+  update: (id, data) => api.put(`/vehicles/${id}`, data),
+  delete: (id) => api.delete(`/vehicles/${id}`),
+};
+
+export const deliveryRouteApi = {
+  getAll: () => api.get('/delivery-routes'),
+  getActive: () => api.get('/delivery-routes/active'),
+  getById: (id) => api.get(`/delivery-routes/${id}`),
+  create: (data) => api.post('/delivery-routes', data),
+  update: (id, data) => api.put(`/delivery-routes/${id}`, data),
+  delete: (id) => api.delete(`/delivery-routes/${id}`),
+};
+
+export const deliveryApi = {
+  search: (params) => api.get('/deliveries', { params }),
+  getSummary: () => api.get('/deliveries/summary'),
+  getPendingInvoices: () => api.get('/deliveries/pending-invoices'),
+  getById: (id) => api.get(`/deliveries/${id}`),
+  create: (data) => api.post('/deliveries', data),
+  dispatch: (id, data) => api.post(`/deliveries/${id}/dispatch`, data || {}),
+  complete: (id, data) => api.post(`/deliveries/${id}/complete`, data || {}),
+  cancel: (id, data) => api.post(`/deliveries/${id}/cancel`, data || {}),
+};
+
 export default api;
+
 

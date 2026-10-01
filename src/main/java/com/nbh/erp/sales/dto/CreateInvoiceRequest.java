@@ -43,7 +43,11 @@ public class CreateInvoiceRequest {
     private String notes;
 
     @Builder.Default
-    private boolean hold = false; // If true, saved as HELD cart
+    private Boolean hold = false; // If true, saved as HELD cart
+
+    public boolean isHold() {
+        return Boolean.TRUE.equals(this.hold);
+    }
 
     @NotEmpty(message = "Invoice must contain at least one line item")
     @Valid

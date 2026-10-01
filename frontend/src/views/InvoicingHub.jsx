@@ -108,6 +108,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     paymentType: true,
     paymentMethod: true,
     status: true,
+    delivery: true,
     total: true,
     paid: true,
     balance: true,
@@ -124,7 +125,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         invoiceNumber: inv.invoiceNumber,
         customerName: inv.customerName || (inv.customer ? inv.customer.name : 'Walk-in'),
         customerId: inv.customerId || (inv.customer ? inv.customer.id : null),
-        deliveryStatus: inv.deliveryStatus || 'Not Delivered',
+        deliveryStatus: inv.deliveryStatus || 'PENDING',
+        deliveryNumber: inv.deliveryNumber || null,
+        deliveryRouteName: inv.deliveryRouteName || null,
         invoiceDate: inv.invoiceDate ? inv.invoiceDate.split('T')[0] : '',
         displayDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
         paymentType: inv.paymentType || (Number(inv.balanceAmount || 0) === 0 ? 'Full Payment' : 'Installment'),
@@ -1812,6 +1815,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     {visibleColumns.total && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>}
                     {visibleColumns.paid && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
                     {visibleColumns.balance && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
+                    {visibleColumns.delivery && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
@@ -1881,6 +1885,25 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       {visibleColumns.balance && (
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: Number(inv.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
                           LKR {Number(inv.balanceAmount || 0).toFixed(2)}
+                        </td>
+                      )}
+
+                      {/* Delivery Status */}
+                      {visibleColumns.delivery && (
+                        <td style={{ padding: '12px 16px' }}>
+                          {inv.deliveryStatus === 'DELIVERED' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                              <CheckCircle size={11} /> Delivered
+                            </span>
+                          ) : inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                              <Truck size={11} /> On Route {inv.deliveryNumber ? `(${inv.deliveryNumber})` : ''}
+                            </span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                              <Clock size={11} /> Pending Delivery
+                            </span>
+                          )}
                         </td>
                       )}
 

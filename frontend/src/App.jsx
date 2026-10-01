@@ -11,6 +11,7 @@ import MastersView from './views/MastersView';
 import ReportsView from './views/ReportsView';
 import AccountingHub from './views/AccountingHub';
 import CustomersHub from './views/CustomersHub';
+import DeliveryHub from './views/DeliveryHub';
 import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
@@ -147,7 +148,7 @@ export default function App() {
         permissions: ['CUSTOMER_MANAGE'],
         subItems: [
           { id: 'list', label: 'Customer List', permission: 'CUSTOMER_MANAGE' },
-          { id: 'groups', label: 'Groups & Routes', permission: 'CUSTOMER_MANAGE' },
+          { id: 'groups', label: 'Customer Groups', permission: 'CUSTOMER_MANAGE' },
           { id: 'history', label: 'Customer History', permission: 'CUSTOMER_MANAGE' },
         ],
       },
@@ -190,6 +191,17 @@ export default function App() {
           { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
           { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
           { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_MANAGE' },
+        ],
+      },
+      {
+        id: 'delivery',
+        label: 'Delivery',
+        icon: Truck,
+        permissions: ['DELIVERY_VIEW', 'DELIVERY_MANAGE'],
+        subItems: [
+          { id: 'deliveries', label: 'Delivery Trips', permission: 'DELIVERY_VIEW' },
+          { id: 'routes', label: 'Delivery Routes', permission: 'DELIVERY_VIEW' },
+          { id: 'vehicles', label: 'Fleet Vehicles', permission: 'DELIVERY_VIEW' },
         ],
       },
       {
@@ -293,6 +305,15 @@ export default function App() {
     } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
       setCurrentView('purchasing');
       setSubTab(view);
+    } else if (view === 'delivery' || view === 'deliveries') {
+      setCurrentView('delivery');
+      setSubTab(sub || 'deliveries');
+    } else if (view === 'delivery-routes') {
+      setCurrentView('delivery');
+      setSubTab('routes');
+    } else if (view === 'vehicles') {
+      setCurrentView('delivery');
+      setSubTab('vehicles');
     } else if (view === 'inventory') {
       setCurrentView('inventory');
       setSubTab(sub || 'inventory-list');
@@ -679,6 +700,9 @@ export default function App() {
               )}
               {currentView === 'purchasing' && (
                 <PurchasingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
+              {currentView === 'delivery' && (
+                <DeliveryHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
               {currentView === 'accounting' && (
                 <AccountingHub activeSubTab={subTab} onSubTabChange={setSubTab} />

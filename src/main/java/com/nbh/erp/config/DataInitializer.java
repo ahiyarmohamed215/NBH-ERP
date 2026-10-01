@@ -27,6 +27,8 @@ public class DataInitializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.nbh.erp.delivery.service.VehicleService vehicleService;
+    private final com.nbh.erp.delivery.service.DeliveryRouteService deliveryRouteService;
 
     @Value("${app.security.initial-admin.enabled:true}")
     private boolean initialAdminEnabled;
@@ -59,6 +61,10 @@ public class DataInitializer implements ApplicationRunner {
         } else {
             log.info("Initial super admin user creation is disabled via configuration (initial-admin.enabled=false).");
         }
+
+        // 4. Seed initial distribution fleet vehicles and routes
+        vehicleService.seedDefaultVehiclesIfEmpty();
+        deliveryRouteService.seedDefaultRoutesIfEmpty();
 
         log.info("System initialization completed successfully.");
     }
@@ -103,6 +109,8 @@ public class DataInitializer implements ApplicationRunner {
                 new PermItem("PAYMENT", "PAYMENT_VIEW", "View payment receipts and transaction records"),
                 new PermItem("REPORT", "REPORT_VIEW", "Access business analytics, sales, and inventory reports"),
                 new PermItem("AUDIT", "AUDIT_VIEW", "View system security and data change audit logs"),
+                new PermItem("DELIVERY", "DELIVERY_VIEW", "View delivery trips, dispatches, and routes"),
+                new PermItem("DELIVERY", "DELIVERY_MANAGE", "Create, dispatch, deliver, and cancel delivery trips and routes"),
                 new PermItem("DASHBOARD", "DASHBOARD_VIEW", "View management dashboard and KPI metrics")
         );
 
