@@ -24,6 +24,7 @@ public class DeliveryRouteService {
 
     private final DeliveryRouteRepository routeRepository;
     private final CustomerRepository customerRepository;
+    private final com.nbh.erp.user.repository.UserRepository userRepository;
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
@@ -69,11 +70,18 @@ public class DeliveryRouteService {
             throw new DuplicateResourceException("DeliveryRoute", "routeCode", code);
         }
 
+        com.nbh.erp.user.entity.User assignedStaff = null;
+        Long staffId = req.getEffectiveStaffId();
+        if (staffId != null) {
+            assignedStaff = userRepository.findById(staffId).orElse(null);
+        }
+
         DeliveryRoute route = DeliveryRoute.builder()
                 .routeCode(code)
                 .routeName(req.getRouteName().trim())
                 .description(req.getDescription())
                 .area(req.getArea())
+                .assignedStaff(assignedStaff)
                 .startLocation(req.getStartLocation())
                 .endLocation(req.getEndLocation())
                 .estimatedDurationMinutes(req.getEstimatedDurationMinutes())
@@ -113,6 +121,13 @@ public class DeliveryRouteService {
                 throw new DuplicateResourceException("DeliveryRoute", "routeCode", newCode);
             }
             route.setRouteCode(newCode);
+        }
+
+        Long staffId = req.getEffectiveStaffId();
+        if (staffId != null) {
+            route.setAssignedStaff(userRepository.findById(staffId).orElse(null));
+        } else {
+            route.setAssignedStaff(null);
         }
 
         route.setRouteName(req.getRouteName().trim());

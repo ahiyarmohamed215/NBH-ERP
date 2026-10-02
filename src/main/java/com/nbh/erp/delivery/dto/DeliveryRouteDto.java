@@ -19,6 +19,8 @@ public class DeliveryRouteDto {
     private String routeName;
     private String description;
     private String area;
+    private Long assignedStaffId;
+    private String assignedStaffName;
     private String startLocation;
     private String endLocation;
     private Integer estimatedDurationMinutes;
@@ -30,13 +32,27 @@ public class DeliveryRouteDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Backward compatibility aliases
+    public Long getSalesmanId() {
+        return assignedStaffId;
+    }
+
+    public String getSalesmanName() {
+        return assignedStaffName;
+    }
+
     public static DeliveryRouteDto from(DeliveryRoute r, List<Long> customerIds) {
+        Long staffId = r.getAssignedStaff() != null ? r.getAssignedStaff().getId() : null;
+        String staffName = r.getAssignedStaff() != null ? r.getAssignedStaff().getFullName() : null;
+
         return DeliveryRouteDto.builder()
                 .id(r.getId())
                 .routeCode(r.getRouteCode())
                 .routeName(r.getRouteName())
                 .description(r.getDescription())
                 .area(r.getArea())
+                .assignedStaffId(staffId)
+                .assignedStaffName(staffName)
                 .startLocation(r.getStartLocation())
                 .endLocation(r.getEndLocation())
                 .estimatedDurationMinutes(r.getEstimatedDurationMinutes())

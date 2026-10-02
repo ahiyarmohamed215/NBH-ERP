@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi } from '../api/apiClient';
+import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi, staffQuotaApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
@@ -17,6 +17,7 @@ import {
   Clock,
   User,
   ShieldAlert,
+  ShieldCheck,
   X,
   Download,
   Building2,
@@ -246,7 +247,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
   };
 
   // Flow Step 3: When clicking a product, activate Per-Product Staging Workstation
-  const handleSelectProductForStaging = (product) => {
+  const handleSelectProductForStaging = async (product) => {
     // 1. Filter warehouses that have available stock for this product
     const whsWithStock = warehouses.filter((wh) => getProductStockInWarehouse(product.id, wh.id) > 0);
 
@@ -263,6 +264,21 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     const price = Number(product.sellingPrice || 0);
     const qty = 1;
 
+    let quotaInfo = null;
+    try {
+      if (user?.id) {
+        const qRes = await staffQuotaApi.check({
+          productId: product.id,
+          userId: user.id,
+          warehouseId: autoWarehouse ? autoWarehouse.id : undefined,
+          requestedQuantity: 1,
+        });
+        quotaInfo = qRes.data?.data || qRes.data || null;
+      }
+    } catch (e) {
+      console.error('Failed to check staff quota in POS:', e);
+    }
+
     setStagedItem({
       product,
       availableWarehouses: availableWhs,
@@ -270,6 +286,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       warehouseCode: autoWarehouse ? autoWarehouse.code : 'WH-01',
       warehouseName: autoWarehouse ? autoWarehouse.name : 'Main Warehouse',
       realQuantity: Math.max(0, realQty),
+      quotaInfo: quotaInfo,
       salesPrice: price, // Non-editable, locked from GRN/Inventory
       salesQty: qty,
       discountRate: 0,
@@ -281,18 +298,34 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     setSearchResults([]);
   };
 
-  const handleStagedWarehouseChange = (whId) => {
+  const handleStagedWarehouseChange = async (whId) => {
     if (!stagedItem) return;
     const wh = (stagedItem.availableWarehouses || warehouses).find((w) => w.id === Number(whId)) || warehouses.find((w) => w.id === Number(whId));
     if (!wh) return;
 
     const realStock = getProductStockInWarehouse(stagedItem.product.id, wh.id);
+    let quotaInfo = stagedItem.quotaInfo;
+    try {
+      if (user?.id) {
+        const qRes = await staffQuotaApi.check({
+          productId: stagedItem.product.id,
+          userId: user.id,
+          warehouseId: wh.id,
+          requestedQuantity: stagedItem.salesQty || 1,
+        });
+        quotaInfo = qRes.data?.data || qRes.data || null;
+      }
+    } catch (e) {
+      console.error('Failed to recheck staff quota:', e);
+    }
+
     setStagedItem((prev) => ({
       ...prev,
       warehouseId: wh.id,
       warehouseCode: wh.code,
       warehouseName: wh.name,
       realQuantity: realStock,
+      quotaInfo: quotaInfo,
     }));
   };
 
@@ -328,7 +361,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   const handleStagedQtyChange = (qtyVal) => {
     if (!stagedItem) return;
-    const maxStock = Math.max(1, stagedItem.realQuantity || 1);
+    let maxLimit = stagedItem.realQuantity || 1;
+    if (stagedItem.quotaInfo?.quotaRestricted) {
+      const rem = Number(stagedItem.quotaInfo.remainingQuantity ?? 999999);
+      maxLimit = Math.min(maxLimit, rem);
+    }
+    const maxStock = Math.max(1, maxLimit);
     const qty = Math.min(maxStock, Math.max(1, parseFloat(qtyVal) || 1));
     const gross = stagedItem.salesPrice * qty;
     const discAmt = stagedItem.discountRate > 0
@@ -357,6 +395,19 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       return;
     }
 
+    // Quota restriction check
+    if (stagedItem.quotaInfo?.quotaRestricted && stagedItem.quotaInfo?.remainingQuantity !== undefined) {
+      const rem = Number(stagedItem.quotaInfo.remainingQuantity);
+      if (rem <= 0) {
+        addToast(`Staff Quota Limit Reached: You have sold all your allocated ${stagedItem.quotaInfo.allocatedQuantity} units for ${stagedItem.product.name}. Cannot bill.`, 'error');
+        return;
+      }
+      if (stagedItem.salesQty > rem) {
+        addToast(`Exceeds your remaining quota limit (${rem} units available). Please reduce quantity.`, 'error');
+        return;
+      }
+    }
+
     if (stagedItem.salesQty > stagedItem.realQuantity) {
       addToast(
         `Quantity (${stagedItem.salesQty}) cannot exceed available stock (${stagedItem.realQuantity}) in ${stagedItem.warehouseCode}`,
@@ -372,7 +423,19 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
       if (existingIdx !== -1) {
         const existing = prev[existingIdx];
-        const newQty = Math.min(stagedItem.realQuantity, existing.quantity + stagedItem.salesQty);
+        let maxLimit = stagedItem.realQuantity;
+        if (stagedItem.quotaInfo?.quotaRestricted) {
+          const rem = Number(stagedItem.quotaInfo.remainingQuantity ?? 999999);
+          maxLimit = Math.min(maxLimit, rem);
+        }
+        if (existing.quantity + stagedItem.salesQty > maxLimit) {
+          addToast(
+            `Cannot add: total quantity (${existing.quantity + stagedItem.salesQty}) exceeds quota limit of ${maxLimit}`,
+            'error'
+          );
+          return prev;
+        }
+        const newQty = Math.min(maxLimit, existing.quantity + stagedItem.salesQty);
         const gross = newQty * existing.unitPrice;
         const newDiscAmt = existing.discountRate > 0
           ? (gross * existing.discountRate) / 100
@@ -385,6 +448,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           quantity: newQty,
           discountAmount: newDiscAmt,
           total: newTotal,
+          quotaInfo: stagedItem.quotaInfo || existing.quotaInfo,
         };
         return updated;
       }
@@ -404,6 +468,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
         discountAmount: stagedItem.discountAmount,
         total: stagedItem.subtotal,
         availableQty: stagedItem.realQuantity,
+        quotaInfo: stagedItem.quotaInfo,
       };
 
       return [...prev, newLineItem];
@@ -418,10 +483,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === lineId) {
-          const maxAvail = item.availableQty || 999999;
+          let maxAvail = item.availableQty || 999999;
+          if (item.quotaInfo?.quotaRestricted) {
+            const rem = Number(item.quotaInfo.remainingQuantity ?? 999999);
+            maxAvail = Math.min(maxAvail, rem);
+          }
           const candidate = item.quantity + delta;
           if (candidate > maxAvail) {
-            addToast(`Quantity cannot exceed available stock (${maxAvail})`, 'warning');
+            addToast(
+              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Staff Quota Limit)' : ' (Warehouse Stock)'}`,
+              'warning'
+            );
             return item;
           }
           const newQty = Math.max(1, candidate);
@@ -444,10 +516,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     setCart((prev) =>
       prev.map((item) => {
         if (item.id === lineId) {
-          const maxAvail = item.availableQty || 999999;
+          let maxAvail = item.availableQty || 999999;
+          if (item.quotaInfo?.quotaRestricted) {
+            const rem = Number(item.quotaInfo.remainingQuantity ?? 999999);
+            maxAvail = Math.min(maxAvail, rem);
+          }
           const finalQty = Math.min(maxAvail, parsed);
           if (parsed > maxAvail) {
-            addToast(`Quantity cannot exceed available stock (${maxAvail})`, 'warning');
+            addToast(
+              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Staff Quota Limit)' : ' (Warehouse Stock)'}`,
+              'warning'
+            );
           }
           const gross = finalQty * item.unitPrice;
           const disc = item.discountRate > 0 ? (gross * item.discountRate) / 100 : item.discountAmount;
@@ -1211,6 +1290,62 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               </button>
             </div>
 
+            {/* Quota Restriction Alert Banner */}
+            {stagedItem.quotaInfo?.quotaRestricted && (
+              <div
+                style={{
+                  marginBottom: '12px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
+                    ? '#fef2f2'
+                    : '#f0fdf4',
+                  border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fca5a5' : '#86efac'}`,
+                }}
+              >
+                {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
+                  <ShieldAlert size={20} color="#dc2626" style={{ flexShrink: 0 }} />
+                ) : (
+                  <ShieldCheck size={20} color="#16a34a" style={{ flexShrink: 0 }} />
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#991b1b' : '#166534',
+                  }}>
+                    {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
+                      ? 'POS Staff Selling Quota Exhausted'
+                      : 'POS Staff Selling Quota Active'}
+                  </div>
+                  <div style={{
+                    fontSize: '0.74rem',
+                    color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#b91c1c' : '#15803d',
+                    marginTop: '1px',
+                  }}>
+                    {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
+                      ? `You have reached your allocated selling quota (${stagedItem.quotaInfo.allocatedQuantity} units). POS billing is blocked for this product.`
+                      : `Your selling quota is limited: ${stagedItem.quotaInfo.remainingQuantity} units remaining out of ${stagedItem.quotaInfo.allocatedQuantity} allocated (Sold: ${stagedItem.quotaInfo.soldQuantity || 0}).`}
+                  </div>
+                </div>
+                <div style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontWeight: 800,
+                  fontSize: '0.78rem',
+                  background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fee2e2' : '#dcfce7',
+                  color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#dc2626' : '#15803d',
+                  border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#f87171' : '#4ade80'}`,
+                  whiteSpace: 'nowrap',
+                }}>
+                  {stagedItem.quotaInfo.remainingQuantity} Units Left
+                </div>
+              </div>
+            )}
+
             <div
               style={{
                 display: 'grid',
@@ -1263,7 +1398,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     fontSize: '0.82rem',
                   }}
                 >
-                  {stagedItem.realQuantity} {stagedItem.product.unitOfMeasure || 'Units'} Available
+                  {stagedItem.quotaInfo?.quotaRestricted
+                    ? `${stagedItem.quotaInfo.remainingQuantity} Quota Left (${stagedItem.realQuantity} in WH)`
+                    : `${stagedItem.realQuantity} ${stagedItem.product.unitOfMeasure || 'Units'} Available`}
                 </div>
               </div>
 
@@ -1375,11 +1512,20 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 </div>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? "btn btn-secondary" : "btn btn-primary"}
                   onClick={handleAddStagedToTable}
+                  disabled={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0}
                   style={{ height: '34px', width: '100%', gap: '5px', fontWeight: 700, fontSize: '0.82rem' }}
                 >
-                  <Plus size={14} /> Add to Table
+                  {stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
+                    <>
+                      <ShieldAlert size={14} /> Quota Reached
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} /> Add to Table
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1479,8 +1625,24 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem', lineHeight: '1.25' }}>{item.name}</div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                          Unit: {item.unitOfMeasure || 'PCS'}
+                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>Unit: {item.unitOfMeasure || 'PCS'}</span>
+                          {item.quotaInfo?.quotaRestricted && (
+                            <span
+                              style={{
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '4px',
+                                padding: '1px 5px',
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                              }}
+                              title={`Staff Quota Limit: ${item.quotaInfo.allocatedQuantity} allocated, ${item.quotaInfo.remainingQuantity} remaining`}
+                            >
+                              Quota: {item.quotaInfo.remainingQuantity} max
+                            </span>
+                          )}
                         </div>
                       </td>
 

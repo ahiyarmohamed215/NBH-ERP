@@ -26,19 +26,27 @@ import {
   UserCheck,
   Gauge,
   Check,
-  Info
+  Info,
+  Radio,
+  Compass,
+  Wifi,
+  Layers,
+  Activity,
+  Trash2,
+  Download,
 } from 'lucide-react';
 import { deliveryApi, deliveryRouteApi, vehicleApi, salesApi, customerGroupApi, printPdfDocument } from '../api/apiClient';
 import api from '../api/apiClient';
 
 export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
-  // Primary Tabs: 'deliveries' | 'routes' | 'vehicles'
+  // Primary Tabs: 'deliveries' | 'routes' | 'vehicles' | 'gps-tracking'
   const [currentTab, setCurrentTab] = useState(activeSubTab || 'deliveries');
 
   useEffect(() => {
     if (activeSubTab) {
       if (activeSubTab === 'routes') setCurrentTab('routes');
       else if (activeSubTab === 'vehicles') setCurrentTab('vehicles');
+      else if (activeSubTab === 'gps-tracking') setCurrentTab('gps-tracking');
       else setCurrentTab('deliveries');
     }
   }, [activeSubTab]);
@@ -109,7 +117,25 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     cancellationReason: '',
   });
 
-  // Route Form State
+  // Route Form State (matching CustomersHub Customer Groups system)
+  const [isCreatingRoute, setIsCreatingRoute] = useState(false);
+  const [routeEditForm, setRouteEditForm] = useState({
+    id: null,
+    name: '',
+    routeCode: '',
+    description: '',
+    area: '',
+    deliveryDays: 'Monday, Wednesday, Friday',
+    assignedStaffId: '',
+    selectedCustomerIds: [],
+  });
+  const [customerSearchInRoute, setCustomerSearchInRoute] = useState('');
+  const [showAssignCustomerModal, setShowAssignCustomerModal] = useState(false);
+  const [assignCustomerSearch, setAssignCustomerSearch] = useState('');
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
+  const [deleteRouteConfirm, setDeleteRouteConfirm] = useState(null);
+
+  // Keep routeForm as compatibility alias
   const [routeForm, setRouteForm] = useState({
     id: null,
     routeCode: '',
@@ -157,18 +183,40 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       ]);
 
       setDeliveries(delivRes.data?.data || []);
-      setRoutes(routesRes.data?.data || []);
+
+      const rawRoutes = routesRes.data?.data || routesRes.data || [];
+      const normalizedRoutes = (Array.isArray(rawRoutes) ? rawRoutes : []).map((r) => ({
+        id: r.id,
+        routeCode: r.routeCode || '',
+        routeName: r.routeName || r.name || '',
+        name: r.routeName || r.name || '',
+        description: r.description || '',
+        area: r.area || '',
+        deliveryDays: r.deliveryDays || '',
+        startLocation: r.startLocation || '',
+        endLocation: r.endLocation || '',
+        assignedStaffId: r.assignedStaffId ? String(r.assignedStaffId) : '',
+        assignedStaffName: r.assignedStaffName || '',
+        salesmanId: r.assignedStaffId ? String(r.assignedStaffId) : '',
+        salesmanName: r.assignedStaffName || '',
+        customerCount: r.customerCount != null ? r.customerCount : ((r.customerIds || []).length),
+        customerIds: (r.customerIds || []).map(String),
+        createdAt: r.createdAt || '',
+      }));
+      setRoutes(normalizedRoutes);
+
       setVehicles(vehRes.data?.data || []);
       setSummary(sumRes.data?.data || null);
 
-      const uList = usersRes.data?.data || [];
-      setEmployees(uList.filter(u => u.isActive !== false));
+      const rawUsers = usersRes.data?.data?.content || usersRes.data?.data || usersRes.data?.content || usersRes.data || [];
+      const userList = Array.isArray(rawUsers) ? rawUsers : [];
+      setEmployees(userList.filter((u) => u.isActive !== false));
 
-      const wList = whRes.data?.data || [];
-      setWarehouses(wList);
+      const wList = whRes.data?.data || whRes.data || [];
+      setWarehouses(Array.isArray(wList) ? wList : []);
 
-      const cList = custRes.data?.data || [];
-      setCustomers(cList);
+      const cList = custRes.data?.data || custRes.data || [];
+      setCustomers(Array.isArray(cList) ? cList : []);
     } catch (err) {
       console.error('Error fetching delivery data:', err);
       showToast('Failed to load delivery data', 'error');
@@ -329,71 +377,233 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     }
   };
 
-  // Route Management
-  const handleOpenCreateRoute = () => {
-    setRouteForm({
+  // -------------------------------------------------------------
+  // Route / Group Management Actions (matching CustomersHub System)
+  // -------------------------------------------------------------
+  const isCustomerActive = (c) => Boolean(c?.isActive ?? c?.active ?? true);
+
+  // Filtered Routes based on route search term
+  const filteredRoutes = useMemo(() => {
+    const q = routeSearchTerm.trim().toLowerCase();
+    if (!q) return routes;
+    return routes.filter((r) => {
+      const assignedStaff = employees.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
+      const repName = (r.assignedStaffName || r.salesmanName || assignedStaff?.fullName || assignedStaff?.name || '').toLowerCase();
+      const name = (r.routeName || r.name || '').toLowerCase();
+      const code = (r.routeCode || '').toLowerCase();
+      const desc = (r.description || '').toLowerCase();
+      const area = (r.area || '').toLowerCase();
+      const days = (r.deliveryDays || '').toLowerCase();
+      return name.includes(q) || code.includes(q) || repName.includes(q) || desc.includes(q) || area.includes(q) || days.includes(q);
+    });
+  }, [routes, routeSearchTerm, employees]);
+
+  // Assigned customers memo for Route View
+  const assignedCustomerList = useMemo(() => {
+    if (!selectedRoute && !isCreatingRoute) return [];
+    const selectedSet = new Set((routeEditForm.selectedCustomerIds || []).map((id) => String(id)));
+    let list = customers.filter((c) => selectedSet.has(String(c.id)));
+    if (customerSearchInRoute.trim()) {
+      const q = customerSearchInRoute.trim().toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.name && c.name.toLowerCase().includes(q)) ||
+          (c.code && c.code.toLowerCase().includes(q)) ||
+          (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.toLowerCase().includes(q)) ||
+          (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+          (c.address && c.address.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [customers, routeEditForm.selectedCustomerIds, customerSearchInRoute, selectedRoute, isCreatingRoute]);
+
+  // Available customers for Assign Customer popup
+  const availableCustomersToAssign = useMemo(() => {
+    if (!showAssignCustomerModal) return [];
+    const q = assignCustomerSearch.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q)) ||
+        (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.contactPerson && c.contactPerson.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q))
+    );
+  }, [customers, assignCustomerSearch, showAssignCustomerModal]);
+
+  const handleOpenRouteView = (route) => {
+    setSelectedRoute(route);
+    setIsCreatingRoute(false);
+    setRouteEditForm({
+      id: route.id,
+      name: route.routeName || route.name || '',
+      routeCode: route.routeCode || '',
+      description: route.description || '',
+      area: route.area || '',
+      deliveryDays: route.deliveryDays || 'Monday, Wednesday, Friday',
+      assignedStaffId: route.assignedStaffId ? String(route.assignedStaffId) : '',
+      selectedCustomerIds: (route.customerIds || []).map(String),
+    });
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
+  };
+
+  const handleOpenCreateRouteView = () => {
+    setSelectedRoute(null);
+    setIsCreatingRoute(true);
+    setRouteEditForm({
       id: null,
+      name: '',
       routeCode: '',
-      routeName: '',
       description: '',
       area: '',
-      startLocation: '',
-      endLocation: '',
-      estimatedDurationMinutes: '',
       deliveryDays: 'Monday, Wednesday, Friday',
-      customerIds: [],
+      assignedStaffId: '',
+      selectedCustomerIds: [],
     });
-    setShowRouteModal(true);
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
   };
 
-  const handleOpenEditRoute = (r) => {
-    setRouteForm({
-      id: r.id,
-      routeCode: r.routeCode,
-      routeName: r.routeName,
-      description: r.description || '',
-      area: r.area || '',
-      startLocation: r.startLocation || '',
-      endLocation: r.endLocation || '',
-      estimatedDurationMinutes: r.estimatedDurationMinutes || '',
-      deliveryDays: r.deliveryDays || '',
-      customerIds: r.customerIds || [],
-    });
-    setShowRouteModal(true);
+  const handleCloseRouteView = () => {
+    setSelectedRoute(null);
+    setIsCreatingRoute(false);
+    setCustomerSearchInRoute('');
+    setShowAssignCustomerModal(false);
+    setAssignCustomerSearch('');
   };
 
-  const handleSaveRoute = async (e) => {
-    e.preventDefault();
-    if (!routeForm.routeName.trim()) {
-      showToast('Route name is required', 'error');
+  const handleSaveRouteView = async (e) => {
+    if (e) e.preventDefault();
+    if (!routeEditForm.name.trim()) {
+      showToast('Delivery route name is required', 'error');
       return;
     }
-    try {
-      const payload = {
-        routeCode: routeForm.routeCode || undefined,
-        routeName: routeForm.routeName.trim(),
-        description: routeForm.description,
-        area: routeForm.area,
-        startLocation: routeForm.startLocation,
-        endLocation: routeForm.endLocation,
-        estimatedDurationMinutes: routeForm.estimatedDurationMinutes ? Number(routeForm.estimatedDurationMinutes) : null,
-        deliveryDays: routeForm.deliveryDays,
-        customerIds: routeForm.customerIds,
-      };
 
-      if (routeForm.id) {
-        await deliveryRouteApi.update(routeForm.id, payload);
-        showToast('Delivery route updated successfully', 'success');
-      } else {
-        await deliveryRouteApi.create(payload);
-        showToast('New delivery route created successfully', 'success');
+    const assignedStaff = employees.find((em) => String(em.id) === String(routeEditForm.assignedStaffId));
+    const staffName = assignedStaff?.fullName || assignedStaff?.name || '';
+    const staffIdNum = routeEditForm.assignedStaffId ? Number(routeEditForm.assignedStaffId) : null;
+    const customerIdsNum = (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean);
+
+    const payload = {
+      routeName: routeEditForm.name.trim(),
+      name: routeEditForm.name.trim(),
+      routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
+      description: routeEditForm.description ? routeEditForm.description.trim() : '',
+      area: routeEditForm.area ? routeEditForm.area.trim() : '',
+      deliveryDays: routeEditForm.deliveryDays ? routeEditForm.deliveryDays.trim() : '',
+      assignedStaffId: staffIdNum,
+      customerIds: customerIdsNum,
+    };
+
+    try {
+      if (isCreatingRoute) {
+        const res = await deliveryRouteApi.create(payload);
+        const created = res.data?.data || res.data || res;
+        const normalized = {
+          id: created.id,
+          name: created.routeName || created.name,
+          routeName: created.routeName || created.name,
+          routeCode: created.routeCode || '',
+          description: created.description || '',
+          area: created.area || routeEditForm.area,
+          deliveryDays: created.deliveryDays || routeEditForm.deliveryDays,
+          assignedStaffId: created.assignedStaffId ? String(created.assignedStaffId) : (staffIdNum ? String(staffIdNum) : ''),
+          assignedStaffName: created.assignedStaffName || staffName,
+          salesmanId: created.assignedStaffId ? String(created.assignedStaffId) : (staffIdNum ? String(staffIdNum) : ''),
+          salesmanName: created.assignedStaffName || staffName,
+          customerCount: created.customerCount != null ? created.customerCount : customerIdsNum.length,
+          customerIds: (created.customerIds || customerIdsNum).map(String),
+          createdAt: created.createdAt || new Date().toISOString(),
+        };
+        setRoutes((prev) => [...prev, normalized]);
+        showToast(`Delivery route "${normalized.name}" created successfully!`, 'success');
+      } else if (selectedRoute) {
+        const res = await deliveryRouteApi.update(selectedRoute.id, payload);
+        const updated = res.data?.data || res.data || res;
+        const normalized = {
+          id: updated.id,
+          name: updated.routeName || updated.name,
+          routeName: updated.routeName || updated.name,
+          routeCode: updated.routeCode || '',
+          description: updated.description || '',
+          area: updated.area || routeEditForm.area,
+          deliveryDays: updated.deliveryDays || routeEditForm.deliveryDays,
+          assignedStaffId: updated.assignedStaffId ? String(updated.assignedStaffId) : (staffIdNum ? String(staffIdNum) : ''),
+          assignedStaffName: updated.assignedStaffName || staffName,
+          salesmanId: updated.assignedStaffId ? String(updated.assignedStaffId) : (staffIdNum ? String(staffIdNum) : ''),
+          salesmanName: updated.assignedStaffName || staffName,
+          customerCount: updated.customerCount != null ? updated.customerCount : customerIdsNum.length,
+          customerIds: (updated.customerIds || customerIdsNum).map(String),
+          createdAt: selectedRoute.createdAt || new Date().toISOString(),
+        };
+        setRoutes((prev) => prev.map((r) => (r.id === selectedRoute.id ? normalized : r)));
+        showToast(`Delivery route "${normalized.name}" updated successfully!`, 'success');
       }
-      setShowRouteModal(false);
+      handleCloseRouteView();
       fetchData();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to save route', 'error');
+      showToast('Error saving delivery route: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
+
+  const handleDeleteRoute = async () => {
+    if (!deleteRouteConfirm) return;
+    try {
+      await deliveryRouteApi.delete(deleteRouteConfirm.id);
+      setRoutes((prev) => prev.filter((r) => r.id !== deleteRouteConfirm.id));
+      showToast(`Delivery route "${deleteRouteConfirm.routeName || deleteRouteConfirm.name}" deleted successfully.`, 'success');
+      if (selectedRoute?.id === deleteRouteConfirm.id) {
+        handleCloseRouteView();
+      }
+      setDeleteRouteConfirm(null);
+      fetchData();
+    } catch (err) {
+      showToast('Failed to delete route: ' + (err.response?.data?.message || err.message), 'error');
+    }
+  };
+
+  const handleExportRoutesCSV = () => {
+    if (routes.length === 0) {
+      showToast('No delivery routes to export', 'error');
+      return;
+    }
+    const headers = ['Route Name', 'Route Code', 'Assigned Staff', 'Area', 'Delivery Days', 'Total Customers', 'Description'];
+    const rows = (filteredRoutes.length > 0 ? filteredRoutes : routes).map((r) => {
+      const assignedStaff = employees.find((e) => String(e.id) === String(r.assignedStaffId || r.salesmanId));
+      const staffName = r.assignedStaffName || assignedStaff?.fullName || assignedStaff?.name || 'Unassigned';
+      const count = r.customerIds?.length || r.customerCount || 0;
+      return [
+        `"${(r.routeName || r.name || '').replace(/"/g, '""')}"`,
+        `"${(r.routeCode || '').replace(/"/g, '""')}"`,
+        `"${staffName.replace(/"/g, '""')}"`,
+        `"${(r.area || '').replace(/"/g, '""')}"`,
+        `"${(r.deliveryDays || '').replace(/"/g, '""')}"`,
+        count,
+        `"${(r.description || '').replace(/"/g, '""')}"`,
+      ];
+    });
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `delivery_routes_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Delivery routes exported to CSV', 'success');
+  };
+
+  // Compatibility aliases
+  const handleOpenCreateRoute = () => handleOpenCreateRouteView();
+  const handleOpenEditRoute = (r) => handleOpenRouteView(r);
+  const handleSaveRoute = handleSaveRouteView;
 
   // Vehicle Management
   const handleOpenCreateVehicle = () => {
@@ -476,7 +686,23 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1440px', margin: '0 auto', fontFamily: 'inherit' }}>
+    <div
+      style={{
+        padding: '24px 32px',
+        flex: 1,
+        height: '100%',
+        maxHeight: '100%',
+        minHeight: 0,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        backgroundColor: '#f8fafc',
+        fontFamily: "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)",
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast popup */}
       {toast && (
         <div
@@ -502,27 +728,42 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
       )}
 
-      {/* Header & Title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+      {/* Page Header (Fixed / Sticky to Desktop Screen - Matching CustomersHub) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '16px',
+          flexShrink: 0,
+        }}
+      >
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Truck size={28} color="#0284c7" />
-            Delivery & Distribution Management
+          <h1
+            style={{
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              margin: '0 0 4px 0',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Delivery Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.88rem', margin: 0 }}>
-            Dispatch warehouse orders, assign two-person delivery crews, plan delivery routes, and track vehicle trip durations.
+          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+            Dispatch warehouse orders, assign delivery staff and vehicles, plan delivery routes, and track vehicle trips.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
             type="button"
             onClick={fetchData}
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              backgroundColor: '#f8fafc',
+              backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               color: '#334155',
               padding: '8px 14px',
@@ -530,6 +771,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               fontSize: '0.85rem',
               fontWeight: 600,
               cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              transition: 'all 0.15s ease',
             }}
           >
             <RefreshCw size={15} /> Refresh
@@ -540,18 +783,18 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               type="button"
               onClick={handleOpenCreateTrip}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
                 backgroundColor: '#0284c7',
                 color: '#ffffff',
-                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.88rem',
                 padding: '9px 18px',
                 borderRadius: '6px',
-                fontSize: '0.88rem',
-                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                border: 'none',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
               }}
             >
               <Plus size={17} /> Schedule Delivery Trip
@@ -561,22 +804,23 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           {currentTab === 'routes' && (
             <button
               type="button"
-              onClick={handleOpenCreateRoute}
+              onClick={handleOpenCreateRouteView}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
                 backgroundColor: '#0284c7',
                 color: '#ffffff',
-                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.88rem',
                 padding: '9px 18px',
                 borderRadius: '6px',
-                fontSize: '0.88rem',
-                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                border: 'none',
                 cursor: 'pointer',
               }}
             >
-              <Plus size={17} /> + Create Delivery Route
+              <Plus size={17} /> Create Delivery Route
             </button>
           )}
 
@@ -585,217 +829,141 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               type="button"
               onClick={handleOpenCreateVehicle}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
                 backgroundColor: '#0284c7',
                 color: '#ffffff',
-                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.88rem',
                 padding: '9px 18px',
                 borderRadius: '6px',
-                fontSize: '0.88rem',
-                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                border: 'none',
                 cursor: 'pointer',
               }}
             >
-              <Plus size={17} /> + Add Vehicle
+              <Plus size={17} /> Add Vehicle
             </button>
           )}
         </div>
       </div>
 
-      {/* KPI Metric Overview Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
-        }}
-      >
-        {/* Card 1: In Transit / On Route */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #bfdbfe',
-            padding: '16px 20px',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.05)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369a1', letterSpacing: '0.04em' }}>
-              ON ROUTE / IN TRANSIT
-            </span>
-            <div
-              style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: '#0284c7',
-                boxShadow: '0 0 0 4px rgba(2, 132, 199, 0.25)',
-              }}
-            />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0284c7' }}>
-            {summary?.inTransitCount || 0}
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Vehicles dispatched on active customer routes
-          </div>
-        </div>
-
-        {/* Card 2: Delivered & Completed */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #bbf7d0',
-            padding: '16px 20px',
-            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.05)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#15803d', letterSpacing: '0.04em' }}>
-              DELIVERED & COMPLETED
-            </span>
-            <CheckCircle2 size={18} color="#16a34a" />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#16a34a' }}>
-            {summary?.deliveredCount || 0}
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Trips returned & customer invoices delivered
-          </div>
-        </div>
-
-        {/* Card 3: Scheduled / Loading in Warehouse */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #fed7aa',
-            padding: '16px 20px',
-            boxShadow: '0 2px 6px rgba(249, 115, 22, 0.05)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#c2410c', letterSpacing: '0.04em' }}>
-              SCHEDULED / LOADING
-            </span>
-            <Clock size={18} color="#ea580c" />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ea580c' }}>
-            {summary?.scheduledCount || 0}
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Trips planned awaiting warehouse departure
-          </div>
-        </div>
-
-        {/* Card 4: Invoices Ready for Delivery */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', letterSpacing: '0.04em' }}>
-              PENDING INVOICE DELIVERIES
-            </span>
-            <PackageCheck size={18} color="#64748b" />
-          </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a' }}>
-            {summary?.pendingInvoicesForDeliveryCount || 0}
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Invoices awaiting vehicle & route dispatch
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Sub-Tabs */}
+      {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
       <div
         style={{
           display: 'flex',
-          gap: '8px',
+          alignItems: 'center',
+          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '20px',
+          marginBottom: '16px',
+          flexShrink: 0,
         }}
       >
         <button
           type="button"
           onClick={() => setCurrentTab('deliveries')}
           style={{
-            padding: '10px 18px',
+            background: 'none',
             border: 'none',
-            borderBottom: currentTab === 'deliveries' ? '3px solid #0284c7' : '3px solid transparent',
-            backgroundColor: 'transparent',
-            color: currentTab === 'deliveries' ? '#0284c7' : '#64748b',
-            fontWeight: currentTab === 'deliveries' ? 700 : 500,
+            borderBottom: currentTab === 'deliveries' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
             fontSize: '0.92rem',
+            fontWeight: currentTab === 'deliveries' ? 700 : 500,
+            color: currentTab === 'deliveries' ? '#0284c7' : '#64748b',
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
+            marginBottom: '-1px',
           }}
         >
-          <Truck size={17} />
-          Delivery Trips & Dispatches ({deliveries.length})
+          <Truck size={16} /> Delivery Trips ({deliveries.length})
         </button>
 
         <button
           type="button"
           onClick={() => setCurrentTab('routes')}
           style={{
-            padding: '10px 18px',
+            background: 'none',
             border: 'none',
-            borderBottom: currentTab === 'routes' ? '3px solid #0284c7' : '3px solid transparent',
-            backgroundColor: 'transparent',
-            color: currentTab === 'routes' ? '#0284c7' : '#64748b',
-            fontWeight: currentTab === 'routes' ? 700 : 500,
+            borderBottom: currentTab === 'routes' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
             fontSize: '0.92rem',
+            fontWeight: currentTab === 'routes' ? 700 : 500,
+            color: currentTab === 'routes' ? '#0284c7' : '#64748b',
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
+            marginBottom: '-1px',
           }}
         >
-          <Navigation size={17} />
-          Delivery Routes ({routes.length})
+          <Navigation size={16} /> Delivery Routes ({routes.length})
         </button>
 
         <button
           type="button"
           onClick={() => setCurrentTab('vehicles')}
           style={{
-            padding: '10px 18px',
+            background: 'none',
             border: 'none',
-            borderBottom: currentTab === 'vehicles' ? '3px solid #0284c7' : '3px solid transparent',
-            backgroundColor: 'transparent',
-            color: currentTab === 'vehicles' ? '#0284c7' : '#64748b',
-            fontWeight: currentTab === 'vehicles' ? 700 : 500,
+            borderBottom: currentTab === 'vehicles' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
             fontSize: '0.92rem',
+            fontWeight: currentTab === 'vehicles' ? 700 : 500,
+            color: currentTab === 'vehicles' ? '#0284c7' : '#64748b',
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
+            marginBottom: '-1px',
           }}
         >
-          <Gauge size={17} />
-          Fleet Vehicles ({vehicles.length})
+          <Gauge size={16} /> Fleet Vehicles ({vehicles.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('gps-tracking')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: currentTab === 'gps-tracking' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: currentTab === 'gps-tracking' ? 700 : 500,
+            color: currentTab === 'gps-tracking' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <Radio size={16} color={currentTab === 'gps-tracking' ? '#0284c7' : '#64748b'} />
+          Live GPS Tracking
+          <span
+            style={{
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              backgroundColor: currentTab === 'gps-tracking' ? '#e0f2fe' : '#f1f5f9',
+              color: currentTab === 'gps-tracking' ? '#0284c7' : '#64748b',
+              border: `1px solid ${currentTab === 'gps-tracking' ? '#bae6fd' : '#cbd5e1'}`,
+              borderRadius: '9999px',
+              padding: '2px 8px',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Coming Soon
+          </span>
         </button>
       </div>
 
       {/* TAB 1: DELIVERIES LIST */}
       {currentTab === 'deliveries' && (
-        <div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {/* Controls Bar */}
           <div
             style={{
@@ -1095,6 +1263,33 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                               </button>
                             )}
 
+                            {/* Live GPS Track (Coming Soon) */}
+                            {isInTransit && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCurrentTab('gps-tracking');
+                                  showToast(`Live GPS tracking for trip ${trip.tripNumber || ''} is in preview. Feature coming soon!`, 'info');
+                                }}
+                                style={{
+                                  backgroundColor: '#f0f9ff',
+                                  color: '#0284c7',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '4px',
+                                  padding: '5px 8px',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                                title="Live GPS Tracking (Coming Soon)"
+                              >
+                                <Radio size={12} color="#0284c7" /> Track
+                              </button>
+                            )}
+
                             {/* View manifest / sheet */}
                             <button
                               type="button"
@@ -1149,97 +1344,358 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
       )}
 
-      {/* TAB 2: DELIVERY ROUTES SUB-NAV */}
+      {/* TAB 2: DELIVERY ROUTES (MATCHING CUSTOMER GROUPS UI) */}
       {currentTab === 'routes' && (
-        <div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header row with Title, subtitle and Create Route button */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-              gap: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '4px',
+              flexWrap: 'wrap',
+              gap: '12px',
+              flexShrink: 0,
             }}
           >
-            {routes.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <Navigation size={36} color="#cbd5e1" style={{ marginBottom: '8px' }} />
-                <div style={{ fontWeight: 600, color: '#64748b' }}>No delivery routes configured</div>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
+                Delivery Routes
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
+                Organize delivery destinations into routes and assign a dedicated staff member to manage each route.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenCreateRouteView}
+              style={{
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '9px 18px',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+            >
+              <Plus size={16} /> Create Delivery Route
+            </button>
+          </div>
+
+          {/* Routes Toolbar: Search Input + Export CSV Icon */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              flexWrap: 'wrap',
+              flexShrink: 0,
+            }}
+          >
+            {/* Search bar filling width */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <Search
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '11px',
+                  color: '#94a3b8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search delivery routes by name, code, assigned staff, area..."
+                value={routeSearchTerm}
+                onChange={(e) => setRouteSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 32px 0 38px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.88rem',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                }}
+              />
+              {routeSearchTerm && (
                 <button
                   type="button"
-                  onClick={handleOpenCreateRoute}
-                  style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  + Add First Delivery Route
-                </button>
-              </div>
-            ) : (
-              routes.map((route) => (
-                <div
-                  key={route.id}
+                  onClick={() => setRouteSearchTerm('')}
                   style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '2px',
+                  }}
+                  title="Clear search text"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+
+            {/* Right Controls: Export CSV Icon */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={handleExportRoutesCSV}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+                title="Export delivery routes to CSV"
+              >
+                <Download size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Routes Cards Grid Scroll Container (Only cards scroll) */}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              paddingRight: '4px',
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '14px',
+                paddingBottom: '16px',
+              }}
+            >
+              {filteredRoutes.length === 0 ? (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '48px 20px',
+                    color: '#64748b',
                     backgroundColor: '#ffffff',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    padding: '16px 18px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
+                    fontSize: '0.875rem',
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0284c7', backgroundColor: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
-                        {route.routeCode}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                        {route.customerCount || route.customerIds?.length || 0} customers on route
-                      </span>
-                    </div>
+                  No delivery routes found matching current search.
+                </div>
+              ) : (
+                filteredRoutes.map((route) => {
+                  const count = route.customerIds?.length || route.customerCount || 0;
+                  const assignedStaff = employees.find((s) => String(s.id) === String(route.assignedStaffId || route.salesmanId));
+                  const repName = route.assignedStaffName || route.salesmanName || assignedStaff?.fullName || assignedStaff?.name;
 
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
-                      {route.routeName}
-                    </h3>
-
-                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                      {route.description || 'General commercial delivery route'}
-                    </p>
-
-                    <div style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-                      <div>
-                        <strong>Area:</strong> {route.area || 'All Territories'}
-                      </div>
-                      <div>
-                        <strong>Days:</strong> {route.deliveryDays || 'Daily dispatch'}
-                      </div>
-                      {route.startLocation && (
-                        <div>
-                          <strong>Terminal:</strong> {route.startLocation} → {route.endLocation || 'End Hub'}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditRoute(route)}
+                  return (
+                    <div
+                      key={route.id}
+                      onClick={() => handleOpenRouteView(route)}
                       style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        color: '#334155',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        padding: '16px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                        minHeight: '140px',
                         cursor: 'pointer',
                       }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#0284c7';
+                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(2, 132, 199, 0.12)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                      }}
                     >
-                      Edit Route & Customers
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                      <div>
+                        {/* Card Top: Route Name & User Count Badge */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {route.routeName || route.name}
+                            </h3>
+                            {route.routeCode && (
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontFamily: 'monospace',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {route.routeCode}
+                              </span>
+                            )}
+                          </div>
+
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              backgroundColor: '#f0f9ff',
+                              color: '#0284c7',
+                              border: '1px solid #bae6fd',
+                              borderRadius: '9999px',
+                              padding: '2px 8px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Users size={12} />
+                            {count} customer{count === 1 ? '' : 's'}
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                          {route.description || 'No description added'}
+                        </p>
+
+                        {/* Area & Delivery Days Info */}
+                        {(route.area || route.deliveryDays) && (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '0.75rem', color: '#64748b' }}>
+                            {route.area && (
+                              <span style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
+                                <strong>Area:</strong> {route.area}
+                              </span>
+                            )}
+                            {route.deliveryDays && (
+                              <span style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
+                                <strong>Days:</strong> {route.deliveryDays}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Responsible Staff */}
+                        <p
+                          style={{
+                            color: repName ? '#0369a1' : '#64748b',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            margin: '0 0 12px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
+                          {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
+                        </p>
+                      </div>
+
+                      {/* Card Footer: Manage link */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingTop: '10px',
+                          borderTop: '1px solid #f1f5f9',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Manage Delivery Route →
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1284,6 +1740,646 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* TAB 4: LIVE GPS FLEET TRACKING (COMING SOON PREVIEW) */}
+      {currentTab === 'gps-tracking' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header Banner */}
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '12px',
+              padding: '24px 28px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Background glowing gradient accents */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-60px',
+                right: '-60px',
+                width: '220px',
+                height: '220px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(2, 132, 199, 0.35) 0%, rgba(2, 132, 199, 0) 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-40px',
+                left: '20%',
+                width: '180px',
+                height: '180px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0) 70%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            <div style={{ position: 'relative', zIndex: 1, maxWidth: '680px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span
+                  style={{
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Feature Preview
+                </span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    color: '#4ade80',
+                    border: '1px solid rgba(74, 222, 128, 0.3)',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      backgroundColor: '#22c55e',
+                      boxShadow: '0 0 6px #22c55e',
+                    }}
+                  />
+                  TELEMETRY ENGINE READY
+                </span>
+              </div>
+
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '1.45rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Radio size={24} color="#38bdf8" />
+                Live Fleet GPS Tracking & Telemetry
+              </h2>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.88rem', lineHeight: '1.5' }}>
+                Track delivery vehicles in real-time, view live breadcrumb route trails, monitor driver speeds, and receive automated geofenced arrival alerts as staff reach customer shops.
+              </p>
+            </div>
+
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              <div
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Rollout Status</div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#38bdf8' }}>Scheduled for Upcoming Release</div>
+                </div>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(2, 132, 199, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#38bdf8',
+                  }}
+                >
+                  <MapPin size={20} />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => showToast('GPS Fleet Tracking is scheduled on your roadmap. Architecture and backend endpoints ready!', 'success')}
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                <CheckCircle2 size={14} /> Coming Soon (Prioritized)
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Simulated Live Fleet Tracking Control Canvas */}
+          <div
+            style={{
+              backgroundColor: '#0b1329',
+              borderRadius: '12px',
+              border: '1px solid #1e293b',
+              padding: '20px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            {/* Control Bar Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #1e293b', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+                    color: '#38bdf8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Activity size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#f8fafc' }}>
+                    Active Route Telemetry Preview • Trip #TRIP-2026-004
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Live Simulated GPS Feed • Carrier: WP-NA-4491 (Toyota Dyna 3-Ton)
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badges */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
+                  style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    color: '#94a3b8',
+                    border: '1px solid #334155',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Wifi size={13} color="#22c55e" /> GPS Fix: 3D High Accuracy (11 Sats)
+                </span>
+                <span
+                  style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    color: '#94a3b8',
+                    border: '1px solid #334155',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Compass size={13} color="#38bdf8" /> Heading: 68° ENE
+                </span>
+                <span
+                  style={{
+                    backgroundColor: 'rgba(2, 132, 199, 0.15)',
+                    color: '#38bdf8',
+                    border: '1px solid #0284c7',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  Speed: 42 km/h
+                </span>
+              </div>
+            </div>
+
+            {/* Simulated Tactical Map Canvas */}
+            <div
+              style={{
+                height: '380px',
+                width: '100%',
+                borderRadius: '10px',
+                backgroundColor: '#0a0f1d',
+                border: '1px solid #1e293b',
+                position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {/* SVG Map Grid & City Streets Simulation */}
+              <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, opacity: 0.6 }}>
+                <defs>
+                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+                  </pattern>
+                  <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#0284c7" />
+                    <stop offset="50%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                {/* Simulated Arterial Roads */}
+                <path d="M 50 200 Q 250 120 480 180 T 780 150 T 1100 240" fill="none" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" />
+                <path d="M 200 40 Q 280 180 320 340" fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" />
+                <path d="M 600 50 Q 640 180 700 350" fill="none" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" />
+                <path d="M 400 320 Q 700 280 1000 310" fill="none" stroke="#1e293b" strokeWidth="5" strokeLinecap="round" />
+
+                {/* Traveled Route Path (Solid Blue) */}
+                <path
+                  d="M 120 180 Q 250 130 380 160 T 560 170"
+                  fill="none"
+                  stroke="#0284c7"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+
+                {/* Remaining Planned Route Path (Dashed Cyan) */}
+                <path
+                  d="M 560 170 Q 700 150 820 210 T 960 190"
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="3"
+                  strokeDasharray="6,6"
+                  strokeLinecap="round"
+                />
+
+                {/* Geofence Perimeter Around Next Stop */}
+                <circle cx="820" cy="210" r="42" fill="rgba(56, 189, 248, 0.08)" stroke="#38bdf8" strokeWidth="1" strokeDasharray="3,3" />
+              </svg>
+
+              {/* Waypoint Pin 1: Origin Warehouse */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '100px',
+                  top: '150px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: '#f8fafc',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    marginBottom: '4px',
+                    border: '1px solid #334155',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Central Warehouse (Start 08:30)
+                </div>
+                <div
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 12px rgba(2, 132, 199, 0.8)',
+                  }}
+                >
+                  <Building2 size={14} />
+                </div>
+              </div>
+
+              {/* Waypoint Pin 2: Customer Stop 1 (Delivered) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '360px',
+                  top: '130px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: 'rgba(22, 163, 74, 0.9)',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    marginBottom: '4px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  ✓ Stop 1: Cargills Food City (Delivered)
+                </div>
+                <div
+                  style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    backgroundColor: '#16a34a',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 8px rgba(22, 163, 74, 0.6)',
+                  }}
+                >
+                  <Check size={12} />
+                </div>
+              </div>
+
+              {/* Animated Live Vehicle Marker (Currently on Road) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '540px',
+                  top: '135px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  zIndex: 10,
+                }}
+              >
+                {/* Live Vehicle Telemetry Popover */}
+                <div
+                  style={{
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #38bdf8',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    color: '#ffffff',
+                    fontSize: '0.74rem',
+                    marginBottom: '6px',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#38bdf8' }}>
+                    <Truck size={13} />
+                    <span>WP-NA-4491 • Moving (42 km/h)</span>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                    Driver: Kamal Perera • Next: Keells Super (ETA 6m)
+                  </div>
+                </div>
+
+                {/* Pulsing Radar Ring & Truck Dot */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(56, 189, 248, 0.25)',
+                      animation: 'ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite',
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#38bdf8',
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 16px #38bdf8',
+                      zIndex: 2,
+                    }}
+                  >
+                    <Truck size={17} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Waypoint Pin 3: Customer Stop 2 (Approaching Next) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '800px',
+                  top: '180px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: 'rgba(234, 88, 12, 0.9)',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    marginBottom: '4px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Stop 2: Keells Super (Next - 1.8 km)
+                </div>
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ea580c',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 10px rgba(234, 88, 12, 0.7)',
+                  }}
+                >
+                  <MapPin size={13} />
+                </div>
+              </div>
+
+              {/* Waypoint Pin 4: Final Stop (Pending) */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '940px',
+                  top: '160px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: '#334155',
+                    color: '#94a3b8',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    marginBottom: '4px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Stop 3: City Mart (Pending)
+                </div>
+                <div
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: '#475569',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <MapPin size={11} />
+                </div>
+              </div>
+
+              {/* Map Floating HUD Info Card */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '16px',
+                  left: '16px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.88)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid #334155',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  gap: '16px',
+                  fontSize: '0.74rem',
+                  color: '#cbd5e1',
+                }}
+              >
+                <div>
+                  <span style={{ color: '#64748b' }}>Route:</span> <strong>Colombo Metro North</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Progress:</span> <strong style={{ color: '#22c55e' }}>1 / 3 Delivered (33%)</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Elapsed:</span> <strong>1h 14m</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Remaining ETA:</span> <strong>~45 mins</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom 3 Capability Cards */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '14px',
+                marginTop: '4px',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#111c38',
+                  border: '1px solid #1e293b',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', fontWeight: 700, fontSize: '0.86rem' }}>
+                  <Wifi size={16} /> Driver Mobile GPS ($0 Hardware Cost)
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45 }}>
+                  Delivery drivers simply open the delivery link on their smartphone. Phone automatically transmits GPS coordinates every 20 seconds during the active trip.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#111c38',
+                  border: '1px solid #1e293b',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4ade80', fontWeight: 700, fontSize: '0.86rem' }}>
+                  <Radio size={16} /> OBD-II / Hardwired Vehicle GPS
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45 }}>
+                  Integrates with standard 4G vehicle GPS trackers. Tamper-proof 24/7 fleet location, vehicle battery, ignition status, and odometer logging.
+                </p>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#111c38',
+                  border: '1px solid #1e293b',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 700, fontSize: '0.86rem' }}>
+                  <Navigation size={16} /> Geofencing & Proof of Delivery
+                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45 }}>
+                  Detects when vehicles enter within 150m of a customer shop. Delivery reps can collect signatures and photo receipts directly on-site.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1882,121 +2978,903 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
       )}
 
-      {/* MODAL 6: CREATE / EDIT DELIVERY ROUTE */}
-      {showRouteModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '580px', width: '100%', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                {routeForm.id ? 'Edit Delivery Route' : 'Create Delivery Route'}
-              </h3>
-              <button type="button" onClick={() => setShowRouteModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 6: DELIVERY ROUTE VIEW POPUP (SPLIT 2 COLUMNS)          */}
+      {/* ------------------------------------------------------------- */}
+      {(selectedRoute || isCreatingRoute) && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '1040px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
+              height: 'min(640px, 86vh)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '14px 22px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                  {isCreatingRoute ? 'Create Delivery Route' : `Manage Delivery Route: ${routeEditForm.name}`}
+                </h3>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    backgroundColor: '#f0f9ff',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  {routeEditForm.selectedCustomerIds.length} Assigned
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseRouteView}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Close"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRoute} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Route Code</label>
+            {/* Modal Body: Split into Two Columns */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(280px, 340px) 1fr',
+                gap: '20px',
+                padding: '18px 22px',
+                overflow: 'hidden',
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              {/* LEFT COLUMN: Text Fields & Settings (Sticky/Fixed - No Scroll) */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
+                    Delivery Route Details
+                  </div>
+
+                  {/* Route Code Input */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Route Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DR-001"
+                      value={routeEditForm.routeCode}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, routeCode: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Route Name Input */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Route Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Colombo Western Corridor"
+                      value={routeEditForm.name}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Responsible Staff Dropdown */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Assigned Staff Member / Driver
+                    </label>
+                    <select
+                      value={routeEditForm.assignedStaffId}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, assignedStaffId: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 28px 0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 10px center',
+                      }}
+                    >
+                      <option value="">None (Unassigned)</option>
+                      {employees.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.fullName || s.name} {s.role ? `— ${s.role}` : (s.employeeCode ? `(${s.employeeCode})` : '')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Area / Territory */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Territory / Area
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Western Province / Colombo 01-15"
+                      value={routeEditForm.area}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, area: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Delivery Days */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Delivery Days
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Monday, Wednesday, Friday"
+                      value={routeEditForm.deliveryDays}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, deliveryDays: e.target.value })}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.88rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  {/* Description Input */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                      Route Description / Notes
+                    </label>
+                    <textarea
+                      rows="3"
+                      placeholder="e.g. Daily wholesale distribution to supermarkets and convenience stores"
+                      value={routeEditForm.description}
+                      onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.86rem',
+                        backgroundColor: '#ffffff',
+                        boxSizing: 'border-box',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Left Column Delete Button if editing */}
+                {!isCreatingRoute && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteRouteConfirm(selectedRoute)}
+                      style={{
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        border: '1px solid #fecaca',
+                        backgroundColor: '#ffffff',
+                        color: '#dc2626',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                        e.currentTarget.style.borderColor = '#dc2626';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#fecaca';
+                      }}
+                    >
+                      <Trash2 size={14} /> Delete this Delivery Route
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT COLUMN: Assigned Customers Table & Workspace */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  minHeight: 0,
+                  height: '100%',
+                }}
+              >
+                {/* Top Row: Small Route Summary on Table Side & Assign Customer Button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                  {/* Small Route Summary */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                      Route Summary:
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        border: '1px solid #bae6fd',
+                      }}
+                    >
+                      {routeEditForm.selectedCustomerIds.length} Assigned Customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  {/* Assign Customer Button (Opens Small Popup) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssignCustomerModal(true);
+                      setAssignCustomerSearch('');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '0 14px',
+                      height: '34px',
+                      borderRadius: '6px',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                      transition: 'background-color 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                  >
+                    <Plus size={14} /> Assign Customer
+                  </button>
+                </div>
+
+                {/* Table Side Search with Small Icon */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search
+                    size={14}
+                    style={{
+                      position: 'absolute',
+                      left: '10px',
+                      top: '10px',
+                      color: '#94a3b8',
+                      pointerEvents: 'none',
+                    }}
+                  />
                   <input
                     type="text"
-                    placeholder="e.g. DR-001"
-                    value={routeForm.routeCode}
-                    onChange={(e) => setRouteForm({ ...routeForm, routeCode: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
+                    placeholder="Search assigned customers..."
+                    value={customerSearchInRoute}
+                    onChange={(e) => setCustomerSearchInRoute(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      padding: '0 28px 0 30px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.82rem',
+                      backgroundColor: '#ffffff',
+                      boxSizing: 'border-box',
+                    }}
                   />
+                  {customerSearchInRoute && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerSearchInRoute('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#94a3b8',
+                        padding: 0,
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Route Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Southern Coastal Express"
-                    value={routeForm.routeName}
-                    onChange={(e) => setRouteForm({ ...routeForm, routeName: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                    required
-                  />
+
+                {/* Assigned Customers Table Container */}
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#ffffff',
+                    flex: 1,
+                    minHeight: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                          <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignedCustomerList.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                <Users size={28} color="#cbd5e1" />
+                                <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                  {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                  {customerSearchInRoute
+                                    ? 'Try adjusting your search query above.'
+                                    : 'Click the "Assign Customer" button above to search and add customers to this route.'}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          assignedCustomerList.map((c) => (
+                            <tr
+                              key={c.id}
+                              style={{ borderBottom: '1px solid #f1f5f9' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <td style={{ padding: '8px 12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div
+                                    style={{
+                                      width: '26px',
+                                      height: '26px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#e0f2fe',
+                                      color: '#0284c7',
+                                      border: '1px solid #bae6fd',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 600,
+                                      fontSize: '0.74rem',
+                                    }}
+                                  >
+                                    {(c.name || 'C').slice(0, 1).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
+                                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                      {c.code || c.customerCode}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                <div>{c.contactPerson || '—'}</div>
+                                {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    padding: '2px 7px',
+                                    borderRadius: '9999px',
+                                    backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
+                                    color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
+                                  }}
+                                >
+                                  {isCustomerActive(c) ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRouteEditForm({
+                                      ...routeEditForm,
+                                      selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                                    });
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    backgroundColor: 'transparent',
+                                    color: '#dc2626',
+                                    cursor: 'pointer',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 600,
+                                    padding: '3px 6px',
+                                    borderRadius: '4px',
+                                  }}
+                                  title="Remove customer from route"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
+            </div>
 
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '12px 22px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleCloseRouteView}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRouteView}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: '0.86rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                <Check size={16} /> {isCreatingRoute ? 'Save New Delivery Route' : 'Update Delivery Route'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* SMALL POPUP: Search & Assign Customers to Route               */}
+      {/* ------------------------------------------------------------- */}
+      {showAssignCustomerModal && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1150, backgroundColor: 'rgba(15, 23, 42, 0.55)', overflowY: 'auto' }}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '14px 18px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Area / Province</label>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                  Assign Customers to Route
+                </h4>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Search and add customers to {routeEditForm.name || 'this delivery route'}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssignCustomerModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px',
+                }}
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '10px',
+                    color: '#94a3b8',
+                    pointerEvents: 'none',
+                  }}
+                />
                 <input
                   type="text"
-                  placeholder="e.g. Western Province / Southern Highway"
-                  value={routeForm.area}
-                  onChange={(e) => setRouteForm({ ...routeForm, area: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
+                  placeholder="Search by name, code, phone, address..."
+                  value={assignCustomerSearch}
+                  onChange={(e) => setAssignCustomerSearch(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 28px 0 32px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.84rem',
+                    backgroundColor: '#ffffff',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {assignCustomerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignCustomerSearch('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '8px',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      padding: 0,
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Delivery Days</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Monday, Wednesday, Friday"
-                  value={routeForm.deliveryDays}
-                  onChange={(e) => setRouteForm({ ...routeForm, deliveryDays: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
+            {/* Customers List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 12px', maxHeight: '360px' }}>
+              {availableCustomersToAssign.length === 0 ? (
+                <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                  No matching customers found.
+                </div>
+              ) : (
+                availableCustomersToAssign.map((c) => {
+                  const isAssigned = routeEditForm.selectedCustomerIds.includes(String(c.id));
+                  const otherRoutes = routes.filter(
+                    (r) => r.id !== (selectedRoute?.id) && r.customerIds && r.customerIds.includes(String(c.id))
+                  );
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Description / Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Route coverage details and drop off notes..."
-                  value={routeForm.description}
-                  onChange={(e) => setRouteForm({ ...routeForm, description: e.target.value })}
-                  style={{ width: '100%', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '8px 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              {/* Assign Customers to this Route */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  Assign Customers along this Route ({routeForm.customerIds?.length || 0} assigned)
-                </label>
-                <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px', backgroundColor: '#f8fafc' }}>
-                  {customers.map((c) => {
-                    const isChecked = routeForm.customerIds.includes(c.id);
-                    return (
-                      <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 6px', fontSize: '0.8rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setRouteForm({ ...routeForm, customerIds: [...routeForm.customerIds, c.id] });
-                            } else {
-                              setRouteForm({ ...routeForm, customerIds: routeForm.customerIds.filter(id => id !== c.id) });
-                            }
+                  return (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <div
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            backgroundColor: '#e0f2fe',
+                            color: '#0284c7',
+                            border: '1px solid #bae6fd',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 600,
+                            fontSize: '0.74rem',
+                            flexShrink: 0,
                           }}
-                        />
-                        <span>{c.name} ({c.customerCode || c.code}) - {c.address || 'No address'}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
+                        >
+                          {(c.name || 'C').slice(0, 1).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {c.name}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{c.code || c.customerCode}</span>
+                            {c.phone && <span>• {c.phone}</span>}
+                            {otherRoutes.length > 0 && (
+                              <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
+                                Also in: {otherRoutes.map((r) => r.routeName || r.name).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowRouteModal(false)}
-                  style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Save Route
-                </button>
-              </div>
-            </form>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isAssigned) {
+                            setRouteEditForm({
+                              ...routeEditForm,
+                              selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                            });
+                          } else {
+                            setRouteEditForm({
+                              ...routeEditForm,
+                              selectedCustomerIds: [...routeEditForm.selectedCustomerIds, String(c.id)],
+                            });
+                          }
+                        }}
+                        style={{
+                          marginLeft: '10px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 10px',
+                          borderRadius: '5px',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: isAssigned ? '1px solid #bbf7d0' : 'none',
+                          backgroundColor: isAssigned ? '#f0fdf4' : '#0284c7',
+                          color: isAssigned ? '#15803d' : '#ffffff',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isAssigned ? (
+                          <>
+                            <Check size={12} /> Assigned
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={12} /> Add
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '10px 18px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                <strong style={{ color: '#0f172a' }}>{routeEditForm.selectedCustomerIds.length}</strong> customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'} in route
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAssignCustomerModal(false)}
+                style={{
+                  padding: '6px 18px',
+                  borderRadius: '6px',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* CONFIRMATION POPUP: Delete Route                              */}
+      {/* ------------------------------------------------------------- */}
+      {deleteRouteConfirm && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '10px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 25px rgba(0,0,0,0.15)',
+            }}
+          >
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={22} color="#b91c1c" />
+              Delete Delivery Route
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '20px', lineHeight: 1.5 }}>
+              Are you sure you want to delete delivery route <strong>"{deleteRouteConfirm.routeName || deleteRouteConfirm.name}"</strong>
+              {deleteRouteConfirm.routeCode ? ` (${deleteRouteConfirm.routeCode})` : ''}? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteRouteConfirm(null)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteRoute}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Confirm Delete Route
+              </button>
+            </div>
           </div>
         </div>
       )}

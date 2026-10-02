@@ -70,8 +70,10 @@ public class CreateInvoiceRequest {
         @PositiveOrZero(message = "Unit price cannot be negative")
         private BigDecimal unitPrice;
 
+        @Builder.Default
         private BigDecimal discountRate = BigDecimal.ZERO;
 
+        @Builder.Default
         private BigDecimal discountAmount = BigDecimal.ZERO;
     }
 }

@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "audit_logs", indexes = {
         @Index(name = "idx_audit_created", columnList = "created_at"),
-        @Index(name = "idx_audit_entity", columnList = "entity_name, entity_id")
+        @Index(name = "idx_audit_entity", columnList = "entity_name, entity_id"),
+        @Index(name = "idx_audit_module", columnList = "module")
 })
 @Getter
 @Setter
@@ -24,6 +25,9 @@ public class AuditLog {
     @Column(nullable = false, length = 50)
     private String action;
 
+    @Column(name = "module", length = 50)
+    private String module;
+
     @Column(name = "entity_name", nullable = false, length = 100)
     private String entityName;
 
@@ -32,6 +36,12 @@ public class AuditLog {
 
     @Column(nullable = false, length = 50)
     private String username;
+
+    @Column(name = "user_full_name", length = 100)
+    private String userFullName;
+
+    @Column(name = "user_role", length = 50)
+    private String userRole;
 
     @Column(name = "ip_address", length = 50)
     private String ipAddress;

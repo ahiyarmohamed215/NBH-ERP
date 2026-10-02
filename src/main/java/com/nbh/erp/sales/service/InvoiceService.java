@@ -22,6 +22,8 @@ import com.nbh.erp.user.entity.User;
 import com.nbh.erp.user.repository.UserRepository;
 import com.nbh.erp.warehouse.entity.Warehouse;
 import com.nbh.erp.warehouse.repository.WarehouseRepository;
+import com.nbh.erp.inventory.service.ProductStaffQuotaService;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -50,6 +52,7 @@ public class InvoiceService {
     private final DocumentSequenceService sequenceService;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+    private final ProductStaffQuotaService productStaffQuotaService;
 
     public String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -151,6 +154,23 @@ public class InvoiceService {
         if (request.getSalesmanId() != null) {
             salesman = userRepository.findById(request.getSalesmanId())
                     .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getSalesmanId()));
+        } else {
+            Long currentUserId = SecurityUtils.getCurrentUserId().orElse(null);
+            if (currentUserId != null) {
+                salesman = userRepository.findById(currentUserId).orElse(null);
+            }
+        }
+
+        // Validate staff quota restrictions before processing sale
+        if (!request.isHold() && salesman != null) {
+            for (CreateInvoiceRequest.CreateInvoiceItemRequest itemReq : request.getItems()) {
+                productStaffQuotaService.validateStaffQuota(
+                        itemReq.getProductId(),
+                        salesman.getId(),
+                        warehouse.getId(),
+                        itemReq.getQuantity()
+                );
+            }
         }
 
         String invoiceNumber = sequenceService.generateInvoiceNumber();
@@ -160,6 +180,7 @@ public class InvoiceService {
                 .invoiceNumber(invoiceNumber)
                 .customer(customer)
                 .warehouse(warehouse)
+                .salesRep(salesman)
                 .status(request.isHold() ? "HELD" : "COMPLETED")
                 .paymentType(request.getPaymentType() != null ? request.getPaymentType().toUpperCase() : "CASH")
                 .invoiceDate(invDate)
@@ -235,7 +256,7 @@ public class InvoiceService {
 
         Invoice saved = invoiceRepository.save(invoice);
 
-        // If not hold, immediately deduct inventory via StockService
+            // If not hold, immediately deduct inventory via StockService and consume staff quota
         if (!request.isHold()) {
             Long whId = warehouse.getId();
             for (InvoiceItem item : saved.getItems()) {
@@ -247,6 +268,18 @@ public class InvoiceService {
                         saved.getInvoiceNumber(),
                         "Sale to customer " + customer.getName()
                 );
+            }
+
+            // Consume staff quota if a sales rep is assigned
+            if (salesman != null) {
+                for (InvoiceItem item : saved.getItems()) {
+                    productStaffQuotaService.consumeStaffQuota(
+                            item.getProduct().getId(),
+                            salesman.getId(),
+                            whId,
+                            item.getQuantity()
+                    );
+                }
             }
 
             // Update customer balance if credit sale
@@ -379,6 +412,16 @@ public class InvoiceService {
                                 invoice.getInvoiceNumber(),
                                 "Stock restored due to voiding of invoice " + invoice.getInvoiceNumber() + (reason != null ? " (" + reason + ")" : "")
                         );
+
+                        // Restore staff quota if invoice had a salesman
+                        if (invoice.getSalesman() != null) {
+                            productStaffQuotaService.restoreStaffQuota(
+                                    item.getProduct().getId(),
+                                    invoice.getSalesman().getId(),
+                                    whId,
+                                    item.getQuantity()
+                            );
+                        }
                     }
                 }
             }

@@ -55,7 +55,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         log.warn("Access denied: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Access denied: You do not have permission to perform this action"));
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "Access denied: You do not have permission to perform this action";
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

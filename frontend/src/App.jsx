@@ -178,6 +178,7 @@ export default function App() {
           { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
           { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
           { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
+          { id: 'pos-quotas', label: 'POS Staff Quotas', permission: 'INVENTORY_VIEW' },
         ],
       },
       {
@@ -202,6 +203,7 @@ export default function App() {
           { id: 'deliveries', label: 'Delivery Trips', permission: 'DELIVERY_VIEW' },
           { id: 'routes', label: 'Delivery Routes', permission: 'DELIVERY_VIEW' },
           { id: 'vehicles', label: 'Fleet Vehicles', permission: 'DELIVERY_VIEW' },
+          { id: 'gps-tracking', label: 'Live GPS Tracking (Coming Soon)', permission: 'DELIVERY_VIEW' },
         ],
       },
       {

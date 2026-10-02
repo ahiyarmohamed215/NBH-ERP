@@ -147,6 +147,16 @@ export const inventoryApi = {
   getProductStock: (whId, prodId) => api.get(`/inventory/warehouse/${whId}/product/${prodId}`),
 };
 
+export const staffQuotaApi = {
+  search: (params) => api.get('/inventory/staff-quotas', { params }),
+  getSummary: () => api.get('/inventory/staff-quotas/summary'),
+  getById: (id) => api.get(`/inventory/staff-quotas/${id}`),
+  check: (params) => api.get('/inventory/staff-quotas/check', { params }),
+  create: (data) => api.post('/inventory/staff-quotas', data),
+  update: (id, data) => api.put(`/inventory/staff-quotas/${id}`, data),
+  delete: (id) => api.delete(`/inventory/staff-quotas/${id}`),
+};
+
 export const grnApi = {
   search: (params) => api.get('/grns', { params }),
   getById: (id) => api.get(`/grns/${id}`),

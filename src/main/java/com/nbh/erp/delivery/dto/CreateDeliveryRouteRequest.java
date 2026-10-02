@@ -21,10 +21,16 @@ public class CreateDeliveryRouteRequest {
 
     private String description;
     private String area;
+    private Long assignedStaffId;
     private String startLocation;
     private String endLocation;
     private Integer estimatedDurationMinutes;
     private Double estimatedDistanceKm;
     private String deliveryDays;
     private List<Long> customerIds;
+
+    // Helper for salesmanId alias
+    public Long getEffectiveStaffId() {
+        return assignedStaffId;
+    }
 }

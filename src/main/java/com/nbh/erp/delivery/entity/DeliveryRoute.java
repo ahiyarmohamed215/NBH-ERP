@@ -2,6 +2,7 @@ package com.nbh.erp.delivery.entity;
 
 import com.nbh.erp.common.entity.BaseEntity;
 import com.nbh.erp.customer.entity.Customer;
+import com.nbh.erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,6 +35,10 @@ public class DeliveryRoute extends BaseEntity {
 
     @Column(length = 100)
     private String area; // e.g. Western Province
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private User assignedStaff;
 
     @Column(name = "start_location", length = 150)
     private String startLocation; // e.g. Central Warehouse
