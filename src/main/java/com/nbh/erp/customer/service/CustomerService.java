@@ -1,5 +1,6 @@
 package com.nbh.erp.customer.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
@@ -8,13 +9,16 @@ import com.nbh.erp.customer.dto.CustomerDto;
 import com.nbh.erp.customer.entity.Customer;
 import com.nbh.erp.customer.repository.CustomerRepository;
 import com.nbh.erp.sales.repository.InvoiceRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,6 +28,7 @@ public class CustomerService {
     private final CustomerRepository customerRepository;
     private final InvoiceRepository invoiceRepository;
     private final com.nbh.erp.customergroup.repository.CustomerGroupRepository customerGroupRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
@@ -70,11 +75,12 @@ public class CustomerService {
             throw new DuplicateResourceException("Customer", "code", code);
         }
 
-        com.nbh.erp.customergroup.entity.CustomerGroup group = null;
-        Long groupId = request.getEffectiveCustomerGroupId();
-        if (groupId != null) {
-            group = customerGroupRepository.findById(groupId).orElse(null);
+        List<Long> groupIds = request.getEffectiveCustomerGroupIds();
+        Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = new HashSet<>();
+        if (groupIds != null && !groupIds.isEmpty()) {
+            groups.addAll(customerGroupRepository.findAllById(groupIds));
         }
+        com.nbh.erp.customergroup.entity.CustomerGroup primaryGroup = groups.isEmpty() ? null : groups.iterator().next();
 
         Customer customer = Customer.builder()
                 .customerCode(code)
@@ -85,11 +91,16 @@ public class CustomerService {
                 .address(request.getAddress())
                 .creditLimit(request.getCreditLimit() != null ? request.getCreditLimit() : BigDecimal.ZERO)
                 .currentBalance(BigDecimal.ZERO)
-                .customerGroup(group)
+                .customerGroup(primaryGroup)
+                .customerGroups(groups)
                 .isActive(true)
                 .build();
 
         Customer saved = customerRepository.save(customer);
+
+        auditLogService.log("CUSTOMER_CREATE", "CUSTOMERS", "Customer", saved.getCustomerCode(),
+                String.format("Created customer '%s' (Code: %s, Phone: %s)", saved.getName(), saved.getCustomerCode(), saved.getPhone()));
+
         return CustomerDto.from(saved);
     }
 
@@ -97,6 +108,9 @@ public class CustomerService {
     public CustomerDto updateCustomer(Long id, CreateCustomerRequest request) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+
+        // Enforce that only authorized staff can edit
+        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer: " + customer.getName());
 
         if (StringUtils.hasText(request.getCustomerCode())) {
             String newCode = request.getCustomerCode().trim().toUpperCase();
@@ -117,15 +131,21 @@ public class CustomerService {
             customer.setCreditLimit(request.getCreditLimit());
         }
 
-        Long groupId = request.getEffectiveCustomerGroupId();
-        if (groupId != null) {
-            com.nbh.erp.customergroup.entity.CustomerGroup group = customerGroupRepository.findById(groupId).orElse(null);
-            customer.setCustomerGroup(group);
-        } else {
-            customer.setCustomerGroup(null);
+        if (request.getCustomerGroupIds() != null || request.getRouteIds() != null || request.getCustomerGroupId() != null || request.getRouteId() != null) {
+            List<Long> groupIds = request.getEffectiveCustomerGroupIds();
+            Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = new HashSet<>();
+            if (groupIds != null && !groupIds.isEmpty()) {
+                groups.addAll(customerGroupRepository.findAllById(groupIds));
+            }
+            customer.setCustomerGroups(groups);
+            customer.setCustomerGroup(groups.isEmpty() ? null : groups.iterator().next());
         }
 
         Customer saved = customerRepository.save(customer);
+
+        auditLogService.log("CUSTOMER_UPDATE", "CUSTOMERS", "Customer", saved.getCustomerCode(),
+                String.format("Updated customer details for '%s' (Code: %s)", saved.getName(), saved.getCustomerCode()));
+
         return CustomerDto.from(saved);
     }
 
@@ -133,16 +153,19 @@ public class CustomerService {
     public void toggleActive(Long id) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+
+        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer: " + customer.getName());
+
         customer.setIsActive(!customer.getIsActive());
         customerRepository.save(customer);
+
+        auditLogService.log("CUSTOMER_STATUS", "CUSTOMERS", "Customer", customer.getCustomerCode(),
+                String.format("Set customer '%s' (Code: %s) active status to %s", customer.getName(), customer.getCustomerCode(), customer.getIsActive()));
     }
 
     @Transactional
     public void deleteCustomer(Long id) {
-        Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
-
-        customer.setIsActive(false);
-        customerRepository.save(customer);
+        // Enforce ERP policy: records cannot be deleted once created
+        SecurityUtils.enforceNoDelete("Customer", id);
     }
 }

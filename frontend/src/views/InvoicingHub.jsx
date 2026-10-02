@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import PosView from './PosView';
 import SalesReturnsView from './SalesReturnsView';
+import { canEditModule } from '../utils/permissionUtils';
 import {
   FileText,
   DollarSign,
@@ -25,7 +26,6 @@ import {
   Filter,
   PauseCircle,
   PlayCircle,
-  Trash2,
   Building2,
   Package,
   User,
@@ -42,6 +42,8 @@ import {
 export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange }) {
   const { addToast } = useToast();
   const { user } = useAuth();
+  const canEditSales = canEditModule(user, 'SALES');
+  const canEditQuotation = canEditModule(user, 'QUOTATION');
 
   // Sub-tabs ordered exactly per user workflow specification:
   // sales, hold bills, sales return, payments, advance payments, outstanding payments, quotation
@@ -264,6 +266,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   const handleSaveEditedInvoice = async () => {
     if (!editingInvoice) return;
+    if (!canEditSales) {
+      addToast('Permission denied: Only permissible staff can edit invoices', 'error');
+      return;
+    }
     try {
       if (editingInvoice.id && !editingInvoice.id.startsWith('inv-')) {
         await salesApi.update(editingInvoice.id, {
@@ -650,53 +656,6 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       loadHeldBills();
     }
   }, [currentTab]);
-
-  const handleDiscardHeldBill = async (heldBillOrId, invNum) => {
-    let heldId = heldBillOrId;
-    let invoiceNumber = invNum;
-    if (typeof heldBillOrId === 'object' && heldBillOrId !== null) {
-      heldId = heldBillOrId.id;
-      invoiceNumber = heldBillOrId.invoiceNumber;
-    }
-    const displayName = invoiceNumber || heldId || 'this held bill';
-    if (!window.confirm(`Are you sure you want to discard held bill ${displayName}?`)) {
-      return;
-    }
-    try {
-      if (heldId) {
-        await salesApi.deleteHeld(heldId).catch(() => salesApi.cancelHeld(heldId));
-      } else if (invoiceNumber) {
-        await salesApi.deleteHeldByNumber(invoiceNumber).catch(() => {});
-      }
-      addToast(`Held bill ${displayName} discarded successfully`, 'info');
-      setSelectedHeldIds((prev) => prev.filter((id) => String(id) !== String(heldId)));
-      if (selectedHeldDetail && (selectedHeldDetail.id === heldId || selectedHeldDetail.invoiceNumber === invoiceNumber)) {
-        setSelectedHeldDetail(null);
-      }
-      await loadHeldBills();
-    } catch (err) {
-      addToast('Failed to discard held bill: ' + err.message, 'error');
-    }
-  };
-
-  const handleBulkDiscardHeld = async () => {
-    if (selectedHeldIds.length === 0) return;
-    if (!window.confirm(`Are you sure you want to discard all ${selectedHeldIds.length} selected held bills?`)) {
-      return;
-    }
-    const toDeleteIds = [...selectedHeldIds];
-    try {
-      await Promise.allSettled(
-        toDeleteIds.map((id) => salesApi.deleteHeld(id).catch(() => salesApi.cancelHeld(id)))
-      );
-      addToast(`${toDeleteIds.length} held bill(s) discarded successfully`, 'info');
-      setSelectedHeldIds([]);
-      setSelectedHeldDetail(null);
-      await loadHeldBills();
-    } catch (err) {
-      addToast('Failed to discard held bills: ' + err.message, 'error');
-    }
-  };
 
   const handleResumeHeldBill = (heldInv) => {
     setHeldToResume(heldInv);
@@ -1910,30 +1869,20 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       {/* Actions */}
                       <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            type="button"
-                            className="btn btn-glass btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingInvoice({ ...inv });
-                            }}
-                            title="Edit Invoice"
-                            style={{ padding: '4px 8px', borderRadius: '5px', color: '#0284c7' }}
-                          >
-                            <Edit3 size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-glass btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteInvoice(inv);
-                            }}
-                            title="Delete Invoice"
-                            style={{ padding: '4px 8px', borderRadius: '5px', color: '#dc2626' }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditSales && (
+                            <button
+                              type="button"
+                              className="btn btn-glass btn-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingInvoice({ ...inv });
+                              }}
+                              title="Edit Invoice"
+                              style={{ padding: '4px 8px', borderRadius: '5px', color: '#0284c7' }}
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2240,26 +2189,6 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </button>
                 <button
                   type="button"
-                  onClick={handleBulkDiscardHeld}
-                  style={{
-                    padding: '6px 14px',
-                    fontSize: '0.82rem',
-                    borderRadius: '6px',
-                    border: '1px solid #fecaca',
-                    backgroundColor: '#fee2e2',
-                    color: '#dc2626',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                  }}
-                  title="Discard all selected held bills"
-                >
-                  <Trash2 size={14} /> Discard Selected ({selectedHeldIds.length})
-                </button>
-                <button
-                  type="button"
                   onClick={handleOpenMergeDispatchModal}
                   style={{
                     padding: '6px 16px',
@@ -2479,37 +2408,6 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                               title="View bill items & details"
                             >
                               <Eye size={13} /> View
-                            </button>
-
-                            {/* 3. Delete / Discard */}
-                            <button
-                              type="button"
-                              onClick={() => handleDiscardHeldBill(hb.id, hb.invoiceNumber)}
-                              style={{
-                                padding: '5px 8px',
-                                fontSize: '0.76rem',
-                                fontWeight: 600,
-                                backgroundColor: '#ffffff',
-                                color: '#ef4444',
-                                border: '1px solid #fecaca',
-                                borderRadius: '5px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#ef4444';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete / discard held bill"
-                            >
-                              <Trash2 size={13} />
                             </button>
 
                             {/* Optional Warehouse helper if already in warehouse workflow */}
@@ -3607,15 +3505,6 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           >
                             <Printer size={13} />
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-glass btn-sm"
-                            onClick={() => handleDeleteQuotation(qt)}
-                            style={{ padding: '4px 7px', fontSize: '0.74rem', borderRadius: '5px', color: '#dc2626' }}
-                            title="Delete quotation"
-                          >
-                            <Trash2 size={13} />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -4207,32 +4096,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  const bill = selectedHeldDetail;
-                  handleDiscardHeldBill(bill.id, bill.invoiceNumber);
-                }}
-                style={{
-                  padding: '7px 14px',
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  border: '1px solid #fecaca',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s ease',
-                }}
-                title="Discard this held bill permanently"
-              >
-                <Trash2 size={14} /> Discard Bill
-              </button>
-
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
@@ -4387,10 +4251,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                 totalAmount: newNet,
                               });
                             }}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
                             title="Remove line item"
                           >
-                            <Trash2 size={13} />
+                            <X size={13} />
                           </button>
                         )}
                       </td>

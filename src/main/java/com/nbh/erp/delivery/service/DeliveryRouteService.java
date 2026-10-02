@@ -9,6 +9,7 @@ import com.nbh.erp.delivery.dto.CreateDeliveryRouteRequest;
 import com.nbh.erp.delivery.dto.DeliveryRouteDto;
 import com.nbh.erp.delivery.entity.DeliveryRoute;
 import com.nbh.erp.delivery.repository.DeliveryRouteRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -114,6 +115,8 @@ public class DeliveryRouteService {
         DeliveryRoute route = routeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
 
+        SecurityUtils.enforceCanEdit("DELIVERY", "Delivery Route: " + route.getRouteName());
+
         String code = req.getRouteCode();
         if (StringUtils.hasText(code)) {
             String newCode = code.trim().toUpperCase();
@@ -165,18 +168,7 @@ public class DeliveryRouteService {
 
     @Transactional
     public void deleteRoute(Long id) {
-        DeliveryRoute route = routeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
-
-        customerRepository.findByDeliveryRouteId(route.getId()).forEach(c -> c.setDeliveryRoute(null));
-        routeRepository.delete(route);
-
-        auditLogService.log(
-                "DELIVERY_ROUTE_DELETE",
-                "DeliveryRoute",
-                route.getRouteCode(),
-                String.format("Delivery route '%s' deleted", route.getRouteName())
-        );
+        SecurityUtils.enforceNoDelete("DeliveryRoute", id);
     }
 
     @Transactional

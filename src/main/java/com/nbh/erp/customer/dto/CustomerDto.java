@@ -8,6 +8,9 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Data
 @Builder
@@ -28,12 +31,16 @@ public class CustomerDto {
     private Long customerGroupId;
     private String customerGroupName;
     private String customerGroupCode;
+    private List<Long> customerGroupIds;
+    private List<String> customerGroupNames;
     private Long deliveryRouteId;
     private String deliveryRouteName;
     private String deliveryRouteCode;
     private Long routeId;
     private String routeName;
     private String routeCode;
+    private List<Long> routeIds;
+    private List<String> routeNames;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -42,8 +49,16 @@ public class CustomerDto {
     }
 
     public static CustomerDto from(Customer c) {
-        Long groupId = c.getCustomerGroup() != null ? c.getCustomerGroup().getId() : null;
-        String groupName = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupName() : null;
+        Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = c.getCustomerGroups();
+        List<Long> groupIds = groups != null
+                ? groups.stream().map(com.nbh.erp.customergroup.entity.CustomerGroup::getId).filter(Objects::nonNull).toList()
+                : List.of();
+        List<String> groupNames = groups != null
+                ? groups.stream().map(com.nbh.erp.customergroup.entity.CustomerGroup::getGroupName).filter(Objects::nonNull).toList()
+                : List.of();
+
+        Long groupId = c.getCustomerGroup() != null ? c.getCustomerGroup().getId() : (!groupIds.isEmpty() ? groupIds.get(0) : null);
+        String groupName = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupName() : (!groupNames.isEmpty() ? groupNames.get(0) : null);
         String groupCode = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupCode() : null;
 
         Long delRouteId = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getId() : null;
@@ -65,12 +80,16 @@ public class CustomerDto {
                 .customerGroupId(groupId)
                 .customerGroupName(groupName)
                 .customerGroupCode(groupCode)
+                .customerGroupIds(groupIds)
+                .customerGroupNames(groupNames)
                 .deliveryRouteId(delRouteId)
                 .deliveryRouteName(delRouteName)
                 .deliveryRouteCode(delRouteCode)
                 .routeId(groupId)
                 .routeName(groupName)
                 .routeCode(groupCode)
+                .routeIds(groupIds)
+                .routeNames(groupNames)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

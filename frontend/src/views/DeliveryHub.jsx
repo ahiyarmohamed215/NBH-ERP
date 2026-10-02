@@ -32,13 +32,16 @@ import {
   Wifi,
   Layers,
   Activity,
-  Trash2,
   Download,
 } from 'lucide-react';
 import { deliveryApi, deliveryRouteApi, vehicleApi, salesApi, customerGroupApi, printPdfDocument } from '../api/apiClient';
 import api from '../api/apiClient';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 
 export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
+  const { user } = useAuth();
+  const canEditDelivery = canEditModule(user, 'DELIVERY');
   // Primary Tabs: 'deliveries' | 'routes' | 'vehicles' | 'gps-tracking'
   const [currentTab, setCurrentTab] = useState(activeSubTab || 'deliveries');
 
@@ -133,7 +136,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const [showAssignCustomerModal, setShowAssignCustomerModal] = useState(false);
   const [assignCustomerSearch, setAssignCustomerSearch] = useState('');
   const [routeSearchTerm, setRouteSearchTerm] = useState('');
-  const [deleteRouteConfirm, setDeleteRouteConfirm] = useState(null);
 
   // Keep routeForm as compatibility alias
   const [routeForm, setRouteForm] = useState({
@@ -480,6 +482,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
   const handleSaveRouteView = async (e) => {
     if (e) e.preventDefault();
+    if (!isCreatingRoute && !canEditDelivery) {
+      showToast('Permission denied: Only authorized staff can edit existing delivery routes.', 'error');
+      return;
+    }
     if (!routeEditForm.name.trim()) {
       showToast('Delivery route name is required', 'error');
       return;
@@ -549,22 +555,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       fetchData();
     } catch (err) {
       showToast('Error saving delivery route: ' + (err.response?.data?.message || err.message), 'error');
-    }
-  };
-
-  const handleDeleteRoute = async () => {
-    if (!deleteRouteConfirm) return;
-    try {
-      await deliveryRouteApi.delete(deleteRouteConfirm.id);
-      setRoutes((prev) => prev.filter((r) => r.id !== deleteRouteConfirm.id));
-      showToast(`Delivery route "${deleteRouteConfirm.routeName || deleteRouteConfirm.name}" deleted successfully.`, 'success');
-      if (selectedRoute?.id === deleteRouteConfirm.id) {
-        handleCloseRouteView();
-      }
-      setDeleteRouteConfirm(null);
-      fetchData();
-    } catch (err) {
-      showToast('Failed to delete route: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
@@ -3225,42 +3215,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     />
                   </div>
                 </div>
-
-                {/* Left Column Delete Button if editing */}
-                {!isCreatingRoute && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteRouteConfirm(selectedRoute)}
-                      style={{
-                        width: '100%',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '6px',
-                        border: '1px solid #fecaca',
-                        backgroundColor: '#ffffff',
-                        color: '#dc2626',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fef2f2';
-                        e.currentTarget.style.borderColor = '#dc2626';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.borderColor = '#fecaca';
-                      }}
-                    >
-                      <Trash2 size={14} /> Delete this Delivery Route
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* RIGHT COLUMN: Assigned Customers Table & Workspace */}
@@ -3532,6 +3486,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               <button
                 type="button"
                 onClick={handleSaveRouteView}
+                disabled={!isCreatingRoute && !canEditDelivery}
+                title={!isCreatingRoute && !canEditDelivery ? 'Only authorized staff can edit routes' : ''}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -3539,18 +3495,23 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                   padding: '8px 20px',
                   borderRadius: '6px',
                   border: 'none',
-                  backgroundColor: '#0284c7',
+                  backgroundColor: !isCreatingRoute && !canEditDelivery ? '#94a3b8' : '#0284c7',
                   color: '#ffffff',
                   fontSize: '0.86rem',
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: !isCreatingRoute && !canEditDelivery ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                   transition: 'background-color 0.15s ease',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                onMouseEnter={(e) => {
+                  if (isCreatingRoute || canEditDelivery) e.currentTarget.style.backgroundColor = '#0369a1';
+                }}
+                onMouseLeave={(e) => {
+                  if (isCreatingRoute || canEditDelivery) e.currentTarget.style.backgroundColor = '#0284c7';
+                }}
               >
-                <Check size={16} /> {isCreatingRoute ? 'Save New Delivery Route' : 'Update Delivery Route'}
+                <Check size={16} />
+                {isCreatingRoute ? 'Save New Delivery Route' : (!canEditDelivery ? 'View Only (Restricted)' : 'Update Delivery Route')}
               </button>
             </div>
           </div>
@@ -3809,70 +3770,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
               >
                 Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* CONFIRMATION POPUP: Delete Route                              */}
-      {/* ------------------------------------------------------------- */}
-      {deleteRouteConfirm && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              maxWidth: '440px',
-              width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px rgba(0,0,0,0.15)',
-            }}
-          >
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={22} color="#b91c1c" />
-              Delete Delivery Route
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '20px', lineHeight: 1.5 }}>
-              Are you sure you want to delete delivery route <strong>"{deleteRouteConfirm.routeName || deleteRouteConfirm.name}"</strong>
-              {deleteRouteConfirm.routeCode ? ` (${deleteRouteConfirm.routeCode})` : ''}? This action cannot be undone.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setDeleteRouteConfirm(null)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontWeight: 600,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteRoute}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Confirm Delete Route
               </button>
             </div>
           </div>

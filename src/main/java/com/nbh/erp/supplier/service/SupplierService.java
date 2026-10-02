@@ -1,10 +1,12 @@
 package com.nbh.erp.supplier.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.grn.repository.GrnRepository;
 import com.nbh.erp.product.repository.ProductRepository;
+import com.nbh.erp.security.SecurityUtils;
 import com.nbh.erp.supplier.dto.CreateSupplierRequest;
 import com.nbh.erp.supplier.dto.SupplierDto;
 import com.nbh.erp.supplier.entity.Supplier;
@@ -24,6 +26,7 @@ public class SupplierService {
     private final SupplierRepository supplierRepository;
     private final GrnRepository grnRepository;
     private final ProductRepository productRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
@@ -81,6 +84,10 @@ public class SupplierService {
                 .build();
 
         Supplier saved = supplierRepository.save(supplier);
+
+        auditLogService.log("SUPPLIER_CREATE", "PURCHASING", "Supplier", saved.getSupplierCode(),
+                String.format("Created supplier '%s' (Code: %s)", saved.getName(), saved.getSupplierCode()));
+
         return SupplierDto.from(saved);
     }
 
@@ -88,6 +95,8 @@ public class SupplierService {
     public SupplierDto updateSupplier(Long id, CreateSupplierRequest request) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+
+        SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + supplier.getName());
 
         if (StringUtils.hasText(request.getSupplierCode())) {
             String newCode = request.getSupplierCode().trim().toUpperCase();
@@ -106,6 +115,10 @@ public class SupplierService {
         supplier.setAddress(request.getAddress());
 
         Supplier saved = supplierRepository.save(supplier);
+
+        auditLogService.log("SUPPLIER_UPDATE", "PURCHASING", "Supplier", saved.getSupplierCode(),
+                String.format("Updated supplier '%s' (Code: %s)", saved.getName(), saved.getSupplierCode()));
+
         return SupplierDto.from(saved);
     }
 
@@ -113,16 +126,18 @@ public class SupplierService {
     public void toggleActive(Long id) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+
+        SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + supplier.getName());
+
         supplier.setIsActive(!supplier.getIsActive());
         supplierRepository.save(supplier);
+
+        auditLogService.log("SUPPLIER_STATUS", "PURCHASING", "Supplier", supplier.getSupplierCode(),
+                String.format("Set supplier '%s' active status to %s", supplier.getName(), supplier.getIsActive()));
     }
 
     @Transactional
     public void deleteSupplier(Long id) {
-        Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
-
-        supplier.setIsActive(false);
-        supplierRepository.save(supplier);
+        SecurityUtils.enforceNoDelete("Supplier", id);
     }
 }

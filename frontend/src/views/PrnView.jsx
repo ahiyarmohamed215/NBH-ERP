@@ -6,7 +6,6 @@ import {
   Plus,
   Search,
   CheckCircle,
-  Trash2,
   RefreshCw,
   Edit2,
   Printer,
@@ -1061,13 +1060,13 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                             style={{
                               background: 'transparent',
                               border: 'none',
-                              color: '#ef4444',
+                              color: '#94a3b8',
                               cursor: 'pointer',
                               padding: '8px',
                             }}
                             title="Remove line"
                           >
-                            <Trash2 size={18} />
+                            <X size={18} />
                           </button>
                         ) : (
                           <div style={{ width: '34px' }} />

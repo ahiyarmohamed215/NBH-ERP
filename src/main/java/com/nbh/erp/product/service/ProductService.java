@@ -17,6 +17,8 @@ import com.nbh.erp.supplier.entity.Supplier;
 import com.nbh.erp.supplier.repository.SupplierRepository;
 import com.nbh.erp.warehouse.entity.Warehouse;
 import com.nbh.erp.warehouse.repository.WarehouseRepository;
+import com.nbh.erp.audit.service.AuditLogService;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,6 +41,7 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final SupplierRepository supplierRepository;
     private final WarehouseRepository warehouseRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public PagedResponse<ProductDto> getProductsPaginated(String query, Long categoryId, Pageable pageable) {
@@ -125,6 +128,10 @@ public class ProductService {
                 .build();
 
         Product saved = productRepository.save(product);
+
+        auditLogService.log("PRODUCT_CREATE", "INVENTORY", "Product", saved.getSku(),
+                String.format("Created product '%s' (SKU: %s, Selling Price: Rs. %s)", saved.getName(), saved.getSku(), saved.getSellingPrice()));
+
         return ProductDto.from(saved);
     }
 
@@ -132,6 +139,8 @@ public class ProductService {
     public ProductDto updateProduct(Long id, CreateProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        SecurityUtils.enforceCanEdit("PRODUCT", "Product: " + product.getName());
 
         if (StringUtils.hasText(request.getSku())) {
             String newSku = request.getSku().trim().toUpperCase();
@@ -196,6 +205,10 @@ public class ProductService {
         }
 
         Product saved = productRepository.save(product);
+
+        auditLogService.log("PRODUCT_UPDATE", "INVENTORY", "Product", saved.getSku(),
+                String.format("Updated product '%s' (SKU: %s)", saved.getName(), saved.getSku()));
+
         return ProductDto.from(saved);
     }
 
@@ -203,17 +216,18 @@ public class ProductService {
     public void toggleActive(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        SecurityUtils.enforceCanEdit("PRODUCT", "Product: " + product.getName());
+
         product.setIsActive(!product.getIsActive());
         productRepository.save(product);
+
+        auditLogService.log("PRODUCT_STATUS", "INVENTORY", "Product", product.getSku(),
+                String.format("Set product '%s' (SKU: %s) active status to %s", product.getName(), product.getSku(), product.getIsActive()));
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
-
-        product.setIsActive(false);
-        productRepository.save(product);
-        log.info("Product ID {} ('{}') soft-deleted (deactivated).", id, product.getName());
+        SecurityUtils.enforceNoDelete("Product", id);
     }
 }

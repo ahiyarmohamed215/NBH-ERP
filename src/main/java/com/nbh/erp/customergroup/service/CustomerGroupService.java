@@ -10,6 +10,7 @@ import com.nbh.erp.customergroup.entity.CustomerGroup;
 import com.nbh.erp.customergroup.repository.CustomerGroupRepository;
 import com.nbh.erp.user.entity.User;
 import com.nbh.erp.user.repository.UserRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -93,7 +94,12 @@ public class CustomerGroupService {
         CustomerGroup saved = customerGroupRepository.save(group);
 
         if (request.getCustomerIds() != null && !request.getCustomerIds().isEmpty()) {
-            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> c.setCustomerGroup(saved));
+            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> {
+                c.getCustomerGroups().add(saved);
+                if (c.getCustomerGroup() == null) {
+                    c.setCustomerGroup(saved);
+                }
+            });
         }
 
         auditLogService.log(
@@ -113,6 +119,8 @@ public class CustomerGroupService {
     public CustomerGroupDto updateGroup(Long id, CreateCustomerGroupRequest request) {
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", id));
+
+        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Group: " + group.getGroupName());
 
         String code = request.getEffectiveCode();
         if (StringUtils.hasText(code)) {
@@ -143,10 +151,18 @@ public class CustomerGroupService {
         if (request.getCustomerIds() != null) {
             customerRepository.findByCustomerGroupId(saved.getId()).forEach(c -> {
                 if (!request.getCustomerIds().contains(c.getId())) {
-                    c.setCustomerGroup(null);
+                    c.getCustomerGroups().removeIf(g -> g.getId().equals(saved.getId()));
+                    if (c.getCustomerGroup() != null && c.getCustomerGroup().getId().equals(saved.getId())) {
+                        c.setCustomerGroup(c.getCustomerGroups().isEmpty() ? null : c.getCustomerGroups().iterator().next());
+                    }
                 }
             });
-            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> c.setCustomerGroup(saved));
+            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> {
+                c.getCustomerGroups().add(saved);
+                if (c.getCustomerGroup() == null) {
+                    c.setCustomerGroup(saved);
+                }
+            });
         }
 
         auditLogService.log(
@@ -166,6 +182,9 @@ public class CustomerGroupService {
     public void toggleActive(Long id) {
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", id));
+
+        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Group: " + group.getGroupName());
+
         group.setIsActive(!Boolean.TRUE.equals(group.getIsActive()));
         customerGroupRepository.save(group);
 
@@ -179,16 +198,6 @@ public class CustomerGroupService {
 
     @Transactional
     public void deleteGroup(Long id) {
-        CustomerGroup group = customerGroupRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", id));
-        group.setIsActive(false);
-        customerGroupRepository.save(group);
-
-        auditLogService.log(
-                "CUSTOMER_GROUP_DELETE",
-                "CustomerGroup",
-                group.getGroupCode(),
-                String.format("Customer group '%s' soft-deleted", group.getGroupName())
-        );
+        SecurityUtils.enforceNoDelete("CustomerGroup", id);
     }
 }

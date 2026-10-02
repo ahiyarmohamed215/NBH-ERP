@@ -1,11 +1,13 @@
 package com.nbh.erp.warehouse.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.grn.repository.GrnRepository;
 import com.nbh.erp.inventory.repository.StockBalanceRepository;
 import com.nbh.erp.sales.repository.InvoiceRepository;
+import com.nbh.erp.security.SecurityUtils;
 import com.nbh.erp.warehouse.dto.CreateWarehouseRequest;
 import com.nbh.erp.warehouse.dto.WarehouseDto;
 import com.nbh.erp.warehouse.entity.Warehouse;
@@ -25,6 +27,7 @@ public class WarehouseService {
     private final StockBalanceRepository stockBalanceRepository;
     private final InvoiceRepository invoiceRepository;
     private final GrnRepository grnRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<WarehouseDto> getAllWarehouses() {
@@ -63,6 +66,10 @@ public class WarehouseService {
                 .build();
 
         Warehouse saved = warehouseRepository.save(warehouse);
+
+        auditLogService.log("WAREHOUSE_CREATE", "INVENTORY", "Warehouse", saved.getCode(),
+                String.format("Created warehouse facility '%s' (Code: %s)", saved.getName(), saved.getCode()));
+
         return WarehouseDto.from(saved);
     }
 
@@ -70,6 +77,8 @@ public class WarehouseService {
     public WarehouseDto updateWarehouse(Long id, CreateWarehouseRequest request) {
         Warehouse warehouse = warehouseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+
+        SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
 
         warehouseRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -85,6 +94,10 @@ public class WarehouseService {
         warehouse.setContactPerson(request.getContactPerson());
 
         Warehouse saved = warehouseRepository.save(warehouse);
+
+        auditLogService.log("WAREHOUSE_UPDATE", "INVENTORY", "Warehouse", saved.getCode(),
+                String.format("Updated warehouse facility '%s' (Code: %s)", saved.getName(), saved.getCode()));
+
         return WarehouseDto.from(saved);
     }
 
@@ -92,17 +105,19 @@ public class WarehouseService {
     public void toggleActive(Long id) {
         Warehouse warehouse = warehouseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+
+        SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
+
         warehouse.setIsActive(!warehouse.getIsActive());
         warehouseRepository.save(warehouse);
+
+        auditLogService.log("WAREHOUSE_STATUS", "INVENTORY", "Warehouse", warehouse.getCode(),
+                String.format("Set warehouse '%s' active status to %s", warehouse.getName(), warehouse.getIsActive()));
     }
 
     @Transactional
     public void deleteWarehouse(Long id) {
-        Warehouse warehouse = warehouseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
-
-        warehouse.setIsActive(false);
-        warehouseRepository.save(warehouse);
+        SecurityUtils.enforceNoDelete("Warehouse", id);
     }
 }
 

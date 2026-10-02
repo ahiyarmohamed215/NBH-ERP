@@ -168,6 +168,8 @@ public class QuotationService {
         Quotation quotation = quotationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
 
+        SecurityUtils.enforceCanEdit("QUOTATION", quotation.getQuotationNumber());
+
         if ("CONVERTED".equals(quotation.getStatus())) {
             throw new BusinessException("Cannot update quotation " + quotation.getQuotationNumber() + " because it is already converted to an invoice.");
         }
@@ -222,19 +224,23 @@ public class QuotationService {
         }
 
         Quotation saved = quotationRepository.save(quotation);
+        String username = SecurityUtils.getCurrentUsername().orElse("system");
+        auditLogService.log(
+                "QUOTATION_UPDATE",
+                "Quotation",
+                saved.getQuotationNumber(),
+                String.format("Quotation %s updated for customer '%s' totaling %s by %s",
+                        saved.getQuotationNumber(),
+                        saved.getCustomerName(),
+                        saved.getTotalAmount(),
+                        username)
+        );
         return QuotationDto.from(saved);
     }
 
     @Transactional
     public void deleteQuotation(Long id) {
-        Quotation quotation = quotationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
-        if ("CONVERTED".equals(quotation.getStatus())) {
-            throw new BusinessException("Cannot delete quotation " + quotation.getQuotationNumber() + " because it is already converted to an invoice.");
-        }
-        quotationRepository.delete(quotation);
-        auditLogService.log("QUOTATION_DELETE", "Quotation", quotation.getQuotationNumber(),
-                "Deleted quotation " + quotation.getQuotationNumber());
+        SecurityUtils.enforceNoDelete("Quotation", id);
     }
 
     @Transactional

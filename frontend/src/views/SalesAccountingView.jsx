@@ -16,7 +16,6 @@ import {
   ChevronRight,
   X,
   PlayCircle,
-  Trash2,
   Eye
 } from 'lucide-react';
 
@@ -94,22 +93,6 @@ export default function SalesAccountingView() {
       addToast('Failed to load cashier activity: ' + err.message, 'error');
     } finally {
       setDetailLoading(false);
-    }
-  };
-
-  const handleDiscardHeld = async (heldId, invoiceNumber) => {
-    if (!window.confirm(`Discard held bill ${invoiceNumber}?`)) return;
-    try {
-      await salesApi.cancelHeld(heldId);
-      addToast(`Held bill ${invoiceNumber} discarded`, 'info');
-      // refresh inspection
-      if (selectedCashier) {
-        const heldRes = await salesApi.getHeld(selectedCashier.username);
-        setCashierHeld(heldRes.data || []);
-      }
-      loadAccountingData();
-    } catch (err) {
-      addToast('Failed to discard held bill: ' + err.message, 'error');
     }
   };
 
@@ -621,14 +604,9 @@ export default function SalesAccountingView() {
                           <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
                             Rs. {Number(held.netTotal).toFixed(2)}
                           </span>
-                          <button
-                            className="btn btn-glass btn-sm"
-                            title="Discard this held bill"
-                            onClick={() => handleDiscardHeld(held.id, held.invoiceNumber)}
-                            style={{ color: '#ef4444', padding: '6px 10px' }}
-                          >
-                            <Trash2 size={14} /> Discard
-                          </button>
+                          <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600 }}>
+                            HELD
+                          </span>
                         </div>
                       </div>
                     ))}

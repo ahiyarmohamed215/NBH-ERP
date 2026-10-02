@@ -1,11 +1,13 @@
 package com.nbh.erp.delivery.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.delivery.dto.CreateVehicleRequest;
 import com.nbh.erp.delivery.dto.VehicleDto;
 import com.nbh.erp.delivery.entity.Vehicle;
 import com.nbh.erp.delivery.repository.VehicleRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.List;
 public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<VehicleDto> getAllVehicles() {
@@ -54,13 +57,20 @@ public class VehicleService {
                 .notes(req.getNotes())
                 .build();
 
-        return VehicleDto.from(vehicleRepository.save(v));
+        Vehicle saved = vehicleRepository.save(v);
+
+        auditLogService.log("VEHICLE_CREATE", "DELIVERY", "Vehicle", saved.getVehicleNumber(),
+                String.format("Added vehicle '%s' (%s, Type: %s)", saved.getVehicleNumber(), saved.getModel(), saved.getVehicleType()));
+
+        return VehicleDto.from(saved);
     }
 
     @Transactional
     public VehicleDto updateVehicle(Long id, CreateVehicleRequest req) {
         Vehicle v = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", "id", id));
+
+        SecurityUtils.enforceCanEdit("DELIVERY", "Vehicle: " + v.getVehicleNumber());
 
         String num = req.getVehicleNumber().trim().toUpperCase();
         if (!num.equalsIgnoreCase(v.getVehicleNumber()) && vehicleRepository.existsByVehicleNumber(num)) {
@@ -74,15 +84,17 @@ public class VehicleService {
         if (req.getStatus() != null) v.setStatus(req.getStatus());
         v.setNotes(req.getNotes());
 
-        return VehicleDto.from(vehicleRepository.save(v));
+        Vehicle saved = vehicleRepository.save(v);
+
+        auditLogService.log("VEHICLE_UPDATE", "DELIVERY", "Vehicle", saved.getVehicleNumber(),
+                String.format("Updated vehicle '%s' (%s, Status: %s)", saved.getVehicleNumber(), saved.getModel(), saved.getStatus()));
+
+        return VehicleDto.from(saved);
     }
 
     @Transactional
     public void deleteVehicle(Long id) {
-        Vehicle v = vehicleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle", "id", id));
-        v.setIsActive(false);
-        vehicleRepository.save(v);
+        SecurityUtils.enforceNoDelete("Vehicle", id);
     }
 
     @Transactional

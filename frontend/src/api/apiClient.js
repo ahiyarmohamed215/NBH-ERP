@@ -236,6 +236,8 @@ export const quotationApi = {
 
 export const auditApi = {
   search: (params) => api.get('/audit-logs', { params }),
+  getLogs: (params) => api.get('/audit-logs', { params }),
+  getDaySummary: (date) => api.get('/audit-logs/day-summary', { params: date ? { date } : {} }),
 };
 
 export const reportApi = {

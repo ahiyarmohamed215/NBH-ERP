@@ -1,5 +1,6 @@
 package com.nbh.erp.category.service;
 
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.category.dto.CategoryDto;
 import com.nbh.erp.category.dto.CreateCategoryRequest;
 import com.nbh.erp.category.entity.Category;
@@ -8,6 +9,7 @@ import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.product.repository.ProductRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<CategoryDto> getAllCategories() {
@@ -57,6 +60,10 @@ public class CategoryService {
                 .build();
 
         Category saved = categoryRepository.save(category);
+
+        auditLogService.log("CATEGORY_CREATE", "INVENTORY", "Category", saved.getCode(),
+                String.format("Created category '%s' (Code: %s)", saved.getName(), saved.getCode()));
+
         return CategoryDto.from(saved);
     }
 
@@ -64,6 +71,8 @@ public class CategoryService {
     public CategoryDto updateCategory(Long id, CreateCategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        SecurityUtils.enforceCanEdit("PRODUCT", "Category: " + category.getName());
 
         categoryRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -77,6 +86,10 @@ public class CategoryService {
         category.setDescription(request.getDescription());
 
         Category saved = categoryRepository.save(category);
+
+        auditLogService.log("CATEGORY_UPDATE", "INVENTORY", "Category", saved.getCode(),
+                String.format("Updated category '%s' (Code: %s)", saved.getName(), saved.getCode()));
+
         return CategoryDto.from(saved);
     }
 
@@ -84,17 +97,19 @@ public class CategoryService {
     public void toggleActive(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        SecurityUtils.enforceCanEdit("PRODUCT", "Category: " + category.getName());
+
         category.setIsActive(!category.getIsActive());
         categoryRepository.save(category);
+
+        auditLogService.log("CATEGORY_STATUS", "INVENTORY", "Category", category.getCode(),
+                String.format("Set category '%s' active status to %s", category.getName(), category.getIsActive()));
     }
 
     @Transactional
     public void deleteCategory(Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
-
-        category.setIsActive(false);
-        categoryRepository.save(category);
+        SecurityUtils.enforceNoDelete("Category", id);
     }
 }
 

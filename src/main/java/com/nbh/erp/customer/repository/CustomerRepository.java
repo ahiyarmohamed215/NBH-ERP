@@ -14,7 +14,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();
-    List<Customer> findByCustomerGroupId(Long customerGroupId);
+
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g WHERE g.id = :customerGroupId OR c.customerGroup.id = :customerGroupId")
+    List<Customer> findByCustomerGroupId(@Param("customerGroupId") Long customerGroupId);
+
     List<Customer> findByDeliveryRouteId(Long deliveryRouteId);
 
     default List<Customer> findByRouteId(Long routeId) {

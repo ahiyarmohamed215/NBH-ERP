@@ -6,7 +6,6 @@ import {
   Plus,
   Search,
   CheckCircle,
-  Trash2,
   RefreshCw,
   Edit2,
   X,
@@ -1055,10 +1054,10 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(idx)}
-                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
                                 title="Remove line item"
                               >
-                                <Trash2 size={15} />
+                                <X size={15} />
                               </button>
                             </td>
                           </tr>

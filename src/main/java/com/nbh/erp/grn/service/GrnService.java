@@ -119,6 +119,8 @@ public class GrnService {
         Grn grn = grnRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
 
+        SecurityUtils.enforceCanEdit("GRN", grn.getGrnNumber());
+
         if (!"DRAFT".equals(grn.getStatus())) {
             throw new BusinessException("Only DRAFT GRNs can be edited. GRN " + grn.getGrnNumber() + " is " + grn.getStatus());
         }
@@ -161,6 +163,17 @@ public class GrnService {
         grn.setTotalAmount(grandTotal);
         Grn savedGrn = grnRepository.save(grn);
 
+        auditLogService.log(
+                "GRN_UPDATE",
+                "Grn",
+                savedGrn.getGrnNumber(),
+                String.format("GRN %s updated for supplier '%s' by %s. Total: %s",
+                        savedGrn.getGrnNumber(),
+                        savedGrn.getSupplier().getName(),
+                        SecurityUtils.getCurrentUsername().orElse("SYSTEM"),
+                        savedGrn.getTotalAmount())
+        );
+
         if (autoProcess) {
             return processGrnInternal(savedGrn);
         }
@@ -170,14 +183,7 @@ public class GrnService {
 
     @Transactional
     public void deleteGrn(Long id) {
-        Grn grn = grnRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
-
-        if (!"DRAFT".equals(grn.getStatus())) {
-            throw new BusinessException("Only un-processed DRAFT GRNs can be deleted. GRN " + grn.getGrnNumber() + " is " + grn.getStatus());
-        }
-
-        grnRepository.delete(grn);
+        SecurityUtils.enforceNoDelete("GRN", id);
     }
 
     @Transactional

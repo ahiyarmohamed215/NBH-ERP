@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { userApi, roleApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 import RolesView from './RolesView';
 import {
   Users,
@@ -10,7 +11,6 @@ import {
   Upload,
   Download,
   Edit2,
-  Trash2,
   RefreshCw,
   CheckCircle,
   XCircle,
@@ -34,6 +34,7 @@ import {
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
+  const canEditUser = canEditModule(currentUser, 'USER');
   const { addToast } = useToast();
 
   // Active sub-tab state: 'list' | 'roles' | 'pending-approvals' | 'attendance' | 'payroll' | 'commissions'
@@ -62,8 +63,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [viewingEmployee, setViewingEmployee] = useState(null);
-  const [employeeToDelete, setEmployeeToDelete] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   // Add / Edit form data
   const [formData, setFormData] = useState({
@@ -219,39 +218,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   // Toggle active
   const handleToggleActive = async (emp) => {
+    if (!canEditUser) {
+      addToast('Permission denied: Only authorized staff can change employee status.', 'error');
+      return;
+    }
     try {
       await userApi.toggleActive(emp.id);
       addToast(`Status updated for ${emp.fullName || emp.username}`, 'success');
       loadData();
     } catch (err) {
       addToast(err.message || 'Failed to update status', 'error');
-    }
-  };
-
-  // Delete employee
-  const handleInitiateDeleteEmployee = (emp) => {
-    if (currentUser && (currentUser.id === emp.id || currentUser.username === emp.username)) {
-      addToast('You cannot delete your own logged-in employee account.', 'error');
-      return;
-    }
-    setEmployeeToDelete(emp);
-  };
-
-  const handleExecuteDeleteEmployee = async () => {
-    if (!employeeToDelete) return;
-    try {
-      setDeletingId(employeeToDelete.id);
-      await userApi.delete(employeeToDelete.id);
-      addToast(`Employee "${employeeToDelete.fullName || employeeToDelete.username}" deleted successfully`, 'success');
-      if (viewingEmployee?.id === employeeToDelete.id) {
-        setViewingEmployee(null);
-      }
-      setEmployeeToDelete(null);
-      loadData();
-    } catch (err) {
-      addToast(err.message || 'Failed to delete employee record', 'error');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -313,6 +289,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!selectedEmployee) return;
+    if (!canEditUser) {
+      addToast('Permission denied: Only authorized staff can edit existing employee accounts.', 'error');
+      return;
+    }
     try {
       setSubmitting(true);
       await userApi.update(selectedEmployee.id, {
@@ -1049,30 +1029,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                               title="Edit Employee"
                             >
                               <Edit2 size={13} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleInitiateDeleteEmployee(emp);
-                              }}
-                              disabled={deletingId === emp.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title="Delete Employee"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -1981,28 +1937,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const emp = viewingEmployee;
-                    handleInitiateDeleteEmployee(emp);
-                  }}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #fecaca',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#dc2626',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
-                <button
-                  type="button"
                   onClick={() => setViewingEmployee(null)}
                   style={{
                     background: 'transparent',
@@ -2192,110 +2126,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: Delete Employee Confirmation Dialog                     */}
-      {/* ------------------------------------------------------------- */}
-      {employeeToDelete && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '460px',
-              padding: '24px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={20} />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                  Delete Employee
-                </h3>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                  This action will permanently remove the employee.
-                </p>
-              </div>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fee2e2',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                fontSize: '0.85rem',
-                color: '#991b1b',
-                marginBottom: '18px',
-                lineHeight: '1.4',
-              }}
-            >
-              Are you sure you want to delete employee <strong>"{employeeToDelete.fullName || employeeToDelete.username}"</strong> (@{employeeToDelete.username})? This action cannot be undone.
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                disabled={Boolean(deletingId)}
-                onClick={() => setEmployeeToDelete(null)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={Boolean(deletingId)}
-                onClick={handleExecuteDeleteEmployee}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <Trash2 size={14} /> {deletingId ? 'Deleting...' : 'Confirm Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

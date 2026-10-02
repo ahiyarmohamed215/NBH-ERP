@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "customers")
@@ -49,6 +51,15 @@ public class Customer extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "customer_group_mappings",
+            joinColumns = @JoinColumn(name = "customer_id"),
+            inverseJoinColumns = @JoinColumn(name = "group_id")
+    )
+    @Builder.Default
+    private Set<com.nbh.erp.customergroup.entity.CustomerGroup> customerGroups = new HashSet<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_group_id")
     private com.nbh.erp.customergroup.entity.CustomerGroup customerGroup;
@@ -56,6 +67,16 @@ public class Customer extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "delivery_route_id")
     private com.nbh.erp.delivery.entity.DeliveryRoute deliveryRoute;
+
+    public Set<com.nbh.erp.customergroup.entity.CustomerGroup> getCustomerGroups() {
+        if (this.customerGroups == null) {
+            this.customerGroups = new HashSet<>();
+        }
+        if (this.customerGroups.isEmpty() && this.customerGroup != null) {
+            this.customerGroups.add(this.customerGroup);
+        }
+        return this.customerGroups;
+    }
 
     // Backward compatibility accessors
     public com.nbh.erp.customergroup.entity.CustomerGroup getRoute() {

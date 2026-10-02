@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { grnApi, supplierApi, warehouseApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 import {
   FileCheck,
   Plus,
   Search,
   Printer,
   CheckCircle,
-  Trash2,
   RefreshCw,
   RotateCcw,
   X,
@@ -69,6 +70,8 @@ const INITIAL_STAGING_ITEM = {
 };
 
 const GrnView = React.forwardRef(function GrnView(props, ref) {
+  const { user } = useAuth();
+  const canEditGrn = canEditModule(user, 'GRN');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [grns, setGrns] = useState([]);
@@ -520,6 +523,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const handleEditGrn = async (g) => {
+    if (!canEditGrn) {
+      addToast('Permission denied: Only permissible staff can edit GRNs', 'error');
+      return;
+    }
     if (g.status === 'PROCESSED') {
       addToast(`GRN ${g.grnNumber} is already processed and posted to inventory. Cannot be modified.`, 'info');
       handleInspectGrn(g.id);
@@ -564,23 +571,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       setShowCreateModal(true);
     } catch (err) {
       addToast('Failed to load GRN for editing: ' + err.message, 'error');
-    }
-  };
-
-  const handleDeleteDraftGrn = async (g) => {
-    if (g.status !== 'DRAFT') {
-      addToast('Only un-processed draft GRNs can be deleted.', 'warning');
-      return;
-    }
-    if (!window.confirm(`Are you sure you want to delete draft GRN "${g.grnNumber}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      await grnApi.delete(g.id);
-      addToast(`Draft GRN ${g.grnNumber} deleted successfully`, 'success');
-      loadData();
-    } catch (err) {
-      addToast(err.response?.data?.message || err.message || 'Failed to delete draft GRN', 'error');
     }
   };
 
@@ -1223,59 +1213,32 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            {g.status === 'DRAFT' && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditGrn(g);
-                                  }}
-                                  style={{
-                                    width: '30px',
-                                    height: '30px',
-                                    background: '#ffffff',
-                                    border: '1px solid #bae6fd',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#0284c7',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.15s ease',
-                                  }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                                  title="Edit Draft GRN"
-                                >
-                                  <Edit2 size={13} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteDraftGrn(g);
-                                  }}
-                                  style={{
-                                    width: '30px',
-                                    height: '30px',
-                                    background: '#ffffff',
-                                    border: '1px solid #fecdd3',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#e11d48',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.15s ease',
-                                  }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fff1f2')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                                  title="Delete Draft GRN"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </>
+                            {g.status === 'DRAFT' && canEditGrn && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditGrn(g);
+                                }}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                title="Edit Draft GRN"
+                              >
+                                <Edit2 size={13} />
+                              </button>
                             )}
                             <button
                               type="button"
@@ -2076,10 +2039,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(idx)}
-                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
                             title="Remove line"
                           >
-                            <Trash2 size={15} />
+                            <X size={15} />
                           </button>
                         </td>
                       </tr>

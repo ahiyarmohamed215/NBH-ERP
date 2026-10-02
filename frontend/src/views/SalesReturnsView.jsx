@@ -7,7 +7,6 @@ import {
   Search,
   CheckCircle,
   Receipt,
-  Trash2,
   RefreshCw,
   RotateCcw,
   Eye,

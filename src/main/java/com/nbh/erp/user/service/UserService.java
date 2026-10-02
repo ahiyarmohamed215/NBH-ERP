@@ -11,6 +11,7 @@ import com.nbh.erp.user.dto.UpdateUserRequest;
 import com.nbh.erp.user.dto.UserDto;
 import com.nbh.erp.user.entity.User;
 import com.nbh.erp.user.repository.UserRepository;
+import com.nbh.erp.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -79,6 +80,8 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
+        SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(id)) {
@@ -109,6 +112,10 @@ public class UserService {
         }
 
         User updatedUser = userRepository.save(user);
+
+        auditLogService.log("USER_UPDATE", "EMPLOYEES", "User", updatedUser.getUsername(),
+                String.format("Updated employee profile for '%s' (%s)", updatedUser.getFullName(), updatedUser.getUsername()));
+
         return UserDto.from(updatedUser);
     }
 
@@ -116,8 +123,14 @@ public class UserService {
     public void toggleUserActive(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+
+        SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
+
+        auditLogService.log("USER_STATUS", "EMPLOYEES", "User", user.getUsername(),
+                String.format("Set user '%s' active status to %s", user.getUsername(), user.getIsActive()));
     }
 
     @Transactional(readOnly = true)
@@ -130,6 +143,8 @@ public class UserService {
     public UserDto approveUser(Long id, com.nbh.erp.user.dto.ApproveUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+
+        SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
 
         Set<Role> roles = new HashSet<>();
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
@@ -148,6 +163,7 @@ public class UserService {
 
         auditLogService.log(
                 "USER_APPROVE",
+                "EMPLOYEES",
                 "User",
                 user.getUsername(),
                 String.format("User '%s' approved with roles: %s", user.getUsername(), request.getRoles())
@@ -161,6 +177,8 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
+        SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+
         user.setApprovalStatus("REJECTED");
         user.setIsActive(false);
 
@@ -168,6 +186,7 @@ public class UserService {
 
         auditLogService.log(
                 "USER_REJECT",
+                "EMPLOYEES",
                 "User",
                 user.getUsername(),
                 String.format("User '%s' registration rejected", user.getUsername())
@@ -178,19 +197,7 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
-
-        user.setIsActive(false);
-        user.setApprovalStatus("REJECTED");
-        userRepository.save(user);
-
-        auditLogService.log(
-                "USER_DEACTIVATE",
-                "User",
-                user.getUsername(),
-                String.format("User '%s' soft-deleted (deactivated)", user.getUsername())
-        );
+        SecurityUtils.enforceNoDelete("User", id);
     }
 
     @Transactional(readOnly = true)

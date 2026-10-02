@@ -149,10 +149,7 @@ public class ProductStaffQuotaService {
 
     @Transactional
     public void deleteQuota(Long id) {
-        ProductStaffQuota quota = quotaRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("ProductStaffQuota", "id", id));
-        quotaRepository.delete(quota);
-        log.info("Deleted product staff quota ID {}", id);
+        com.nbh.erp.security.SecurityUtils.enforceNoDelete("ProductStaffQuota", id);
     }
 
     @Transactional(readOnly = true)

@@ -1,6 +1,7 @@
 package com.nbh.erp.audit.controller;
 
 import com.nbh.erp.audit.dto.AuditLogDto;
+import com.nbh.erp.audit.dto.DaySummaryDto;
 import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.common.dto.PagedResponse;
@@ -29,10 +30,11 @@ public class AuditLogController {
     private final AuditLogService auditLogService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('AUDIT_VIEW')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('AUDIT_VIEW') or hasAuthority('REPORT_VIEW')")
     @Operation(summary = "Search system audit logs with filters")
     public ResponseEntity<ApiResponse<PagedResponse<AuditLogDto>>> getAuditLogs(
             @RequestParam(required = false) String action,
+            @RequestParam(required = false) String module,
             @RequestParam(required = false) String entityName,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -42,7 +44,17 @@ public class AuditLogController {
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : null;
 
-        PagedResponse<AuditLogDto> response = auditLogService.searchLogs(action, entityName, username, start, end, pageable);
+        PagedResponse<AuditLogDto> response = auditLogService.searchLogs(action, module, entityName, username, start, end, pageable);
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping("/day-summary")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('AUDIT_VIEW') or hasAuthority('REPORT_VIEW')")
+    @Operation(summary = "Get day summary of all activity and actions in the system")
+    public ResponseEntity<ApiResponse<DaySummaryDto>> getDaySummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        DaySummaryDto summary = auditLogService.getDaySummary(date);
+        return ResponseEntity.ok(ApiResponse.ok(summary));
     }
 }

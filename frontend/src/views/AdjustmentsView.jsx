@@ -11,7 +11,6 @@ import {
   RotateCcw,
   Eye,
   X,
-  Trash2,
   Package,
 } from 'lucide-react';
 
@@ -487,13 +486,13 @@ export default function AdjustmentsView() {
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: '#ef4444',
+                            color: '#94a3b8',
                             cursor: 'pointer',
                             padding: '4px',
                           }}
                           title="Remove line"
                         >
-                          <Trash2 size={15} />
+                          <X size={15} />
                         </button>
                       ) : (
                         <div style={{ width: '23px' }} />

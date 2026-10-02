@@ -343,38 +343,27 @@ public class InvoiceService {
             throw new BusinessException("Access denied: You cannot discard a bill placed on hold by another cashier (" + invoice.getCreatedBy() + ")");
         }
 
+        invoice.setStatus("CANCELLED");
+        invoiceRepository.save(invoice);
         auditLogService.log(
-                "INVOICE_HELD_DISCARD",
+                "INVOICE_CANCELLED",
                 "Invoice",
                 invoice.getInvoiceNumber(),
-                String.format("Held invoice %s discarded by %s", invoice.getInvoiceNumber(), currentUser)
+                String.format("Held invoice %s marked as CANCELLED by %s", invoice.getInvoiceNumber(), currentUser)
         );
-        invoiceRepository.delete(invoice);
-        log.info("Held invoice {} (ID {}) discarded and removed from DB successfully.", invoice.getInvoiceNumber(), id);
+        log.info("Held invoice {} (ID {}) cancelled successfully.", invoice.getInvoiceNumber(), id);
     }
 
     public static final Set<String> VALID_STATUSES = InvoiceStatus.NAMES;
 
     @Transactional
     public void deleteInvoice(Long id) {
-        Invoice invoice = invoiceRepository.findById(id).orElse(null);
-        if (invoice != null && ("HELD".equalsIgnoreCase(invoice.getStatus()) || "CANCELLED".equalsIgnoreCase(invoice.getStatus()))) {
-            cancelHeldInvoice(id);
-            return;
-        }
-        log.warn("Direct deletion request for invoice ID {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", id);
-        voidInvoice(id, "Voided via delete endpoint");
+        SecurityUtils.enforceNoDelete("Invoice", id);
     }
 
     @Transactional
     public void deleteInvoiceByNumber(String invoiceNumber) {
-        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber).orElse(null);
-        if (invoice != null && ("HELD".equalsIgnoreCase(invoice.getStatus()) || "CANCELLED".equalsIgnoreCase(invoice.getStatus()))) {
-            cancelHeldInvoice(invoice.getId());
-            return;
-        }
-        log.warn("Direct deletion request for invoice {} intercepted. Voiding invoice instead of hard deleting to preserve financial audit trail.", invoiceNumber);
-        voidInvoiceByNumber(invoiceNumber, "Voided via delete endpoint");
+        SecurityUtils.enforceNoDelete("Invoice", invoiceNumber);
     }
 
     @Transactional
@@ -463,6 +452,7 @@ public class InvoiceService {
     public InvoiceDto updateInvoice(Long id, UpdateInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
+        SecurityUtils.enforceCanEdit("SALES", invoice.getInvoiceNumber());
         return performUpdateInvoice(invoice, request);
     }
 
@@ -470,6 +460,7 @@ public class InvoiceService {
     public InvoiceDto updateInvoiceByNumber(String invoiceNumber, UpdateInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
+        SecurityUtils.enforceCanEdit("SALES", invoice.getInvoiceNumber());
         return performUpdateInvoice(invoice, request);
     }
 
@@ -634,6 +625,13 @@ public class InvoiceService {
         }
 
         Invoice saved = invoiceRepository.save(invoice);
+        auditLogService.log(
+                "INVOICE_UPDATE",
+                "Invoice",
+                saved.getInvoiceNumber(),
+                String.format("Invoice %s updated by %s (Status: %s, Net Total: %s)",
+                        saved.getInvoiceNumber(), getCurrentUsername(), saved.getStatus(), saved.getNetTotal())
+        );
         log.info("Invoice {} (ID {}) updated successfully in DB. Status: {}, Net Total: {}",
                 saved.getInvoiceNumber(), saved.getId(), saved.getStatus(), saved.getNetTotal());
         return InvoiceDto.from(saved);

@@ -21,7 +21,9 @@ import {
   X,
   Printer,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
+import AuditHub from './AuditHub';
 
 const INITIAL_OUTSTANDING_CUSTOMERS = [];
 
@@ -36,6 +38,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
     { id: 'purchase-reports', label: 'Purchase Reports', title: 'Procurement & Supplier Reports', icon: ShoppingCart },
     { id: 'project-reports', label: 'Project Report', title: 'Commercial Project Reports', icon: FolderKanban },
     { id: 'accounting-reports', label: 'Accounting Reports', title: 'Financial Accounting Reports', icon: DollarSign },
+    { id: 'day-summary', label: 'Day Summary & Audit', title: 'Day Summary & System Audit Trail', icon: ShieldCheck },
   ];
 
   const [currentPrimaryTab, setCurrentPrimaryTab] = useState(() => {
@@ -927,7 +930,13 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Customise Ageing Cards */}
+      {/* 7. DAY SUMMARY & SYSTEM AUDIT TRAIL TAB */}
+      {/* ------------------------------------------------------------- */}
+      {currentPrimaryTab === 'day-summary' && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <AuditHub />
+        </div>
+      )}
       {/* ------------------------------------------------------------- */}
       {showAgeingConfigModal && (
         <div

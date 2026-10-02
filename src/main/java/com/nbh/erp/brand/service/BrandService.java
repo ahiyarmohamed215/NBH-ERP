@@ -91,6 +91,8 @@ public class BrandService {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
+        SecurityUtils.enforceCanEdit("PRODUCT", "Brand: " + brand.getName());
+
         brand.setName(request.getName().trim());
         brand.setDescription(request.getDescription());
 
@@ -107,6 +109,8 @@ public class BrandService {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
+        SecurityUtils.enforceCanEdit("PRODUCT", "Brand: " + brand.getName());
+
         brand.setIsActive(!brand.getIsActive());
         brandRepository.save(brand);
         log.info("Brand ID {} active status toggled to {}", id, brand.getIsActive());
@@ -116,14 +120,6 @@ public class BrandService {
 
     @Transactional
     public void deleteBrand(Long id) {
-        Brand brand = brandRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
-
-        // Soft delete (Recommendation 8 & 18)
-        brand.setIsActive(false);
-        brandRepository.save(brand);
-        log.info("Brand ID {} ('{}') soft-deleted by {}", id, brand.getName(), getCurrentUsername());
-        auditLogService.log("BRAND_DELETE", "Brand", brand.getCode(),
-                String.format("Brand '%s' soft-deleted by %s", brand.getName(), getCurrentUsername()));
+        SecurityUtils.enforceNoDelete("Brand", id);
     }
 }

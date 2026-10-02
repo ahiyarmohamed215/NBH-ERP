@@ -7,7 +7,6 @@ import {
   Search,
   Plus,
   Minus,
-  Trash2,
   PauseCircle,
   PlayCircle,
   CheckCircle,
@@ -631,20 +630,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     await loadHeldInvoices();
     setShowHeldModal(false);
     addToast(`Resumed held bill ${heldInv.invoiceNumber}`, 'success');
-  };
-
-  const handleDiscardHeld = async (heldInv) => {
-    if (!window.confirm(`Discard held bill ${heldInv.invoiceNumber}?`)) return;
-    try {
-      if (heldInv.id) {
-        await salesApi.deleteHeld(heldInv.id).catch(() => salesApi.cancelHeld(heldInv.id));
-      }
-      addToast(`Held bill ${heldInv.invoiceNumber} discarded`, 'info');
-      await loadHeldInvoices();
-      loadStaffPerformance();
-    } catch (err) {
-      addToast('Failed to discard held bill: ' + err.message, 'error');
-    }
   };
 
   useEffect(() => {
@@ -1696,11 +1681,11 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       <td style={{ padding: '12px 12px', textAlign: 'center' }}>
                         <button
                           type="button"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           onClick={() => removeFromCart(item.id)}
                           title="Remove item"
                         >
-                          <Trash2 size={14} />
+                          <X size={14} />
                         </button>
                       </td>
                     </tr>
@@ -2464,14 +2449,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           style={{ padding: '4px 8px', fontSize: '0.76rem' }}
                         >
                           <PlayCircle size={12} /> Resume
-                        </button>
-                        <button
-                          className="btn btn-glass btn-sm"
-                          title="Discard held bill"
-                          onClick={() => handleDiscardHeld(held)}
-                          style={{ color: '#ef4444', padding: '4px 7px' }}
-                        >
-                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>

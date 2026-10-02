@@ -8,6 +8,8 @@ import {
   brandApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 import {
   Database,
   Building2,
@@ -22,7 +24,6 @@ import {
   RefreshCw,
   X,
   Eye,
-  Trash2,
   Package,
   Download,
   Award,
@@ -68,9 +69,27 @@ const MastersView = React.forwardRef(function MastersView({
 
   // View Details Modal State
   const [viewingItem, setViewingItem] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
+  const { user } = useAuth();
   const { addToast } = useToast();
+
+  const getTabModule = (tab) => {
+    switch (tab) {
+      case 'products':
+      case 'brands':
+      case 'categories':
+        return 'PRODUCT';
+      case 'warehouses':
+        return 'WAREHOUSE';
+      case 'suppliers':
+        return 'SUPPLIER';
+      case 'customers':
+        return 'CUSTOMER';
+      default:
+        return 'INVENTORY';
+    }
+  };
+  const canEditCurrentTab = canEditModule(user, getTabModule(activeTab));
 
   React.useImperativeHandle(ref, () => ({
     openAdd: handleOpenAdd,
@@ -222,6 +241,10 @@ const MastersView = React.forwardRef(function MastersView({
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (editingItem && !canEditCurrentTab) {
+      addToast('Permission denied: Only authorized staff can edit existing records.', 'error');
+      return;
+    }
     try {
       setSaving(true);
       if (activeTab === 'products') {
@@ -322,6 +345,10 @@ const MastersView = React.forwardRef(function MastersView({
   };
 
   const handleToggleActive = async (id, currentStatus) => {
+    if (!canEditCurrentTab) {
+      addToast('Permission denied: Only authorized staff can change record status.', 'error');
+      return;
+    }
     try {
       if (activeTab === 'products') await productApi.toggleActive(id);
       else if (activeTab === 'brands') await brandApi.toggleActive(id);
@@ -334,29 +361,6 @@ const MastersView = React.forwardRef(function MastersView({
       loadTabData();
     } catch (err) {
       addToast('Status update failed: ' + err.message, 'error');
-    }
-  };
-
-  const handleDelete = async (item) => {
-    const itemName = item.name || item.code || item.sku || 'this record';
-    if (!window.confirm(`Are you sure you want to permanently delete "${itemName}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      setDeletingId(item.id);
-      if (activeTab === 'products') await productApi.delete(item.id);
-      else if (activeTab === 'brands') await brandApi.delete(item.id);
-      else if (activeTab === 'warehouses') await warehouseApi.delete(item.id);
-      else if (activeTab === 'categories') await categoryApi.delete(item.id);
-      else if (activeTab === 'customers') await customerApi.delete(item.id);
-      else if (activeTab === 'suppliers') await supplierApi.delete(item.id);
-
-      addToast(`"${itemName}" deleted successfully`, 'success');
-      loadTabData();
-    } catch (err) {
-      addToast(err.message || 'Delete failed', 'error');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -1070,39 +1074,6 @@ const MastersView = React.forwardRef(function MastersView({
                             >
                               <Edit2 size={13} />
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(p);
-                              }}
-                              disabled={deletingId === p.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#f87171';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete Product"
-                            >
-                              <Trash2 size={13} />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1207,26 +1178,6 @@ const MastersView = React.forwardRef(function MastersView({
                               title="Edit Brand"
                             >
                               <Edit2 size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(b)}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              title="Delete Brand"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -1347,39 +1298,6 @@ const MastersView = React.forwardRef(function MastersView({
                             >
                               <Edit2 size={13} />
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(w);
-                              }}
-                              disabled={deletingId === w.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#f87171';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete Warehouse"
-                            >
-                              <Trash2 size={13} />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1495,39 +1413,6 @@ const MastersView = React.forwardRef(function MastersView({
                               title="Edit Category"
                             >
                               <Edit2 size={13} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(c);
-                              }}
-                              disabled={deletingId === c.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#f87171';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete Category"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
@@ -1654,39 +1539,6 @@ const MastersView = React.forwardRef(function MastersView({
                             >
                               <Edit2 size={13} />
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(c);
-                              }}
-                              disabled={deletingId === c.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#f87171';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete Customer"
-                            >
-                              <Trash2 size={13} />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1807,39 +1659,6 @@ const MastersView = React.forwardRef(function MastersView({
                               title="Edit Supplier"
                             >
                               <Edit2 size={13} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(s);
-                              }}
-                              disabled={deletingId === s.id}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #fecaca',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#dc2626',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#fef2f2';
-                                e.currentTarget.style.borderColor = '#f87171';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#fecaca';
-                              }}
-                              title="Delete Supplier"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>

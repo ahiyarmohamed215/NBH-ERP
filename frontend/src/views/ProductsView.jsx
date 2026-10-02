@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { productApi, categoryApi, brandApi, warehouseApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 import {
   Package,
   Plus,
@@ -11,10 +13,11 @@ import {
   RefreshCw,
   X,
   Eye,
-  Trash2,
 } from 'lucide-react';
 
 export default function ProductsView({ isEmbedded = false }) {
+  const { user } = useAuth();
+  const canEditProduct = canEditModule(user, 'PRODUCT');
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -40,7 +43,6 @@ export default function ProductsView({ isEmbedded = false }) {
 
   // View Details Modal State
   const [viewingProduct, setViewingProduct] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   const { addToast } = useToast();
 
@@ -97,6 +99,10 @@ export default function ProductsView({ isEmbedded = false }) {
   };
 
   const handleOpenEdit = (prod) => {
+    if (!canEditProduct) {
+      addToast('Permission denied: Only permissible staff can edit products', 'error');
+      return;
+    }
     setEditingProduct(prod);
     const matchedWh = warehouses.find((w) => String(w.id) === String(prod.warehouseId || prod.defaultWarehouseId) || w.name === prod.warehouseName) || warehouses[0];
     setFormData({
@@ -114,6 +120,10 @@ export default function ProductsView({ isEmbedded = false }) {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (editingProduct && !canEditProduct) {
+      addToast('Permission denied: Only permissible staff can edit products', 'error');
+      return;
+    }
     if (!formData.sku || !formData.name) {
       addToast('SKU and Product Name are required', 'error');
       return;
@@ -151,28 +161,16 @@ export default function ProductsView({ isEmbedded = false }) {
   };
 
   const handleToggleActive = async (id, currentStatus) => {
+    if (!canEditProduct) {
+      addToast('Permission denied: Only permissible staff can toggle product status', 'error');
+      return;
+    }
     try {
       await productApi.toggleActive(id);
       addToast(`Product status changed to ${currentStatus ? 'Inactive' : 'Active'}`, 'success');
       loadData();
     } catch (err) {
       addToast('Failed to toggle status: ' + err.message, 'error');
-    }
-  };
-
-  const handleDelete = async (p) => {
-    if (!window.confirm(`Are you sure you want to permanently delete product "${p.name}" (${p.sku})? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      setDeletingId(p.id);
-      await productApi.delete(p.id);
-      addToast(`Product "${p.name}" deleted successfully`, 'success');
-      loadData();
-    } catch (err) {
-      addToast(err.message || 'Delete failed', 'error');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -362,9 +360,11 @@ export default function ProductsView({ isEmbedded = false }) {
                             gap: '6px',
                             padding: '5px 10px',
                             transition: 'all 0.15s ease-in-out',
+                            opacity: canEditProduct ? 1 : 0.75,
                           }}
                           onClick={() => handleToggleActive(p.id, active)}
-                          title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                          disabled={!canEditProduct}
+                          title={canEditProduct ? `Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)` : `Status: ${active ? 'Active' : 'Inactive'} (Editing restricted)`}
                         >
                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                           {active ? 'Active' : 'Inactive'}
@@ -379,22 +379,15 @@ export default function ProductsView({ isEmbedded = false }) {
                           >
                             <Eye size={14} /> View
                           </button>
-                          <button
-                            className="btn btn-glass btn-sm"
-                            onClick={() => handleOpenEdit(p)}
-                            title="Edit product"
-                          >
-                            <Edit2 size={14} /> Edit
-                          </button>
-                          <button
-                            className="btn btn-glass btn-sm"
-                            style={{ color: '#dc2626' }}
-                            onClick={() => handleDelete(p)}
-                            disabled={deletingId === p.id}
-                            title="Delete product"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canEditProduct && (
+                            <button
+                              className="btn btn-glass btn-sm"
+                              onClick={() => handleOpenEdit(p)}
+                              title="Edit product"
+                            >
+                              <Edit2 size={14} /> Edit
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -507,17 +500,19 @@ export default function ProductsView({ isEmbedded = false }) {
               <button type="button" className="btn btn-glass" onClick={() => setViewingProduct(null)}>
                 Close
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  const p = viewingProduct;
-                  setViewingProduct(null);
-                  handleOpenEdit(p);
-                }}
-              >
-                <Edit2 size={16} /> Edit Product
-              </button>
+              {canEditProduct && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const p = viewingProduct;
+                    setViewingProduct(null);
+                    handleOpenEdit(p);
+                  }}
+                >
+                  <Edit2 size={16} /> Edit Product
+                </button>
+              )}
             </div>
           </div>
         </div>

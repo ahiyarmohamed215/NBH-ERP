@@ -12,6 +12,7 @@ import ReportsView from './views/ReportsView';
 import AccountingHub from './views/AccountingHub';
 import CustomersHub from './views/CustomersHub';
 import DeliveryHub from './views/DeliveryHub';
+import AuditHub from './views/AuditHub';
 import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
@@ -28,6 +29,7 @@ import {
   Package,
   ChevronRight,
   ShieldAlert,
+  ShieldCheck,
   Lock,
   Maximize,
   Minimize,
@@ -232,6 +234,16 @@ export default function App() {
           { id: 'purchase-reports', label: 'Purchase Reports', permission: 'REPORT_VIEW' },
           { id: 'project-reports', label: 'Project Report', permission: 'REPORT_VIEW' },
           { id: 'accounting-reports', label: 'Accounting Reports', permission: 'REPORT_VIEW' },
+          { id: 'day-summary', label: 'Day Summary & Audit', permission: 'REPORT_VIEW' },
+        ],
+      },
+      {
+        id: 'audit',
+        label: 'Day Summary & Audit',
+        icon: ShieldCheck,
+        permissions: ['REPORT_VIEW', 'AUDIT_VIEW', 'DASHBOARD_VIEW'],
+        subItems: [
+          { id: 'day-summary', label: 'Day Summary & Ledger' },
         ],
       },
     ],
@@ -360,6 +372,9 @@ export default function App() {
     } else if (view === 'reports') {
       setCurrentView('reports');
       setSubTab(sub || 'customer-reports');
+    } else if (view === 'audit' || view === 'day-summary' || view === 'audit-trail') {
+      setCurrentView('audit');
+      setSubTab(sub || 'day-summary');
     } else {
       setCurrentView(view);
       if (sub) setSubTab(sub);
@@ -709,7 +724,16 @@ export default function App() {
               {currentView === 'accounting' && (
                 <AccountingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
               )}
-              {currentView === 'reports' && <ReportsView activeSubTab={subTab} />}
+              {currentView === 'reports' && (
+                subTab === 'day-summary' ? (
+                  <AuditHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+                ) : (
+                  <ReportsView activeSubTab={subTab} />
+                )
+              )}
+              {currentView === 'audit' && (
+                <AuditHub activeSubTab={subTab} onSubTabChange={setSubTab} />
+              )}
             </>
           )}
         </main>

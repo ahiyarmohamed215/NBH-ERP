@@ -8,12 +8,13 @@ import {
   routeApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
 import {
   Users,
   UserCheck,
   Plus,
   Edit2,
-  Trash2,
   Search,
   RefreshCw,
   X,
@@ -47,6 +48,8 @@ import {
 } from 'lucide-react';
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
+  const { user } = useAuth();
+  const canEditCustomer = canEditModule(user, 'CUSTOMER');
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -79,11 +82,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [viewingCustomer, setViewingCustomer] = useState(null);
-  const [deletingCustomerId, setDeletingCustomerId] = useState(null);
-
-  // Simple Deletion Confirmation Modal State
-  const [securityModalData, setSecurityModalData] = useState(null);
-  const [isExecutingDelete, setIsExecutingDelete] = useState(false);
 
   // Customer History State
   const [selectedHistoryCustomerId, setSelectedHistoryCustomerId] = useState('');
@@ -701,6 +699,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Save Customer
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
+    if (editingCustomer && !canEditCustomer) {
+      addToast('Permission denied: Only authorized staff can edit existing customer records.', 'error');
+      return;
+    }
     if (!customerForm.name.trim()) {
       addToast('Customer Name is required', 'error');
       return;
@@ -735,67 +737,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast(err.message || 'Failed to save customer', 'error');
     } finally {
       setSavingCustomer(false);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // High-Security Deletion System
-  // -------------------------------------------------------------
-  const handleInitiateDeleteCustomer = (c) => {
-    setSecurityModalData({
-      type: 'customer',
-      item: c,
-      entityName: c.name,
-      entityCode: c.code || c.customerCode || '—',
-    });
-  };
-
-  const handleInitiateDeleteRoute = (route) => {
-    setSecurityModalData({
-      type: 'route',
-      item: route,
-      entityName: route.name,
-      entityCode: route.id,
-    });
-  };
-
-  const handleDeleteCustomer = (c) => {
-    handleInitiateDeleteCustomer(c);
-  };
-
-  const handleExecuteSecureDelete = async () => {
-    if (!securityModalData) return;
-    try {
-      setIsExecutingDelete(true);
-      if (securityModalData.type === 'customer') {
-        const c = securityModalData.item;
-        setDeletingCustomerId(c.id);
-        await customerApi.delete(c.id);
-        addToast(`Customer "${c.name}" deleted successfully.`, 'success');
-        const cid = String(c.id);
-        setRoutes((prev) => prev.map((r) => ({ ...r, customerIds: (r.customerIds || []).filter((id) => id !== cid) })));
-        if (viewingCustomer?.id === c.id) {
-          setViewingCustomer(null);
-        }
-        loadInitialData();
-      } else if (securityModalData.type === 'route' || securityModalData.type === 'group') {
-        const r = securityModalData.item;
-        if (r.id && !String(r.id).startsWith('route-') && !String(r.id).startsWith('group-')) {
-          await customerGroupApi.delete(r.id);
-        }
-        setRoutes((prev) => prev.filter((route) => route.id !== r.id));
-        addToast(`Customer group "${r.name}" deleted successfully.`, 'success');
-        if (selectedRoute?.id === r.id) {
-          setSelectedRoute(null);
-          setIsCreatingRoute(false);
-        }
-      }
-      setSecurityModalData(null);
-    } catch (err) {
-      addToast('Deletion failed: ' + (err.message || 'Server error'), 'error');
-    } finally {
-      setIsExecutingDelete(false);
-      setDeletingCustomerId(null);
     }
   };
 
@@ -842,6 +783,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   const handleSaveRouteView = async (e) => {
     if (e) e.preventDefault();
+    if (!isCreatingRoute && !canEditCustomer) {
+      addToast('Permission denied: Only authorized staff can edit customer groups.', 'error');
+      return;
+    }
     if (!routeEditForm.name.trim()) {
       addToast('Customer group name is required', 'error');
       return;
@@ -912,11 +857,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     } catch (err) {
       addToast('Error saving customer group: ' + (err.response?.data?.message || err.message), 'error');
     }
-  };
-
-  const handleDeleteCurrentRoute = () => {
-    if (!selectedRoute) return;
-    handleInitiateDeleteRoute(selectedRoute);
   };
 
   // Assigned customers memo for Route View
@@ -1658,29 +1598,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               >
                                 <Edit2 size={13} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleInitiateDeleteCustomer(c);
-                                }}
-                                disabled={deletingCustomerId === c.id}
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  background: '#ffffff',
-                                  border: '1px solid #fecaca',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  color: '#dc2626',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                                title="Delete Customer from Database"
-                              >
-                                <Trash2 size={13} />
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -2194,42 +2111,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     />
                   </div>
                 </div>
-
-                {/* Left Column Delete Button if editing */}
-                {!isCreatingRoute && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={handleDeleteCurrentRoute}
-                      style={{
-                        width: '100%',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '6px',
-                        border: '1px solid #fecaca',
-                        backgroundColor: '#ffffff',
-                        color: '#dc2626',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fef2f2';
-                        e.currentTarget.style.borderColor = '#dc2626';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.borderColor = '#fecaca';
-                      }}
-                    >
-                      <Trash2 size={14} /> Delete this Customer Group
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* RIGHT COLUMN: Assigned Customers Table & Workspace */}
@@ -4399,29 +4280,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const c = viewingCustomer;
-                    setViewingCustomer(null);
-                    handleInitiateDeleteCustomer(c);
-                  }}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #fecaca',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#dc2626',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
-                <button
-                  type="button"
                   onClick={() => setViewingCustomer(null)}
                   style={{
                     background: 'transparent',
@@ -4979,110 +4837,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* ------------------------------------------------------------- */}
-      {/* SIMPLE & USER-FRIENDLY DELETE CONFIRMATION MODAL */}
-      {/* ------------------------------------------------------------- */}
-      {securityModalData && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '440px',
-              padding: '24px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header / Icon */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Trash2 size={20} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                  {securityModalData.type === 'route' ? 'Delete Route' : 'Delete Customer'}
-                </h3>
-                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', lineHeight: 1.5 }}>
-                  Are you sure you want to delete <strong style={{ color: '#0f172a' }}>{securityModalData.entityName}</strong>? This action cannot be undone.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => !isExecutingDelete && setSecurityModalData(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-              <button
-                type="button"
-                disabled={isExecutingDelete}
-                onClick={() => setSecurityModalData(null)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  cursor: isExecutingDelete ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isExecutingDelete}
-                onClick={handleExecuteSecureDelete}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#dc2626',
-                  color: '#ffffff',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  cursor: isExecutingDelete ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-                onMouseEnter={(e) => !isExecutingDelete && (e.currentTarget.style.backgroundColor = '#b91c1c')}
-                onMouseLeave={(e) => !isExecutingDelete && (e.currentTarget.style.backgroundColor = '#dc2626')}
-              >
-                <Trash2 size={15} />
-                {isExecutingDelete ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -77,6 +77,8 @@ public class RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "id", id));
 
+        com.nbh.erp.security.SecurityUtils.enforceCanEdit("ROLE", "Role: " + role.getName());
+
         role.setDescription(request.getDescription());
 
         if (request.getPermissions() != null) {
@@ -95,14 +97,6 @@ public class RoleService {
 
     @Transactional
     public void deleteRole(Long id) {
-        Role role = roleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Role", "id", id));
-
-        if ("ROLE_ADMIN".equalsIgnoreCase(role.getName())) {
-            throw new BusinessException("Cannot delete super administrator role.");
-        }
-
-        roleRepository.delete(role);
-        log.info("Deleted role: {}", role.getName());
+        com.nbh.erp.security.SecurityUtils.enforceNoDelete("Role", id);
     }
 }

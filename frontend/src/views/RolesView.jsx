@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { roleApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
-import { ShieldCheck, Plus, Edit2, Trash2, X, Check, Search, Shield, ChevronRight, Eye } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { canEditModule } from '../utils/permissionUtils';
+import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye } from 'lucide-react';
 
 export default function RolesView() {
+  const { user } = useAuth();
+  const canEditRole = canEditModule(user, 'ROLE');
   const { addToast } = useToast();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
@@ -94,6 +98,10 @@ export default function RolesView() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editingRole && !canEditRole) {
+      addToast('Permission denied: Only authorized staff can edit existing roles.', 'error');
+      return;
+    }
     if (!editingRole && !formData.name.trim()) {
       addToast('Role name is required', 'error');
       return;
@@ -121,17 +129,6 @@ export default function RolesView() {
       addToast(err.message || 'Failed to save role', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async (role) => {
-    if (!window.confirm(`Are you sure you want to delete role "${role.name}"?`)) return;
-    try {
-      await roleApi.delete(role.id);
-      addToast('Role deleted successfully', 'success');
-      fetchData();
-    } catch (err) {
-      addToast(err.message || 'Failed to delete role', 'error');
     }
   };
 
@@ -444,30 +441,6 @@ export default function RolesView() {
                     >
                       <Edit2 size={12} /> Edit
                     </button>
-                    {!isSystemAdmin && (
-                      <button
-                        type="button"
-                        style={{
-                          width: '30px',
-                          height: '30px',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #fecaca',
-                          borderRadius: '5px',
-                          color: '#dc2626',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(role);
-                        }}
-                        title="Delete Role"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -578,31 +551,6 @@ export default function RolesView() {
                 >
                   <Edit2 size={13} /> Edit Permissions
                 </button>
-                {viewingRole.name !== 'ROLE_ADMIN' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const r = viewingRole;
-                      setViewingRole(null);
-                      handleDelete(r);
-                    }}
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #fecaca',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      color: '#dc2626',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setViewingRole(null)}

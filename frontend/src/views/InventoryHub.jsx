@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { canEditModule } from '../utils/permissionUtils';
 import MastersView from './MastersView';
 import {
   warehouseApi,
@@ -21,7 +22,6 @@ import {
   X,
   RefreshCw,
   Eye,
-  Trash2,
   Edit2,
   CheckCircle,
   AlertTriangle,
@@ -56,6 +56,7 @@ const INITIAL_ADJUSTMENTS = [];
 
 export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTabChange, onNavigate }) {
   const { user } = useAuth();
+  const canEditInventory = canEditModule(user, 'INVENTORY');
   const { addToast } = useToast();
   const mastersRef = useRef(null);
 
@@ -256,17 +257,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       addToast('Failed to save staff quota: ' + (err.response?.data?.message || err.message), 'error');
     } finally {
       setSavingQuota(false);
-    }
-  };
-
-  const handleDeleteQuota = async (id, staffName, prodName) => {
-    if (!window.confirm(`Are you sure you want to remove the quota restriction for ${staffName} on ${prodName}?`)) return;
-    try {
-      await staffQuotaApi.delete(id);
-      addToast('Staff quota removed', 'info');
-      await loadQuotas();
-    } catch (err) {
-      addToast('Failed to delete quota: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
@@ -560,14 +550,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       remarks: rec.remarks || '',
     });
     setShowCreateModal(true);
-  };
-
-  const handleDeleteRecord = (rec) => {
-    if (window.confirm(`Are you sure you want to delete adjustment record ${rec.recordNo}?`)) {
-      setAdjustmentRecords((prev) => prev.filter((r) => r.id !== rec.id));
-      addToast(`Adjustment record ${rec.recordNo} deleted successfully.`, 'success');
-      if (viewingRecord?.id === rec.id) setViewingRecord(null);
-    }
   };
 
   const handleSaveRecord = async (e) => {
@@ -1742,40 +1724,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                   e.currentTarget.style.backgroundColor = '#ffffff';
                                   e.currentTarget.style.borderColor = '#cbd5e1';
                                 }}
-                                title="Edit Adjustment"
+                                title={canEditInventory ? "Edit Adjustment" : "View Only (Edit Restricted)"}
+                                disabled={!canEditInventory}
                               >
                                 <Edit2 size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRecord(rec);
-                                }}
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  background: '#ffffff',
-                                  border: '1px solid #fecaca',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  color: '#dc2626',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#fef2f2';
-                                  e.currentTarget.style.borderColor = '#dc2626';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#ffffff';
-                                  e.currentTarget.style.borderColor = '#fecaca';
-                                }}
-                                title="Delete Adjustment"
-                              >
-                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>
@@ -2393,27 +2345,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                 title={q.isActive ? 'Deactivate Quota' : 'Activate Quota'}
                               >
                                 {q.isActive ? <Ban size={13} /> : <CheckCircle size={13} />}
-                              </button>
-
-                              {/* Delete Quota */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteQuota(q.id, q.userFullName || q.username, q.productName)}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #fecaca',
-                                  backgroundColor: '#ffffff',
-                                  color: '#dc2626',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  cursor: 'pointer',
-                                }}
-                                title="Delete Quota Restriction"
-                              >
-                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>

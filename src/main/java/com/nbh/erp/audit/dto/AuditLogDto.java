@@ -26,10 +26,15 @@ public class AuditLogDto {
     private LocalDateTime createdAt;
 
     public static AuditLogDto from(AuditLog al) {
+        String mod = al.getModule();
+        if (mod == null || mod.isBlank()) {
+            mod = com.nbh.erp.audit.service.AuditLogService.inferModule(al.getEntityName());
+        }
+
         return AuditLogDto.builder()
                 .id(al.getId())
                 .action(al.getAction())
-                .module(al.getModule())
+                .module(mod)
                 .entityName(al.getEntityName())
                 .entityId(al.getEntityId())
                 .username(al.getUsername())
