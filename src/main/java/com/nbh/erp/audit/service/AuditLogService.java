@@ -107,7 +107,7 @@ public class AuditLogService {
     }
 
     @Transactional
-    public void log(String action, String entityName, String entityId, String details, String ipAddress) {
+    public void logWithIp(String action, String entityName, String entityId, String details, String ipAddress) {
         log(action, inferModule(entityName), entityName, entityId, details, ipAddress);
     }
 

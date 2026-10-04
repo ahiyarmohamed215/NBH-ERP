@@ -114,10 +114,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Inline Route View state (replaces all popups for Groups & Routes)
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [isCreatingRoute, setIsCreatingRoute] = useState(false);
+  const [routeModalMode, setRouteModalMode] = useState('view'); // 'view' or 'edit'
+  const [groupStatusFilter, setGroupStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
   const [routeEditForm, setRouteEditForm] = useState({
     name: '',
+    routeCode: '',
     description: '',
     salesmanId: '',
+    isActive: true,
     selectedCustomerIds: [],
   });
   const [customerSearchInRoute, setCustomerSearchInRoute] = useState('');
@@ -132,8 +136,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         activeSubTab === 'groups' || activeSubTab === 'routes'
           ? 'groups'
           : activeSubTab === 'history'
-          ? 'history'
-          : 'list'
+            ? 'history'
+            : 'list'
       );
     }
   }, [activeSubTab]);
@@ -224,6 +228,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           groupCode: r.groupCode || r.routeCode || '',
           routeCode: r.groupCode || r.routeCode || '',
           description: r.description || '',
+          isActive: r.isActive !== undefined ? r.isActive : true,
           salesmanId: r.assignedStaffId || r.salesRepId ? String(r.assignedStaffId || r.salesRepId) : '',
           salesmanName: r.assignedStaffName || r.salesRepName || '',
           assignedStaffId: r.assignedStaffId || r.salesRepId ? String(r.assignedStaffId || r.salesRepId) : '',
@@ -251,14 +256,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
     const cObj = customers.find((c) => String(c.id) === cid);
-    const routesByArray = routes.filter((r) => r.customerIds && r.customerIds.includes(cid));
-    const directGroupId = cObj?.customerGroupId || cObj?.routeId;
-    if (directGroupId) {
-      const directRoute = routes.filter((r) => String(r.id) === String(directGroupId));
-      const combined = [...directRoute, ...routesByArray];
-      return Array.from(new Map(combined.map((r) => [r.id, r])).values());
-    }
-    return routesByArray;
+    const routesByArray = routes.filter((r) =>
+      Array.isArray(r.customerIds) && r.customerIds.some((id) => String(id) === cid)
+    );
+    const directGroupIds = [
+      ...(Array.isArray(cObj?.customerGroupIds) ? cObj.customerGroupIds : []),
+      ...(Array.isArray(cObj?.routeIds) ? cObj.routeIds : []),
+      ...(cObj?.customerGroupId ? [cObj.customerGroupId] : []),
+      ...(cObj?.routeId ? [cObj.routeId] : []),
+    ].map(String);
+
+    const directRoutes = routes.filter((r) => directGroupIds.includes(String(r.id)));
+    const combined = [...directRoutes, ...routesByArray];
+    return Array.from(new Map(combined.map((r) => [String(r.id), r])).values());
   };
 
   // Helper for single customer group fallback
@@ -636,18 +646,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     });
   }, [customers, statusFilter, searchTerm, routes]);
 
-  // Filtered Routes based on route search term
+  // Filtered Routes based on route search term and status filter
   const filteredRoutes = useMemo(() => {
+    let list = routes;
+    if (groupStatusFilter === 'active') {
+      list = list.filter((r) => r.isActive !== false);
+    } else if (groupStatusFilter === 'inactive') {
+      list = list.filter((r) => r.isActive === false);
+    }
     const q = routeSearchTerm.trim().toLowerCase();
-    if (!q) return routes;
-    return routes.filter((r) => {
+    if (!q) return list;
+    return list.filter((r) => {
       const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId || r.assignedStaffId));
       const repName = (r.assignedStaffName || r.salesmanName || assignedSalesman?.name || '').toLowerCase();
       const name = (r.name || '').toLowerCase();
+      const code = (r.groupCode || r.routeCode || '').toLowerCase();
       const desc = (r.description || '').toLowerCase();
-      return name.includes(q) || repName.includes(q) || desc.includes(q);
+      return name.includes(q) || code.includes(q) || repName.includes(q) || desc.includes(q);
     });
-  }, [routes, routeSearchTerm, salesmen]);
+  }, [routes, routeSearchTerm, groupStatusFilter, salesmen]);
 
   // Customer Toggle Active
   const handleToggleCustomerActive = async (id, currentStatus) => {
@@ -681,7 +698,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleOpenEditCustomer = (c) => {
     setEditingCustomer(c);
     const assignedRoutes = getCustomerRoutes(c.id);
-    const primaryRouteId = c.routeId ? String(c.routeId) : (assignedRoutes[0]?.id ? String(assignedRoutes[0].id) : '');
+    const assignedGroupIds = (c.customerGroupIds && c.customerGroupIds.length > 0)
+      ? c.customerGroupIds.map(String)
+      : (c.routeIds && c.routeIds.length > 0)
+        ? c.routeIds.map(String)
+        : assignedRoutes.map((r) => String(r.id));
+    const primaryRouteId = assignedGroupIds[0] || (c.routeId ? String(c.routeId) : (c.customerGroupId ? String(c.customerGroupId) : ''));
+
     setCustomerForm({
       code: c.code || c.customerCode || '',
       name: c.name || '',
@@ -691,7 +714,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       address: c.address || '',
       creditLimit: c.creditLimit ? String(c.creditLimit) : '0',
       routeId: primaryRouteId,
-      routeIds: primaryRouteId ? [primaryRouteId] : assignedRoutes.map((r) => String(r.id)),
+      routeIds: assignedGroupIds,
     });
     setShowCustomerModal(true);
   };
@@ -710,6 +733,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
     try {
       setSavingCustomer(true);
+      const selectedGroupIds = (customerForm.routeIds || []).map(Number).filter(Boolean);
+      const primaryGroupId = selectedGroupIds.length > 0 ? selectedGroupIds[0] : (customerForm.routeId ? Number(customerForm.routeId) : null);
+
       const payload = {
         code: customerForm.code.trim().toUpperCase() || undefined,
         customerCode: customerForm.code.trim().toUpperCase() || undefined,
@@ -719,8 +745,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         email: customerForm.email.trim(),
         address: customerForm.address.trim(),
         creditLimit: parseFloat(customerForm.creditLimit) || 0,
-        customerGroupId: customerForm.routeId ? Number(customerForm.routeId) : null,
-        routeId: customerForm.routeId ? Number(customerForm.routeId) : null,
+        customerGroupId: primaryGroupId,
+        routeId: primaryGroupId,
+        customerGroupIds: selectedGroupIds,
+        routeIds: selectedGroupIds,
       };
 
       if (editingCustomer) {
@@ -746,11 +774,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleOpenRouteView = (route) => {
     setSelectedRoute(route);
     setIsCreatingRoute(false);
+    setRouteModalMode('view'); // Show read-only view mode first, not edit mode
     setRouteEditForm({
       name: route.name || route.routeName || '',
-      routeCode: route.routeCode || '',
+      routeCode: route.routeCode || route.groupCode || '',
       description: route.description || '',
-      salesmanId: route.salesmanId || '',
+      salesmanId: route.salesmanId || route.assignedStaffId || '',
+      isActive: route.isActive !== false,
       selectedCustomerIds: route.customerIds ? [...route.customerIds] : [],
     });
     setCustomerSearchInRoute('');
@@ -761,11 +791,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleOpenCreateRouteView = () => {
     setSelectedRoute(null);
     setIsCreatingRoute(true);
+    setRouteModalMode('edit');
     setRouteEditForm({
       name: '',
       routeCode: '',
       description: '',
       salesmanId: '',
+      isActive: true,
       selectedCustomerIds: [],
     });
     setCustomerSearchInRoute('');
@@ -776,9 +808,35 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleCloseRouteView = () => {
     setSelectedRoute(null);
     setIsCreatingRoute(false);
+    setRouteModalMode('view');
     setCustomerSearchInRoute('');
     setShowAssignCustomerModal(false);
     setAssignCustomerSearch('');
+  };
+
+  const handleToggleRouteActive = async (route, e) => {
+    if (e) e.stopPropagation();
+    if (!canEditCustomer) {
+      addToast('Permission denied: Only authorized staff can edit customer groups.', 'error');
+      return;
+    }
+    try {
+      await customerGroupApi.toggleActive(route.id);
+      const nextActive = !Boolean(route.isActive !== false);
+      setRoutes((prev) =>
+        prev.map((r) => (r.id === route.id ? { ...r, isActive: nextActive } : r))
+      );
+      if (selectedRoute && String(selectedRoute.id) === String(route.id)) {
+        setSelectedRoute((prev) => ({ ...prev, isActive: nextActive }));
+        setRouteEditForm((prev) => ({ ...prev, isActive: nextActive }));
+      }
+      addToast(
+        `Customer group "${route.name}" is now ${nextActive ? 'Active' : 'Inactive'}.`,
+        'success'
+      );
+    } catch (err) {
+      addToast('Error toggling status: ' + (err.response?.data?.message || err.message), 'error');
+    }
   };
 
   const handleSaveRouteView = async (e) => {
@@ -803,6 +861,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
       assignedStaffId: staffIdNum,
       salesRepId: staffIdNum,
+      isActive: routeEditForm.isActive !== false,
       customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
     };
 
@@ -819,6 +878,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           groupCode: created.groupCode || created.routeCode || '',
           routeCode: created.groupCode || created.routeCode || '',
           description: created.description || '',
+          isActive: created.isActive !== undefined ? created.isActive : true,
           salesmanId: assignedId ? String(assignedId) : '',
           salesmanName: created.assignedStaffName || created.salesRepName || salesmanName,
           assignedStaffId: assignedId ? String(assignedId) : '',
@@ -827,6 +887,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           createdAt: created.createdAt || new Date().toISOString(),
         };
         setRoutes((prev) => [...prev, normalized]);
+        setSelectedRoute(normalized);
+        setIsCreatingRoute(false);
+        setRouteModalMode('view');
         addToast(`Customer group "${normalized.name}" created successfully!`, 'success');
       } else if (selectedRoute) {
         const res = await customerGroupApi.update(selectedRoute.id, payload);
@@ -840,6 +903,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           groupCode: updated.groupCode || updated.routeCode || '',
           routeCode: updated.groupCode || updated.routeCode || '',
           description: updated.description || '',
+          isActive: updated.isActive !== undefined ? updated.isActive : routeEditForm.isActive,
           salesmanId: assignedId ? String(assignedId) : '',
           salesmanName: updated.assignedStaffName || updated.salesRepName || salesmanName,
           assignedStaffId: assignedId ? String(assignedId) : '',
@@ -850,9 +914,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         setRoutes((prev) =>
           prev.map((r) => (r.id === selectedRoute.id ? normalized : r))
         );
+        setSelectedRoute(normalized);
+        setRouteModalMode('view');
         addToast(`Customer group "${normalized.name}" updated successfully!`, 'success');
       }
-      handleCloseRouteView();
       loadInitialData();
     } catch (err) {
       addToast('Error saving customer group: ' + (err.response?.data?.message || err.message), 'error');
@@ -1131,10 +1196,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           {/* Top Filter & Actions Bar (Fixed / Sticky to Desktop Screen) */}
           <div
             style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
+              padding: '4px 0 12px 0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1165,10 +1227,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '38px',
+                  height: '34px',
                   padding: '0 32px 0 38px',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
@@ -1202,7 +1264,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                   title="Clear search text"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -1214,12 +1276,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
-                  height: '38px',
+                  height: '34px',
                   padding: '0 30px 0 12px',
                   width: '135px',
                   minWidth: '115px',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   fontSize: '0.86rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
@@ -1258,7 +1320,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   type="button"
                   onClick={handleResetFilters}
                   style={{
-                    height: '38px',
+                    height: '34px',
                     padding: '0 12px',
                     borderRadius: '6px',
                     border: '1px solid #e2e8f0',
@@ -1286,10 +1348,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 type="button"
                 onClick={handleExportCSV}
                 style={{
-                  height: '38px',
+                  height: '34px',
                   padding: '0 14px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   color: '#334155',
                   fontSize: '0.84rem',
@@ -1316,7 +1378,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
                 title="Export customers to CSV"
               >
-                <Download size={14} /> Export
+                <Download size={13} /> Export
               </button>
 
               {/* Refresh Customer Records */}
@@ -1324,10 +1386,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 type="button"
                 onClick={loadInitialData}
                 style={{
-                  height: '38px',
+                  height: '34px',
                   padding: '0 14px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   color: '#334155',
                   fontSize: '0.84rem',
@@ -1354,7 +1416,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
                 title="Refresh customer records"
               >
-                <RefreshCw size={14} /> Refresh
+                <RefreshCw size={13} /> Refresh
               </button>
             </div>
           </div>
@@ -1420,82 +1482,82 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </td>
                     </tr>
                   ) : (
-                      filteredCustomers.map((c) => {
-                        const active = isCustomerActive(c);
-                        const code = c.code || c.customerCode;
-                        const assignedRoutes = getCustomerRoutes(c.id);
+                    filteredCustomers.map((c) => {
+                      const active = isCustomerActive(c);
+                      const code = c.code || c.customerCode;
+                      const assignedRoutes = getCustomerRoutes(c.id);
 
-                        return (
-                          <tr
-                            key={c.id}
-                            onClick={() => setViewingCustomer(c)}
-                            style={{
-                              borderBottom: '1px solid #f1f5f9',
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                            title="Click row to view customer profile"
-                          >
-                            <td style={{ padding: '12px 18px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#e0f2fe',
-                                    color: '#0284c7',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontWeight: 600,
-                                    fontSize: '0.8125rem',
-                                    border: '1px solid #bae6fd',
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {(c.name || 'C').slice(0, 1).toUpperCase()}
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => setViewingCustomer(c)}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          title="Click row to view customer profile"
+                        >
+                          <td style={{ padding: '12px 18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#e0f2fe',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 600,
+                                  fontSize: '0.8125rem',
+                                  border: '1px solid #bae6fd',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {(c.name || 'C').slice(0, 1).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem', lineHeight: '1.25' }}>
+                                  {c.name}
                                 </div>
-                                <div>
-                                  <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem', lineHeight: '1.25' }}>
-                                    {c.name}
-                                  </div>
-                                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 500, marginTop: '2px' }}>
-                                    {code || 'NO CODE'}
-                                  </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 500, marginTop: '2px' }}>
+                                  {code || 'NO CODE'}
                                 </div>
                               </div>
-                            </td>
+                            </div>
+                          </td>
 
-                            <td style={{ padding: '12px 14px', color: '#334155', fontWeight: 500, fontSize: '0.84rem' }}>
-                              {assignedRoutes.length > 0 ? (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {assignedRoutes.map((r) => (
-                                    <span
-                                      key={r.id}
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        backgroundColor: '#eff6ff',
-                                        color: '#1d4ed8',
-                                        border: '1px solid #dbeafe',
-                                        borderRadius: '5px',
-                                        padding: '2px 8px',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 500,
-                                        whiteSpace: 'nowrap',
-                                      }}
-                                    >
-                                      <Users size={11} color="#2563eb" /> {r.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Unassigned</span>
-                              )}
-                            </td>
+                          <td style={{ padding: '12px 14px', color: '#334155', fontWeight: 500, fontSize: '0.84rem' }}>
+                            {assignedRoutes.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {assignedRoutes.map((r) => (
+                                  <span
+                                    key={r.id}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      backgroundColor: '#eff6ff',
+                                      color: '#1d4ed8',
+                                      border: '1px solid #dbeafe',
+                                      borderRadius: '5px',
+                                      padding: '2px 8px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 500,
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    <Users size={11} color="#2563eb" /> {r.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Unassigned</span>
+                            )}
+                          </td>
 
                           <td style={{ padding: '12px 14px', color: '#1e293b', fontWeight: 500, fontSize: '0.84rem' }}>
                             {c.contactPerson || '—'}
@@ -1586,7 +1648,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   width: '30px',
                                   height: '30px',
                                   background: '#ffffff',
-                                  border: '1px solid #cbd5e1',
+                                  border: '1px solid #e2e8f0',
                                   borderRadius: '6px',
                                   cursor: 'pointer',
                                   color: '#475569',
@@ -1678,10 +1740,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           {/* Routes Toolbar: Search Input + Export CSV Icon */}
           <div
             style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
+              padding: '4px 0 12px 0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1712,10 +1771,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 onChange={(e) => setRouteSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '38px',
+                  height: '34px',
                   padding: '0 32px 0 38px',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
@@ -1749,21 +1808,50 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                   title="Clear search text"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               )}
             </div>
 
-            {/* Right Controls: Export CSV Icon */}
+            {/* Right Controls: Group Status Filter & Export CSV Icon */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <select
+                value={groupStatusFilter}
+                onChange={(e) => setGroupStatusFilter(e.target.value)}
+                style={{
+                  height: '34px',
+                  padding: '0 28px 0 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.84rem',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  color: '#334155',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 8px center',
+                }}
+              >
+                <option value="all">All Groups</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+
               <button
                 type="button"
                 onClick={handleExportRoutesCSV}
                 style={{
-                  height: '38px',
+                  height: '34px',
                   width: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   padding: 0,
                   color: '#64748b',
@@ -1787,7 +1875,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
                 title="Export customer groups to CSV"
               >
-                <Download size={15} />
+                <Download size={14} />
               </button>
             </div>
           </div>
@@ -1809,125 +1897,184 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 paddingBottom: '16px',
               }}
             >
-            {filteredRoutes.length === 0 ? (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '48px 20px',
-                  color: '#64748b',
-                  backgroundColor: '#ffffff',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.875rem',
-                }}
-              >
-                No customer groups found matching current search.
-              </div>
-            ) : (
-              filteredRoutes.map((route) => {
-              const count = route.customerIds?.length || 0;
-              const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.assignedStaffId || route.salesmanId));
-              const repName = route.assignedStaffName || route.salesmanName || assignedSalesman?.name;
-
-              return (
+              {filteredRoutes.length === 0 ? (
                 <div
-                  key={route.id}
-                  onClick={() => handleOpenRouteView(route)}
                   style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    padding: '48px 20px',
+                    color: '#64748b',
                     backgroundColor: '#ffffff',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    padding: '16px 18px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                    minHeight: '140px',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#0284c7';
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(2, 132, 199, 0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                    fontSize: '0.875rem',
                   }}
                 >
-                  <div>
-                    {/* Card Top: Route Name & User Count Badge */}
+                  No customer groups found matching current search.
+                </div>
+              ) : (
+                filteredRoutes.map((route) => {
+                  const count = route.customerIds?.length || 0;
+                  const assignedSalesman = salesmen.find((s) => String(s.id) === String(route.assignedStaffId || route.salesmanId));
+                  const repName = route.assignedStaffName || route.salesmanName || assignedSalesman?.name;
+                  const isGroupActive = route.isActive !== false;
+
+                  return (
                     <div
+                      key={route.id}
+                      onClick={() => handleOpenRouteView(route)}
                       style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        padding: '16px 18px',
                         display: 'flex',
+                        flexDirection: 'column',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '6px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                        minHeight: '140px',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#0284c7';
+                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(2, 132, 199, 0.12)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
                       }}
                     >
-                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                        {route.name}
-                      </h3>
+                      <div>
+                        {/* Card Top: Route Name & Status / Count Badges */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '8px',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <div>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 3px 0' }}>
+                              {route.name}
+                            </h3>
+                            {(route.groupCode || route.routeCode) && (
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                {route.groupCode || route.routeCode}
+                              </span>
+                            )}
+                          </div>
 
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            {/* Status Badge */}
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
+                                color: isGroupActive ? '#15803d' : '#b91c1c',
+                                border: `1px solid ${isGroupActive ? '#bbf7d0' : '#fecaca'}`,
+                              }}
+                            >
+                              {isGroupActive ? '● Active' : '○ Inactive'}
+                            </span>
+
+                            {/* Customer Count */}
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                backgroundColor: '#f0f9ff',
+                                color: '#0284c7',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '9999px',
+                                padding: '2px 8px',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                              }}
+                            >
+                              <Users size={11} />
+                              {count}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                          {route.description || 'No description added'}
+                        </p>
+
+                        {/* Responsible Staff */}
+                        <p
+                          style={{
+                            color: repName ? '#0369a1' : '#64748b',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            margin: '0 0 12px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <UserCheck size={13} color={repName ? '#0284c7' : '#94a3b8'} />
+                          {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
+                        </p>
+                      </div>
+
+                      {/* Card Footer: View link & Active/Deactivate Button */}
                       <div
                         style={{
-                          display: 'inline-flex',
+                          display: 'flex',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          gap: '4px',
-                          backgroundColor: '#f0f9ff',
-                          color: '#0284c7',
-                          border: '1px solid #bae6fd',
-                          borderRadius: '9999px',
-                          padding: '2px 8px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
+                          paddingTop: '10px',
+                          borderTop: '1px solid #f1f5f9',
                         }}
                       >
-                        <Users size={12} />
-                        {count} customer{count === 1 ? '' : 's'}
+                        <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Eye size={13} /> View Group Details →
+                        </span>
+
+                        {/* Active / Deactivate Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleRouteActive(route, e)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: isGroupActive ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                            backgroundColor: isGroupActive ? '#fff1f2' : '#f0fdf4',
+                            color: isGroupActive ? '#be123c' : '#15803d',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isGroupActive ? '#fee2e2' : '#dcfce7';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = isGroupActive ? '#fff1f2' : '#f0fdf4';
+                          }}
+                          title={isGroupActive ? 'Click to deactivate this group' : 'Click to activate this group'}
+                        >
+                          {isGroupActive ? 'Deactivate' : 'Activate'}
+                        </button>
                       </div>
                     </div>
-
-                    {/* Description */}
-                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0' }}>
-                      {route.description || 'No description added'}
-                    </p>
-
-                    {/* Responsible Staff */}
-                    <p
-                      style={{
-                        color: repName ? '#0369a1' : '#64748b',
-                        fontSize: '0.8rem',
-                        fontWeight: 500,
-                        margin: '0 0 12px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
-                      {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
-                    </p>
-                  </div>
-
-                  {/* Card Footer: count & Manage link (Delete icon removed as requested) */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingTop: '10px',
-                      borderTop: '1px solid #f1f5f9',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      Manage Customer Group →
-                    </span>
-                  </div>
-                </div>
-              );
-            }))}
+                  );
+                }))}
             </div>
           </div>
         </div>
@@ -1948,7 +2095,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               maxWidth: '1040px',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e2e8f0',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               height: 'min(640px, 86vh)',
               display: 'flex',
@@ -1957,452 +2104,980 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div
-              style={{
-                padding: '14px 22px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
-                  {isCreatingRoute ? 'Create Customer Group' : `Manage Customer Group: ${routeEditForm.name}`}
-                </h3>
-                <span
+            {/* ------------------------------------------------------------- */}
+            {/* VIEW MODE: Read-Only Group View with "Update Group" button    */}
+            {/* ------------------------------------------------------------- */}
+            {routeModalMode === 'view' && !isCreatingRoute ? (
+              <>
+                {/* View Mode Header */}
+                <div
                   style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    backgroundColor: '#f0f9ff',
-                    color: '#0284c7',
-                    border: '1px solid #bae6fd',
-                    padding: '2px 8px',
-                    borderRadius: '9999px',
+                    padding: '14px 22px',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#ffffff',
+                    flexShrink: 0,
                   }}
                 >
-                  {routeEditForm.selectedCustomerIds.length} Assigned
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseRouteView}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                      {selectedRoute?.name}
+                    </h3>
+                    {(selectedRoute?.groupCode || selectedRoute?.routeCode) && (
+                      <span
+                        style={{
+                          fontSize: '0.74rem',
+                          fontFamily: 'monospace',
+                          backgroundColor: '#f1f5f9',
+                          color: '#475569',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {selectedRoute?.groupCode || selectedRoute?.routeCode}
+                      </span>
+                    )}
 
-            {/* Modal Body: Split into Two Columns */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(280px, 340px) 1fr',
-                gap: '20px',
-                padding: '18px 22px',
-                overflow: 'hidden',
-                flex: 1,
-                minHeight: 0,
-              }}
-            >
-              {/* LEFT COLUMN: Text Fields & Settings (Sticky/Fixed - No Scroll) */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '14px',
-                  overflowY: 'auto',
-                }}
-              >
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
-                    Customer Group Details
-                  </div>
-
-                  {/* Route Name Input */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Customer Group Name *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Wholesale Tier A, Corporate Accounts"
-                      value={routeEditForm.name}
-                      onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
-                      style={{
-                        width: '100%',
-                        height: '38px',
-                        padding: '0 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
-                        backgroundColor: '#ffffff',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-
-                  {/* Responsible Staff Dropdown */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Assigned Staff Member
-                    </label>
-                    <select
-                      value={routeEditForm.salesmanId}
-                      onChange={(e) => setRouteEditForm({ ...routeEditForm, salesmanId: e.target.value })}
-                      style={{
-                        width: '100%',
-                        height: '38px',
-                        padding: '0 28px 0 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
-                        backgroundColor: '#ffffff',
-                        boxSizing: 'border-box',
-                        appearance: 'none',
-                        backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'right 10px center',
-                      }}
-                    >
-                      <option value="">None (Unassigned)</option>
-                      {salesmen.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} {s.role ? `— ${s.role}` : (s.salesmanCode ? `(${s.salesmanCode})` : '')}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Description Input */}
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Group Description / Notes
-                    </label>
-                    <textarea
-                      rows="3"
-                      placeholder="e.g. Group of wholesale and corporate client accounts"
-                      value={routeEditForm.description}
-                      onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.86rem',
-                        backgroundColor: '#ffffff',
-                        boxSizing: 'border-box',
-                        resize: 'vertical',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN: Assigned Customers Table & Workspace */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  minHeight: 0,
-                  height: '100%',
-                }}
-              >
-                {/* Top Row: Small Route Summary on Table Side & Assign Customer Button */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                  {/* Small Route Summary */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
-                      Group Summary:
-                    </span>
+                    {/* Status Badge */}
                     <span
                       style={{
                         fontSize: '0.74rem',
                         fontWeight: 700,
-                        backgroundColor: '#f0f9ff',
-                        color: '#0284c7',
-                        padding: '2px 8px',
+                        padding: '2px 9px',
                         borderRadius: '9999px',
-                        border: '1px solid #bae6fd',
+                        backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                        color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                        border: `1px solid ${selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
                       }}
                     >
-                      {routeEditForm.selectedCustomerIds.length} Assigned Customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'}
+                      {selectedRoute?.isActive !== false ? '● Active' : '○ Inactive'}
+                    </span>
+
+                    {/* Fast Activate / Deactivate button in Header */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
+                      style={{
+                        padding: '3px 10px',
+                        borderRadius: '5px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        border: selectedRoute?.isActive !== false ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                        backgroundColor: selectedRoute?.isActive !== false ? '#fff1f2' : '#f0fdf4',
+                        color: selectedRoute?.isActive !== false ? '#be123c' : '#15803d',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title={selectedRoute?.isActive !== false ? 'Click to deactivate this group' : 'Click to activate this group'}
+                    >
+                      {selectedRoute?.isActive !== false ? 'Deactivate' : 'Activate'}
+                    </button>
+
+                    {/* Count */}
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        border: '1px solid #bae6fd',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                      }}
+                    >
+                      {assignedCustomerList.length} Assigned Customer{assignedCustomerList.length === 1 ? '' : 's'}
                     </span>
                   </div>
 
-                  {/* Assign Customer Button (Opens Small Popup) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Top Update Group Button */}
+                    {canEditCustomer && (
+                      <button
+                        type="button"
+                        onClick={() => setRouteModalMode('edit')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                        title="Click to update/edit this customer group"
+                      >
+                        <Edit2 size={13} /> Update Group
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleCloseRouteView}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#64748b',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Close"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* View Mode Body */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(280px, 340px) 1fr',
+                    gap: '20px',
+                    padding: '18px 22px',
+                    overflow: 'hidden',
+                    flex: 1,
+                    minHeight: 0,
+                  }}
+                >
+                  {/* Left Column: Read-Only Info Card */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', marginBottom: '14px' }}>
+                        Customer Group Details
+                      </div>
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Group Name
+                        </div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
+                          {selectedRoute?.name}
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Group Code
+                        </div>
+                        <div style={{ fontSize: '0.86rem', color: '#334155', fontFamily: 'monospace', marginTop: '2px' }}>
+                          {selectedRoute?.groupCode || selectedRoute?.routeCode || 'Auto-generated'}
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Status
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              padding: '2px 9px',
+                              borderRadius: '9999px',
+                              backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                              color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                              border: `1px solid ${selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca'}`,
+                            }}
+                          >
+                            {selectedRoute?.isActive !== false ? '● Active' : '○ Inactive / Deactivated'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Assigned Staff Member
+                        </div>
+                        <div style={{ fontSize: '0.86rem', color: '#0369a1', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <UserCheck size={13} />
+                          {selectedRoute?.assignedStaffName || selectedRoute?.salesmanName || 'No staff assigned'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Description / Notes
+                        </div>
+                        <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '3px', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                          {selectedRoute?.description || 'No description added.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Assigned Customers List */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      minHeight: 0,
+                      height: '100%',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                        Assigned Customers ({assignedCustomerList.length})
+                      </span>
+                    </div>
+
+                    {/* Search in Assigned Customers */}
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <Search
+                        size={13}
+                        style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '10px',
+                          color: '#94a3b8',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search assigned customers..."
+                        value={customerSearchInRoute}
+                        onChange={(e) => setCustomerSearchInRoute(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '34px',
+                          padding: '0 28px 0 30px',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '0.82rem',
+                          backgroundColor: '#ffffff',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {customerSearchInRoute && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomerSearchInRoute('')}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '8px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            padding: 0,
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Table of Assigned Customers */}
+                    <div
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        backgroundColor: '#ffffff',
+                        flex: 1,
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      <div style={{ flex: 1, overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
+                            <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {assignedCustomerList.length === 0 ? (
+                              <tr>
+                                <td colSpan="3" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                    <Users size={28} color="#cbd5e1" />
+                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                      {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                      {customerSearchInRoute
+                                        ? 'Try adjusting your search query.'
+                                        : 'Click the "Update Group" button below to add customers to this group.'}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              assignedCustomerList.map((c) => (
+                                <tr
+                                  key={c.id}
+                                  style={{ borderBottom: '1px solid #f1f5f9' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                >
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div
+                                        style={{
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '50%',
+                                          backgroundColor: '#e0f2fe',
+                                          color: '#0284c7',
+                                          border: '1px solid #bae6fd',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 600,
+                                          fontSize: '0.74rem',
+                                        }}
+                                      >
+                                        {(c.name || 'C').slice(0, 1).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                          {c.code || c.customerCode}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                    <div>{c.contactPerson || '—'}</div>
+                                    {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                                  </td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        padding: '2px 7px',
+                                        borderRadius: '9999px',
+                                        backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
+                                        color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
+                                      }}
+                                    >
+                                      {isCustomerActive(c) ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* View Mode Footer */}
+                <div
+                  style={{
+                    padding: '12px 22px',
+                    borderTop: '1px solid #e2e8f0',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleCloseRouteView}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      color: '#475569',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+
+                  {/* Update Group Action in Footer */}
+                  {canEditCustomer && (
+                    <button
+                      type="button"
+                      onClick={() => setRouteModalMode('edit')}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 20px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: '#0284c7',
+                        color: '#ffffff',
+                        fontSize: '0.86rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                    >
+                      <Edit2 size={14} /> Update Customer Group
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ------------------------------------------------------------- */
+              /* EDIT MODE: Editable Form & Customer Assignment                */
+              /* ------------------------------------------------------------- */
+              <>
+                {/* Edit Mode Header */}
+                <div
+                  style={{
+                    padding: '14px 22px',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#ffffff',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                      {isCreatingRoute ? 'Create Customer Group' : `Update Customer Group: ${routeEditForm.name || selectedRoute?.name}`}
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        border: '1px solid #bae6fd',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                      }}
+                    >
+                      {routeEditForm.selectedCustomerIds.length} Assigned
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {selectedRoute && (
+                      <button
+                        type="button"
+                        onClick={() => setRouteModalMode('view')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '5px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                          backgroundColor: '#ffffff',
+                          color: '#475569',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <ArrowLeft size={13} /> Back to View
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCloseRouteView}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#64748b',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Close"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Edit Mode Body */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(280px, 340px) 1fr',
+                    gap: '20px',
+                    padding: '18px 22px',
+                    overflow: 'hidden',
+                    flex: 1,
+                    minHeight: 0,
+                  }}
+                >
+                  {/* Left Column: Form Fields */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
+                        Customer Group Details
+                      </div>
+
+                      {/* Route Name Input */}
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                          Customer Group Name *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Wholesale Tier A, Corporate Accounts"
+                          value={routeEditForm.name}
+                          onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
+                          style={{
+                            width: '100%',
+                            height: '34px',
+                            padding: '0 12px',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.88rem',
+                            backgroundColor: '#ffffff',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      {/* Responsible Staff Dropdown */}
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                          Assigned Staff Member
+                        </label>
+                        <select
+                          value={routeEditForm.salesmanId}
+                          onChange={(e) => setRouteEditForm({ ...routeEditForm, salesmanId: e.target.value })}
+                          style={{
+                            width: '100%',
+                            height: '34px',
+                            padding: '0 28px 0 12px',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.88rem',
+                            backgroundColor: '#ffffff',
+                            boxSizing: 'border-box',
+                            appearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 10px center',
+                          }}
+                        >
+                          <option value="">None (Unassigned)</option>
+                          {salesmen.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} {s.role ? `— ${s.role}` : (s.salesmanCode ? `(${s.salesmanCode})` : '')}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Active / Inactive Status Selector */}
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                          Status (Active / Inactive)
+                        </label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setRouteEditForm({ ...routeEditForm, isActive: true })}
+                            style={{
+                              flex: 1,
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: routeEditForm.isActive !== false ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                              backgroundColor: routeEditForm.isActive !== false ? '#f0fdf4' : '#ffffff',
+                              color: routeEditForm.isActive !== false ? '#15803d' : '#64748b',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            ● Active
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRouteEditForm({ ...routeEditForm, isActive: false })}
+                            style={{
+                              flex: 1,
+                              padding: '7px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.82rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: routeEditForm.isActive === false ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                              backgroundColor: routeEditForm.isActive === false ? '#fff1f2' : '#ffffff',
+                              color: routeEditForm.isActive === false ? '#b91c1c' : '#64748b',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            ○ Inactive
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Description Input */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                          Group Description / Notes
+                        </label>
+                        <textarea
+                          rows="3"
+                          placeholder="e.g. Group of wholesale and corporate client accounts"
+                          value={routeEditForm.description}
+                          onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.86rem',
+                            backgroundColor: '#ffffff',
+                            boxSizing: 'border-box',
+                            resize: 'vertical',
+                            fontFamily: 'inherit',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Customer Management with Assign and Remove */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      minHeight: 0,
+                      height: '100%',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                          Customer Members:
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            backgroundColor: '#f0f9ff',
+                            color: '#0284c7',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            border: '1px solid #bae6fd',
+                          }}
+                        >
+                          {routeEditForm.selectedCustomerIds.length} Assigned
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAssignCustomerModal(true);
+                          setAssignCustomerSearch('');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '0 14px',
+                          height: '34px',
+                          borderRadius: '6px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontSize: '0.84rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                          transition: 'background-color 0.15s ease',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                      >
+                        <Plus size={13} /> Assign Customer
+                      </button>
+                    </div>
+
+                    {/* Table Side Search */}
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <Search
+                        size={13}
+                        style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '10px',
+                          color: '#94a3b8',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search assigned customers..."
+                        value={customerSearchInRoute}
+                        onChange={(e) => setCustomerSearchInRoute(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '34px',
+                          padding: '0 28px 0 30px',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '0.82rem',
+                          backgroundColor: '#ffffff',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {customerSearchInRoute && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomerSearchInRoute('')}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '8px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            padding: 0,
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Assigned Customers Table with Remove button */}
+                    <div
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        backgroundColor: '#ffffff',
+                        flex: 1,
+                        minHeight: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      <div style={{ flex: 1, overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
+                            <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
+                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                              <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {assignedCustomerList.length === 0 ? (
+                              <tr>
+                                <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                    <Users size={28} color="#cbd5e1" />
+                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                      {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                      {customerSearchInRoute
+                                        ? 'Try adjusting your search query above.'
+                                        : 'Click the "Assign Customer" button above to search and assign customers.'}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              assignedCustomerList.map((c) => (
+                                <tr
+                                  key={c.id}
+                                  style={{ borderBottom: '1px solid #f1f5f9' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                >
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div
+                                        style={{
+                                          width: '26px',
+                                          height: '26px',
+                                          borderRadius: '50%',
+                                          backgroundColor: '#e0f2fe',
+                                          color: '#0284c7',
+                                          border: '1px solid #bae6fd',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 600,
+                                          fontSize: '0.74rem',
+                                        }}
+                                      >
+                                        {(c.name || 'C').slice(0, 1).toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                          {c.code || c.customerCode}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                    <div>{c.contactPerson || '—'}</div>
+                                    {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                                  </td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        padding: '2px 7px',
+                                        borderRadius: '9999px',
+                                        backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
+                                        color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
+                                      }}
+                                    >
+                                      {isCustomerActive(c) ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRouteEditForm({
+                                          ...routeEditForm,
+                                          selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                                        });
+                                      }}
+                                      style={{
+                                        border: 'none',
+                                        backgroundColor: 'transparent',
+                                        color: '#dc2626',
+                                        cursor: 'pointer',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 600,
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
+                                      }}
+                                      title="Remove customer from group"
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Edit Mode Footer */}
+                <div
+                  style={{
+                    padding: '12px 22px',
+                    borderTop: '1px solid #e2e8f0',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '10px',
+                    flexShrink: 0,
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => {
-                      setShowAssignCustomerModal(true);
-                      setAssignCustomerSearch('');
+                      if (selectedRoute) {
+                        setRouteModalMode('view');
+                      } else {
+                        handleCloseRouteView();
+                      }
                     }}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      color: '#475569',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveRouteView}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
-                      padding: '0 14px',
-                      height: '34px',
+                      padding: '8px 20px',
                       borderRadius: '6px',
+                      border: 'none',
                       backgroundColor: '#0284c7',
                       color: '#ffffff',
-                      border: 'none',
-                      fontSize: '0.84rem',
+                      fontSize: '0.86rem',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                       transition: 'background-color 0.15s ease',
-                      whiteSpace: 'nowrap',
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                   >
-                    <Plus size={14} /> Assign Customer
+                    <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Update Customer Group'}
                   </button>
                 </div>
-
-                {/* Table Side Search with Small Icon */}
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <Search
-                    size={14}
-                    style={{
-                      position: 'absolute',
-                      left: '10px',
-                      top: '10px',
-                      color: '#94a3b8',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search assigned customers..."
-                    value={customerSearchInRoute}
-                    onChange={(e) => setCustomerSearchInRoute(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '34px',
-                      padding: '0 28px 0 30px',
-                      borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.82rem',
-                      backgroundColor: '#ffffff',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  {customerSearchInRoute && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomerSearchInRoute('')}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#94a3b8',
-                        padding: 0,
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Assigned Customers Table Container (Only Data Rows Scroll, Header is Sticky) */}
-                <div
-                  style={{
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    backgroundColor: '#ffffff',
-                    flex: 1,
-                    minHeight: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
-                        <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {assignedCustomerList.length === 0 ? (
-                          <tr>
-                            <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                                <Users size={28} color="#cbd5e1" />
-                                <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
-                                  {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
-                                </div>
-                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                                  {customerSearchInRoute
-                                    ? 'Try adjusting your search query above.'
-                                    : 'Click the "Assign Customer" button above to search and assign customers.'}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          assignedCustomerList.map((c) => (
-                            <tr
-                              key={c.id}
-                              style={{ borderBottom: '1px solid #f1f5f9' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                            >
-                              <td style={{ padding: '8px 12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div
-                                    style={{
-                                      width: '26px',
-                                      height: '26px',
-                                      borderRadius: '50%',
-                                      backgroundColor: '#e0f2fe',
-                                      color: '#0284c7',
-                                      border: '1px solid #bae6fd',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontWeight: 600,
-                                      fontSize: '0.74rem',
-                                    }}
-                                  >
-                                    {(c.name || 'C').slice(0, 1).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
-                                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
-                                      {c.code || c.customerCode}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: '8px 12px', color: '#334155' }}>
-                                <div>{c.contactPerson || '—'}</div>
-                                {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
-                              </td>
-                              <td style={{ padding: '8px 12px' }}>
-                                <span
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    fontWeight: 600,
-                                    padding: '2px 7px',
-                                    borderRadius: '9999px',
-                                    backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
-                                    color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
-                                  }}
-                                >
-                                  {isCustomerActive(c) ? 'Active' : 'Inactive'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setRouteEditForm({
-                                      ...routeEditForm,
-                                      selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
-                                    });
-                                  }}
-                                  style={{
-                                    border: 'none',
-                                    backgroundColor: 'transparent',
-                                    color: '#dc2626',
-                                    cursor: 'pointer',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
-                                    padding: '3px 6px',
-                                    borderRadius: '4px',
-                                  }}
-                                  title="Remove customer from group"
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div
-              style={{
-                padding: '12px 22px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                flexShrink: 0,
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleCloseRouteView}
-                style={{
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveRouteView}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 20px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-              >
-                <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Update Customer Group'}
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -2422,7 +3097,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               maxWidth: '520px',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e2e8f0',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
               maxHeight: '80vh',
               display: 'flex',
@@ -2469,7 +3144,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
               <div style={{ position: 'relative' }}>
                 <Search
-                  size={14}
+                  size={13}
                   style={{
                     position: 'absolute',
                     left: '10px',
@@ -2489,7 +3164,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     height: '34px',
                     padding: '0 28px 0 32px',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e2e8f0',
                     fontSize: '0.84rem',
                     backgroundColor: '#ffffff',
                     boxSizing: 'border-box',
@@ -2524,9 +3199,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
               ) : (
                 availableCustomersToAssign.map((c) => {
-                  const isAssigned = routeEditForm.selectedCustomerIds.includes(String(c.id));
+                  const isAssigned = (routeEditForm.selectedCustomerIds || []).some((id) => String(id) === String(c.id));
                   const otherRoutes = routes.filter(
-                    (r) => r.id !== (selectedRoute?.id) && r.customerIds && r.customerIds.includes(String(c.id))
+                    (r) => String(r.id) !== String(selectedRoute?.id) &&
+                      Array.isArray(r.customerIds) &&
+                      r.customerIds.some((id) => String(id) === String(c.id))
                   );
 
                   return (
@@ -2775,7 +3452,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     onFocus={() => setIsCustomerSearchOpen(true)}
                     style={{
                       width: '100%',
-                      height: '38px',
+                      height: '34px',
                       padding: '0 32px 0 36px',
                       borderRadius: '6px',
                       border: isCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
@@ -2808,7 +3485,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                       title="Clear customer selection"
                     >
-                      <X size={15} />
+                      <X size={14} />
                     </button>
                   )}
 
@@ -2824,7 +3501,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         overflowY: 'auto',
                         backgroundColor: '#ffffff',
                         borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e2e8f0',
                         boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06)',
                         zIndex: 100,
                       }}
@@ -2910,7 +3587,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 >
                                   {isCustomerActive(c) ? 'Active' : 'Inactive'}
                                 </span>
-                                {isSelected && <Check size={14} color="#0284c7" />}
+                                {isSelected && <Check size={13} color="#0284c7" />}
                               </div>
                             </div>
                           );
@@ -2927,10 +3604,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       type="button"
                       onClick={() => setViewingCustomer(selectedHistoryCustomer)}
                       style={{
-                        height: '38px',
+                        height: '34px',
                         padding: '0 12px',
                         borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e2e8f0',
                         backgroundColor: '#ffffff',
                         color: '#334155',
                         fontSize: '0.84rem',
@@ -2944,17 +3621,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                       title="View Full Customer Profile"
                     >
-                      <Users size={14} /> Full Profile
+                      <Users size={13} /> Full Profile
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleOpenEditCustomer(selectedHistoryCustomer)}
                       style={{
-                        height: '38px',
+                        height: '34px',
                         padding: '0 12px',
                         borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e2e8f0',
                         backgroundColor: '#ffffff',
                         color: '#334155',
                         fontSize: '0.84rem',
@@ -3147,1006 +3824,991 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </div>
                   </div>
 
-              {/* SUBTABS NAVIGATION (Matches User Screenshot) */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '24px',
-                  borderBottom: '1px solid #e2e8f0',
-                  padding: '0 4px',
-                  marginTop: '4px',
-                  flexShrink: 0,
-                }}
-              >
-                {[
-                  { id: 'invoices', label: `Invoices (${rawCustomerInvoices.length})` },
-                  { id: 'advances', label: `Advance Payments (${rawCustomerAdvances.length})` },
-                  { id: 'payments', label: `Payments (${rawCustomerPayments.length})` },
-                  { id: 'cheques', label: `Cheques (${rawCustomerCheques.length})` },
-                  { id: 'outstanding', label: `Outstanding (${rawCustomerOutstanding.length})` },
-                ].map((tab) => {
-                  const isSel = historyTableTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setHistoryTableTab(tab.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: isSel ? '2.5px solid #0284c7' : '2.5px solid transparent',
-                        padding: '10px 4px',
-                        fontSize: '0.92rem',
-                        fontWeight: isSel ? 700 : 500,
-                        color: isSel ? '#0284c7' : '#64748b',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '-1px',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* TAB 1: INVOICES TABLE (Matches User Screenshot!) */}
-              {historyTableTab === 'invoices' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                  {/* Invoices Toolbar */}
+                  {/* SUBTABS NAVIGATION (Matches User Screenshot) */}
                   <div
                     style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '10px 16px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      flexWrap: 'wrap',
+                      gap: '24px',
+                      borderBottom: '1px solid #e2e8f0',
+                      padding: '0 4px',
+                      marginTop: '4px',
                       flexShrink: 0,
                     }}
                   >
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                      <input
-                        type="text"
-                        placeholder="Search invoice #..."
-                        value={invoiceSearchQuery}
-                        onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 32px 0 38px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.88rem',
-                          outline: 'none',
-                          backgroundColor: '#ffffff',
-                          color: '#0f172a',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                      {invoiceSearchQuery && (
-                        <button type="button" onClick={() => setInvoiceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <select
-                        value={invoiceStatusFilter}
-                        onChange={(e) => setInvoiceStatusFilter(e.target.value)}
-                        style={{
-                          height: '38px',
-                          padding: '0 30px 0 12px',
-                          width: '135px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          color: '#334155',
-                          backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
-                        }}
-                      >
-                        <option value="ALL">All Statuses</option>
-                        <option value="PAID">Paid</option>
-                        <option value="PARTIAL">Partial</option>
-                        <option value="UNPAID">Unpaid</option>
-                      </select>
-
-                      {(invoiceSearchQuery || invoiceStatusFilter !== 'ALL') && (
+                    {[
+                      { id: 'invoices', label: `Invoices (${rawCustomerInvoices.length})` },
+                      { id: 'advances', label: `Advance Payments (${rawCustomerAdvances.length})` },
+                      { id: 'payments', label: `Payments (${rawCustomerPayments.length})` },
+                      { id: 'cheques', label: `Cheques (${rawCustomerCheques.length})` },
+                      { id: 'outstanding', label: `Outstanding (${rawCustomerOutstanding.length})` },
+                    ].map((tab) => {
+                      const isSel = historyTableTab === tab.id;
+                      return (
                         <button
+                          key={tab.id}
                           type="button"
-                          onClick={() => { setInvoiceSearchQuery(''); setInvoiceStatusFilter('ALL'); }}
+                          onClick={() => setHistoryTableTab(tab.id)}
                           style={{
-                            height: '38px',
-                            padding: '0 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            backgroundColor: '#f1f5f9',
-                            color: '#64748b',
-                            fontSize: '0.85rem',
-                            fontWeight: 500,
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: isSel ? '2.5px solid #0284c7' : '2.5px solid transparent',
+                            padding: '10px 4px',
+                            fontSize: '0.92rem',
+                            fontWeight: isSel ? 700 : 500,
+                            color: isSel ? '#0284c7' : '#64748b',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
+                            gap: '6px',
+                            marginBottom: '-1px',
+                            transition: 'all 0.15s ease',
                           }}
                         >
-                          <X size={13} /> Reset
+                          {tab.label}
                         </button>
-                      )}
+                      );
+                    })}
+                  </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleExportTableCSV('invoices')}
+                  {/* TAB 1: INVOICES TABLE (Matches User Screenshot!) */}
+                  {historyTableTab === 'invoices' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
+                      {/* Invoices Toolbar */}
+                      <div
                         style={{
-                          height: '38px',
-                          width: '38px',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          padding: 0,
-                          color: '#64748b',
-                          display: 'inline-flex',
+                          padding: '4px 0 12px 0',
+                          display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          flexWrap: 'wrap',
+                          flexShrink: 0,
                         }}
-                        title="Export invoices to CSV"
                       >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Invoices Table */}
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      width: '100%',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      flex: 1,
-                      minHeight: 0,
-                    }}
-                  >
-                    <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                      <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                            <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>BALANCE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>TAGS</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomerInvoices.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                                <FileText size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                No invoices found for {selectedHistoryCustomer?.name || 'this customer'}.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomerInvoices.map((inv) => {
-                              const bal = Number(inv.balanceAmount || 0);
-                              const isPaid = (inv.status || '').toUpperCase() === 'PAID' || bal === 0;
-                              const isPartial = (inv.status || '').toUpperCase() === 'PARTIAL' || (bal > 0 && Number(inv.paidAmount || 0) > 0);
-                              return (
-                                <tr
-                                  key={inv.id || inv.invoiceNumber}
-                                  style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                >
-                                  <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}>
-                                    {inv.invoiceNumber || inv.id}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                    {inv.displayDate || inv.invoiceDate}
-                                  </td>
-                                  <td style={{ padding: '12px 14px' }}>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
-                                      {inv.paymentType || 'standard'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
-                                    LKR {Number(inv.totalAmount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
-                                    LKR {Number(inv.paidAmount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: bal > 0 ? '#0f172a' : '#64748b' }}>
-                                    LKR {bal.toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '0.74rem',
-                                        fontWeight: 600,
-                                        padding: '2px 8px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: isPaid ? '#dcfce7' : isPartial ? '#e0f2fe' : '#fee2e2',
-                                        color: isPaid ? '#15803d' : isPartial ? '#0284c7' : '#b91c1c',
-                                        border: isPaid ? '1px solid #bbf7d0' : isPartial ? '1px solid #bae6fd' : '1px solid #fecaca',
-                                        textTransform: 'lowercase',
-                                      }}
-                                    >
-                                      {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}
-                                      style={{
-                                        border: '1px solid #cbd5e1',
-                                        backgroundColor: '#ffffff',
-                                        borderRadius: '5px',
-                                        padding: '4px 8px',
-                                        cursor: 'pointer',
-                                        color: '#64748b',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}
-                                      title="View invoice details"
-                                    >
-                                      <Eye size={15} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          <input
+                            type="text"
+                            placeholder="Search invoice #..."
+                            value={invoiceSearchQuery}
+                            onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                            style={{
+                              width: '100%',
+                              height: '34px',
+                              padding: '0 32px 0 38px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.88rem',
+                              outline: 'none',
+                              backgroundColor: '#ffffff',
+                              color: '#0f172a',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          {invoiceSearchQuery && (
+                            <button type="button" onClick={() => setInvoiceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                              <X size={14} />
+                            </button>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                    {/* Table Footer Summary */}
-                    <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>Showing <strong>{filteredCustomerInvoices.length}</strong> of <strong>{rawCustomerInvoices.length}</strong> invoices</span>
-                      <span>Total Invoiced: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerInvoices.reduce((s, i) => s + Number(i.totalAmount || 0), 0).toFixed(2)}</strong></span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                        </div>
 
-              {/* TAB 2: ADVANCE PAYMENTS TABLE */}
-              {historyTableTab === 'advances' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '10px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      flexWrap: 'wrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                      <input
-                        type="text"
-                        placeholder="Search voucher #..."
-                        value={advanceSearchQuery}
-                        onChange={(e) => setAdvanceSearchQuery(e.target.value)}
-                        style={{ width: '100%', height: '38px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                      />
-                      {advanceSearchQuery && (
-                        <button type="button" onClick={() => setAdvanceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <select
+                            value={invoiceStatusFilter}
+                            onChange={(e) => setInvoiceStatusFilter(e.target.value)}
+                            style={{
+                              height: '34px',
+                              padding: '0 30px 0 12px',
+                              width: '135px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              fontFamily: 'inherit',
+                              fontWeight: 500,
+                              color: '#334155',
+                              backgroundColor: '#ffffff',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 10px center',
+                            }}
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="PAID">Paid</option>
+                            <option value="PARTIAL">Partial</option>
+                            <option value="UNPAID">Unpaid</option>
+                          </select>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <select
-                        value={advanceStatusFilter}
-                        onChange={(e) => setAdvanceStatusFilter(e.target.value)}
-                        style={{
-                          height: '38px',
-                          padding: '0 30px 0 12px',
-                          width: '135px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          color: '#334155',
-                          backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
-                        }}
-                      >
-                        <option value="ALL">All Statuses</option>
-                        <option value="ACTIVE">Active</option>
-                        <option value="UTILIZED">Utilized</option>
-                      </select>
-
-                      {(advanceSearchQuery || advanceStatusFilter !== 'ALL') && (
-                        <button
-                          type="button"
-                          onClick={() => { setAdvanceSearchQuery(''); setAdvanceStatusFilter('ALL'); }}
-                          style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <X size={13} /> Reset
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleExportTableCSV('advances')}
-                        style={{ height: '38px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                        title="Export advance payments to CSV"
-                      >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                    <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                      <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                            <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>VOUCHER #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>DEPOSIT AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AVAILABLE BALANCE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomerAdvances.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                                <DollarSign size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                No advance payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomerAdvances.map((adv) => {
-                              const isActive = (adv.status || '').toUpperCase() === 'ACTIVE';
-                              return (
-                                <tr
-                                  key={adv.id || adv.voucherNo}
-                                  style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                >
-                                  <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}>
-                                    {adv.voucherNo || adv.id}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                    {adv.displayDate || adv.date}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
-                                    {adv.paymentMethod || 'Bank Transfer'}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
-                                    LKR {Number(adv.amount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: Number(adv.balance || 0) > 0 ? '#16a34a' : '#64748b' }}>
-                                    LKR {Number(adv.balance || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '0.74rem',
-                                        fontWeight: 600,
-                                        padding: '2px 8px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: isActive ? '#dcfce7' : '#f1f5f9',
-                                        color: isActive ? '#15803d' : '#64748b',
-                                        border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                        textTransform: 'lowercase',
-                                      }}
-                                    >
-                                      {adv.status ? adv.status.toLowerCase() : 'active'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}
-                                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                      title="View advance voucher details"
-                                    >
-                                      <Eye size={15} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })
+                          {(invoiceSearchQuery || invoiceStatusFilter !== 'ALL') && (
+                            <button
+                              type="button"
+                              onClick={() => { setInvoiceSearchQuery(''); setInvoiceStatusFilter('ALL'); }}
+                              style={{
+                                height: '34px',
+                                padding: '0 12px',
+                                borderRadius: '6px',
+                                border: '1px solid #e2e8f0',
+                                backgroundColor: '#f1f5f9',
+                                color: '#64748b',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <X size={13} /> Reset
+                            </button>
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>Showing <strong>{filteredCustomerAdvances.length}</strong> of <strong>{rawCustomerAdvances.length}</strong> advance vouchers</span>
-                      <span>Total Advances: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerAdvances.reduce((s, a) => s + Number(a.amount || 0), 0).toFixed(2)}</strong></span>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* TAB 3: PAYMENTS TABLE */}
-              {historyTableTab === 'payments' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '10px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      flexWrap: 'wrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                      <input
-                        type="text"
-                        placeholder="Search receipt # or invoice #..."
-                        value={paymentSearchQuery}
-                        onChange={(e) => setPaymentSearchQuery(e.target.value)}
-                        style={{ width: '100%', height: '38px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                      />
-                      {paymentSearchQuery && (
-                        <button type="button" onClick={() => setPaymentSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
+                          <button
+                            type="button"
+                            onClick={() => handleExportTableCSV('invoices')}
+                            style={{
+                              height: '34px',
+                              width: '38px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              padding: 0,
+                              color: '#64748b',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                            title="Export invoices to CSV"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <select
-                        value={paymentStatusFilter}
-                        onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                      {/* Invoices Table */}
+                      <div
                         style={{
-                          height: '38px',
-                          padding: '0 30px 0 12px',
-                          width: '135px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          color: '#334155',
                           backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          width: '100%',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          flex: 1,
+                          minHeight: 0,
                         }}
                       >
-                        <option value="ALL">All Statuses</option>
-                        <option value="CLEARED">Cleared</option>
-                        <option value="RECEIVED">Received</option>
-                      </select>
-
-                      {(paymentSearchQuery || paymentStatusFilter !== 'ALL') && (
-                        <button
-                          type="button"
-                          onClick={() => { setPaymentSearchQuery(''); setPaymentStatusFilter('ALL'); }}
-                          style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <X size={13} /> Reset
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleExportTableCSV('payments')}
-                        style={{ height: '38px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                        title="Export payments to CSV"
-                      >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                    <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                      <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                            <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>RECEIPT #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT PAID</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomerPayments.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                                <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                No payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomerPayments.map((pmt) => (
-                              <tr
-                                key={pmt.id || pmt.receiptNo}
-                                style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                              >
-                                <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}>
-                                  {pmt.receiptNo || pmt.id}
-                                </td>
-                                <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                  {pmt.displayDate || pmt.paymentDate}
-                                </td>
-                                <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
-                                  {pmt.invoiceNo || '—'}
-                                </td>
-                                <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
-                                  {pmt.paymentMethod || 'Cash'}
-                                </td>
-                                <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#16a34a' }}>
-                                  LKR {Number(pmt.amount || 0).toFixed(2)}
-                                </td>
-                                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                  <span
-                                    style={{
-                                      fontSize: '0.74rem',
-                                      fontWeight: 600,
-                                      padding: '2px 8px',
-                                      borderRadius: '9999px',
-                                      backgroundColor: '#dcfce7',
-                                      color: '#15803d',
-                                      border: '1px solid #bbf7d0',
-                                      textTransform: 'lowercase',
-                                    }}
-                                  >
-                                    {pmt.status ? pmt.status.toLowerCase() : 'cleared'}
-                                  </span>
-                                </td>
-                                <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}
-                                    style={{ border: '1px solid #cbd5e1', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                    title="View receipt details"
-                                  >
-                                    <Eye size={15} />
-                                  </button>
-                                </td>
+                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>BALANCE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>TAGS</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>Showing <strong>{filteredCustomerPayments.length}</strong> of <strong>{rawCustomerPayments.length}</strong> payment receipts</span>
-                      <span>Total Payments: <strong style={{ color: '#16a34a', fontFamily: 'monospace' }}>LKR {filteredCustomerPayments.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2)}</strong></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: CHEQUES TABLE */}
-              {historyTableTab === 'cheques' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '10px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      flexWrap: 'wrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                      <input
-                        type="text"
-                        placeholder="Search cheque #, bank name..."
-                        value={chequeSearchQuery}
-                        onChange={(e) => setChequeSearchQuery(e.target.value)}
-                        style={{ width: '100%', height: '38px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                      />
-                      {chequeSearchQuery && (
-                        <button type="button" onClick={() => setChequeSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <select
-                        value={chequeStatusFilter}
-                        onChange={(e) => setChequeStatusFilter(e.target.value)}
-                        style={{
-                          height: '38px',
-                          padding: '0 30px 0 12px',
-                          width: '135px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          color: '#334155',
-                          backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
-                        }}
-                      >
-                        <option value="ALL">All Statuses</option>
-                        <option value="CLEARED">Cleared</option>
-                        <option value="PENDING">Pending</option>
-                        <option value="DEPOSITED">Deposited</option>
-                        <option value="BOUNCED">Bounced</option>
-                      </select>
-
-                      {(chequeSearchQuery || chequeStatusFilter !== 'ALL') && (
-                        <button
-                          type="button"
-                          onClick={() => { setChequeSearchQuery(''); setChequeStatusFilter('ALL'); }}
-                          style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <X size={13} /> Reset
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleExportTableCSV('cheques')}
-                        style={{ height: '38px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                        title="Export cheques to CSV"
-                      >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                    <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                      <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                            <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE DATE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>BANK NAME</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE / REF #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomerCheques.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                                <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                No cheques recorded for {selectedHistoryCustomer?.name || 'this customer'}.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomerCheques.map((chq) => {
-                              const st = (chq.status || '').toUpperCase();
-                              const isCleared = st === 'CLEARED';
-                              const isPending = st === 'PENDING';
-                              const isBounced = st === 'BOUNCED';
-                              return (
-                                <tr
-                                  key={chq.id || chq.chequeNo}
-                                  style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                >
-                                  <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}>
-                                    {chq.chequeNo || chq.id}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                    {chq.displayDate || chq.chequeDate}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#0f172a', fontWeight: 500 }}>
-                                    {chq.bankName || '—'}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
-                                    {chq.invoiceNo || '—'}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
-                                    LKR {Number(chq.amount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '0.74rem',
-                                        fontWeight: 600,
-                                        padding: '2px 8px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: isCleared ? '#dcfce7' : isPending ? '#fef3c7' : isBounced ? '#fee2e2' : '#e0f2fe',
-                                        color: isCleared ? '#15803d' : isPending ? '#b45309' : isBounced ? '#b91c1c' : '#0284c7',
-                                        border: isCleared ? '1px solid #bbf7d0' : isPending ? '1px solid #fde68a' : isBounced ? '1px solid #fecaca' : '1px solid #bae6fd',
-                                        textTransform: 'lowercase',
-                                      }}
-                                    >
-                                      {chq.status ? chq.status.toLowerCase() : 'pending'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}
-                                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                      title="View cheque details"
-                                    >
-                                      <Eye size={15} />
-                                    </button>
+                            </thead>
+                            <tbody>
+                              {filteredCustomerInvoices.length === 0 ? (
+                                <tr>
+                                  <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                    <FileText size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                    No invoices found for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
                                 </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                              ) : (
+                                filteredCustomerInvoices.map((inv) => {
+                                  const bal = Number(inv.balanceAmount || 0);
+                                  const isPaid = (inv.status || '').toUpperCase() === 'PAID' || bal === 0;
+                                  const isPartial = (inv.status || '').toUpperCase() === 'PARTIAL' || (bal > 0 && Number(inv.paidAmount || 0) > 0);
+                                  return (
+                                    <tr
+                                      key={inv.id || inv.invoiceNumber}
+                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                    >
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}>
+                                        {inv.invoiceNumber || inv.id}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                        {inv.displayDate || inv.invoiceDate}
+                                      </td>
+                                      <td style={{ padding: '12px 14px' }}>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
+                                          {inv.paymentType || 'standard'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                        LKR {Number(inv.totalAmount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
+                                        LKR {Number(inv.paidAmount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: bal > 0 ? '#0f172a' : '#64748b' }}>
+                                        LKR {bal.toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <span
+                                          style={{
+                                            fontSize: '0.74rem',
+                                            fontWeight: 600,
+                                            padding: '2px 8px',
+                                            borderRadius: '9999px',
+                                            backgroundColor: isPaid ? '#dcfce7' : isPartial ? '#e0f2fe' : '#fee2e2',
+                                            color: isPaid ? '#15803d' : isPartial ? '#0284c7' : '#b91c1c',
+                                            border: isPaid ? '1px solid #bbf7d0' : isPartial ? '1px solid #bae6fd' : '1px solid #fecaca',
+                                            textTransform: 'lowercase',
+                                          }}
+                                        >
+                                          {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}
+                                          style={{
+                                            border: '1px solid #e2e8f0',
+                                            backgroundColor: '#ffffff',
+                                            borderRadius: '5px',
+                                            padding: '4px 8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                          }}
+                                          title="View invoice details"
+                                        >
+                                          <Eye size={14} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        {/* Table Footer Summary */}
+                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>Showing <strong>{filteredCustomerInvoices.length}</strong> of <strong>{rawCustomerInvoices.length}</strong> invoices</span>
+                          <span>Total Invoiced: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerInvoices.reduce((s, i) => s + Number(i.totalAmount || 0), 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>Showing <strong>{filteredCustomerCheques.length}</strong> of <strong>{rawCustomerCheques.length}</strong> cheques</span>
-                      <span>Total Cheques Amount: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerCheques.reduce((s, c) => s + Number(c.amount || 0), 0).toFixed(2)}</strong></span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {/* TAB 5: OUTSTANDING PAYMENTS TABLE */}
-              {historyTableTab === 'outstanding' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '10px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      flexWrap: 'wrap',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                      <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                      <input
-                        type="text"
-                        placeholder="Search outstanding invoice #..."
-                        value={outstandingSearchQuery}
-                        onChange={(e) => setOutstandingSearchQuery(e.target.value)}
-                        style={{ width: '100%', height: '38px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                      />
-                      {outstandingSearchQuery && (
-                        <button type="button" onClick={() => setOutstandingSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <select
-                        value={outstandingStatusFilter}
-                        onChange={(e) => setOutstandingStatusFilter(e.target.value)}
+                  {/* TAB 2: ADVANCE PAYMENTS TABLE */}
+                  {historyTableTab === 'advances' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
+                      <div
                         style={{
-                          height: '38px',
-                          padding: '0 30px 0 12px',
-                          width: '135px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          color: '#334155',
-                          backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
+                          padding: '4px 0 12px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          flexWrap: 'wrap',
+                          flexShrink: 0,
                         }}
                       >
-                        <option value="ALL">All Statuses</option>
-                        <option value="PARTIAL">Partial</option>
-                        <option value="UNPAID">Unpaid</option>
-                      </select>
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          <input
+                            type="text"
+                            placeholder="Search voucher #..."
+                            value={advanceSearchQuery}
+                            onChange={(e) => setAdvanceSearchQuery(e.target.value)}
+                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                          />
+                          {advanceSearchQuery && (
+                            <button type="button" onClick={() => setAdvanceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
 
-                      {(outstandingSearchQuery || outstandingStatusFilter !== 'ALL') && (
-                        <button
-                          type="button"
-                          onClick={() => { setOutstandingSearchQuery(''); setOutstandingStatusFilter('ALL'); }}
-                          style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <X size={13} /> Reset
-                        </button>
-                      )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <select
+                            value={advanceStatusFilter}
+                            onChange={(e) => setAdvanceStatusFilter(e.target.value)}
+                            style={{
+                              height: '34px',
+                              padding: '0 30px 0 12px',
+                              width: '135px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              fontFamily: 'inherit',
+                              fontWeight: 500,
+                              color: '#334155',
+                              backgroundColor: '#ffffff',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 10px center',
+                            }}
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="UTILIZED">Utilized</option>
+                          </select>
 
-                      <button
-                        type="button"
-                        onClick={() => handleExportTableCSV('outstanding')}
-                        style={{ height: '38px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                        title="Export outstanding payments to CSV"
-                      >
-                        <Download size={15} />
-                      </button>
-                    </div>
-                  </div>
+                          {(advanceSearchQuery || advanceStatusFilter !== 'ALL') && (
+                            <button
+                              type="button"
+                              onClick={() => { setAdvanceSearchQuery(''); setAdvanceStatusFilter('ALL'); }}
+                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <X size={13} /> Reset
+                            </button>
+                          )}
 
-                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                    <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                      <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                          <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                            <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>OUTSTANDING BALANCE</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                            <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredCustomerOutstanding.length === 0 ? (
-                            <tr>
-                              <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#16a34a' }}>
-                                <CheckCircle size={36} color="#86efac" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                All clear! No outstanding payments pending for {selectedHistoryCustomer?.name || 'this customer'}.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredCustomerOutstanding.map((inv) => {
-                              const bal = Number(inv.balanceAmount || 0);
-                              return (
-                                <tr
-                                  key={inv.id || inv.invoiceNumber}
-                                  style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                >
-                                  <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}>
-                                    {inv.invoiceNumber || inv.id}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                    {inv.displayDate || inv.invoiceDate}
-                                  </td>
-                                  <td style={{ padding: '12px 14px' }}>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
-                                      {inv.paymentType || 'installment'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
-                                    LKR {Number(inv.totalAmount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
-                                    LKR {Number(inv.paidAmount || 0).toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>
-                                    LKR {bal.toFixed(2)}
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '0.74rem',
-                                        fontWeight: 600,
-                                        padding: '2px 8px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: Number(inv.paidAmount || 0) > 0 ? '#e0f2fe' : '#fee2e2',
-                                        color: Number(inv.paidAmount || 0) > 0 ? '#0284c7' : '#b91c1c',
-                                        border: Number(inv.paidAmount || 0) > 0 ? '1px solid #bae6fd' : '1px solid #fecaca',
-                                        textTransform: 'lowercase',
-                                      }}
-                                    >
-                                      {Number(inv.paidAmount || 0) > 0 ? 'partial' : 'unpaid'}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}
-                                      style={{ border: '1px solid #cbd5e1', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                      title="View outstanding invoice details"
-                                    >
-                                      <Eye size={15} />
-                                    </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportTableCSV('advances')}
+                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            title="Export advance payments to CSV"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>VOUCHER #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>DEPOSIT AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AVAILABLE BALANCE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredCustomerAdvances.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                    <DollarSign size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                    No advance payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
                                 </tr>
-                              );
-                            })
+                              ) : (
+                                filteredCustomerAdvances.map((adv) => {
+                                  const isActive = (adv.status || '').toUpperCase() === 'ACTIVE';
+                                  return (
+                                    <tr
+                                      key={adv.id || adv.voucherNo}
+                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                    >
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}>
+                                        {adv.voucherNo || adv.id}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                        {adv.displayDate || adv.date}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
+                                        {adv.paymentMethod || 'Bank Transfer'}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                        LKR {Number(adv.amount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: Number(adv.balance || 0) > 0 ? '#16a34a' : '#64748b' }}>
+                                        LKR {Number(adv.balance || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <span
+                                          style={{
+                                            fontSize: '0.74rem',
+                                            fontWeight: 600,
+                                            padding: '2px 8px',
+                                            borderRadius: '9999px',
+                                            backgroundColor: isActive ? '#dcfce7' : '#f1f5f9',
+                                            color: isActive ? '#15803d' : '#64748b',
+                                            border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                            textTransform: 'lowercase',
+                                          }}
+                                        >
+                                          {adv.status ? adv.status.toLowerCase() : 'active'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}
+                                          style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                          title="View advance voucher details"
+                                        >
+                                          <Eye size={14} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>Showing <strong>{filteredCustomerAdvances.length}</strong> of <strong>{rawCustomerAdvances.length}</strong> advance vouchers</span>
+                          <span>Total Advances: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerAdvances.reduce((s, a) => s + Number(a.amount || 0), 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 3: PAYMENTS TABLE */}
+                  {historyTableTab === 'payments' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
+                      <div
+                        style={{
+                          padding: '4px 0 12px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          flexWrap: 'wrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          <input
+                            type="text"
+                            placeholder="Search receipt # or invoice #..."
+                            value={paymentSearchQuery}
+                            onChange={(e) => setPaymentSearchQuery(e.target.value)}
+                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                          />
+                          {paymentSearchQuery && (
+                            <button type="button" onClick={() => setPaymentSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                              <X size={14} />
+                            </button>
                           )}
-                        </tbody>
-                      </table>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <select
+                            value={paymentStatusFilter}
+                            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                            style={{
+                              height: '34px',
+                              padding: '0 30px 0 12px',
+                              width: '135px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              fontFamily: 'inherit',
+                              fontWeight: 500,
+                              color: '#334155',
+                              backgroundColor: '#ffffff',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 10px center',
+                            }}
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="CLEARED">Cleared</option>
+                            <option value="RECEIVED">Received</option>
+                          </select>
+
+                          {(paymentSearchQuery || paymentStatusFilter !== 'ALL') && (
+                            <button
+                              type="button"
+                              onClick={() => { setPaymentSearchQuery(''); setPaymentStatusFilter('ALL'); }}
+                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <X size={13} /> Reset
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleExportTableCSV('payments')}
+                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            title="Export payments to CSV"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>RECEIPT #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT PAID</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredCustomerPayments.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                    <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                    No payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredCustomerPayments.map((pmt) => (
+                                  <tr
+                                    key={pmt.id || pmt.receiptNo}
+                                    style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                  >
+                                    <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}>
+                                      {pmt.receiptNo || pmt.id}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                      {pmt.displayDate || pmt.paymentDate}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
+                                      {pmt.invoiceNo || '—'}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
+                                      {pmt.paymentMethod || 'Cash'}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#16a34a' }}>
+                                      LKR {Number(pmt.amount || 0).toFixed(2)}
+                                    </td>
+                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <span
+                                        style={{
+                                          fontSize: '0.74rem',
+                                          fontWeight: 600,
+                                          padding: '2px 8px',
+                                          borderRadius: '9999px',
+                                          backgroundColor: '#dcfce7',
+                                          color: '#15803d',
+                                          border: '1px solid #bbf7d0',
+                                          textTransform: 'lowercase',
+                                        }}
+                                      >
+                                        {pmt.status ? pmt.status.toLowerCase() : 'cleared'}
+                                      </span>
+                                    </td>
+                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}
+                                        style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        title="View receipt details"
+                                      >
+                                        <Eye size={14} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>Showing <strong>{filteredCustomerPayments.length}</strong> of <strong>{rawCustomerPayments.length}</strong> payment receipts</span>
+                          <span>Total Payments: <strong style={{ color: '#16a34a', fontFamily: 'monospace' }}>LKR {filteredCustomerPayments.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                      <span>Showing <strong>{filteredCustomerOutstanding.length}</strong> of <strong>{rawCustomerOutstanding.length}</strong> pending invoices</span>
-                      <span>Total Pending Balance: <strong style={{ color: '#dc2626', fontFamily: 'monospace' }}>LKR {filteredCustomerOutstanding.reduce((s, i) => s + Number(i.balanceAmount || 0), 0).toFixed(2)}</strong></span>
+                  )}
+
+                  {/* TAB 4: CHEQUES TABLE */}
+                  {historyTableTab === 'cheques' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
+                      <div
+                        style={{
+                          padding: '4px 0 12px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          flexWrap: 'wrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          <input
+                            type="text"
+                            placeholder="Search cheque #, bank name..."
+                            value={chequeSearchQuery}
+                            onChange={(e) => setChequeSearchQuery(e.target.value)}
+                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                          />
+                          {chequeSearchQuery && (
+                            <button type="button" onClick={() => setChequeSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <select
+                            value={chequeStatusFilter}
+                            onChange={(e) => setChequeStatusFilter(e.target.value)}
+                            style={{
+                              height: '34px',
+                              padding: '0 30px 0 12px',
+                              width: '135px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              fontFamily: 'inherit',
+                              fontWeight: 500,
+                              color: '#334155',
+                              backgroundColor: '#ffffff',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 10px center',
+                            }}
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="CLEARED">Cleared</option>
+                            <option value="PENDING">Pending</option>
+                            <option value="DEPOSITED">Deposited</option>
+                            <option value="BOUNCED">Bounced</option>
+                          </select>
+
+                          {(chequeSearchQuery || chequeStatusFilter !== 'ALL') && (
+                            <button
+                              type="button"
+                              onClick={() => { setChequeSearchQuery(''); setChequeStatusFilter('ALL'); }}
+                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <X size={13} /> Reset
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleExportTableCSV('cheques')}
+                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            title="Export cheques to CSV"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE DATE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>BANK NAME</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE / REF #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredCustomerCheques.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                    <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                    No cheques recorded for {selectedHistoryCustomer?.name || 'this customer'}.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredCustomerCheques.map((chq) => {
+                                  const st = (chq.status || '').toUpperCase();
+                                  const isCleared = st === 'CLEARED';
+                                  const isPending = st === 'PENDING';
+                                  const isBounced = st === 'BOUNCED';
+                                  return (
+                                    <tr
+                                      key={chq.id || chq.chequeNo}
+                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                    >
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}>
+                                        {chq.chequeNo || chq.id}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                        {chq.displayDate || chq.chequeDate}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#0f172a', fontWeight: 500 }}>
+                                        {chq.bankName || '—'}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
+                                        {chq.invoiceNo || '—'}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                                        LKR {Number(chq.amount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <span
+                                          style={{
+                                            fontSize: '0.74rem',
+                                            fontWeight: 600,
+                                            padding: '2px 8px',
+                                            borderRadius: '9999px',
+                                            backgroundColor: isCleared ? '#dcfce7' : isPending ? '#fef3c7' : isBounced ? '#fee2e2' : '#e0f2fe',
+                                            color: isCleared ? '#15803d' : isPending ? '#b45309' : isBounced ? '#b91c1c' : '#0284c7',
+                                            border: isCleared ? '1px solid #bbf7d0' : isPending ? '1px solid #fde68a' : isBounced ? '1px solid #fecaca' : '1px solid #bae6fd',
+                                            textTransform: 'lowercase',
+                                          }}
+                                        >
+                                          {chq.status ? chq.status.toLowerCase() : 'pending'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}
+                                          style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                          title="View cheque details"
+                                        >
+                                          <Eye size={14} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>Showing <strong>{filteredCustomerCheques.length}</strong> of <strong>{rawCustomerCheques.length}</strong> cheques</span>
+                          <span>Total Cheques Amount: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerCheques.reduce((s, c) => s + Number(c.amount || 0), 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+
+                  {/* TAB 5: OUTSTANDING PAYMENTS TABLE */}
+                  {historyTableTab === 'outstanding' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
+                      <div
+                        style={{
+                          padding: '4px 0 12px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          flexWrap: 'wrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          <input
+                            type="text"
+                            placeholder="Search outstanding invoice #..."
+                            value={outstandingSearchQuery}
+                            onChange={(e) => setOutstandingSearchQuery(e.target.value)}
+                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
+                          />
+                          {outstandingSearchQuery && (
+                            <button type="button" onClick={() => setOutstandingSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <select
+                            value={outstandingStatusFilter}
+                            onChange={(e) => setOutstandingStatusFilter(e.target.value)}
+                            style={{
+                              height: '34px',
+                              padding: '0 30px 0 12px',
+                              width: '135px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              fontFamily: 'inherit',
+                              fontWeight: 500,
+                              color: '#334155',
+                              backgroundColor: '#ffffff',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 10px center',
+                            }}
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="PARTIAL">Partial</option>
+                            <option value="UNPAID">Unpaid</option>
+                          </select>
+
+                          {(outstandingSearchQuery || outstandingStatusFilter !== 'ALL') && (
+                            <button
+                              type="button"
+                              onClick={() => { setOutstandingSearchQuery(''); setOutstandingStatusFilter('ALL'); }}
+                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <X size={13} /> Reset
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleExportTableCSV('outstanding')}
+                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            title="Export outstanding payments to CSV"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>OUTSTANDING BALANCE</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
+                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredCustomerOutstanding.length === 0 ? (
+                                <tr>
+                                  <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#16a34a' }}>
+                                    <CheckCircle size={36} color="#86efac" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                    All clear! No outstanding payments pending for {selectedHistoryCustomer?.name || 'this customer'}.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredCustomerOutstanding.map((inv) => {
+                                  const bal = Number(inv.balanceAmount || 0);
+                                  return (
+                                    <tr
+                                      key={inv.id || inv.invoiceNumber}
+                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                    >
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}>
+                                        {inv.invoiceNumber || inv.id}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                        {inv.displayDate || inv.invoiceDate}
+                                      </td>
+                                      <td style={{ padding: '12px 14px' }}>
+                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
+                                          {inv.paymentType || 'installment'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                        LKR {Number(inv.totalAmount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
+                                        LKR {Number(inv.paidAmount || 0).toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>
+                                        LKR {bal.toFixed(2)}
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <span
+                                          style={{
+                                            fontSize: '0.74rem',
+                                            fontWeight: 600,
+                                            padding: '2px 8px',
+                                            borderRadius: '9999px',
+                                            backgroundColor: Number(inv.paidAmount || 0) > 0 ? '#e0f2fe' : '#fee2e2',
+                                            color: Number(inv.paidAmount || 0) > 0 ? '#0284c7' : '#b91c1c',
+                                            border: Number(inv.paidAmount || 0) > 0 ? '1px solid #bae6fd' : '1px solid #fecaca',
+                                            textTransform: 'lowercase',
+                                          }}
+                                        >
+                                          {Number(inv.paidAmount || 0) > 0 ? 'partial' : 'unpaid'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}
+                                          style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                          title="View outstanding invoice details"
+                                        >
+                                          <Eye size={14} />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
+                          <span>Showing <strong>{filteredCustomerOutstanding.length}</strong> of <strong>{rawCustomerOutstanding.length}</strong> pending invoices</span>
+                          <span>Total Pending Balance: <strong style={{ color: '#dc2626', fontFamily: 'monospace' }}>LKR {filteredCustomerOutstanding.reduce((s, i) => s + Number(i.balanceAmount || 0), 0).toFixed(2)}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
-        </>
-      )}
         </div>
       )}
 
@@ -4166,7 +4828,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               padding: '24px 28px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e2e8f0',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               maxHeight: '90vh',
               overflowY: 'auto',
@@ -4264,7 +4926,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                   style={{
                     backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '6px',
                     padding: '6px 12px',
                     fontSize: '0.82rem',
@@ -4432,7 +5094,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
                 }}
               >
-                <History size={14} /> View Financial History
+                <History size={13} /> View Financial History
               </button>
 
               <button
@@ -4441,7 +5103,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 style={{
                   backgroundColor: '#ffffff',
                   color: '#475569',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   padding: '7px 16px',
                   fontWeight: 600,
@@ -4472,7 +5134,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               padding: '24px 28px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e2e8f0',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -4649,7 +5311,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               padding: '28px 32px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e2e8f0',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               maxHeight: '90vh',
               overflowY: 'auto',
@@ -4690,7 +5352,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="Auto (e.g. CUST-001)"
                     value={customerForm.code}
                     onChange={(e) => setCustomerForm({ ...customerForm, code: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
@@ -4702,7 +5364,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="e.g. Apex Supermarket"
                     value={customerForm.name}
                     onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                     required
                   />
                 </div>
@@ -4719,7 +5381,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="e.g. John Doe"
                     value={customerForm.contactPerson}
                     onChange={(e) => setCustomerForm({ ...customerForm, contactPerson: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
@@ -4731,7 +5393,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="e.g. 077 123 4567"
                     value={customerForm.phone}
                     onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -4747,7 +5409,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="e.g. info@apex.com"
                     value={customerForm.email}
                     onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
@@ -4760,7 +5422,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     placeholder="0.00"
                     value={customerForm.creditLimit}
                     onChange={(e) => setCustomerForm({ ...customerForm, creditLimit: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -4775,27 +5437,152 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   placeholder="e.g. 123 Main Street, Colombo 03"
                   value={customerForm.address}
                   onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                 />
               </div>
 
-              {/* Customer Group */}
+              {/* Customer Groups (Multi-select) */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Customer Group
-                </label>
-                <select
-                  value={customerForm.routeId || ''}
-                  onChange={(e) => setCustomerForm({ ...customerForm, routeId: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
+                    Assigned Customer Groups
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
+                    {(customerForm.routeIds || []).length} selected
+                  </span>
+                </div>
+
+                {/* Selected Group Badges */}
+                {(customerForm.routeIds || []).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                    {(customerForm.routeIds || []).map((gid) => {
+                      const grp = routes.find((r) => String(r.id) === String(gid));
+                      const name = grp ? (grp.name || grp.groupName || grp.routeName) : `Group #${gid}`;
+                      return (
+                        <span
+                          key={gid}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '9999px',
+                            padding: '3px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {name}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextIds = (customerForm.routeIds || []).filter((id) => String(id) !== String(gid));
+                              setCustomerForm({
+                                ...customerForm,
+                                routeIds: nextIds,
+                                routeId: nextIds[0] || '',
+                              });
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#1d4ed8',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              fontSize: '0.9rem',
+                              lineHeight: 1,
+                              padding: 0,
+                            }}
+                            title="Remove group"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Groups Selection Box */}
+                <div
+                  style={{
+                    maxHeight: '140px',
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    backgroundColor: '#ffffff',
+                    padding: '4px',
+                  }}
                 >
-                  <option value="">-- No Customer Group Assigned --</option>
-                  {routes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name || r.groupName || r.routeName} {r.groupCode || r.routeCode ? `(${r.groupCode || r.routeCode})` : ''} {(r.assignedStaffName || r.salesmanName) ? `— Staff: ${r.assignedStaffName || r.salesmanName}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  {routes.length === 0 ? (
+                    <div style={{ padding: '12px', fontSize: '0.82rem', color: '#94a3b8', textAlign: 'center' }}>
+                      No customer groups available.
+                    </div>
+                  ) : (
+                    routes.map((r) => {
+                      const isSelected = (customerForm.routeIds || []).some((id) => String(id) === String(r.id));
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => {
+                            let nextIds;
+                            if (isSelected) {
+                              nextIds = (customerForm.routeIds || []).filter((id) => String(id) !== String(r.id));
+                            } else {
+                              nextIds = [...(customerForm.routeIds || []), String(r.id)];
+                            }
+                            setCustomerForm({
+                              ...customerForm,
+                              routeIds: nextIds,
+                              routeId: nextIds[0] || '',
+                            });
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            backgroundColor: isSelected ? '#f0fdf4' : 'transparent',
+                            transition: 'background-color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => { }}
+                            style={{ cursor: 'pointer', accentColor: '#16a34a' }}
+                          />
+                          <span style={{ fontSize: '0.84rem', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#15803d' : '#334155', flex: 1 }}>
+                            {r.name || r.groupName || r.routeName}
+                            {(r.groupCode || r.routeCode) && (
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', marginLeft: '6px' }}>
+                                ({r.groupCode || r.routeCode})
+                              </span>
+                            )}
+                          </span>
+                          {(r.assignedStaffName || r.salesmanName) && (
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                              Rep: {r.assignedStaffName || r.salesmanName}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                  Customers can belong to zero, one, or multiple groups.
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
@@ -4804,7 +5591,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   onClick={() => setShowCustomerModal(false)}
                   style={{
                     backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '6px',
                     padding: '8px 16px',
                     fontSize: '0.86rem',
