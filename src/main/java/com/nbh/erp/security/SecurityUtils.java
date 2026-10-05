@@ -103,6 +103,29 @@ public final class SecurityUtils {
     }
 
     /**
+     * Determines whether the current authenticated user can view cost prices and valuations.
+     * Authorized staff include:
+     * - Privileged roles: ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_MANAGER, ROLE_DIRECTOR
+     * - Role allocation permissions: INVENTORY_COST_VIEW, INVENTORY_MANAGE, PRODUCT_MANAGE, GRN_PROCESS, PRN_PROCESS
+     */
+    public static boolean canViewCostPrice() {
+        Set<String> authorities = getCurrentUserAuthorities();
+        if (authorities.isEmpty()) {
+            return false;
+        }
+
+        return authorities.contains("ROLE_SUPER_ADMIN")
+                || authorities.contains("ROLE_ADMIN")
+                || authorities.contains("ROLE_MANAGER")
+                || authorities.contains("ROLE_DIRECTOR")
+                || authorities.contains("INVENTORY_COST_VIEW")
+                || authorities.contains("INVENTORY_MANAGE")
+                || authorities.contains("PRODUCT_MANAGE")
+                || authorities.contains("GRN_PROCESS")
+                || authorities.contains("PRN_PROCESS");
+    }
+
+    /**
      * Enforces edit permission. Throws AccessDeniedException if the user is not authorized.
      */
     public static void enforceCanEdit(String module, String recordName) {

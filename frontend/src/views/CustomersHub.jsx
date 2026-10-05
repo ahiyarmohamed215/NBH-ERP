@@ -78,7 +78,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     email: '',
     address: '',
     creditLimit: '0',
-    routeId: '',
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [viewingCustomer, setViewingCustomer] = useState(null);
@@ -688,8 +687,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: '',
       address: '',
       creditLimit: '0',
-      routeId: '',
-      routeIds: [],
     });
     setShowCustomerModal(true);
   };
@@ -697,14 +694,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Open Edit Customer Modal
   const handleOpenEditCustomer = (c) => {
     setEditingCustomer(c);
-    const assignedRoutes = getCustomerRoutes(c.id);
-    const assignedGroupIds = (c.customerGroupIds && c.customerGroupIds.length > 0)
-      ? c.customerGroupIds.map(String)
-      : (c.routeIds && c.routeIds.length > 0)
-        ? c.routeIds.map(String)
-        : assignedRoutes.map((r) => String(r.id));
-    const primaryRouteId = assignedGroupIds[0] || (c.routeId ? String(c.routeId) : (c.customerGroupId ? String(c.customerGroupId) : ''));
-
     setCustomerForm({
       code: c.code || c.customerCode || '',
       name: c.name || '',
@@ -713,8 +702,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       email: c.email || '',
       address: c.address || '',
       creditLimit: c.creditLimit ? String(c.creditLimit) : '0',
-      routeId: primaryRouteId,
-      routeIds: assignedGroupIds,
     });
     setShowCustomerModal(true);
   };
@@ -733,9 +720,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
     try {
       setSavingCustomer(true);
-      const selectedGroupIds = (customerForm.routeIds || []).map(Number).filter(Boolean);
-      const primaryGroupId = selectedGroupIds.length > 0 ? selectedGroupIds[0] : (customerForm.routeId ? Number(customerForm.routeId) : null);
-
       const payload = {
         code: customerForm.code.trim().toUpperCase() || undefined,
         customerCode: customerForm.code.trim().toUpperCase() || undefined,
@@ -745,10 +729,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         email: customerForm.email.trim(),
         address: customerForm.address.trim(),
         creditLimit: parseFloat(customerForm.creditLimit) || 0,
-        customerGroupId: primaryGroupId,
-        routeId: primaryGroupId,
-        customerGroupIds: selectedGroupIds,
-        routeIds: selectedGroupIds,
       };
 
       if (editingCustomer) {
@@ -821,8 +801,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       return;
     }
     try {
-      await customerGroupApi.toggleActive(route.id);
-      const nextActive = !Boolean(route.isActive !== false);
+      const res = await customerGroupApi.toggleActive(route.id);
+      const updatedDto = res.data?.data;
+      const nextActive = (updatedDto && updatedDto.isActive !== undefined)
+        ? Boolean(updatedDto.isActive)
+        : !Boolean(route.isActive !== false);
+
       setRoutes((prev) =>
         prev.map((r) => (r.id === route.id ? { ...r, isActive: nextActive } : r))
       );
@@ -1968,23 +1952,46 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                            {/* Status Badge */}
-                            <span
+                            {/* Clickable Status Badge to toggle Active / Inactive */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleRouteActive(route, e)}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                padding: '2px 8px',
+                                gap: '5px',
+                                padding: '3px 10px',
                                 borderRadius: '9999px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.74rem',
                                 fontWeight: 700,
                                 backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
                                 color: isGroupActive ? '#15803d' : '#b91c1c',
-                                border: `1px solid ${isGroupActive ? '#bbf7d0' : '#fecaca'}`,
+                                border: `1px solid ${isGroupActive ? '#86efac' : '#fca5a5'}`,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                               }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = isGroupActive ? '#bbf7d0' : '#fecaca';
+                                e.currentTarget.style.transform = 'scale(1.03)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = isGroupActive ? '#dcfce7' : '#fee2e2';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }}
+                              title={`Status: ${isGroupActive ? 'Active' : 'Inactive'} (Click to set as ${isGroupActive ? 'Inactive' : 'Active'})`}
                             >
-                              {isGroupActive ? '● Active' : '○ Inactive'}
-                            </span>
+                              <span
+                                style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  backgroundColor: isGroupActive ? '#16a34a' : '#dc2626',
+                                  display: 'inline-block',
+                                }}
+                              />
+                              {isGroupActive ? 'Active' : 'Inactive'}
+                            </button>
 
                             {/* Customer Count */}
                             <div
@@ -2029,11 +2036,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </p>
                       </div>
 
-                      {/* Card Footer: View link & Active/Deactivate Button */}
+                      {/* Card Footer: View link */}
                       <div
                         style={{
                           display: 'flex',
-                          justifyContent: 'space-between',
+                          justifyContent: 'flex-start',
                           alignItems: 'center',
                           paddingTop: '10px',
                           borderTop: '1px solid #f1f5f9',
@@ -2042,35 +2049,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <Eye size={13} /> View Group Details →
                         </span>
-
-                        {/* Active / Deactivate Toggle Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleRouteActive(route, e)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            border: isGroupActive ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                            backgroundColor: isGroupActive ? '#fff1f2' : '#f0fdf4',
-                            color: isGroupActive ? '#be123c' : '#15803d',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isGroupActive ? '#fee2e2' : '#dcfce7';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = isGroupActive ? '#fff1f2' : '#f0fdf4';
-                          }}
-                          title={isGroupActive ? 'Click to deactivate this group' : 'Click to activate this group'}
-                        >
-                          {isGroupActive ? 'Deactivate' : 'Activate'}
-                        </button>
                       </div>
                     </div>
                   );
@@ -2141,42 +2119,45 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </span>
                     )}
 
-                    {/* Status Badge */}
-                    <span
-                      style={{
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        padding: '2px 9px',
-                        borderRadius: '9999px',
-                        backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
-                        color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
-                        border: `1px solid ${selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca'}`,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      {selectedRoute?.isActive !== false ? '● Active' : '○ Inactive'}
-                    </span>
-
-                    {/* Fast Activate / Deactivate button in Header */}
+                    {/* Clickable Status Badge in View Popup Header */}
                     <button
                       type="button"
                       onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
                       style={{
-                        padding: '3px 10px',
-                        borderRadius: '5px',
                         fontSize: '0.74rem',
-                        fontWeight: 600,
+                        fontWeight: 700,
+                        padding: '3px 11px',
+                        borderRadius: '9999px',
+                        backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                        color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                        border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
                         cursor: 'pointer',
-                        border: selectedRoute?.isActive !== false ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                        backgroundColor: selectedRoute?.isActive !== false ? '#fff1f2' : '#f0fdf4',
-                        color: selectedRoute?.isActive !== false ? '#be123c' : '#15803d',
                         transition: 'all 0.15s ease',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                       }}
-                      title={selectedRoute?.isActive !== false ? 'Click to deactivate this group' : 'Click to activate this group'}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca';
+                        e.currentTarget.style.transform = 'scale(1.03)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                      title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to set as ${selectedRoute?.isActive !== false ? 'Inactive' : 'Active'})`}
                     >
-                      {selectedRoute?.isActive !== false ? 'Deactivate' : 'Activate'}
+                      <span
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                          display: 'inline-block',
+                        }}
+                      />
+                      {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
                     </button>
 
                     {/* Count */}
@@ -2293,19 +2274,36 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           Status
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <span
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
                             style={{
                               fontSize: '0.76rem',
                               fontWeight: 700,
-                              padding: '2px 9px',
+                              padding: '3px 10px',
                               borderRadius: '9999px',
                               backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
                               color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
-                              border: `1px solid ${selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca'}`,
+                              border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
                             }}
+                            title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to toggle)`}
                           >
-                            {selectedRoute?.isActive !== false ? '● Active' : '○ Inactive / Deactivated'}
-                          </span>
+                            <span
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                                display: 'inline-block',
+                              }}
+                            />
+                            {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
+                          </button>
                         </div>
                       </div>
 
@@ -3411,242 +3409,365 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </div>
           ) : (
             <>
-              {/* TOP SEARCH & ACTIONS TOOLBAR - All in ONE line: Search bar, Full Profile, Edit */}
+              {/* TOP CUSTOMER HISTORY HEADER (2 EQUAL HALVES: Left = Search + Customer Details, Right = 3-KPI Card) */}
               <div
                 style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  padding: '8px 14px',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
+                  alignItems: 'stretch',
+                  gap: '12px',
                   width: '100%',
                   maxWidth: '100%',
                   boxSizing: 'border-box',
                   flexShrink: 0,
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  position: 'relative',
+                  flexWrap: 'wrap',
                 }}
               >
-                {/* Search Bar with Autocomplete Suggestions Dropdown */}
-                <div ref={searchContainerRef} style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                  <Search
-                    size={16}
+                {/* LEFT HALF (50% of window): Search bar on top, Customer Details on bottom (both same width) */}
+                <div
+                  style={{
+                    flex: selectedHistoryCustomer ? '1 1 360px' : 1,
+                    width: selectedHistoryCustomer ? 'calc(50% - 6px)' : '100%',
+                    minWidth: '300px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    justifyContent: 'space-between',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {/* Search Bar with Autocomplete Suggestions Dropdown */}
+                  <div
+                    ref={searchContainerRef}
                     style={{
-                      position: 'absolute',
-                      left: '12px',
-                      top: '11px',
-                      color: '#94a3b8',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search customer by code, name, phone, or route to view history..."
-                    value={customerSearchInput}
-                    onChange={(e) => {
-                      setCustomerSearchInput(e.target.value);
-                      setIsCustomerSearchOpen(true);
-                    }}
-                    onFocus={() => setIsCustomerSearchOpen(true)}
-                    style={{
+                      position: 'relative',
                       width: '100%',
-                      height: '34px',
-                      padding: '0 32px 0 36px',
-                      borderRadius: '6px',
-                      border: isCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                      fontSize: '0.88rem',
-                      outline: 'none',
-                      backgroundColor: '#ffffff',
-                      color: '#0f172a',
-                      boxSizing: 'border-box',
-                      boxShadow: isCustomerSearchOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
-                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                     }}
-                  />
-                  {customerSearchInput && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedHistoryCustomerId('');
-                        setCustomerSearchInput('');
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '10px',
+                        color: '#94a3b8',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search customer by code, name, phone, or route to view history..."
+                      value={customerSearchInput}
+                      onChange={(e) => {
+                        setCustomerSearchInput(e.target.value);
                         setIsCustomerSearchOpen(true);
                       }}
+                      onFocus={() => setIsCustomerSearchOpen(true)}
                       style={{
-                        position: 'absolute',
-                        right: '10px',
-                        top: '10px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#94a3b8',
-                        padding: '2px',
-                      }}
-                      title="Clear customer selection"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-
-                  {/* Floating Autocomplete Suggestions Dropdown */}
-                  {isCustomerSearchOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 4px)',
-                        left: 0,
-                        right: 0,
-                        maxHeight: '280px',
-                        overflowY: 'auto',
+                        width: '100%',
+                        height: '35px',
+                        padding: '0 32px 0 36px',
+                        borderRadius: '6px',
+                        border: isCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                        fontSize: '0.86rem',
+                        outline: 'none',
                         backgroundColor: '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06)',
-                        zIndex: 100,
+                        color: '#0f172a',
+                        boxSizing: 'border-box',
+                        boxShadow: isCustomerSearchOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                       }}
-                    >
-                      {filteredHistoryCustomerOptions.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                          No matching customers found for "{customerSearchInput}"
-                        </div>
-                      ) : (
-                        filteredHistoryCustomerOptions.map((c) => {
-                          const isSelected = selectedHistoryCustomerId === String(c.id);
-                          const route = getCustomerRoute(c.id);
-                          return (
-                            <div
-                              key={c.id}
-                              onClick={() => handleSelectCustomerForHistory(c)}
-                              style={{
-                                padding: '9px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '10px',
-                                cursor: 'pointer',
-                                backgroundColor: isSelected ? '#f0f9ff' : '#ffffff',
-                                borderBottom: '1px solid #f1f5f9',
-                                transition: 'background-color 0.1s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = '#ffffff';
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                                <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
-                                  {c.name}
-                                </span>
-                                <span
-                                  style={{
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700,
-                                    backgroundColor: '#f1f5f9',
-                                    color: '#475569',
-                                    padding: '1px 6px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #e2e8f0',
-                                  }}
-                                >
-                                  {c.code || c.customerCode || 'NO CODE'}
-                                </span>
-                                {c.phone && (
-                                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                                    📞 {c.phone}
+                    />
+                    {customerSearchInput && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedHistoryCustomerId('');
+                          setCustomerSearchInput('');
+                          setIsCustomerSearchOpen(true);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '9px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#94a3b8',
+                          padding: '2px',
+                        }}
+                        title="Clear customer selection"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+
+                    {/* Floating Autocomplete Suggestions Dropdown */}
+                    {isCustomerSearchOpen && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 'calc(100% + 4px)',
+                          left: 0,
+                          right: 0,
+                          maxHeight: '280px',
+                          overflowY: 'auto',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                          boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06)',
+                          zIndex: 100,
+                        }}
+                      >
+                        {filteredHistoryCustomerOptions.length === 0 ? (
+                          <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                            No matching customers found for "{customerSearchInput}"
+                          </div>
+                        ) : (
+                          filteredHistoryCustomerOptions.map((c) => {
+                            const isSelected = selectedHistoryCustomerId === String(c.id);
+                            const route = getCustomerRoute(c.id);
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => handleSelectCustomerForHistory(c)}
+                                style={{
+                                  padding: '9px 14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '10px',
+                                  cursor: 'pointer',
+                                  backgroundColor: isSelected ? '#f0f9ff' : '#ffffff',
+                                  borderBottom: '1px solid #f1f5f9',
+                                  transition: 'background-color 0.1s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) e.currentTarget.style.backgroundColor = '#ffffff';
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                  <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                                    {c.name}
                                   </span>
-                                )}
-                                {route?.name && (
                                   <span
                                     style={{
-                                      fontSize: '0.74rem',
-                                      color: '#0284c7',
-                                      backgroundColor: '#e0f2fe',
+                                      fontFamily: 'monospace',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      backgroundColor: '#f1f5f9',
+                                      color: '#475569',
                                       padding: '1px 6px',
                                       borderRadius: '4px',
+                                      border: '1px solid #e2e8f0',
                                     }}
                                   >
-                                    👥 {route.name}
+                                    {c.code || c.customerCode || 'NO CODE'}
                                   </span>
-                                )}
-                              </div>
+                                  {c.phone && (
+                                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                      📞 {c.phone}
+                                    </span>
+                                  )}
+                                  {route?.name && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.74rem',
+                                        color: '#0284c7',
+                                        backgroundColor: '#e0f2fe',
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                      }}
+                                    >
+                                      👥 {route.name}
+                                    </span>
+                                  )}
+                                </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                <span
-                                  style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    padding: '1px 6px',
-                                    borderRadius: '9999px',
-                                    backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
-                                    color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
-                                  }}
-                                >
-                                  {isCustomerActive(c) ? 'Active' : 'Inactive'}
-                                </span>
-                                {isSelected && <Check size={13} color="#0284c7" />}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                  <span
+                                    style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: 600,
+                                      padding: '1px 6px',
+                                      borderRadius: '9999px',
+                                      backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
+                                      color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
+                                    }}
+                                  >
+                                    {isCustomerActive(c) ? 'Active' : 'Inactive'}
+                                  </span>
+                                  {isSelected && <Check size={13} color="#0284c7" />}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Customer Details Line (Same width as Search Bar = half the window) */}
+                  {selectedHistoryCustomer && (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '35px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '0 12px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '0.84rem',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                          {selectedHistoryCustomer.name}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            backgroundColor: '#f1f5f9',
+                            color: '#334155',
+                            borderRadius: '4px',
+                            border: '1px solid #cbd5e1',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {selectedHistoryCustomer.code || selectedHistoryCustomer.customerCode || 'NO CODE'}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            padding: '1px 6px',
+                            borderRadius: '9999px',
+                            backgroundColor: isCustomerActive(selectedHistoryCustomer) ? '#dcfce7' : '#fee2e2',
+                            color: isCustomerActive(selectedHistoryCustomer) ? '#15803d' : '#b91c1c',
+                            border: isCustomerActive(selectedHistoryCustomer) ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isCustomerActive(selectedHistoryCustomer) ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        {selectedHistoryCustomer.phone && (
+                          <span style={{ color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                            📞 {selectedHistoryCustomer.phone}
+                          </span>
+                        )}
+                        {getCustomerRoute(selectedHistoryCustomer.id)?.name && (
+                          <span
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 600,
+                              color: '#0284c7',
+                              backgroundColor: '#e0f2fe',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            👥 {getCustomerRoute(selectedHistoryCustomer.id)?.name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Full Profile and Edit buttons in ONE LINE */}
+                {/* RIGHT HALF (50% of window): Card with 3 equal columns matching left side height */}
                 {selectedHistoryCustomer && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => setViewingCustomer(selectedHistoryCustomer)}
+                  <div
+                    style={{
+                      flex: '1 1 360px',
+                      width: 'calc(50% - 6px)',
+                      minWidth: '300px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                      padding: '8px 12px',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      alignItems: 'center',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {/* Column 1: Total Invoiced (equal 1/3 of the right half) */}
+                    <div
                       style={{
-                        height: '34px',
-                        padding: '0 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #e2e8f0',
-                        backgroundColor: '#ffffff',
-                        color: '#334155',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
                         alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                        whiteSpace: 'nowrap',
+                        textAlign: 'center',
+                        padding: '0 8px',
+                        borderRight: '1px solid #e2e8f0',
                       }}
-                      title="View Full Customer Profile"
                     >
-                      <Users size={13} /> Full Profile
-                    </button>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                        Total Invoiced
+                      </span>
+                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                        LKR {customerHistoryMetrics.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditCustomer(selectedHistoryCustomer)}
+                    {/* Column 2: Outstanding (equal 1/3 of the right half) */}
+                    <div
                       style={{
-                        height: '34px',
-                        padding: '0 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #e2e8f0',
-                        backgroundColor: '#ffffff',
-                        color: '#334155',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
                         alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                        whiteSpace: 'nowrap',
+                        textAlign: 'center',
+                        padding: '0 8px',
+                        borderRight: '1px solid #e2e8f0',
                       }}
-                      title="Edit Customer Details"
                     >
-                      <Edit2 size={13} /> Edit
-                    </button>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                        Outstanding
+                      </span>
+                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>
+                        LKR {customerHistoryMetrics.outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {/* Column 3: Credit Limit (equal 1/3 of the right half) */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        padding: '0 8px',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                        Credit Limit
+                      </span>
+                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
+                        LKR {Number(selectedHistoryCustomer.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3673,259 +3794,223 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
               ) : (
                 <>
-                  {/* COMPACT SINGLE-LINE CUSTOMER SUMMARY BAR (No profile avatar circle, small & sleek) */}
-                  <div
-                    style={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      padding: '8px 14px',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                      flexWrap: 'nowrap',
-                      overflowX: 'auto',
-                      flexShrink: 0,
-                      minHeight: '40px',
-                    }}
-                  >
-                    {/* Left: Essential Customer Info */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexShrink: 1 }}>
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color: '#0f172a',
-                          fontSize: '0.92rem',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {selectedHistoryCustomer.name}
-                      </span>
+                  {/* UNIFIED SUB-NAV TABS & TABLE TOOLBAR (All in one line, responsive) */}
+                  {(() => {
+                    const currentSearchVal =
+                      historyTableTab === 'invoices' ? invoiceSearchQuery :
+                      historyTableTab === 'advances' ? advanceSearchQuery :
+                      historyTableTab === 'payments' ? paymentSearchQuery :
+                      historyTableTab === 'cheques' ? chequeSearchQuery :
+                      outstandingSearchQuery;
 
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          fontWeight: 700,
-                          fontSize: '0.75rem',
-                          backgroundColor: '#f1f5f9',
-                          color: '#334155',
-                          padding: '2px 7px',
-                          borderRadius: '4px',
-                          border: '1px solid #e2e8f0',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {selectedHistoryCustomer.code || selectedHistoryCustomer.customerCode || 'NO CODE'}
-                      </span>
+                    const currentSearchSetter =
+                      historyTableTab === 'invoices' ? setInvoiceSearchQuery :
+                      historyTableTab === 'advances' ? setAdvanceSearchQuery :
+                      historyTableTab === 'payments' ? setPaymentSearchQuery :
+                      historyTableTab === 'cheques' ? setChequeSearchQuery :
+                      setOutstandingSearchQuery;
 
-                      <span
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: '9999px',
-                          backgroundColor: isCustomerActive(selectedHistoryCustomer) ? '#dcfce7' : '#fee2e2',
-                          color: isCustomerActive(selectedHistoryCustomer) ? '#15803d' : '#b91c1c',
-                          border: isCustomerActive(selectedHistoryCustomer) ? '1px solid #bbf7d0' : '1px solid #fecaca',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {isCustomerActive(selectedHistoryCustomer) ? 'Active' : 'Inactive'}
-                      </span>
+                    const currentSearchPlaceholder =
+                      historyTableTab === 'invoices' ? 'Search invoice #...' :
+                      historyTableTab === 'advances' ? 'Search voucher #...' :
+                      historyTableTab === 'payments' ? 'Search receipt # or invoice #...' :
+                      historyTableTab === 'cheques' ? 'Search cheque #, bank...' :
+                      'Search outstanding invoice #...';
 
-                      <span style={{ color: '#cbd5e1', userSelect: 'none' }}>|</span>
+                    const currentStatusVal =
+                      historyTableTab === 'invoices' ? invoiceStatusFilter :
+                      historyTableTab === 'advances' ? advanceStatusFilter :
+                      historyTableTab === 'payments' ? paymentStatusFilter :
+                      historyTableTab === 'cheques' ? chequeStatusFilter :
+                      outstandingStatusFilter;
 
-                      {selectedHistoryCustomer.phone && (
-                        <span
-                          style={{
-                            fontSize: '0.8rem',
-                            color: '#64748b',
-                            whiteSpace: 'nowrap',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          <Phone size={12} color="#94a3b8" /> {selectedHistoryCustomer.phone}
-                        </span>
-                      )}
+                    const currentStatusSetter =
+                      historyTableTab === 'invoices' ? setInvoiceStatusFilter :
+                      historyTableTab === 'advances' ? setAdvanceStatusFilter :
+                      historyTableTab === 'payments' ? setPaymentStatusFilter :
+                      historyTableTab === 'cheques' ? setChequeStatusFilter :
+                      setOutstandingStatusFilter;
 
-                      <span
-                        style={{
-                          fontSize: '0.8rem',
-                          color: '#64748b',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Users size={12} color="#94a3b8" /> Group: <strong style={{ color: '#0f172a' }}>{getCustomerRoute(selectedHistoryCustomer.id)?.name || 'Unassigned'}</strong>
-                      </span>
-                    </div>
+                    const currentStatusOptions =
+                      historyTableTab === 'invoices' ? [
+                        { value: 'ALL', label: 'All Statuses' },
+                        { value: 'PAID', label: 'Paid' },
+                        { value: 'PARTIAL', label: 'Partial' },
+                        { value: 'UNPAID', label: 'Unpaid' },
+                      ] :
+                      historyTableTab === 'advances' ? [
+                        { value: 'ALL', label: 'All Statuses' },
+                        { value: 'ACTIVE', label: 'Active' },
+                        { value: 'UTILIZED', label: 'Utilized' },
+                      ] :
+                      historyTableTab === 'payments' ? [
+                        { value: 'ALL', label: 'All Statuses' },
+                        { value: 'CLEARED', label: 'Cleared' },
+                        { value: 'RECEIVED', label: 'Received' },
+                      ] :
+                      historyTableTab === 'cheques' ? [
+                        { value: 'ALL', label: 'All Statuses' },
+                        { value: 'CLEARED', label: 'Cleared' },
+                        { value: 'PENDING', label: 'Pending' },
+                        { value: 'DEPOSITED', label: 'Deposited' },
+                        { value: 'BOUNCED', label: 'Bounced' },
+                      ] : [
+                        { value: 'ALL', label: 'All Statuses' },
+                        { value: 'PARTIAL', label: 'Partial' },
+                        { value: 'UNPAID', label: 'Unpaid' },
+                      ];
 
-                    {/* Right: Inline Financial KPI Badges */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    const hasActiveFilter = Boolean(currentSearchVal || currentStatusVal !== 'ALL');
+
+                    return (
                       <div
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: '6px',
-                          border: '1px solid #e2e8f0',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Invoiced:</span>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
-                          LKR {customerHistoryMetrics.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          backgroundColor: '#f0fdf4',
-                          borderRadius: '6px',
-                          border: '1px solid #bbf7d0',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <span style={{ fontSize: '0.72rem', color: '#16a34a', textTransform: 'uppercase', fontWeight: 600 }}>Total Paid:</span>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
-                          LKR {customerHistoryMetrics.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          backgroundColor: customerHistoryMetrics.outstandingBalance > 0 ? '#fef2f2' : '#f8fafc',
-                          borderRadius: '6px',
-                          border: customerHistoryMetrics.outstandingBalance > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <span style={{ fontSize: '0.72rem', color: customerHistoryMetrics.outstandingBalance > 0 ? '#dc2626' : '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding:</span>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 700, color: customerHistoryMetrics.outstandingBalance > 0 ? '#dc2626' : '#0f172a', fontFamily: 'monospace' }}>
-                          LKR {customerHistoryMetrics.outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SUBTABS NAVIGATION (Matches User Screenshot) */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '24px',
-                      borderBottom: '1px solid #e2e8f0',
-                      padding: '0 4px',
-                      marginTop: '4px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {[
-                      { id: 'invoices', label: `Invoices (${rawCustomerInvoices.length})` },
-                      { id: 'advances', label: `Advance Payments (${rawCustomerAdvances.length})` },
-                      { id: 'payments', label: `Payments (${rawCustomerPayments.length})` },
-                      { id: 'cheques', label: `Cheques (${rawCustomerCheques.length})` },
-                      { id: 'outstanding', label: `Outstanding (${rawCustomerOutstanding.length})` },
-                    ].map((tab) => {
-                      const isSel = historyTableTab === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => setHistoryTableTab(tab.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            borderBottom: isSel ? '2.5px solid #0284c7' : '2.5px solid transparent',
-                            padding: '10px 4px',
-                            fontSize: '0.92rem',
-                            fontWeight: isSel ? 700 : 500,
-                            color: isSel ? '#0284c7' : '#64748b',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            marginBottom: '-1px',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          {tab.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* TAB 1: INVOICES TABLE (Matches User Screenshot!) */}
-                  {historyTableTab === 'invoices' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                      {/* Invoices Toolbar */}
-                      <div
-                        style={{
-                          padding: '4px 0 12px 0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: '12px',
+                          gap: '10px',
+                          borderBottom: '1px solid #e2e8f0',
+                          padding: '4px 0 10px 0',
+                          marginTop: '2px',
+                          flexWrap: 'wrap',
                           width: '100%',
                           boxSizing: 'border-box',
-                          flexWrap: 'wrap',
                           flexShrink: 0,
                         }}
                       >
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                          <input
-                            type="text"
-                            placeholder="Search invoice #..."
-                            value={invoiceSearchQuery}
-                            onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                            style={{
-                              width: '100%',
-                              height: '34px',
-                              padding: '0 32px 0 38px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.88rem',
-                              outline: 'none',
-                              backgroundColor: '#ffffff',
-                              color: '#0f172a',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          {invoiceSearchQuery && (
-                            <button type="button" onClick={() => setInvoiceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                              <X size={14} />
-                            </button>
-                          )}
+                        {/* Sub-nav tabs */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flexWrap: 'wrap',
+                            overflowX: 'auto',
+                            padding: '3px',
+                            backgroundColor: '#f1f5f9',
+                            borderRadius: '8px',
+                          }}
+                        >
+                          {[
+                            { id: 'invoices', label: 'Invoices', count: rawCustomerInvoices.length },
+                            { id: 'advances', label: 'Advance Payments', count: rawCustomerAdvances.length },
+                            { id: 'payments', label: 'Payments', count: rawCustomerPayments.length },
+                            { id: 'cheques', label: 'Cheques', count: rawCustomerCheques.length },
+                            { id: 'outstanding', label: 'Outstanding', count: rawCustomerOutstanding.length },
+                          ].map((tab) => {
+                            const isSel = historyTableTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setHistoryTableTab(tab.id)}
+                                style={{
+                                  backgroundColor: isSel ? '#ffffff' : 'transparent',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '5px 11px',
+                                  fontSize: '0.84rem',
+                                  fontWeight: isSel ? 600 : 500,
+                                  color: isSel ? '#0284c7' : '#64748b',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: isSel ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
+                                  transition: 'all 0.15s ease',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <span>{tab.label}</span>
+                                <span
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    padding: '1px 6px',
+                                    borderRadius: '9999px',
+                                    backgroundColor: isSel ? '#e0f2fe' : '#e2e8f0',
+                                    color: isSel ? '#0284c7' : '#64748b',
+                                  }}
+                                >
+                                  {tab.count}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        {/* Search, Filter, Reset, Export (Right-aligned in the same line) */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                            flexShrink: 0,
+                            marginLeft: 'auto',
+                          }}
+                        >
+                          {/* Search Input */}
+                          <div style={{ position: 'relative', width: '200px', minWidth: '150px' }}>
+                            <Search
+                              size={15}
+                              style={{
+                                position: 'absolute',
+                                left: '10px',
+                                top: '10px',
+                                color: '#94a3b8',
+                                pointerEvents: 'none',
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder={currentSearchPlaceholder}
+                              value={currentSearchVal}
+                              onChange={(e) => currentSearchSetter(e.target.value)}
+                              style={{
+                                width: '100%',
+                                height: '34px',
+                                padding: '0 28px 0 32px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '0.84rem',
+                                outline: 'none',
+                                backgroundColor: '#ffffff',
+                                color: '#0f172a',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                            {currentSearchVal && (
+                              <button
+                                type="button"
+                                onClick={() => currentSearchSetter('')}
+                                style={{
+                                  position: 'absolute',
+                                  right: '8px',
+                                  top: '9px',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  color: '#94a3b8',
+                                  padding: 0,
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Filter Select */}
                           <select
-                            value={invoiceStatusFilter}
-                            onChange={(e) => setInvoiceStatusFilter(e.target.value)}
+                            value={currentStatusVal}
+                            onChange={(e) => currentStatusSetter(e.target.value)}
                             style={{
                               height: '34px',
-                              padding: '0 30px 0 12px',
-                              width: '135px',
+                              padding: '0 28px 0 10px',
+                              width: '128px',
                               borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.84rem',
                               fontFamily: 'inherit',
                               fontWeight: 500,
                               color: '#334155',
@@ -3938,46 +4023,51 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               MozAppearance: 'none',
                               backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                               backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 10px center',
+                              backgroundPosition: 'right 8px center',
                             }}
                           >
-                            <option value="ALL">All Statuses</option>
-                            <option value="PAID">Paid</option>
-                            <option value="PARTIAL">Partial</option>
-                            <option value="UNPAID">Unpaid</option>
+                            {currentStatusOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
                           </select>
 
-                          {(invoiceSearchQuery || invoiceStatusFilter !== 'ALL') && (
+                          {/* Reset Button */}
+                          {hasActiveFilter && (
                             <button
                               type="button"
-                              onClick={() => { setInvoiceSearchQuery(''); setInvoiceStatusFilter('ALL'); }}
+                              onClick={() => {
+                                currentSearchSetter('');
+                                currentStatusSetter('ALL');
+                              }}
                               style={{
                                 height: '34px',
-                                padding: '0 12px',
+                                padding: '0 10px',
                                 borderRadius: '6px',
                                 border: '1px solid #e2e8f0',
                                 backgroundColor: '#f1f5f9',
                                 color: '#64748b',
-                                fontSize: '0.85rem',
+                                fontSize: '0.82rem',
                                 fontWeight: 500,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
                               }}
+                              title="Reset filter and search"
                             >
                               <X size={13} /> Reset
                             </button>
                           )}
 
+                          {/* CSV Export Button */}
                           <button
                             type="button"
-                            onClick={() => handleExportTableCSV('invoices')}
+                            onClick={() => handleExportTableCSV(historyTableTab)}
                             style={{
                               height: '34px',
-                              width: '38px',
+                              width: '36px',
                               backgroundColor: '#ffffff',
-                              border: '1px solid #e2e8f0',
+                              border: '1px solid #cbd5e1',
                               borderRadius: '6px',
                               padding: 0,
                               color: '#64748b',
@@ -3986,12 +4076,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               justifyContent: 'center',
                               cursor: 'pointer',
                             }}
-                            title="Export invoices to CSV"
+                            title={`Export ${historyTableTab} to CSV`}
                           >
                             <Download size={14} />
                           </button>
                         </div>
                       </div>
+                    );
+                  })()}
+
+                  {/* TAB 1: INVOICES TABLE (Matches User Screenshot!) */}
+                  {historyTableTab === 'invoices' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
                       {/* Invoices Table */}
                       <div
@@ -4105,98 +4201,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </tbody>
                           </table>
                         </div>
-                        {/* Table Footer Summary */}
-                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                          <span>Showing <strong>{filteredCustomerInvoices.length}</strong> of <strong>{rawCustomerInvoices.length}</strong> invoices</span>
-                          <span>Total Invoiced: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerInvoices.reduce((s, i) => s + Number(i.totalAmount || 0), 0).toFixed(2)}</strong></span>
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* TAB 2: ADVANCE PAYMENTS TABLE */}
                   {historyTableTab === 'advances' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                      <div
-                        style={{
-                          padding: '4px 0 12px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          flexWrap: 'wrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                          <input
-                            type="text"
-                            placeholder="Search voucher #..."
-                            value={advanceSearchQuery}
-                            onChange={(e) => setAdvanceSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                          />
-                          {advanceSearchQuery && (
-                            <button type="button" onClick={() => setAdvanceSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <select
-                            value={advanceStatusFilter}
-                            onChange={(e) => setAdvanceStatusFilter(e.target.value)}
-                            style={{
-                              height: '34px',
-                              padding: '0 30px 0 12px',
-                              width: '135px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
-                              fontFamily: 'inherit',
-                              fontWeight: 500,
-                              color: '#334155',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              appearance: 'none',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 10px center',
-                            }}
-                          >
-                            <option value="ALL">All Statuses</option>
-                            <option value="ACTIVE">Active</option>
-                            <option value="UTILIZED">Utilized</option>
-                          </select>
-
-                          {(advanceSearchQuery || advanceStatusFilter !== 'ALL') && (
-                            <button
-                              type="button"
-                              onClick={() => { setAdvanceSearchQuery(''); setAdvanceStatusFilter('ALL'); }}
-                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <X size={13} /> Reset
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportTableCSV('advances')}
-                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            title="Export advance payments to CSV"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </div>
-                      </div>
-
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -4277,97 +4288,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </tbody>
                           </table>
                         </div>
-                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                          <span>Showing <strong>{filteredCustomerAdvances.length}</strong> of <strong>{rawCustomerAdvances.length}</strong> advance vouchers</span>
-                          <span>Total Advances: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerAdvances.reduce((s, a) => s + Number(a.amount || 0), 0).toFixed(2)}</strong></span>
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* TAB 3: PAYMENTS TABLE */}
                   {historyTableTab === 'payments' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                      <div
-                        style={{
-                          padding: '4px 0 12px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          flexWrap: 'wrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                          <input
-                            type="text"
-                            placeholder="Search receipt # or invoice #..."
-                            value={paymentSearchQuery}
-                            onChange={(e) => setPaymentSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                          />
-                          {paymentSearchQuery && (
-                            <button type="button" onClick={() => setPaymentSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <select
-                            value={paymentStatusFilter}
-                            onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                            style={{
-                              height: '34px',
-                              padding: '0 30px 0 12px',
-                              width: '135px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
-                              fontFamily: 'inherit',
-                              fontWeight: 500,
-                              color: '#334155',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              appearance: 'none',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 10px center',
-                            }}
-                          >
-                            <option value="ALL">All Statuses</option>
-                            <option value="CLEARED">Cleared</option>
-                            <option value="RECEIVED">Received</option>
-                          </select>
-
-                          {(paymentSearchQuery || paymentStatusFilter !== 'ALL') && (
-                            <button
-                              type="button"
-                              onClick={() => { setPaymentSearchQuery(''); setPaymentStatusFilter('ALL'); }}
-                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <X size={13} /> Reset
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportTableCSV('payments')}
-                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            title="Export payments to CSV"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </div>
-                      </div>
-
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -4445,99 +4372,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </tbody>
                           </table>
                         </div>
-                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                          <span>Showing <strong>{filteredCustomerPayments.length}</strong> of <strong>{rawCustomerPayments.length}</strong> payment receipts</span>
-                          <span>Total Payments: <strong style={{ color: '#16a34a', fontFamily: 'monospace' }}>LKR {filteredCustomerPayments.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2)}</strong></span>
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* TAB 4: CHEQUES TABLE */}
                   {historyTableTab === 'cheques' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                      <div
-                        style={{
-                          padding: '4px 0 12px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          flexWrap: 'wrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                          <input
-                            type="text"
-                            placeholder="Search cheque #, bank name..."
-                            value={chequeSearchQuery}
-                            onChange={(e) => setChequeSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                          />
-                          {chequeSearchQuery && (
-                            <button type="button" onClick={() => setChequeSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <select
-                            value={chequeStatusFilter}
-                            onChange={(e) => setChequeStatusFilter(e.target.value)}
-                            style={{
-                              height: '34px',
-                              padding: '0 30px 0 12px',
-                              width: '135px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
-                              fontFamily: 'inherit',
-                              fontWeight: 500,
-                              color: '#334155',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              appearance: 'none',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 10px center',
-                            }}
-                          >
-                            <option value="ALL">All Statuses</option>
-                            <option value="CLEARED">Cleared</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="DEPOSITED">Deposited</option>
-                            <option value="BOUNCED">Bounced</option>
-                          </select>
-
-                          {(chequeSearchQuery || chequeStatusFilter !== 'ALL') && (
-                            <button
-                              type="button"
-                              onClick={() => { setChequeSearchQuery(''); setChequeStatusFilter('ALL'); }}
-                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <X size={13} /> Reset
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportTableCSV('cheques')}
-                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            title="Export cheques to CSV"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </div>
-                      </div>
-
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -4621,97 +4462,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </tbody>
                           </table>
                         </div>
-                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                          <span>Showing <strong>{filteredCustomerCheques.length}</strong> of <strong>{rawCustomerCheques.length}</strong> cheques</span>
-                          <span>Total Cheques Amount: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>LKR {filteredCustomerCheques.reduce((s, c) => s + Number(c.amount || 0), 0).toFixed(2)}</strong></span>
-                        </div>
                       </div>
                     </div>
                   )}
 
                   {/* TAB 5: OUTSTANDING PAYMENTS TABLE */}
                   {historyTableTab === 'outstanding' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0 }}>
-                      <div
-                        style={{
-                          padding: '4px 0 12px 0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          flexWrap: 'wrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
-                          <Search size={17} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }} />
-                          <input
-                            type="text"
-                            placeholder="Search outstanding invoice #..."
-                            value={outstandingSearchQuery}
-                            onChange={(e) => setOutstandingSearchQuery(e.target.value)}
-                            style={{ width: '100%', height: '34px', padding: '0 32px 0 38px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
-                          />
-                          {outstandingSearchQuery && (
-                            <button type="button" onClick={() => setOutstandingSearchQuery('')} style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <select
-                            value={outstandingStatusFilter}
-                            onChange={(e) => setOutstandingStatusFilter(e.target.value)}
-                            style={{
-                              height: '34px',
-                              padding: '0 30px 0 12px',
-                              width: '135px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
-                              fontFamily: 'inherit',
-                              fontWeight: 500,
-                              color: '#334155',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              appearance: 'none',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 10px center',
-                            }}
-                          >
-                            <option value="ALL">All Statuses</option>
-                            <option value="PARTIAL">Partial</option>
-                            <option value="UNPAID">Unpaid</option>
-                          </select>
-
-                          {(outstandingSearchQuery || outstandingStatusFilter !== 'ALL') && (
-                            <button
-                              type="button"
-                              onClick={() => { setOutstandingSearchQuery(''); setOutstandingStatusFilter('ALL'); }}
-                              style={{ height: '34px', padding: '0 12px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <X size={13} /> Reset
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleExportTableCSV('outstanding')}
-                            style={{ height: '34px', width: '38px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: 0, color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                            title="Export outstanding payments to CSV"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </div>
-                      </div>
-
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -4797,10 +4554,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               )}
                             </tbody>
                           </table>
-                        </div>
-                        <div style={{ padding: '10px 18px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#64748b', flexWrap: 'wrap', gap: '8px' }}>
-                          <span>Showing <strong>{filteredCustomerOutstanding.length}</strong> of <strong>{rawCustomerOutstanding.length}</strong> pending invoices</span>
-                          <span>Total Pending Balance: <strong style={{ color: '#dc2626', fontFamily: 'monospace' }}>LKR {filteredCustomerOutstanding.reduce((s, i) => s + Number(i.balanceAmount || 0), 0).toFixed(2)}</strong></span>
                         </div>
                       </div>
                     </div>
@@ -5439,150 +5192,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
                   style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
                 />
-              </div>
-
-              {/* Customer Groups (Multi-select) */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                    Assigned Customer Groups
-                  </label>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
-                    {(customerForm.routeIds || []).length} selected
-                  </span>
-                </div>
-
-                {/* Selected Group Badges */}
-                {(customerForm.routeIds || []).length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                    {(customerForm.routeIds || []).map((gid) => {
-                      const grp = routes.find((r) => String(r.id) === String(gid));
-                      const name = grp ? (grp.name || grp.groupName || grp.routeName) : `Group #${gid}`;
-                      return (
-                        <span
-                          key={gid}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            backgroundColor: '#eff6ff',
-                            color: '#1d4ed8',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '9999px',
-                            padding: '3px 10px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {name}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextIds = (customerForm.routeIds || []).filter((id) => String(id) !== String(gid));
-                              setCustomerForm({
-                                ...customerForm,
-                                routeIds: nextIds,
-                                routeId: nextIds[0] || '',
-                              });
-                            }}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#1d4ed8',
-                              cursor: 'pointer',
-                              fontWeight: 700,
-                              fontSize: '0.9rem',
-                              lineHeight: 1,
-                              padding: 0,
-                            }}
-                            title="Remove group"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Groups Selection Box */}
-                <div
-                  style={{
-                    maxHeight: '140px',
-                    overflowY: 'auto',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    backgroundColor: '#ffffff',
-                    padding: '4px',
-                  }}
-                >
-                  {routes.length === 0 ? (
-                    <div style={{ padding: '12px', fontSize: '0.82rem', color: '#94a3b8', textAlign: 'center' }}>
-                      No customer groups available.
-                    </div>
-                  ) : (
-                    routes.map((r) => {
-                      const isSelected = (customerForm.routeIds || []).some((id) => String(id) === String(r.id));
-                      return (
-                        <div
-                          key={r.id}
-                          onClick={() => {
-                            let nextIds;
-                            if (isSelected) {
-                              nextIds = (customerForm.routeIds || []).filter((id) => String(id) !== String(r.id));
-                            } else {
-                              nextIds = [...(customerForm.routeIds || []), String(r.id)];
-                            }
-                            setCustomerForm({
-                              ...customerForm,
-                              routeIds: nextIds,
-                              routeId: nextIds[0] || '',
-                            });
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '6px 10px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            backgroundColor: isSelected ? '#f0fdf4' : 'transparent',
-                            transition: 'background-color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => { }}
-                            style={{ cursor: 'pointer', accentColor: '#16a34a' }}
-                          />
-                          <span style={{ fontSize: '0.84rem', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#15803d' : '#334155', flex: 1 }}>
-                            {r.name || r.groupName || r.routeName}
-                            {(r.groupCode || r.routeCode) && (
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', marginLeft: '6px' }}>
-                                ({r.groupCode || r.routeCode})
-                              </span>
-                            )}
-                          </span>
-                          {(r.assignedStaffName || r.salesmanName) && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                              Rep: {r.assignedStaffName || r.salesmanName}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
-                  Customers can belong to zero, one, or multiple groups.
-                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>

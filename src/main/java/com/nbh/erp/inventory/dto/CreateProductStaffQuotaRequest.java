@@ -24,8 +24,8 @@ public class CreateProductStaffQuotaRequest {
 
     private Long warehouseId; // Optional: null means all warehouses
 
-    @NotNull(message = "Allocated quantity is required")
-    @Positive(message = "Allocated quantity must be greater than zero")
+    @NotNull(message = "Allowed quantity is required")
+    @Positive(message = "Allowed quantity must be greater than zero")
     private BigDecimal allocatedQuantity;
 
     private LocalDate validFrom;

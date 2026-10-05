@@ -1,5 +1,7 @@
 package com.nbh.erp.report.controller;
 
+import com.nbh.erp.audit.dto.DaySummaryDto;
+import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.report.dto.ReportDto;
 import com.nbh.erp.report.service.ReportService;
@@ -25,6 +27,17 @@ import java.time.LocalDate;
 public class ReportController {
 
     private final ReportService reportService;
+    private final AuditLogService auditLogService;
+
+    @GetMapping("/day-summary")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('REPORT_VIEW') or hasAuthority('AUDIT_VIEW')")
+    @Operation(summary = "Get day summary of all activity and actions in the system under Reports")
+    public ResponseEntity<ApiResponse<DaySummaryDto>> getDaySummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        DaySummaryDto summary = auditLogService.getDaySummary(date);
+        return ResponseEntity.ok(ApiResponse.ok(summary));
+    }
 
     @GetMapping("/sales-summary")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('REPORT_VIEW')")

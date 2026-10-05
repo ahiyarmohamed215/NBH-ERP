@@ -43,6 +43,11 @@ public class ProductDto {
     }
 
     public static ProductDto from(Product p) {
+        return from(p, com.nbh.erp.security.SecurityUtils.canViewCostPrice());
+    }
+
+    public static ProductDto from(Product p, boolean allowCostPrice) {
+        if (p == null) return null;
         return ProductDto.builder()
                 .id(p.getId())
                 .sku(p.getSku())
@@ -61,7 +66,7 @@ public class ProductDto {
                 .defaultWarehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)
                 .defaultWarehouseName(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getName() : null)
                 .unitOfMeasure(p.getUnitOfMeasure())
-                .costPrice(p.getCostPrice())
+                .costPrice(allowCostPrice ? p.getCostPrice() : null)
                 .sellingPrice(p.getSellingPrice())
                 .minStockLevel(p.getMinStockLevel())
                 .isActive(p.getIsActive())

@@ -237,10 +237,12 @@ export const quotationApi = {
 export const auditApi = {
   search: (params) => api.get('/audit-logs', { params }),
   getLogs: (params) => api.get('/audit-logs', { params }),
-  getDaySummary: (date) => api.get('/audit-logs/day-summary', { params: date ? { date } : {} }),
+  getDaySummary: (date) => api.get('/reports/day-summary', { params: date ? { date } : {} }),
 };
 
 export const reportApi = {
+  getDaySummary: (date) =>
+    api.get('/reports/day-summary', { params: date ? { date } : {} }),
   getSalesSummary: (startDate, endDate) =>
     api.get('/reports/sales-summary', { params: { startDate, endDate } }),
   getInventoryValuation: (warehouseId) =>

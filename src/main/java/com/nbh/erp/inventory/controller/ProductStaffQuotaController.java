@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/v1/inventory/staff-quotas")
 @RequiredArgsConstructor
-@Tag(name = "POS Staff Quotas", description = "Product selling limits and quantity allocations for sales reps and POS cashiers")
+@Tag(name = "Inventory Allocation", description = "Inventory allocation and product limits for sales staff and POS cashiers")
 public class ProductStaffQuotaController {
 
     private final ProductStaffQuotaService quotaService;

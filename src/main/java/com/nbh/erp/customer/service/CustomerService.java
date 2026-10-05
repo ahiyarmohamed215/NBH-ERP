@@ -131,16 +131,6 @@ public class CustomerService {
             customer.setCreditLimit(request.getCreditLimit());
         }
 
-        if (request.getCustomerGroupIds() != null || request.getRouteIds() != null || request.getCustomerGroupId() != null || request.getRouteId() != null) {
-            List<Long> groupIds = request.getEffectiveCustomerGroupIds();
-            Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = new HashSet<>();
-            if (groupIds != null && !groupIds.isEmpty()) {
-                groups.addAll(customerGroupRepository.findAllById(groupIds));
-            }
-            customer.setCustomerGroups(groups);
-            customer.setCustomerGroup(groups.isEmpty() ? null : groups.iterator().next());
-        }
-
         Customer saved = customerRepository.save(customer);
 
         auditLogService.log("CUSTOMER_UPDATE", "CUSTOMERS", "Customer", saved.getCustomerCode(),

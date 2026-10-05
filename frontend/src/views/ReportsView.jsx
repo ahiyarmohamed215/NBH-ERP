@@ -27,7 +27,7 @@ import AuditHub from './AuditHub';
 
 const INITIAL_OUTSTANDING_CUSTOMERS = [];
 
-export default function ReportsView({ activeSubTab = 'customer-reports' }) {
+export default function ReportsView({ activeSubTab = 'customer-reports', onSubTabChange }) {
   const { addToast } = useToast();
 
   // Primary Category Tabs matching user screenshot
@@ -38,7 +38,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
     { id: 'purchase-reports', label: 'Purchase Reports', title: 'Procurement & Supplier Reports', icon: ShoppingCart },
     { id: 'project-reports', label: 'Project Report', title: 'Commercial Project Reports', icon: FolderKanban },
     { id: 'accounting-reports', label: 'Accounting Reports', title: 'Financial Accounting Reports', icon: DollarSign },
-    { id: 'day-summary', label: 'Day Summary & Audit', title: 'Day Summary & System Audit Trail', icon: ShieldCheck },
+    { id: 'day-summary', label: 'Day Summary', title: 'Day Summary & Audit Ledger', icon: ShieldCheck },
   ];
 
   const [currentPrimaryTab, setCurrentPrimaryTab] = useState(() => {
@@ -325,7 +325,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports' }) {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setCurrentPrimaryTab(tab.id)}
+              onClick={() => {
+                setCurrentPrimaryTab(tab.id);
+                if (onSubTabChange) onSubTabChange(tab.id);
+              }}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

@@ -88,7 +88,7 @@ public class CustomerGroupService {
                 .groupName(name.trim())
                 .description(request.getDescription())
                 .assignedStaff(assignedStaff)
-                .isActive(true)
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
 
         CustomerGroup saved = customerGroupRepository.save(group);
@@ -146,6 +146,10 @@ public class CustomerGroupService {
             group.setAssignedStaff(null);
         }
 
+        if (request.getIsActive() != null) {
+            group.setIsActive(request.getIsActive());
+        }
+
         CustomerGroup saved = customerGroupRepository.save(group);
 
         if (request.getCustomerIds() != null) {
@@ -179,14 +183,14 @@ public class CustomerGroupService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
+    public CustomerGroupDto toggleActive(Long id) {
         CustomerGroup group = customerGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", id));
 
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Group: " + group.getGroupName());
 
         group.setIsActive(!Boolean.TRUE.equals(group.getIsActive()));
-        customerGroupRepository.save(group);
+        CustomerGroup saved = customerGroupRepository.save(group);
 
         auditLogService.log(
                 "CUSTOMER_GROUP_TOGGLE_ACTIVE",
@@ -194,6 +198,11 @@ public class CustomerGroupService {
                 group.getGroupCode(),
                 String.format("Customer group '%s' active status changed to %s", group.getGroupName(), group.getIsActive())
         );
+
+        List<Long> custIds = customerRepository.findByCustomerGroupId(saved.getId()).stream()
+                .map(com.nbh.erp.customer.entity.Customer::getId)
+                .toList();
+        return CustomerGroupDto.from(saved, custIds);
     }
 
     @Transactional

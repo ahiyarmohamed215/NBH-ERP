@@ -25,6 +25,7 @@ public class ProductStaffQuotaDto {
     private String productBarcode;
     private String productUnit;
     private BigDecimal currentStockInWarehouse;
+    private BigDecimal totalStockAvailable;
 
     // Staff / User info
     private Long userId;
@@ -52,7 +53,11 @@ public class ProductStaffQuotaDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static ProductStaffQuotaDto fromEntity(ProductStaffQuota q, BigDecimal currentStock) {
+    public static ProductStaffQuotaDto fromEntity(ProductStaffQuota q, BigDecimal stock) {
+        return fromEntity(q, stock, stock);
+    }
+
+    public static ProductStaffQuotaDto fromEntity(ProductStaffQuota q, BigDecimal totalStock, BigDecimal currentStock) {
         if (q == null) return null;
 
         BigDecimal alloc = q.getAllocatedQuantity() != null ? q.getAllocatedQuantity() : BigDecimal.ZERO;
@@ -73,6 +78,8 @@ public class ProductStaffQuotaDto {
             statusStr = "ACTIVE";
         }
 
+        BigDecimal totStock = totalStock != null ? totalStock : (currentStock != null ? currentStock : BigDecimal.ZERO);
+
         return ProductStaffQuotaDto.builder()
                 .id(q.getId())
                 .productId(q.getProduct() != null ? q.getProduct().getId() : null)
@@ -81,6 +88,7 @@ public class ProductStaffQuotaDto {
                 .productBarcode(q.getProduct() != null ? q.getProduct().getBarcode() : null)
                 .productUnit(q.getProduct() != null ? q.getProduct().getUnitOfMeasure() : null)
                 .currentStockInWarehouse(currentStock != null ? currentStock : BigDecimal.ZERO)
+                .totalStockAvailable(totStock)
                 .userId(q.getUser() != null ? q.getUser().getId() : null)
                 .username(q.getUser() != null ? q.getUser().getUsername() : null)
                 .userFullName(q.getUser() != null ? q.getUser().getFullName() : null)

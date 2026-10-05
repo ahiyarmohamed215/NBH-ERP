@@ -394,15 +394,15 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       return;
     }
 
-    // Quota restriction check
+    // Inventory allocation check
     if (stagedItem.quotaInfo?.quotaRestricted && stagedItem.quotaInfo?.remainingQuantity !== undefined) {
       const rem = Number(stagedItem.quotaInfo.remainingQuantity);
       if (rem <= 0) {
-        addToast(`Staff Quota Limit Reached: You have sold all your allocated ${stagedItem.quotaInfo.allocatedQuantity} units for ${stagedItem.product.name}. Cannot bill.`, 'error');
+        addToast(`Inventory Allocation Limit Reached: You have sold all ${stagedItem.quotaInfo.allocatedQuantity} allocated items for ${stagedItem.product.name}. Cannot add.`, 'error');
         return;
       }
       if (stagedItem.salesQty > rem) {
-        addToast(`Exceeds your remaining quota limit (${rem} units available). Please reduce quantity.`, 'error');
+        addToast(`Exceeds your inventory allocation (${rem} items left). Please enter a lower quantity.`, 'error');
         return;
       }
     }
@@ -429,7 +429,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
         }
         if (existing.quantity + stagedItem.salesQty > maxLimit) {
           addToast(
-            `Cannot add: total quantity (${existing.quantity + stagedItem.salesQty}) exceeds quota limit of ${maxLimit}`,
+            `Cannot add: total quantity (${existing.quantity + stagedItem.salesQty}) exceeds your inventory allocation of ${maxLimit}`,
             'error'
           );
           return prev;
@@ -490,7 +490,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           const candidate = item.quantity + delta;
           if (candidate > maxAvail) {
             addToast(
-              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Staff Quota Limit)' : ' (Warehouse Stock)'}`,
+              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Your Inventory Allocation)' : ' (Warehouse Stock)'}`,
               'warning'
             );
             return item;
@@ -523,7 +523,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           const finalQty = Math.min(maxAvail, parsed);
           if (parsed > maxAvail) {
             addToast(
-              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Staff Quota Limit)' : ' (Warehouse Stock)'}`,
+              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Your Inventory Allocation)' : ' (Warehouse Stock)'}`,
               'warning'
             );
           }
@@ -1303,8 +1303,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#991b1b' : '#166534',
                   }}>
                     {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
-                      ? 'POS Staff Selling Quota Exhausted'
-                      : 'POS Staff Selling Quota Active'}
+                      ? 'Inventory Allocation Finished'
+                      : 'Inventory Allocation Active'}
                   </div>
                   <div style={{
                     fontSize: '0.74rem',
@@ -1312,8 +1312,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     marginTop: '1px',
                   }}>
                     {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
-                      ? `You have reached your allocated selling quota (${stagedItem.quotaInfo.allocatedQuantity} units). POS billing is blocked for this product.`
-                      : `Your selling quota is limited: ${stagedItem.quotaInfo.remainingQuantity} units remaining out of ${stagedItem.quotaInfo.allocatedQuantity} allocated (Sold: ${stagedItem.quotaInfo.soldQuantity || 0}).`}
+                      ? `You have reached your allocated limit of ${stagedItem.quotaInfo.allocatedQuantity} items. You cannot sell more of this product.`
+                      : `You have ${stagedItem.quotaInfo.remainingQuantity} items left out of ${stagedItem.quotaInfo.allocatedQuantity} allocated (Sold: ${stagedItem.quotaInfo.soldQuantity || 0}).`}
                   </div>
                 </div>
                 <div style={{
@@ -1326,7 +1326,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#f87171' : '#4ade80'}`,
                   whiteSpace: 'nowrap',
                 }}>
-                  {stagedItem.quotaInfo.remainingQuantity} Units Left
+                  {stagedItem.quotaInfo.remainingQuantity} Left (Allocation)
                 </div>
               </div>
             )}
@@ -1384,7 +1384,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   }}
                 >
                   {stagedItem.quotaInfo?.quotaRestricted
-                    ? `${stagedItem.quotaInfo.remainingQuantity} Quota Left (${stagedItem.realQuantity} in WH)`
+                    ? `${stagedItem.quotaInfo.remainingQuantity} Left of Allocation (${stagedItem.realQuantity} in Stock)`
                     : `${stagedItem.realQuantity} ${stagedItem.product.unitOfMeasure || 'Units'} Available`}
                 </div>
               </div>
@@ -1504,7 +1504,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 >
                   {stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
                     <>
-                      <ShieldAlert size={14} /> Quota Reached
+                      <ShieldAlert size={14} /> Allocation Limit Reached
                     </>
                   ) : (
                     <>
@@ -1623,9 +1623,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                                 fontSize: '0.68rem',
                                 fontWeight: 700,
                               }}
-                              title={`Staff Quota Limit: ${item.quotaInfo.allocatedQuantity} allocated, ${item.quotaInfo.remainingQuantity} remaining`}
+                              title={`Allocation: ${item.quotaInfo.remainingQuantity} left of ${item.quotaInfo.allocatedQuantity} allocated`}
                             >
-                              Quota: {item.quotaInfo.remainingQuantity} max
+                              Allocation: {item.quotaInfo.remainingQuantity} left
                             </span>
                           )}
                         </div>

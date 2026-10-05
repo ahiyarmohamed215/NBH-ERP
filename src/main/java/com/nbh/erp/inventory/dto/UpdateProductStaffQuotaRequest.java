@@ -15,7 +15,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UpdateProductStaffQuotaRequest {
 
-    @PositiveOrZero(message = "Allocated quantity cannot be negative")
+    @PositiveOrZero(message = "Allowed quantity cannot be negative")
     private BigDecimal allocatedQuantity;
 
     @PositiveOrZero(message = "Sold quantity cannot be negative")

@@ -25,6 +25,8 @@ public class CreateCustomerGroupRequest {
 
     private List<Long> customerIds;
 
+    private Boolean isActive;
+
     // Backward compatibility aliases
     private String routeCode;
     private String routeName;

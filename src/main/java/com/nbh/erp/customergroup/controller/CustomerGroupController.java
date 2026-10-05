@@ -66,9 +66,9 @@ public class CustomerGroupController {
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE')")
     @Operation(summary = "Toggle active status of customer group")
-    public ResponseEntity<ApiResponse<Void>> toggleActive(@PathVariable Long id) {
-        customerGroupService.toggleActive(id);
-        return ResponseEntity.ok(ApiResponse.ok("Customer group status updated successfully", null));
+    public ResponseEntity<ApiResponse<CustomerGroupDto>> toggleActive(@PathVariable Long id) {
+        CustomerGroupDto updated = customerGroupService.toggleActive(id);
+        return ResponseEntity.ok(ApiResponse.ok("Customer group status updated successfully", updated));
     }
 
     @DeleteMapping("/{id}")

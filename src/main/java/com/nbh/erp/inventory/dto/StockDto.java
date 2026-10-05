@@ -32,11 +32,22 @@ public class StockDto {
     private Boolean isLowStock;
 
     public static StockDto from(StockBalance sb) {
+        return from(sb, com.nbh.erp.security.SecurityUtils.canViewCostPrice());
+    }
+
+    public static StockDto from(StockBalance sb, boolean allowCostPrice) {
+        if (sb == null) return null;
+
         BigDecimal qty = sb.getQuantity() != null ? sb.getQuantity() : BigDecimal.ZERO;
         BigDecimal reserved = sb.getReservedQuantity() != null ? sb.getReservedQuantity() : BigDecimal.ZERO;
         BigDecimal available = qty.subtract(reserved);
-        BigDecimal cost = sb.getProduct().getCostPrice() != null ? sb.getProduct().getCostPrice() : BigDecimal.ZERO;
-        BigDecimal totalValue = qty.multiply(cost);
+
+        BigDecimal cost = null;
+        BigDecimal totalValue = null;
+        if (allowCostPrice) {
+            cost = sb.getProduct().getCostPrice() != null ? sb.getProduct().getCostPrice() : BigDecimal.ZERO;
+            totalValue = qty.multiply(cost);
+        }
 
         int minLevel = sb.getProduct().getMinStockLevel() != null ? sb.getProduct().getMinStockLevel() : 0;
         boolean lowStock = qty.compareTo(BigDecimal.valueOf(minLevel)) <= 0;

@@ -42,3 +42,33 @@ export function canEditModule(user, module) {
   const required = permissionsMap[m] || [`${m}_MANAGE`, `${m}_EDIT`];
   return required.some((p) => permissions.includes(p));
 }
+
+/**
+ * Determines whether the user has permission to view product & inventory cost prices.
+ * Authorized staff include:
+ * - Super Admin, Admin, Manager, Director
+ * - Staff allocated with INVENTORY_COST_VIEW, INVENTORY_MANAGE, or PRODUCT_MANAGE permissions
+ */
+export function canViewCostPrice(user) {
+  if (!user) return false;
+  const roles = user.roles || [];
+  const permissions = user.permissions || [];
+
+  const isPrivilegedStaff = roles.some((r) => {
+    const s = String(r).toUpperCase();
+    return (
+      s.includes('ADMIN') ||
+      s.includes('SUPER') ||
+      s.includes('MANAGER') ||
+      s.includes('DIRECTOR')
+    );
+  });
+  if (isPrivilegedStaff) return true;
+
+  const allowedPerms = [
+    'INVENTORY_COST_VIEW',
+    'INVENTORY_MANAGE',
+    'PRODUCT_MANAGE',
+  ];
+  return allowedPerms.some((p) => permissions.includes(p));
+}

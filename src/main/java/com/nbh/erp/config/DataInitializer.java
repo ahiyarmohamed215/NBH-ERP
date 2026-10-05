@@ -92,6 +92,7 @@ public class DataInitializer implements ApplicationRunner {
                 new PermItem("INVENTORY", "INVENTORY_VIEW", "View stock balances across warehouses"),
                 new PermItem("INVENTORY", "INVENTORY_MANAGE", "Manage inventory movements and stocks"),
                 new PermItem("INVENTORY", "INVENTORY_ADJUST", "Perform and approve stock count adjustments"),
+                new PermItem("INVENTORY", "INVENTORY_COST_VIEW", "View inventory and product cost prices"),
                 new PermItem("GRN", "GRN_VIEW", "View Goods Received Notes from suppliers"),
                 new PermItem("GRN", "GRN_PROCESS", "Create and process incoming GRNs into stock"),
                 new PermItem("GTN", "GTN_VIEW", "View Goods Transfer Notes between warehouses"),

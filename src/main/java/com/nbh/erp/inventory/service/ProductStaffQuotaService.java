@@ -5,6 +5,7 @@ import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.inventory.dto.*;
 import com.nbh.erp.inventory.entity.ProductStaffQuota;
 import com.nbh.erp.inventory.repository.ProductStaffQuotaRepository;
+import com.nbh.erp.inventory.repository.StockBalanceRepository;
 import com.nbh.erp.product.entity.Product;
 import com.nbh.erp.product.repository.ProductRepository;
 import com.nbh.erp.user.entity.User;
@@ -33,6 +34,7 @@ public class ProductStaffQuotaService {
     private final UserRepository userRepository;
     private final WarehouseRepository warehouseRepository;
     private final StockService stockService;
+    private final StockBalanceRepository stockBalanceRepository;
 
     @Transactional(readOnly = true)
     public Page<ProductStaffQuotaDto> searchQuotas(
@@ -45,12 +47,16 @@ public class ProductStaffQuotaService {
     ) {
         return quotaRepository.searchQuotas(productId, userId, warehouseId, activeOnly, query, pageable)
                 .map(q -> {
-                    BigDecimal stock = BigDecimal.ZERO;
+                    BigDecimal totalStock = BigDecimal.ZERO;
+                    BigDecimal whStock = BigDecimal.ZERO;
                     if (q.getProduct() != null) {
+                        Long pId = q.getProduct().getId();
+                        BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(pId);
+                        totalStock = tot != null ? tot : BigDecimal.ZERO;
                         Long whId = q.getWarehouse() != null ? q.getWarehouse().getId() : (warehouseId != null ? warehouseId : 1L);
-                        stock = stockService.getAvailableStock(whId, q.getProduct().getId());
+                        whStock = stockService.getAvailableStock(whId, pId);
                     }
-                    return ProductStaffQuotaDto.fromEntity(q, stock);
+                    return ProductStaffQuotaDto.fromEntity(q, totalStock, whStock);
                 });
     }
 
@@ -58,12 +64,16 @@ public class ProductStaffQuotaService {
     public ProductStaffQuotaDto getQuotaById(Long id) {
         ProductStaffQuota quota = quotaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductStaffQuota", "id", id));
-        BigDecimal stock = BigDecimal.ZERO;
+        BigDecimal totalStock = BigDecimal.ZERO;
+        BigDecimal whStock = BigDecimal.ZERO;
         if (quota.getProduct() != null) {
+            Long pId = quota.getProduct().getId();
+            BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(pId);
+            totalStock = tot != null ? tot : BigDecimal.ZERO;
             Long whId = quota.getWarehouse() != null ? quota.getWarehouse().getId() : 1L;
-            stock = stockService.getAvailableStock(whId, quota.getProduct().getId());
+            whStock = stockService.getAvailableStock(whId, pId);
         }
-        return ProductStaffQuotaDto.fromEntity(quota, stock);
+        return ProductStaffQuotaDto.fromEntity(quota, totalStock, whStock);
     }
 
     @Transactional
@@ -76,8 +86,10 @@ public class ProductStaffQuotaService {
 
         Warehouse warehouse = null;
         if (request.getWarehouseId() != null) {
-            warehouse = warehouseRepository.findById(request.getWarehouseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+            warehouse = warehouseRepository.findById(request.getWarehouseId()).orElse(null);
+        }
+        if (warehouse == null && product.getDefaultWarehouse() != null) {
+            warehouse = product.getDefaultWarehouse();
         }
 
         // Check if an existing quota already exists for this (product, user, warehouse)
@@ -113,8 +125,10 @@ public class ProductStaffQuotaService {
 
         ProductStaffQuota saved = quotaRepository.save(quota);
         Long whId = saved.getWarehouse() != null ? saved.getWarehouse().getId() : 1L;
-        BigDecimal currentStock = stockService.getAvailableStock(whId, product.getId());
-        return ProductStaffQuotaDto.fromEntity(saved, currentStock);
+        BigDecimal whStock = stockService.getAvailableStock(whId, product.getId());
+        BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
+        BigDecimal totalStock = tot != null ? tot : BigDecimal.ZERO;
+        return ProductStaffQuotaDto.fromEntity(saved, totalStock, whStock);
     }
 
     @Transactional
@@ -143,8 +157,10 @@ public class ProductStaffQuotaService {
 
         ProductStaffQuota saved = quotaRepository.save(quota);
         Long whId = saved.getWarehouse() != null ? saved.getWarehouse().getId() : 1L;
-        BigDecimal currentStock = stockService.getAvailableStock(whId, saved.getProduct().getId());
-        return ProductStaffQuotaDto.fromEntity(saved, currentStock);
+        BigDecimal whStock = stockService.getAvailableStock(whId, saved.getProduct().getId());
+        BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(saved.getProduct().getId());
+        BigDecimal totalStock = tot != null ? tot : BigDecimal.ZERO;
+        return ProductStaffQuotaDto.fromEntity(saved, totalStock, whStock);
     }
 
     @Transactional
@@ -172,7 +188,7 @@ public class ProductStaffQuotaService {
                     .quotaRestricted(false)
                     .isAllowed(true)
                     .requestedQuantity(req)
-                    .message("No quota restrictions configured for this staff member")
+                    .message("No inventory allocation set for this staff member")
                     .build();
         }
 
@@ -185,7 +201,7 @@ public class ProductStaffQuotaService {
                     .quotaRestricted(false)
                     .isAllowed(true)
                     .requestedQuantity(req)
-                    .message("Quota is not yet active (starts " + quota.getValidFrom() + ")")
+                    .message("Allocation starts on " + quota.getValidFrom())
                     .build();
         }
         if (quota.getValidTo() != null && today.isAfter(quota.getValidTo())) {
@@ -198,7 +214,7 @@ public class ProductStaffQuotaService {
                     .requestedQuantity(req)
                     .staffName(quota.getUser() != null ? quota.getUser().getFullName() : "Staff")
                     .productName(quota.getProduct() != null ? quota.getProduct().getName() : "Product")
-                    .message("Quota expired on " + quota.getValidTo())
+                    .message("Allocation ended on " + quota.getValidTo())
                     .build();
         }
 
@@ -209,9 +225,9 @@ public class ProductStaffQuotaService {
         String prodName = quota.getProduct() != null ? quota.getProduct().getName() : "Product";
 
         String msg = allowed
-                ? String.format("Quota OK: Staff '%s' has %s units remaining (Allocated: %s, Sold: %s)",
+                ? String.format("Allocation OK: %s has %s left (Allocated: %s, Sold: %s)",
                     staffName, remaining, quota.getAllocatedQuantity(), quota.getSoldQuantity())
-                : String.format("Quota Exceeded: Staff '%s' has only %s units remaining for '%s' (Allocated: %s, Sold: %s), requested: %s",
+                : String.format("Allocation Limit Reached: %s has only %s left for '%s' (Allocated: %s, Sold: %s). You entered: %s",
                     staffName, remaining, prodName, quota.getAllocatedQuantity(), quota.getSoldQuantity(), req);
 
         return QuotaCheckResultDto.builder()
@@ -236,7 +252,7 @@ public class ProductStaffQuotaService {
         QuotaCheckResultDto check = checkStaffProductQuota(productId, userId, warehouseId, requestedQty);
         if (check.isQuotaRestricted() && !check.isAllowed()) {
             throw new BusinessException(
-                    String.format("POS Staff Quota Restriction: %s has only %s units remaining for '%s' (Allocated: %s, Sold: %s). Requested: %s. Increase staff quota in Inventory to bill.",
+                    String.format("Inventory Allocation Limit Reached: %s can only sell %s more of '%s' (Allocated: %s, Sold: %s). You entered: %s.",
                             check.getStaffName(),
                             check.getRemainingQuantity(),
                             check.getProductName(),

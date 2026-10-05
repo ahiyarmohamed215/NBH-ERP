@@ -33,6 +33,7 @@ INSERT INTO permissions (name, module, description, created_at, updated_at) VALU
 ('INVENTORY_VIEW', 'INVENTORY', 'View stock balances across warehouses', NOW(), NOW()),
 ('INVENTORY_MANAGE', 'INVENTORY', 'Manage inventory movements and stocks', NOW(), NOW()),
 ('INVENTORY_ADJUST', 'INVENTORY', 'Perform and approve stock count adjustments', NOW(), NOW()),
+('INVENTORY_COST_VIEW', 'INVENTORY', 'View inventory and product cost prices', NOW(), NOW()),
 ('GRN_VIEW', 'GRN', 'View Goods Received Notes from suppliers', NOW(), NOW()),
 ('GRN_PROCESS', 'GRN', 'Create and process incoming GRNs into stock', NOW(), NOW()),
 ('GTN_VIEW', 'GTN', 'View Goods Transfer Notes between warehouses', NOW(), NOW()),

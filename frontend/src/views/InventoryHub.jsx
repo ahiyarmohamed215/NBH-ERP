@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { canEditModule } from '../utils/permissionUtils';
+import { canEditModule, canViewCostPrice } from '../utils/permissionUtils';
 import MastersView from './MastersView';
 import {
   warehouseApi,
@@ -57,17 +57,18 @@ const INITIAL_ADJUSTMENTS = [];
 export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTabChange, onNavigate }) {
   const { user } = useAuth();
   const canEditInventory = canEditModule(user, 'INVENTORY');
+  const canSeeCost = canViewCostPrice(user);
   const { addToast } = useToast();
   const mastersRef = useRef(null);
 
   const INVENTORY_TABS = [
     { id: 'inventory-list', label: 'Inventory List', icon: Boxes },
+    { id: 'pos-quotas', label: 'Inventory Allocation', icon: ShieldCheck },
+    { id: 'warehouses', label: 'Warehouses', icon: Building2 },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'brands', label: 'Brands', icon: Award },
     { id: 'categories', label: 'Categories', icon: LayoutGrid },
-    { id: 'warehouses', label: 'Warehouses', icon: Building2 },
     { id: 'adjustments', label: 'Stock Adjustment', icon: SlidersHorizontal },
-    { id: 'pos-quotas', label: 'POS Staff Quotas', icon: ShieldCheck },
   ];
 
   const [currentTab, setCurrentTab] = useState(() => {
@@ -159,16 +160,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [salesStaff, setSalesStaff] = useState([]);
   const [loadingQuotas, setLoadingQuotas] = useState(false);
   const [quotaSearch, setQuotaSearch] = useState('');
-  const [quotaWarehouseFilter, setQuotaWarehouseFilter] = useState('ALL');
   const [quotaStatusFilter, setQuotaStatusFilter] = useState('ALL');
 
   // Quota Modal State
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [editingQuota, setEditingQuota] = useState(null);
+  const [viewingQuota, setViewingQuota] = useState(null);
+  const [showViewQuotaModal, setShowViewQuotaModal] = useState(false);
   const [quotaForm, setQuotaForm] = useState({
     productId: '',
     userId: '',
-    warehouseId: '',
     allocatedQuantity: '',
     notes: '',
   });
@@ -198,13 +199,17 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     }
   }, [currentTab]);
 
+  const handleViewQuota = (quota) => {
+    setViewingQuota(quota);
+    setShowViewQuotaModal(true);
+  };
+
   const handleOpenQuotaModal = (initialProduct = null, existingQuota = null) => {
     if (existingQuota) {
       setEditingQuota(existingQuota);
       setQuotaForm({
         productId: String(existingQuota.productId || ''),
         userId: String(existingQuota.userId || ''),
-        warehouseId: existingQuota.warehouseId ? String(existingQuota.warehouseId) : '',
         allocatedQuantity: String(existingQuota.allocatedQuantity || ''),
         notes: existingQuota.notes || '',
       });
@@ -213,7 +218,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       setQuotaForm({
         productId: initialProduct ? String(initialProduct.id || initialProduct.productId || '') : (productsList.length > 0 ? String(productsList[0].id) : ''),
         userId: salesStaff.length > 0 ? String(salesStaff[0].id) : '',
-        warehouseId: warehousesList.length > 0 ? String(warehousesList[0].id) : '',
         allocatedQuantity: '',
         notes: '',
       });
@@ -240,21 +244,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           allocatedQuantity: allocQty,
           notes: quotaForm.notes,
         });
-        addToast('Staff quota updated successfully', 'success');
+        addToast('Inventory allocation updated successfully', 'success');
       } else {
         await staffQuotaApi.create({
           productId: Number(quotaForm.productId),
           userId: Number(quotaForm.userId),
-          warehouseId: quotaForm.warehouseId ? Number(quotaForm.warehouseId) : null,
           allocatedQuantity: allocQty,
           notes: quotaForm.notes,
         });
-        addToast('Staff selling quota allocated successfully', 'success');
+        addToast('Inventory allocation saved successfully', 'success');
       }
       setShowQuotaModal(false);
       await loadQuotas();
     } catch (err) {
-      addToast('Failed to save staff quota: ' + (err.response?.data?.message || err.message), 'error');
+      addToast('Failed to save inventory allocation: ' + (err.response?.data?.message || err.message), 'error');
     } finally {
       setSavingQuota(false);
     }
@@ -262,33 +265,37 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
   const handleToggleQuotaStatus = async (quota) => {
     try {
+      const nextActive = !quota.isActive;
       await staffQuotaApi.update(quota.id, {
-        isActive: !quota.isActive,
+        isActive: nextActive,
       });
-      addToast(`Quota ${quota.isActive ? 'deactivated' : 'activated'}`, 'success');
+      addToast(`Inventory allocation ${nextActive ? 'activated' : 'deactivated'}`, 'success');
+      if (viewingQuota && viewingQuota.id === quota.id) {
+        setViewingQuota({ ...viewingQuota, isActive: nextActive, status: nextActive ? 'ACTIVE' : 'INACTIVE' });
+      }
       await loadQuotas();
     } catch (err) {
-      addToast('Failed to toggle quota: ' + (err.response?.data?.message || err.message), 'error');
+      addToast('Failed to change allocation status: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
   const filteredQuotas = useMemo(() => {
     return quotas.filter((q) => {
-      if (quotaWarehouseFilter !== 'ALL' && q.warehouseId && String(q.warehouseId) !== String(quotaWarehouseFilter)) {
+      if (quotaStatusFilter === 'ACTIVE' && !q.isActive) {
         return false;
       }
-      if (quotaStatusFilter !== 'ALL' && q.status !== quotaStatusFilter) {
+      if (quotaStatusFilter === 'INACTIVE' && q.isActive) {
         return false;
       }
       if (quotaSearch.trim()) {
         const qLower = quotaSearch.toLowerCase();
         const prodMatch = (q.productName || '').toLowerCase().includes(qLower) || (q.productSku || '').toLowerCase().includes(qLower);
-        const staffMatch = (q.userFullName || '').toLowerCase().includes(qLower) || (q.username || '').toLowerCase().includes(qLower);
+        const staffMatch = (q.userFullName || '').toLowerCase().includes(qLower) || (q.username || '').toLowerCase().includes(qLower) || (q.userEmployeeCode || '').toLowerCase().includes(qLower);
         return prodMatch || staffMatch;
       }
       return true;
     });
-  }, [quotas, quotaWarehouseFilter, quotaStatusFilter, quotaSearch]);
+  }, [quotas, quotaStatusFilter, quotaSearch]);
 
   // -------------------------------------------------------------
   // INVENTORY LIST (LIVE BALANCES) TAB STATE & LOGIC
@@ -335,7 +342,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             const qty = Number(b.quantity ?? 0);
             const reserved = Number(b.reservedQuantity ?? 0);
             const avail = Number(b.availableQuantity ?? (qty - reserved));
-            const cost = Number(b.costPrice ?? prod?.costPrice ?? 0);
+            const cost = canSeeCost ? Number(b.costPrice ?? prod?.costPrice ?? 0) : null;
             const sell = Number(b.sellingPrice ?? prod?.sellingPrice ?? 0);
             const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 5);
             return {
@@ -354,7 +361,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               availableQuantity: avail,
               costPrice: cost,
               sellingPrice: sell,
-              totalCostValue: Number(b.totalCostValue ?? (qty * cost)),
+              totalCostValue: canSeeCost ? Number(b.totalCostValue ?? (qty * (cost || 0))) : null,
               minStockLevel: min,
               isLowStock: qty <= min && qty > 0,
               isOutOfStock: qty <= 0,
@@ -427,7 +434,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       'Category',
       'Unit',
       'Quantity',
-      'Cost Price (LKR)',
+      ...(canSeeCost ? ['Cost Price (LKR)'] : []),
       'Selling Price (LKR)',
       'Min Stock Level',
       'Stock Status',
@@ -440,7 +447,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       `"${(item.categoryName || '').replace(/"/g, '""')}"`,
       `"${item.unitOfMeasure || 'PCS'}"`,
       item.quantity ?? 0,
-      (Number(item.costPrice) || 0).toFixed(2),
+      ...(canSeeCost ? [(Number(item.costPrice) || 0).toFixed(2)] : []),
       (Number(item.sellingPrice) || 0).toFixed(2),
       item.minStockLevel ?? 0,
       item.isOutOfStock ? 'Out of Stock' : item.isLowStock ? 'Low Stock Alert' : 'In Stock',
@@ -454,6 +461,44 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     link.click();
     document.body.removeChild(link);
     addToast('Inventory list exported to CSV', 'success');
+  };
+
+  const handleExportQuotasCSV = () => {
+    if (filteredQuotas.length === 0) {
+      addToast('No inventory allocation records to export', 'error');
+      return;
+    }
+    const headers = [
+      'SKU',
+      'Product Name',
+      'Staff Member',
+      'Username',
+      'Employee Code',
+      'Total Stock Available',
+      'Given to Staff',
+      'Unit',
+      'Status',
+    ];
+    const rows = filteredQuotas.map((q) => [
+      `"${(q.productSku || '').replace(/"/g, '""')}"`,
+      `"${(q.productName || '').replace(/"/g, '""')}"`,
+      `"${(q.userFullName || q.username || '').replace(/"/g, '""')}"`,
+      `"${(q.username || '').replace(/"/g, '""')}"`,
+      `"${(q.userEmployeeCode || '').replace(/"/g, '""')}"`,
+      Number(q.totalStockAvailable ?? q.currentStockInWarehouse ?? 0),
+      Number(q.allocatedQuantity || 0),
+      `"${q.productUnit || 'Units'}"`,
+      q.isActive ? 'Active' : 'Inactive',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `inventory_allocation_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Inventory allocation exported to CSV', 'success');
   };
 
   const handleNavigateGTN = () => {
@@ -706,7 +751,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               cursor: 'pointer',
             }}
           >
-            <ShieldCheck size={17} /> Allocate Staff Quota
+            <Plus size={17} /> Add Allocation
           </button>
         ) : currentTab === 'adjustments' ? (
           <button
@@ -1071,7 +1116,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUANTITY</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>COST PRICE</th>
+                    {canSeeCost && (
+                      <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>COST PRICE</th>
+                    )}
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>POS QUOTA</th>
@@ -1080,13 +1127,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <tbody>
                   {inventoryLoading ? (
                     <tr>
-                      <td colSpan="10" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan={canSeeCost ? 10 : 9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading live inventory balances...
                       </td>
                     </tr>
                   ) : filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan="10" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan={canSeeCost ? 10 : 9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No inventory records found matching current criteria.
                       </td>
                     </tr>
@@ -1147,9 +1194,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         <td style={{ padding: '12px 16px', fontWeight: 700, color: item.quantity > 0 ? '#0f172a' : '#dc2626' }}>
                           {item.quantity.toLocaleString()} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>{item.unitOfMeasure}</span>
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>
-                          Rs. {Number(item.costPrice || 0).toFixed(2)}
-                        </td>
+                        {canSeeCost && (
+                          <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>
+                            Rs. {Number(item.costPrice || 0).toFixed(2)}
+                          </td>
+                        )}
                         <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>
                           Rs. {Number(item.sellingPrice || 0).toFixed(2)}
                         </td>
@@ -1741,175 +1790,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           </div>
         </div>
       )}
-
       {/* ------------------------------------------------------------- */}
-      {/* 6. POS STAFF QUOTAS TAB (Product Selling Limits per Sales Rep) */}
+      {/* 6. INVENTORY ALLOCATION TAB (Product Quantity Allocated per Staff Member) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'pos-quotas' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           
-          {/* Top KPI Cards */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '16px',
-              flexShrink: 0,
-            }}
-          >
-            {/* Card 1: Active Quotas */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: '#e0f2fe',
-                  color: '#0284c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Active Quotas
-                </p>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>
-                  {quotaSummary?.activeQuotas ?? quotas.filter((q) => q.isActive).length}
-                </h3>
-              </div>
-            </div>
-
-            {/* Card 2: Total Units Allocated */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: '#ede9fe',
-                  color: '#7c3aed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Boxes size={22} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Total Allocated Units
-                </p>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>
-                  {Number(quotaSummary?.totalAllocatedUnits ?? 0).toLocaleString()}
-                </h3>
-              </div>
-            </div>
-
-            {/* Card 3: Sold / Billed Units */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: '#dcfce7',
-                  color: '#16a34a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <TrendingUp size={22} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Sold / Billed Units
-                </p>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>
-                  {Number(quotaSummary?.totalSoldUnits ?? 0).toLocaleString()}
-                </h3>
-              </div>
-            </div>
-
-            {/* Card 4: Exhausted / Blocked Quotas */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <AlertCircle size={22} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Exhausted (Limit Reached)
-                </p>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 800, color: '#dc2626' }}>
-                  {quotaSummary?.exhaustedQuotas ?? quotas.filter((q) => q.status === 'EXHAUSTED').length}
-                </h3>
-              </div>
-            </div>
-          </div>
-
           {/* Search Bar & Filter Controls */}
           <div
             style={{
@@ -1922,12 +1808,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               justifyContent: 'space-between',
               gap: '12px',
               width: '100%',
+              maxWidth: '100%',
               boxSizing: 'border-box',
+              flexWrap: 'nowrap',
               flexShrink: 0,
             }}
           >
             {/* Search */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
               <Search
                 size={16}
                 style={{
@@ -1940,7 +1828,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               />
               <input
                 type="text"
-                placeholder="Search quota by product SKU, name, or staff member..."
+                placeholder="Search allocation by product SKU, name, or staff member..."
                 value={quotaSearch}
                 onChange={(e) => setQuotaSearch(e.target.value)}
                 style={{
@@ -1953,6 +1841,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
+                  boxSizing: 'border-box',
                 }}
               />
               {quotaSearch && (
@@ -1974,97 +1863,105 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
             </div>
 
-            {/* Warehouse Filter */}
-            <select
-              value={quotaWarehouseFilter}
-              onChange={(e) => setQuotaWarehouseFilter(e.target.value)}
-              style={{
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
-                backgroundColor: '#ffffff',
-                color: '#334155',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="ALL">All Warehouses</option>
-              {warehousesList.map((w) => (
-                <option key={w.id} value={String(w.id)}>{w.name}</option>
-              ))}
-            </select>
+            {/* Right Controls: Status Filter, Export CSV (Icon only), Refresh (Icon only) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
+              {/* Status Filter */}
+              <select
+                value={quotaStatusFilter}
+                onChange={(e) => setQuotaStatusFilter(e.target.value)}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="ALL">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
 
-            {/* Status Filter */}
-            <select
-              value={quotaStatusFilter}
-              onChange={(e) => setQuotaStatusFilter(e.target.value)}
-              style={{
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
-                backgroundColor: '#ffffff',
-                color: '#334155',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="ALL">All Status</option>
-              <option value="ACTIVE">Active (Selling Allowed)</option>
-              <option value="EXHAUSTED">Exhausted (Limit Reached)</option>
-              <option value="INACTIVE">Inactive (Disabled)</option>
-            </select>
+              {/* Export CSV - Icon only */}
+              <button
+                type="button"
+                onClick={handleExportQuotasCSV}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+                title="Export inventory allocation to CSV"
+              >
+                <Download size={15} />
+              </button>
 
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={loadQuotas}
-              disabled={loadingQuotas}
-              style={{
-                height: '38px',
-                padding: '0 12px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                backgroundColor: '#f8fafc',
-                color: '#475569',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="Refresh Quotas"
-            >
-              <RefreshCw size={15} className={loadingQuotas ? 'animate-spin' : ''} />
-            </button>
-
-            {/* + Allocate Button */}
-            <button
-              type="button"
-              onClick={() => handleOpenQuotaModal()}
-              style={{
-                height: '38px',
-                padding: '0 16px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
-              }}
-            >
-              <Plus size={16} /> Allocate Quota
-            </button>
+              {/* Refresh Records - Icon only */}
+              <button
+                type="button"
+                onClick={loadQuotas}
+                disabled={loadingQuotas}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+                title="Refresh inventory allocations"
+              >
+                <RefreshCw size={15} className={loadingQuotas ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
 
-          {/* Quotas Data Table */}
+          {/* Inventory Allocation Data Table */}
           <div
             style={{
               flex: 1,
@@ -2083,11 +1980,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>PRODUCT</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>STAFF / SALES REP</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>WAREHOUSE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>ALLOCATED</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>SOLD / BILLED</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>REMAINING LIMIT</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>STAFF MEMBER</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>TOTAL STOCK AVAILABLE</th>
+                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>GIVEN TO STAFF</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10 }}>STATUS</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, textAlign: 'center' }}>ACTIONS</th>
                   </tr>
@@ -2095,70 +1990,69 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <tbody>
                   {loadingQuotas ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                        Loading staff quota allocations...
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        Loading inventory allocations...
                       </td>
                     </tr>
                   ) : filteredQuotas.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                           <ShieldCheck size={36} color="#94a3b8" />
-                          <p style={{ margin: 0, fontWeight: 600, color: '#334155' }}>No staff quotas configured</p>
+                          <p style={{ margin: 0, fontWeight: 600, color: '#334155' }}>No inventory allocations set</p>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                            Allocate product selling limits to sales reps so they don't fight over warehouse stock.
+                            Allocate product quantity to staff members so stock is distributed fairly in POS.
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenQuotaModal()}
-                            style={{
-                              marginTop: '8px',
-                              padding: '6px 14px',
-                              backgroundColor: '#0284c7',
-                              color: '#fff',
-                              borderRadius: '6px',
-                              border: 'none',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            + Allocate First Quota
-                          </button>
+                          {canEditInventory && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenQuotaModal()}
+                              style={{
+                                marginTop: '8px',
+                                padding: '6px 14px',
+                                backgroundColor: '#0284c7',
+                                color: '#fff',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '0.82rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              + Add First Allocation
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ) : (
                     filteredQuotas.map((q) => {
-                      const utilPct = q.utilizationPercentage || 0;
-                      const isExhausted = q.status === 'EXHAUSTED';
-                      const isInactive = q.status === 'INACTIVE';
+                      const isInactive = !q.isActive;
+                      const totalAvail = Number(q.totalStockAvailable ?? q.currentStockInWarehouse ?? 0);
+                      const givenQty = Number(q.allocatedQuantity || 0);
 
                       return (
                         <tr
                           key={q.id}
+                          onClick={() => handleViewQuota(q)}
                           style={{
                             borderBottom: '1px solid #f1f5f9',
                             backgroundColor: isInactive ? '#fafafa' : '#ffffff',
-                            transition: 'background-color 0.1s ease',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.12s ease',
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isInactive ? '#f5f5f5' : '#f8fafc')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isInactive ? '#fafafa' : '#ffffff')}
                         >
                           {/* Product */}
                           <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{q.productName}</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{q.productName}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                               <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>{q.productSku}</span>
-                              {q.currentStockInWarehouse !== undefined && (
-                                <span style={{ fontSize: '0.72rem', backgroundColor: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px' }}>
-                                  Stock: {q.currentStockInWarehouse} {q.productUnit || ''}
-                                </span>
-                              )}
                             </div>
                           </td>
 
-                          {/* Staff / Sales Rep */}
+                          {/* Staff Member */}
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div
@@ -2189,163 +2083,121 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             </div>
                           </td>
 
-                          {/* Warehouse */}
+                          {/* Total Stock Available */}
                           <td style={{ padding: '12px 16px' }}>
-                            <span
-                              style={{
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                color: '#334155',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.78rem',
-                                fontWeight: 600,
-                              }}
-                            >
-                              {q.warehouseName || 'All Warehouses'}
-                            </span>
-                          </td>
-
-                          {/* Allocated Quantity */}
-                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
-                            {Number(q.allocatedQuantity || 0).toLocaleString()} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>{q.productUnit || ''}</span>
-                          </td>
-
-                          {/* Sold / Billed with progress */}
-                          <td style={{ padding: '12px 16px', minWidth: '130px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                              <span>{Number(q.soldQuantity || 0).toLocaleString()}</span>
-                              <span style={{ color: '#64748b', fontSize: '0.75rem' }}>{utilPct}%</span>
-                            </div>
-                            <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div
-                                style={{
-                                  width: `${Math.min(100, utilPct)}%`,
-                                  height: '100%',
-                                  backgroundColor: isExhausted ? '#dc2626' : utilPct > 75 ? '#f59e0b' : '#0284c7',
-                                  borderRadius: '3px',
-                                  transition: 'width 0.3s ease',
-                                }}
-                              />
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 10px', borderRadius: '6px' }}>
+                              <Package size={14} color="#64748b" />
+                              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                                {totalAvail.toLocaleString()}
+                              </span>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
+                                {q.productUnit || 'Units'}
+                              </span>
                             </div>
                           </td>
 
-                          {/* Remaining Limit */}
+                          {/* Given to Staff */}
                           <td style={{ padding: '12px 16px' }}>
-                            {isExhausted ? (
-                              <span
-                                style={{
-                                  backgroundColor: '#fee2e2',
-                                  color: '#dc2626',
-                                  padding: '4px 9px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
-                              >
-                                <Ban size={12} /> 0 Left (Blocked)
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 10px', borderRadius: '6px' }}>
+                              <UserCheck size={14} color="#0284c7" />
+                              <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '0.92rem' }}>
+                                {givenQty.toLocaleString()}
                               </span>
-                            ) : Number(q.remainingQuantity || 0) <= 5 ? (
-                              <span
-                                style={{
-                                  backgroundColor: '#fef3c7',
-                                  color: '#b45309',
-                                  padding: '4px 9px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
-                              >
-                                <AlertTriangle size={12} /> {Number(q.remainingQuantity || 0).toLocaleString()} {q.productUnit || ''} left
+                              <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
+                                {q.productUnit || 'Units'}
                               </span>
-                            ) : (
-                              <span
-                                style={{
-                                  backgroundColor: '#dcfce7',
-                                  color: '#15803d',
-                                  padding: '4px 9px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                }}
-                              >
-                                <CheckCircle size={12} /> {Number(q.remainingQuantity || 0).toLocaleString()} {q.productUnit || ''} avail
-                              </span>
-                            )}
+                            </div>
                           </td>
 
-                          {/* Status */}
-                          <td style={{ padding: '12px 16px' }}>
-                            <span
+                          {/* Status (Clickable to switch Active / Inactive) */}
+                          <td style={{ padding: '12px 16px' }} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleQuotaStatus(q)}
+                              title={`Click to switch to ${q.isActive ? 'INACTIVE' : 'ACTIVE'}`}
                               style={{
-                                backgroundColor: isInactive ? '#f1f5f9' : isExhausted ? '#fff1f2' : '#f0fdf4',
-                                color: isInactive ? '#64748b' : isExhausted ? '#e11d48' : '#16a34a',
-                                border: `1px solid ${isInactive ? '#cbd5e1' : isExhausted ? '#fecdd3' : '#bbf7d0'}`,
-                                padding: '3px 8px',
-                                borderRadius: '4px',
+                                backgroundColor: isInactive ? '#f1f5f9' : '#f0fdf4',
+                                color: isInactive ? '#64748b' : '#16a34a',
+                                border: `1px solid ${isInactive ? '#cbd5e1' : '#bbf7d0'}`,
+                                padding: '4px 10px',
+                                borderRadius: '20px',
                                 fontSize: '0.74rem',
                                 fontWeight: 700,
                                 textTransform: 'uppercase',
-                                letterSpacing: '0.03em',
+                                letterSpacing: '0.04em',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease',
                               }}
                             >
-                              {q.status}
-                            </span>
+                              <span
+                                style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  backgroundColor: isInactive ? '#94a3b8' : '#16a34a',
+                                }}
+                              />
+                              {q.isActive ? 'ACTIVE' : 'INACTIVE'}
+                            </button>
                           </td>
 
                           {/* Actions */}
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              {/* Edit / Adjust Quota */}
+                              {/* View Details */}
                               <button
                                 type="button"
-                                onClick={() => handleOpenQuotaModal(null, q)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewQuota(q);
+                                }}
                                 style={{
-                                  width: '28px',
-                                  height: '28px',
+                                  width: '30px',
+                                  height: '30px',
                                   borderRadius: '6px',
                                   border: '1px solid #cbd5e1',
                                   backgroundColor: '#ffffff',
-                                  color: '#0284c7',
+                                  color: '#475569',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
                                 }}
-                                title="Edit / Adjust Quota Limit"
+                                title="View Details"
                               >
-                                <Edit2 size={13} />
+                                <Eye size={14} />
                               </button>
 
-                              {/* Toggle Active / Inactive */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleQuotaStatus(q)}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #cbd5e1',
-                                  backgroundColor: '#ffffff',
-                                  color: q.isActive ? '#eab308' : '#16a34a',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  cursor: 'pointer',
-                                }}
-                                title={q.isActive ? 'Deactivate Quota' : 'Activate Quota'}
-                              >
-                                {q.isActive ? <Ban size={13} /> : <CheckCircle size={13} />}
-                              </button>
+                              {/* Edit Allocation */}
+                              {canEditInventory && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenQuotaModal(null, q);
+                                  }}
+                                  style={{
+                                    width: '30px',
+                                    height: '30px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0284c7',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                  }}
+                                  title="Edit Allocation"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2360,7 +2212,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Allocate / Adjust Staff Selling Quota */}
+      {/* MODAL: Set / Edit Inventory Allocation */}
       {/* ------------------------------------------------------------- */}
       {showQuotaModal && (
         <div
@@ -2380,7 +2232,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           <div
             style={{
               width: '100%',
-              maxWidth: '560px',
+              maxWidth: '520px',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -2393,7 +2245,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             {/* Modal Header */}
             <div
               style={{
-                padding: '18px 24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
@@ -2417,11 +2269,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   <ShieldCheck size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                    {editingQuota ? 'Adjust POS Selling Quota' : 'Allocate Product Quota to Staff'}
+                  <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 700, color: '#0f172a' }}>
+                    {editingQuota ? 'Edit Inventory Allocation' : 'New Inventory Allocation'}
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    Restrict max units this sales rep can bill to ensure fair stock distribution
+                    Allocate product quantity to staff member for POS selling
                   </p>
                 </div>
               </div>
@@ -2442,11 +2294,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveQuota} style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleSaveQuota} style={{ padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Product Select */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Target Product <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  Product <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <select
                   disabled={!!editingQuota}
@@ -2454,7 +2306,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   onChange={(e) => setQuotaForm({ ...quotaForm, productId: e.target.value })}
                   style={{
                     width: '100%',
-                    height: '40px',
+                    height: '38px',
                     padding: '0 12px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
@@ -2465,7 +2317,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   }}
                   required
                 >
-                  <option value="">Select product to restrict / allocate...</option>
+                  <option value="">Select product...</option>
                   {productsList.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.sku})
@@ -2474,10 +2326,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 </select>
               </div>
 
-              {/* Staff / Sales Rep Select */}
+              {/* Staff Member Select */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Sales Rep / POS Staff Member <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  Staff Member <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <select
                   disabled={!!editingQuota}
@@ -2485,7 +2337,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   onChange={(e) => setQuotaForm({ ...quotaForm, userId: e.target.value })}
                   style={{
                     width: '100%',
-                    height: '40px',
+                    height: '38px',
                     padding: '0 12px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
@@ -2496,7 +2348,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   }}
                   required
                 >
-                  <option value="">Select sales rep or POS staff...</option>
+                  <option value="">Select staff member...</option>
                   {salesStaff.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.fullName || s.username} ({s.username}) {s.employeeCode ? `[${s.employeeCode}]` : ''}
@@ -2504,44 +2356,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   ))}
                 </select>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
-                  Only this staff member will be restricted by this limit when billing in POS or Sales Invoices.
+                  This allocation will apply to this staff member when billing in POS.
                 </p>
-              </div>
-
-              {/* Warehouse Select */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Warehouse Facility
-                </label>
-                <select
-                  disabled={!!editingQuota}
-                  value={quotaForm.warehouseId}
-                  onChange={(e) => setQuotaForm({ ...quotaForm, warehouseId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    height: '40px',
-                    padding: '0 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.88rem',
-                    backgroundColor: editingQuota ? '#f1f5f9' : '#ffffff',
-                    color: '#0f172a',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="">All Warehouses (Global Quota)</option>
-                  {warehousesList.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} ({w.code})
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Allocated Quantity Input */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Allocated Selling Limit (Units) <span style={{ color: '#ef4444' }}>*</span>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  Allocated Quantity <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   type="number"
@@ -2552,7 +2374,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   onChange={(e) => setQuotaForm({ ...quotaForm, allocatedQuantity: e.target.value })}
                   style={{
                     width: '100%',
-                    height: '40px',
+                    height: '38px',
                     padding: '0 12px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
@@ -2564,18 +2386,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   required
                 />
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
-                  Once this staff member bills this quantity, the system will prevent further sales until quota is increased.
+                  Once this staff sells this allocated quantity, POS will stop them from adding more.
                 </p>
               </div>
 
               {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Notes / Distribution Reason
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  Notes
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g., Weekly ration for Western route customers..."
+                  placeholder="Optional notes..."
                   value={quotaForm.notes}
                   onChange={(e) => setQuotaForm({ ...quotaForm, notes: e.target.value })}
                   style={{
@@ -2598,8 +2420,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   alignItems: 'center',
                   justifyContent: 'flex-end',
                   gap: '10px',
-                  marginTop: '12px',
-                  paddingTop: '16px',
+                  marginTop: '10px',
+                  paddingTop: '14px',
                   borderTop: '1px solid #f1f5f9',
                 }}
               >
@@ -2637,10 +2459,285 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     gap: '6px',
                   }}
                 >
-                  {savingQuota ? 'Saving...' : editingQuota ? 'Save Changes' : 'Confirm Allocation'}
+                  {savingQuota ? 'Saving...' : editingQuota ? 'Save Changes' : 'Save Allocation'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: View Inventory Allocation Details Popup */}
+      {/* ------------------------------------------------------------- */}
+      {showViewQuotaModal && viewingQuota && (
+        <div
+          className="modal-backdrop"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            zIndex: 1200,
+          }}
+          onClick={() => setShowViewQuotaModal(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '540px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#f8fafc',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 700, color: '#0f172a' }}>
+                    Inventory Allocation Details
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    Staff product limit and available inventory
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowViewQuotaModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Key Metrics: Total Stock Available vs Given to Staff */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Total Stock Available
+                  </span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f172a' }}>
+                    {Number(viewingQuota.totalStockAvailable ?? viewingQuota.currentStockInWarehouse ?? 0).toLocaleString()}{' '}
+                    <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>{viewingQuota.productUnit || 'Units'}</span>
+                  </div>
+                  <span style={{ fontSize: '0.73rem', color: '#94a3b8' }}>Total enterprise inventory</span>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Given to Staff
+                  </span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0284c7' }}>
+                    {Number(viewingQuota.allocatedQuantity || 0).toLocaleString()}{' '}
+                    <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600 }}>{viewingQuota.productUnit || 'Units'}</span>
+                  </div>
+                  <span style={{ fontSize: '0.73rem', color: '#0284c7' }}>Allocated selling limit</span>
+                </div>
+              </div>
+
+              {/* Details List */}
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
+                {/* Product */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Product</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{viewingQuota.productName}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>SKU: {viewingQuota.productSku}</div>
+                  </div>
+                </div>
+
+                <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
+
+                {/* Staff Member */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Staff Member</span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                      {viewingQuota.userFullName || viewingQuota.username}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      @{viewingQuota.username} {viewingQuota.userEmployeeCode ? `• ${viewingQuota.userEmployeeCode}` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
+
+                {/* Status with Toggle */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Status</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleQuotaStatus(viewingQuota)}
+                    title={`Click to switch to ${viewingQuota.isActive ? 'INACTIVE' : 'ACTIVE'}`}
+                    style={{
+                      backgroundColor: !viewingQuota.isActive ? '#f1f5f9' : '#f0fdf4',
+                      color: !viewingQuota.isActive ? '#64748b' : '#16a34a',
+                      border: `1px solid ${!viewingQuota.isActive ? '#cbd5e1' : '#bbf7d0'}`,
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: !viewingQuota.isActive ? '#94a3b8' : '#16a34a',
+                      }}
+                    />
+                    {viewingQuota.isActive ? 'ACTIVE' : 'INACTIVE'} (Click to toggle)
+                  </button>
+                </div>
+
+                {viewingQuota.notes && (
+                  <>
+                    <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Notes</span>
+                      <span style={{ fontSize: '0.82rem', color: '#334155', maxWidth: '65%', textAlign: 'right' }}>
+                        {viewingQuota.notes}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                backgroundColor: '#f8fafc',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowViewQuotaModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+              {canEditInventory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowViewQuotaModal(false);
+                    handleOpenQuotaModal(null, viewingQuota);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Edit2 size={14} />
+                  <span>Edit Allocation</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2651,97 +2748,60 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {showCreateModal && (
         <div
           className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '12px', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <div
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '720px',
-              padding: '24px 28px',
+              maxWidth: '680px',
+              padding: '16px 20px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              maxHeight: '92vh',
-              overflowY: 'auto',
+              maxHeight: '96vh',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, color: '#0f172a' }}>
                   {editingRecord ? `Edit Stock Adjustment (${editingRecord.recordNo})` : 'New Stock Adjustment'}
                 </h3>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  First choose what should happen to inventory. No action is selected by default.
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                  Adjust warehouse inventory quantities and record reason for audit compliance.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px', borderRadius: '4px' }}
                 title="Close"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRecord} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* What do you want to do? */}
+            <form onSubmit={handleSaveRecord} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Action Selector */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
-                  What do you want to do? *
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  {/* Reduce stock card */}
-                  <div
-                    onClick={() => {
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        type: 'Reduction',
-                        reason: prev.reason || 'Stock count variance',
-                      }));
-                    }}
-                    style={{
-                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1px solid #e2e8f0',
-                      backgroundColor: '#ffffff',
-                      borderRadius: '8px',
-                      padding: '14px 16px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      transition: 'all 0.15s ease',
-                      boxShadow: createForm.type === 'Reduction' ? '0 0 0 1px #ef4444' : 'none',
-                    }}
-                  >
-                    <div style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: createForm.type === 'Reduction' ? '#ef4444' : '#94a3b8',
-                      flexShrink: 0,
-                      marginTop: '1px',
-                    }}>
-                      <Minus size={13} strokeWidth={2.5} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
-                        Reduce stock
-                      </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', lineHeight: 1.35 }}>
-                        Remove units already held in an existing batch.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Add stock card */}
-                  <div
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                    Adjustment Action *
+                  </label>
+                  {createForm.type && (
+                    <span style={{ fontSize: '0.74rem', color: createForm.type === 'Addition' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                      {createForm.type === 'Addition' ? '✓ Adds new units to available inventory' : '✓ Deducts units from existing inventory'}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {/* Add stock button */}
+                  <button
+                    type="button"
                     onClick={() => {
                       setCreateForm((prev) => ({
                         ...prev,
@@ -2751,86 +2811,105 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     }}
                     style={{
                       border: createForm.type === 'Addition' ? '2px solid #22c55e' : '1px solid #e2e8f0',
-                      backgroundColor: '#ffffff',
+                      backgroundColor: createForm.type === 'Addition' ? '#f0fdf4' : '#ffffff',
                       borderRadius: '8px',
-                      padding: '14px 16px',
+                      padding: '7px 12px',
                       cursor: 'pointer',
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
+                      alignItems: 'center',
+                      gap: '10px',
                       transition: 'all 0.15s ease',
-                      boxShadow: createForm.type === 'Addition' ? '0 0 0 1px #22c55e' : 'none',
+                      textAlign: 'left',
                     }}
                   >
                     <div style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '22px',
+                      height: '22px',
                       borderRadius: '50%',
-                      border: createForm.type === 'Addition' ? '2px solid #22c55e' : '1.5px solid #cbd5e1',
+                      backgroundColor: createForm.type === 'Addition' ? '#22c55e' : '#f1f5f9',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: createForm.type === 'Addition' ? '#16a34a' : '#94a3b8',
+                      color: createForm.type === 'Addition' ? '#ffffff' : '#64748b',
                       flexShrink: 0,
-                      marginTop: '1px',
                     }}>
-                      <Plus size={14} strokeWidth={2.5} />
+                      <Plus size={13} strokeWidth={2.5} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
-                        Add stock
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
+                        Add Stock
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', lineHeight: 1.35 }}>
-                        Create new available units and record their cost.
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Increase physical on-hand units
                       </div>
                     </div>
-                  </div>
+                  </button>
+
+                  {/* Reduce stock button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        type: 'Reduction',
+                        reason: prev.reason || 'Stock count variance',
+                      }));
+                    }}
+                    style={{
+                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                      backgroundColor: createForm.type === 'Reduction' ? '#fef2f2' : '#ffffff',
+                      borderRadius: '8px',
+                      padding: '7px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      backgroundColor: createForm.type === 'Reduction' ? '#ef4444' : '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: createForm.type === 'Reduction' ? '#ffffff' : '#64748b',
+                      flexShrink: 0,
+                    }}>
+                      <Minus size={13} strokeWidth={2.5} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
+                        Reduce Stock
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        Deduct damage, variance, or losses
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              {/* Notice Banner */}
-              {!createForm.type ? (
+              {/* Notice when no action selected */}
+              {!createForm.type && (
                 <div
                   style={{
                     backgroundColor: '#fffbeb',
                     border: '1px solid #fef3c7',
                     borderRadius: '6px',
-                    padding: '12px 14px',
+                    padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    gap: '8px',
                     color: '#92400e',
-                    fontSize: '0.84rem',
+                    fontSize: '0.78rem',
                   }}
                 >
-                  <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
-                  <span>Select an action above to continue.</span>
-                </div>
-              ) : createForm.type === 'Addition' ? (
-                <div
-                  style={{
-                    backgroundColor: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '6px',
-                    padding: '10px 14px',
-                    color: '#166534',
-                    fontSize: '0.84rem',
-                  }}
-                >
-                  You are adding stock. The quantity entered below will be added as new available inventory.
-                </div>
-              ) : (
-                <div
-                  style={{
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '6px',
-                    padding: '10px 14px',
-                    color: '#991b1b',
-                    fontSize: '0.84rem',
-                  }}
-                >
-                  You are reducing stock. The quantity entered below will be deducted from existing batch inventory.
+                  <AlertTriangle size={14} color="#d97706" style={{ flexShrink: 0 }} />
+                  <span>Please choose whether to Add Stock or Reduce Stock above to continue.</span>
                 </div>
               )}
 
@@ -2838,9 +2917,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               {createForm.type && (
                 <>
                   {/* Row 1: Warehouse, Product, Quantity */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 0.8fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr 0.8fr', gap: '10px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Warehouse *
                       </label>
                       <select
@@ -2848,11 +2927,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
                         style={{
                           width: '100%',
-                          height: '38px',
-                          padding: '0 10px',
+                          height: '34px',
+                          padding: '0 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
+                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.warehouseId ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2869,7 +2948,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Product *
                       </label>
                       <select
@@ -2884,11 +2963,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         }}
                         style={{
                           width: '100%',
-                          height: '38px',
-                          padding: '0 10px',
+                          height: '34px',
+                          padding: '0 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
+                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.productId ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2905,7 +2984,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Quantity *
                       </label>
                       <input
@@ -2917,11 +2996,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         onChange={(e) => setCreateForm({ ...createForm, quantity: e.target.value })}
                         style={{
                           width: '100%',
-                          height: '38px',
-                          padding: '0 10px',
+                          height: '34px',
+                          padding: '0 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
+                          fontSize: '0.82rem',
                           boxSizing: 'border-box',
                           outline: 'none',
                         }}
@@ -2930,35 +3009,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     </div>
                   </div>
 
-                  {/* Row 2: Cost price per unit & Reason */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {/* Row 2: Reason & Cost price per unit */}
+                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? '1.4fr 1fr' : '1fr', gap: '10px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                        Cost price per unit *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={createForm.costPrice}
-                        onChange={(e) => setCreateForm({ ...createForm, costPrice: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                        }}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Reason *
                       </label>
                       <select
@@ -2966,11 +3020,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
                         style={{
                           width: '100%',
-                          height: '38px',
-                          padding: '0 10px',
+                          height: '34px',
+                          padding: '0 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
+                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.reason ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2998,9 +3052,38 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         )}
                       </select>
                     </div>
+
+                    {canSeeCost ? (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                          Cost price per unit *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={createForm.costPrice}
+                          onChange={(e) => setCreateForm({ ...createForm, costPrice: e.target.value })}
+                          style={{
+                            width: '100%',
+                            height: '34px',
+                            padding: '0 8px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.82rem',
+                            boxSizing: 'border-box',
+                            outline: 'none',
+                          }}
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <input type="hidden" value={createForm.costPrice || '0.00'} />
+                    )}
                   </div>
 
-                  {/* Adjustment summary */}
+                  {/* Compact 1-line Adjustment summary strip */}
                   {(() => {
                     const selWh = warehousesList.find((w) => String(w.id) === String(createForm.warehouseId));
                     const selProd = productsList.find((p) => String(p.id) === String(createForm.productId));
@@ -3014,62 +3097,50 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         style={{
                           backgroundColor: '#f8fafc',
                           border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          padding: '14px 18px',
+                          borderRadius: '6px',
+                          padding: '7px 12px',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                          marginTop: '4px',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          fontSize: '0.78rem',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                            Adjustment summary
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                           <span
                             style={{
                               backgroundColor: isAddition ? '#dcfce7' : '#fee2e2',
                               color: isAddition ? '#15803d' : '#dc2626',
-                              fontSize: '0.72rem',
+                              fontSize: '0.7rem',
                               fontWeight: 700,
-                              padding: '2px 8px',
+                              padding: '2px 6px',
                               borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              flexShrink: 0,
                             }}
                           >
-                            {isAddition ? 'Stock addition' : 'Stock reduction'}
+                            {isAddition ? '+ Add' : '- Reduce'}
+                          </span>
+                          <span style={{ color: '#475569', flexShrink: 0 }}>
+                            Wh: <strong style={{ color: '#0f172a' }}>{selWh?.name || '—'}</strong>
+                          </span>
+                          <span style={{ color: '#cbd5e1', flexShrink: 0 }}>|</span>
+                          <span style={{ color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selProd?.name}>
+                            Prod: <strong style={{ color: '#0f172a' }}>{selProd?.name || '—'}</strong>
                           </span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
-                          <div>
-                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Warehouse</div>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
-                              {selWh?.name || 'Not selected'}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Product</div>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selProd?.name}>
-                              {selProd?.name || 'Not selected'}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Quantity</div>
-                            <div style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626', fontSize: '0.84rem', marginTop: '2px' }}>
-                              {isAddition ? `+${qtyNum} units` : `-${qtyNum} units`}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Cost per unit</div>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
-                              {costNum.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>Total value</div>
-                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.84rem', marginTop: '2px' }}>
-                              {totalVal.toFixed(2)}
-                            </div>
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <span style={{ color: '#475569' }}>
+                            Qty: <strong style={{ color: isAddition ? '#16a34a' : '#dc2626' }}>{isAddition ? `+${qtyNum}` : `-${qtyNum}`}</strong>
+                          </span>
+                          {canSeeCost && (
+                            <>
+                              <span style={{ color: '#cbd5e1' }}>|</span>
+                              <span style={{ color: '#475569' }}>
+                                Total: <strong style={{ color: '#0f172a' }}>LKR {totalVal.toFixed(2)}</strong>
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -3078,7 +3149,24 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
 
               {/* Actions Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '0 14px',
+                    height: '34px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
                 {!createForm.type ? (
                   <button
                     type="button"
@@ -3088,16 +3176,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       color: '#94a3b8',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '10px 20px',
-                      fontSize: '0.86rem',
+                      padding: '0 16px',
+                      height: '34px',
+                      fontSize: '0.82rem',
                       fontWeight: 600,
                       cursor: 'not-allowed',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
                     }}
                   >
-                    + Select an action
+                    Select Action First
                   </button>
                 ) : createForm.type === 'Addition' ? (
                   <button
@@ -3108,20 +3194,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '10px 22px',
-                      fontSize: '0.88rem',
+                      padding: '0 18px',
+                      height: '34px',
+                      fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
-                      transition: 'background-color 0.15s ease',
+                      gap: '5px',
+                      boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#15803d')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#16a34a')}
                   >
-                    <Plus size={16} /> Add Stock
+                    <Plus size={15} /> Add Stock
                   </button>
                 ) : (
                   <button
@@ -3132,20 +3216,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '10px 22px',
-                      fontSize: '0.88rem',
+                      padding: '0 18px',
+                      height: '34px',
+                      fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
-                      transition: 'background-color 0.15s ease',
+                      gap: '5px',
+                      boxShadow: '0 1px 3px rgba(220, 38, 38, 0.25)',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#b91c1c')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dc2626')}
                   >
-                    <Minus size={16} /> Reduce Stock
+                    <Minus size={15} /> Reduce Stock
                   </button>
                 )}
               </div>
@@ -3381,16 +3463,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div>
                   <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    Pricing & Profit Margin
+                    {canSeeCost ? 'Pricing & Profit Margin' : 'Selling Price'}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Cost</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#334155', marginTop: '1px' }}>
-                        Rs. {Number(viewingStockItem.costPrice || 0).toFixed(2)}
+                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? 'repeat(3, 1fr)' : '1fr', gap: '8px' }}>
+                    {canSeeCost && (
+                      <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Cost</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#334155', marginTop: '1px' }}>
+                          Rs. {Number(viewingStockItem.costPrice || 0).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Purchase</div>
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Purchase</div>
-                    </div>
+                    )}
                     <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Selling</div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
@@ -3398,33 +3482,37 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       </div>
                       <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Catalog</div>
                     </div>
-                    <div style={{ backgroundColor: '#f0f9ff', padding: '10px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                      <div style={{ fontSize: '0.70rem', color: '#0369a1', fontWeight: 600 }}>Gross Margin</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
-                        Rs. {(Number(viewingStockItem.sellingPrice || 0) - Number(viewingStockItem.costPrice || 0)).toFixed(2)}
+                    {canSeeCost && (
+                      <div style={{ backgroundColor: '#f0f9ff', padding: '10px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                        <div style={{ fontSize: '0.70rem', color: '#0369a1', fontWeight: 600 }}>Gross Margin</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
+                          Rs. {(Number(viewingStockItem.sellingPrice || 0) - Number(viewingStockItem.costPrice || 0)).toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 700 }}>
+                          {Number(viewingStockItem.sellingPrice) > 0
+                            ? (((Number(viewingStockItem.sellingPrice) - Number(viewingStockItem.costPrice)) / Number(viewingStockItem.sellingPrice)) * 100).toFixed(1)
+                            : '0.0'}% margin
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 700 }}>
-                        {Number(viewingStockItem.sellingPrice) > 0
-                          ? (((Number(viewingStockItem.sellingPrice) - Number(viewingStockItem.costPrice)) / Number(viewingStockItem.sellingPrice)) * 100).toFixed(1)
-                          : '0.0'}% margin
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Inventory Valuation Breakdown */}
                 <div>
                   <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    Asset Valuation & Revenue Potential
+                    {canSeeCost ? 'Asset Valuation & Revenue Potential' : 'Revenue Potential'}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Total Asset Valuation (Cost)</div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
-                        Rs. {Number(viewingStockItem.totalCostValue || (viewingStockItem.quantity * viewingStockItem.costPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? '1fr 1fr' : '1fr', gap: '8px' }}>
+                    {canSeeCost && (
+                      <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Total Asset Valuation (Cost)</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
+                          Rs. {Number(viewingStockItem.totalCostValue || (viewingStockItem.quantity * viewingStockItem.costPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Cost Price</div>
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Cost Price</div>
-                    </div>
+                    )}
                     <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Potential Retail Revenue</div>
                       <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
