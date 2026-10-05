@@ -1121,19 +1121,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     )}
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
                     <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>POS QUOTA</th>
                   </tr>
                 </thead>
                 <tbody>
                   {inventoryLoading ? (
                     <tr>
-                      <td colSpan={canSeeCost ? 10 : 9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading live inventory balances...
                       </td>
                     </tr>
                   ) : filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={canSeeCost ? 10 : 9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No inventory records found matching current criteria.
                       </td>
                     </tr>
@@ -1252,32 +1251,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                               In Stock
                             </span>
                           )}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const prodMatch = productsList.find((p) => p.id === item.productId || p.sku === item.sku) || item;
-                              handleOpenQuotaModal(prodMatch);
-                            }}
-                            style={{
-                              backgroundColor: '#f0f9ff',
-                              color: '#0284c7',
-                              border: '1px solid #bae6fd',
-                              borderRadius: '6px',
-                              padding: '4px 10px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              transition: 'all 0.15s ease',
-                            }}
-                            title="Allocate selling limit to a sales rep"
-                          >
-                            <ShieldCheck size={13} /> Allocate
-                          </button>
                         </td>
                       </tr>
                     ))
