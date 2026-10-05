@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi, quotationApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useDataSync } from '../hooks/useDataSync';
 import PosView from './PosView';
 import SalesReturnsView from './SalesReturnsView';
 import { canEditModule } from '../utils/permissionUtils';
@@ -152,6 +153,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   useEffect(() => {
     loadBackendInvoices();
   }, []);
+
+  useDataSync(loadBackendInvoices, ['erp:data_changed', 'erp:sales_updated']);
 
   // Quotations filtering & export
   const [quotationSearchQuery, setQuotationSearchQuery] = useState('');

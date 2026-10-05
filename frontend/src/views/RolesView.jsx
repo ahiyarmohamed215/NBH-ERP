@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { roleApi } from '../api/apiClient';
+import { roleApi, broadcastDataChange } from '../api/apiClient';
+import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
 import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye } from 'lucide-react';
 
-export default function RolesView() {
+export default function RolesView({ onRoleChange }) {
   const { user } = useAuth();
   const canEditRole = canEditModule(user, 'ROLE');
   const { addToast } = useToast();
@@ -44,6 +45,8 @@ export default function RolesView() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useDataSync(fetchData, ['erp:roles_updated']);
 
   const openCreateModal = () => {
     setEditingRole(null);
@@ -124,6 +127,10 @@ export default function RolesView() {
         addToast('Custom role created successfully', 'success');
       }
       setShowModal(false);
+      broadcastDataChange('roles');
+      if (onRoleChange) {
+        onRoleChange();
+      }
       fetchData();
     } catch (err) {
       addToast(err.message || 'Failed to save role', 'error');

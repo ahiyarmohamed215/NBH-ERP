@@ -37,6 +37,7 @@ import {
 import { deliveryApi, deliveryRouteApi, vehicleApi, salesApi, customerGroupApi, printPdfDocument } from '../api/apiClient';
 import api from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
+import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule } from '../utils/permissionUtils';
 
 export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
@@ -230,6 +231,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useDataSync(fetchData, ['erp:data_changed', 'erp:delivery_updated']);
 
   // Fetch pending invoices when opening Create Trip Modal
   const loadPendingInvoices = async () => {

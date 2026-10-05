@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule, canViewCostPrice } from '../utils/permissionUtils';
 import MastersView from './MastersView';
 import {
@@ -382,6 +383,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     loadInventoryBalances();
     loadAdjustments();
   }, []);
+
+  useDataSync(() => {
+    loadInventoryBalances();
+    loadAdjustments();
+    loadQuotas();
+  }, ['erp:data_changed', 'erp:inventory_updated']);
 
   // Filtered inventory balances
   const filteredInventory = useMemo(() => {

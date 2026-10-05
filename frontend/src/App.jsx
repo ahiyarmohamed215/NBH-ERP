@@ -231,7 +231,6 @@ export default function App() {
           { id: 'sales-reports', label: 'Sales Report', permission: 'REPORT_VIEW' },
           { id: 'inventory-reports', label: 'Inventory Reports', permission: 'REPORT_VIEW' },
           { id: 'purchase-reports', label: 'Purchase Reports', permission: 'REPORT_VIEW' },
-          { id: 'project-reports', label: 'Project Report', permission: 'REPORT_VIEW' },
           { id: 'accounting-reports', label: 'Accounting Reports', permission: 'REPORT_VIEW' },
           { id: 'day-summary', label: 'Day Summary', permission: 'REPORT_VIEW' },
         ],

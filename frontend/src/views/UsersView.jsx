@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { userApi, roleApi } from '../api/apiClient';
+import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import {
   Users,
@@ -67,11 +68,23 @@ export default function UsersView() {
     fetchUsersAndRoles();
   }, []);
 
-  const openApproveModal = (user) => {
+  useDataSync(fetchUsersAndRoles, ['erp:data_changed', 'erp:users_updated', 'erp:roles_updated']);
+
+  const openApproveModal = async (user) => {
     setApprovingUser(user);
+    let currentRoles = roles;
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        currentRoles = rolesRes.data;
+        setRoles(currentRoles);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for approval:', e);
+    }
     // Pre-select first non-admin role or ROLE_CASHIER if available
-    if (roles.length > 0) {
-      const defaultRole = roles.find((r) => r.name !== 'ROLE_ADMIN') || roles[0];
+    if (currentRoles.length > 0) {
+      const defaultRole = currentRoles.find((r) => r.name !== 'ROLE_ADMIN') || currentRoles[0];
       setSelectedRoles([defaultRole.name]);
     } else {
       setSelectedRoles([]);
@@ -128,21 +141,39 @@ export default function UsersView() {
   };
 
   // Direct User Create/Edit
-  const openCreateUserModal = () => {
+  const openCreateUserModal = async () => {
     setEditingUser(null);
+    let currentRoles = roles;
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        currentRoles = rolesRes.data;
+        setRoles(currentRoles);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for create user modal:', e);
+    }
     setUserFormData({
       username: '',
       fullName: '',
       email: '',
       phone: '',
       password: '',
-      roles: roles.length > 0 ? [roles[0].name] : [],
+      roles: currentRoles.length > 0 ? [currentRoles[0].name] : [],
     });
     setShowUserModal(true);
   };
 
-  const openEditUserModal = (user) => {
+  const openEditUserModal = async (user) => {
     setEditingUser(user);
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        setRoles(rolesRes.data);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for edit user modal:', e);
+    }
     setUserFormData({
       username: user.username,
       fullName: user.fullName || '',

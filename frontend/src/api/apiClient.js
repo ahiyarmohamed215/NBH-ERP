@@ -18,9 +18,56 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercept responses for global error handling & session expiration
+// Helper to explicitly broadcast data change to all pages/views
+export const broadcastDataChange = (entityType, detail = {}) => {
+  if (typeof window !== 'undefined') {
+    const payload = { entityType, ...detail, timestamp: Date.now() };
+    window.dispatchEvent(new CustomEvent('erp:data_changed', { detail: payload }));
+    if (entityType) {
+      window.dispatchEvent(new CustomEvent(`erp:${entityType}_updated`, { detail: payload }));
+    }
+  }
+};
+
+// Intercept responses for global error handling, session expiration & data synchronization
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // If request was a mutation (POST, PUT, PATCH, DELETE), broadcast real-time update
+    const method = response.config?.method?.toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const url = response.config?.url || '';
+      if (typeof window !== 'undefined') {
+        const payload = { url, method, timestamp: Date.now() };
+        window.dispatchEvent(new CustomEvent('erp:data_changed', { detail: payload }));
+
+        if (url.includes('/roles')) {
+          window.dispatchEvent(new CustomEvent('erp:roles_updated', { detail: payload }));
+        }
+        if (url.includes('/users')) {
+          window.dispatchEvent(new CustomEvent('erp:users_updated', { detail: payload }));
+        }
+        if (url.includes('/customers') || url.includes('/customer-groups') || url.includes('/routes')) {
+          window.dispatchEvent(new CustomEvent('erp:customers_updated', { detail: payload }));
+        }
+        if (url.includes('/products') || url.includes('/inventory') || url.includes('/warehouses') || url.includes('/stock') || url.includes('/categories') || url.includes('/brands') || url.includes('/adjustments')) {
+          window.dispatchEvent(new CustomEvent('erp:inventory_updated', { detail: payload }));
+        }
+        if (url.includes('/invoices') || url.includes('/sales') || url.includes('/quotations') || url.includes('/payments')) {
+          window.dispatchEvent(new CustomEvent('erp:sales_updated', { detail: payload }));
+        }
+        if (url.includes('/suppliers') || url.includes('/purchase') || url.includes('/grn') || url.includes('/gtn') || url.includes('/prn')) {
+          window.dispatchEvent(new CustomEvent('erp:purchasing_updated', { detail: payload }));
+        }
+        if (url.includes('/delivery') || url.includes('/deliveries') || url.includes('/vehicles')) {
+          window.dispatchEvent(new CustomEvent('erp:delivery_updated', { detail: payload }));
+        }
+        if (url.includes('/accounting') || url.includes('/accounts') || url.includes('/banking') || url.includes('/cheques') || url.includes('/expenses')) {
+          window.dispatchEvent(new CustomEvent('erp:accounting_updated', { detail: payload }));
+        }
+      }
+    }
+    return response.data;
+  },
   (error) => {
     if (error.response && error.response.status === 401) {
       const requestUrl = error.config?.url || '';

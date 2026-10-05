@@ -10,6 +10,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
+import { useDataSync } from '../hooks/useDataSync';
 import {
   Users,
   UserCheck,
@@ -153,10 +154,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initial load of customers, salesmen, and user employees
+  // Initial load & automatic tab switch synchronization
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [activeTab]);
+
+  useDataSync(loadInitialData, [
+    'erp:data_changed',
+    'erp:customers_updated',
+    'erp:roles_updated',
+    'erp:users_updated',
+  ]);
 
   const loadInitialData = async () => {
     setLoading(true);

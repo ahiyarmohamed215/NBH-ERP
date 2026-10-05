@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { userApi, roleApi } from '../api/apiClient';
+import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
@@ -120,7 +121,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTab]);
+
+  useDataSync(loadData, ['erp:data_changed', 'erp:roles_updated', 'erp:users_updated']);
 
   // Format role name for display (e.g., ROLE_MANAGER -> Manager)
   const formatRoleName = (rName) => {
@@ -232,7 +235,17 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   };
 
   // Add Employee
-  const handleOpenAdd = () => {
+  const handleOpenAdd = async () => {
+    let currentRoles = roles;
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        currentRoles = rolesRes.data;
+        setRoles(currentRoles);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for add modal:', e);
+    }
     setFormData({
       username: '',
       fullName: '',
@@ -240,7 +253,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       phone: '',
       password: '',
       employeeType: 'Full-time',
-      roles: roles.length > 0 ? [roles[0].name] : ['ROLE_CASHIER'],
+      roles: currentRoles.length > 0 ? [currentRoles[0].name] : ['ROLE_CASHIER'],
     });
     setShowAddModal(true);
   };
@@ -272,8 +285,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   };
 
   // Edit Employee
-  const handleOpenEdit = (emp) => {
+  const handleOpenEdit = async (emp) => {
     setSelectedEmployee(emp);
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        setRoles(rolesRes.data);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for edit modal:', e);
+    }
     setFormData({
       username: emp.username,
       fullName: emp.fullName || '',
@@ -313,9 +334,19 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   };
 
   // Complete & Approve
-  const handleOpenApprove = (pendingUser) => {
+  const handleOpenApprove = async (pendingUser) => {
     setSelectedEmployee(pendingUser);
-    const defaultRole = roles.find((r) => r.name !== 'ROLE_ADMIN') || roles[0];
+    let currentRoles = roles;
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        currentRoles = rolesRes.data;
+        setRoles(currentRoles);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for approve modal:', e);
+    }
+    const defaultRole = currentRoles.find((r) => r.name !== 'ROLE_ADMIN') || currentRoles[0];
     setSelectedApproveRoles(defaultRole ? [defaultRole.name] : ['ROLE_CASHIER']);
     setApproveType('Full-time');
     setShowApproveModal(true);
@@ -1264,7 +1295,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             flexDirection: 'column',
           }}
         >
-          <RolesView />
+          <RolesView onRoleChange={loadData} />
         </div>
       )}
 

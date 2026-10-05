@@ -9,6 +9,7 @@ import {
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule } from '../utils/permissionUtils';
 import {
   Database,
@@ -102,34 +103,40 @@ const MastersView = React.forwardRef(function MastersView({
     }
   }, [activeSubTab]);
 
-  // Initial load of counts for all tabs so pill badges show real numbers immediately
+  // Load counts for all tabs so pill badges show real numbers immediately
+  const loadAllCounts = async () => {
+    try {
+      const [wRes, cRes, cuRes, sRes, pRes, bRes] = await Promise.allSettled([
+        warehouseApi.getAll(),
+        categoryApi.getAll(),
+        customerApi.getAll(),
+        supplierApi.getAll(),
+        productApi.getProducts({ size: 300 }),
+        brandApi.getAll(),
+      ]);
+      if (wRes.status === 'fulfilled') setWarehouses(wRes.value.data || []);
+      if (cRes.status === 'fulfilled') setCategories(cRes.value.data || []);
+      if (cuRes.status === 'fulfilled') setCustomers(cuRes.value.data || []);
+      if (sRes.status === 'fulfilled') setSuppliers(sRes.value.data || []);
+      if (pRes.status === 'fulfilled') setProducts(pRes.value.data?.content || pRes.value.data || []);
+      if (bRes.status === 'fulfilled') setBrands(bRes.value.data || []);
+    } catch (e) {
+      // silent fallback
+    }
+  };
+
   useEffect(() => {
-    const loadAllCounts = async () => {
-      try {
-        const [wRes, cRes, cuRes, sRes, pRes, bRes] = await Promise.allSettled([
-          warehouseApi.getAll(),
-          categoryApi.getAll(),
-          customerApi.getAll(),
-          supplierApi.getAll(),
-          productApi.getProducts({ size: 300 }),
-          brandApi.getAll(),
-        ]);
-        if (wRes.status === 'fulfilled') setWarehouses(wRes.value.data || []);
-        if (cRes.status === 'fulfilled') setCategories(cRes.value.data || []);
-        if (cuRes.status === 'fulfilled') setCustomers(cuRes.value.data || []);
-        if (sRes.status === 'fulfilled') setSuppliers(sRes.value.data || []);
-        if (pRes.status === 'fulfilled') setProducts(pRes.value.data?.content || pRes.value.data || []);
-        if (bRes.status === 'fulfilled') setBrands(bRes.value.data || []);
-      } catch (e) {
-        // silent fallback
-      }
-    };
     loadAllCounts();
   }, []);
 
   useEffect(() => {
     loadTabData();
   }, [activeTab]);
+
+  useDataSync(() => {
+    loadAllCounts();
+    loadTabData();
+  }, ['erp:data_changed', 'erp:inventory_updated', 'erp:customers_updated', 'erp:purchasing_updated']);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);

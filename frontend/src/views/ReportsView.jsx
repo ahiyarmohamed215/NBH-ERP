@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { reportApi, warehouseApi, customerApi, userApi } from '../api/apiClient';
+import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import {
   Users,
   BarChart3,
   Package,
   ShoppingCart,
-  FolderKanban,
   DollarSign,
   Download,
   Search,
@@ -36,7 +36,6 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
     { id: 'sales-reports', label: 'Sales Report', title: 'Sales & Revenue Reports', icon: BarChart3 },
     { id: 'inventory-reports', label: 'Inventory Reports', title: 'Inventory Valuation & Movement Reports', icon: Package },
     { id: 'purchase-reports', label: 'Purchase Reports', title: 'Procurement & Supplier Reports', icon: ShoppingCart },
-    { id: 'project-reports', label: 'Project Report', title: 'Commercial Project Reports', icon: FolderKanban },
     { id: 'accounting-reports', label: 'Accounting Reports', title: 'Financial Accounting Reports', icon: DollarSign },
     { id: 'day-summary', label: 'Day Summary', title: 'Day Summary & Audit Ledger', icon: ShieldCheck },
   ];
@@ -93,6 +92,8 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
   useEffect(() => {
     loadOutstandingReport();
   }, []);
+
+  useDataSync(loadOutstandingReport, ['erp:data_changed', 'erp:sales_updated', 'erp:customers_updated']);
 
   // Sync subTab
   useEffect(() => {
@@ -889,25 +890,6 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             </p>
             <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
               Total GRN receipts processed this quarter: <strong>14 Receipts</strong> totaling <strong>LKR 458,900.00</strong>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* 5. PROJECT REPORT TAB */}
-      {/* ------------------------------------------------------------- */}
-      {currentPrimaryTab === 'project-reports' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-              Commercial Projects & Supply Job Cards
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-              Project milestones, contractor billing, and material dispatch allocations.
-            </p>
-            <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-              All active commercial project accounts are reconciled and up to date.
             </div>
           </div>
         </div>
