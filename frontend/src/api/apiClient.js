@@ -300,41 +300,77 @@ export const reportApi = {
     `${API_ORIGIN}/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
 };
 
-export const printPdfDocument = (pdfUrl) => {
-  let iframe = document.getElementById('pdf-silent-printer');
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = 'pdf-silent-printer';
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-  }
+export const printPdfDocument = async (pdfUrl) => {
+  try {
+    const token = localStorage.getItem('nbh_token');
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
-  iframe.src = pdfUrl;
-  iframe.onload = () => {
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (err) {
-        const win = window.open(pdfUrl, '_blank');
-        if (win) {
-          win.onload = () => win.print();
+    // Fetch PDF blob with Authorization header to prevent 401 Unauthorized
+    const response = await fetch(pdfUrl, { headers });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => null);
+      throw new Error(errData?.message || `Failed to fetch document (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    let iframe = document.getElementById('pdf-silent-printer');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'pdf-silent-printer';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+    }
+
+    iframe.src = blobUrl;
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (err) {
+          const win = window.open(blobUrl, '_blank');
+          if (win) {
+            win.onload = () => win.print();
+          }
         }
-      }
-    }, 350);
-  };
+      }, 350);
+    };
+  } catch (err) {
+    console.error('Print PDF error, falling back to direct auth URL:', err);
+    const token = localStorage.getItem('nbh_token');
+    const authUrl = token
+      ? (pdfUrl.includes('?') ? `${pdfUrl}&token=${encodeURIComponent(token)}` : `${pdfUrl}?token=${encodeURIComponent(token)}`)
+      : pdfUrl;
+    window.open(authUrl, '_blank');
+  }
 };
 
 export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pdf') => {
   try {
     const downloadUrl = pdfUrl.includes('?') ? `${pdfUrl}&download=true` : `${pdfUrl}?download=true`;
-    const response = await fetch(downloadUrl);
-    if (!response.ok) throw new Error('Download failed');
+    const token = localStorage.getItem('nbh_token');
+    const headers = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Fetch PDF blob with Authorization header
+    const response = await fetch(downloadUrl, { headers });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => null);
+      throw new Error(errData?.message || `Download failed (${response.status})`);
+    }
+
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -345,8 +381,13 @@ export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pd
     document.body.removeChild(a);
     window.URL.revokeObjectURL(blobUrl);
   } catch (err) {
-    console.error('Download error, falling back to direct link:', err);
-    window.open(pdfUrl, '_blank');
+    console.error('Download error, falling back to direct auth link:', err);
+    const token = localStorage.getItem('nbh_token');
+    const baseDownloadUrl = pdfUrl.includes('?') ? `${pdfUrl}&download=true` : `${pdfUrl}?download=true`;
+    const authUrl = token
+      ? `${baseDownloadUrl}&token=${encodeURIComponent(token)}`
+      : baseDownloadUrl;
+    window.open(authUrl, '_blank');
   }
 };
 
@@ -360,6 +401,14 @@ export const pdfApi = {
   downloadGrn: (id, num) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/grns/${id}`, `GRN-${num || id}.pdf`),
   printGtn: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/gtns/${id}`),
   downloadGtn: (id, num) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/gtns/${id}`, `GTN-${num || id}.pdf`),
+  printCustomer: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}`),
+  downloadCustomer: (id, name) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}?download=true`, `Customer-${id}${name ? '-' + name.replace(/[^a-zA-Z0-9_-]/g, '_') : ''}.pdf`),
+  printCustomerList: () => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers`),
+  downloadCustomerList: () => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers?download=true`, 'Customers-Directory.pdf'),
+  printCustomerGroup: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/customer-groups/${id}`),
+  downloadCustomerGroup: (id, name) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customer-groups/${id}?download=true`, `CustomerGroup-${id}${name ? '-' + name.replace(/[^a-zA-Z0-9_-]/g, '_') : ''}.pdf`),
+  printCustomerHistory: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}/history`),
+  downloadCustomerHistory: (id) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}/history?download=true`, `Customer-History-${id}.pdf`),
   printPdf: printPdfDocument,
   downloadPdf: downloadPdfDocument,
 };

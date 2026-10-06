@@ -80,6 +80,10 @@ public class QuotationService {
             }
         }
 
+        if (customer != null && Boolean.FALSE.equals(customer.getIsActive())) {
+            throw new com.nbh.erp.common.exception.BusinessException("Cannot issue quotation for inactive customer: " + customer.getName());
+        }
+
         String quotationNumber = sequenceService.generateQuotationNumber();
         LocalDate qDate = request.getQuotationDate() != null ? request.getQuotationDate() : LocalDate.now();
         LocalDate validUntil = request.getValidUntil() != null ? request.getValidUntil() : qDate.plusDays(30);

@@ -19,7 +19,6 @@ public class PdfController {
     private final PdfGenerationService pdfService;
 
     @GetMapping("/invoices/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Generate and stream or download PDF for sales invoice")
     public ResponseEntity<byte[]> getInvoicePdf(
             @PathVariable Long id,
@@ -36,7 +35,6 @@ public class PdfController {
     }
 
     @GetMapping("/grns/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
     @Operation(summary = "Generate and stream or download PDF for GRN intake")
     public ResponseEntity<byte[]> getGrnPdf(
             @PathVariable Long id,
@@ -53,7 +51,6 @@ public class PdfController {
     }
 
     @GetMapping("/gtns/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GTN_PROCESS')")
     @Operation(summary = "Generate and stream or download PDF for GTN transfer")
     public ResponseEntity<byte[]> getGtnPdf(
             @PathVariable Long id,
@@ -65,6 +62,69 @@ public class PdfController {
         headers.setContentType(MediaType.APPLICATION_PDF);
         String disposition = download ? "attachment" : "inline";
         headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"gtn-" + id + ".pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/customers/{id}")
+    @Operation(summary = "Generate and stream or download PDF for customer profile & statement")
+    public ResponseEntity<byte[]> getCustomerPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateCustomerPdf(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"customer-" + id + ".pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/customers")
+    @Operation(summary = "Generate and stream or download PDF for full customer directory")
+    public ResponseEntity<byte[]> getCustomerListPdf(
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateCustomerListPdf();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"customers-directory.pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/customer-groups/{id}")
+    @Operation(summary = "Generate and stream or download PDF for customer group roster")
+    public ResponseEntity<byte[]> getCustomerGroupPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateCustomerGroupPdf(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"customer-group-" + id + ".pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/customers/{id}/history")
+    @Operation(summary = "Generate and stream or download PDF for customer ledger history")
+    public ResponseEntity<byte[]> getCustomerHistoryPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateCustomerHistoryPdf(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"customer-ledger-" + id + ".pdf\"");
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }

@@ -150,6 +150,10 @@ public class InvoiceService {
                             .orElseThrow(() -> new BusinessException("No default walk-in customer available")));
         }
 
+        if (Boolean.FALSE.equals(customer.getIsActive())) {
+            throw new BusinessException("Cannot process transaction for inactive customer: " + customer.getName() + " (" + customer.getCustomerCode() + ")");
+        }
+
         User salesman = null;
         if (request.getSalesmanId() != null) {
             salesman = userRepository.findById(request.getSalesmanId())

@@ -6,11 +6,14 @@ import {
   salesApi,
   customerGroupApi,
   routeApi,
+  pdfApi,
+  paymentApi,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
 import { useDataSync } from '../hooks/useDataSync';
+import { printA4Report } from '../utils/printReport';
 import {
   Users,
   UserCheck,
@@ -35,6 +38,7 @@ import {
   ListFilter,
   Upload,
   Download,
+  FileDown,
   ArrowLeft,
   History,
   Clock,
@@ -64,9 +68,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Customer List Filters
+  // Customer List Filters (Defaults to ACTIVE so inactive customers are hidden until reactivated)
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
+  const [statusFilter, setStatusFilter] = useState('ACTIVE'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
+
+  // Customer Status Change Confirmation Modal
+  const [confirmStatusModal, setConfirmStatusModal] = useState({
+    isOpen: false,
+    customer: null,
+  });
 
   // Customer Add/Edit Modal
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -154,18 +164,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initial load & automatic tab switch synchronization
-  useEffect(() => {
-    loadInitialData();
-  }, [activeTab]);
-
-  useDataSync(loadInitialData, [
-    'erp:data_changed',
-    'erp:customers_updated',
-    'erp:roles_updated',
-    'erp:users_updated',
-  ]);
-
   const loadInitialData = async () => {
     setLoading(true);
     try {
@@ -252,6 +250,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
+  // Initial load & automatic tab switch synchronization
+  useEffect(() => {
+    loadInitialData();
+  }, [activeTab]);
+
+  useDataSync(loadInitialData, [
+    'erp:data_changed',
+    'erp:customers_updated',
+    'erp:roles_updated',
+    'erp:users_updated',
+  ]);
+
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     if (onSubTabChange) {
@@ -317,18 +327,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return customers.find((c) => String(c.id) === String(selectedHistoryCustomerId)) || null;
   }, [customers, selectedHistoryCustomerId]);
 
-  // Filtered customer list for the Customer History top selector
+  // Filtered customer list for the Customer History top selector (Only ACTIVE customers)
   const filteredHistoryCustomerOptions = useMemo(() => {
+    const activeCustomers = customers.filter((c) => isCustomerActive(c));
     const q = customerSearchInput.toLowerCase().trim();
     if (!q || (selectedHistoryCustomer && q === (selectedHistoryCustomer.name || '').toLowerCase().trim())) {
-      return customers;
+      return activeCustomers;
     }
-    return customers.filter((c) => {
+    return activeCustomers.filter((c) => {
       const name = (c.name || '').toLowerCase();
       const code = (c.code || c.customerCode || '').toLowerCase();
       const phone = (c.phone || '').toLowerCase();
+      const address = (c.address || '').toLowerCase();
       const route = getCustomerRoute(c.id)?.name?.toLowerCase() || '';
-      return name.includes(q) || code.includes(q) || phone.includes(q) || route.includes(q);
+      return name.includes(q) || code.includes(q) || phone.includes(q) || address.includes(q) || route.includes(q);
     });
   }, [customers, customerSearchInput, selectedHistoryCustomer, routes]);
 
@@ -935,17 +947,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return list;
   }, [customers, routeEditForm.selectedCustomerIds, customerSearchInRoute, selectedRoute, isCreatingRoute]);
 
-  // Available customers for Assign Customer popup
+  // Available customers for Assign Customer popup (ACTIVE only, includes address search)
   const availableCustomersToAssign = useMemo(() => {
     if (!showAssignCustomerModal) return [];
+    const activeCustomers = customers.filter((c) => isCustomerActive(c));
     const q = assignCustomerSearch.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter(
+    if (!q) return activeCustomers;
+    return activeCustomers.filter(
       (c) =>
         (c.name && c.name.toLowerCase().includes(q)) ||
         (c.code && c.code.toLowerCase().includes(q)) ||
         (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
-        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q)) ||
         (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
     );
   }, [customers, assignCustomerSearch, showAssignCustomerModal]);
@@ -956,8 +969,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast('No customers to export', 'error');
       return;
     }
-    const headers = ['Code', 'Name', 'Customer Group', 'Contact Person', 'Phone', 'Email', 'Credit Limit', 'Current Balance', 'Status'];
-    const rows = customers.map((c) => {
+    const headers = ['Code', 'Name', 'Customer Group', 'Contact Person', 'Phone', 'Email', 'Address', 'Credit Limit', 'Current Balance', 'Status'];
+    const rows = (filteredCustomers.length > 0 ? filteredCustomers : customers).map((c) => {
       const assignedRoutes = getCustomerRoutes(c.id);
       const routeNames = assignedRoutes.map((r) => r.name).join('; ') || 'Unassigned';
       return [
@@ -967,6 +980,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         `"${(c.contactPerson || '').replace(/"/g, '""')}"`,
         `"${(c.phone || '').replace(/"/g, '""')}"`,
         `"${(c.email || '').replace(/"/g, '""')}"`,
+        `"${(c.address || '').replace(/"/g, '""')}"`,
         c.creditLimit || 0,
         c.currentBalance || 0,
         isCustomerActive(c) ? 'Active' : 'Inactive',
@@ -1017,10 +1031,37 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     addToast('Customer groups exported to CSV', 'success');
   };
 
-  const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ALL');
+  const handlePrintCustomerGroupsReport = () => {
+    const list = filteredRoutes.length > 0 ? filteredRoutes : routes;
+    if (list.length === 0) {
+      addToast('No customer groups to print', 'error');
+      return;
+    }
+    printA4Report({
+      title: 'Customer Groups Directory',
+      subtitle: `Total Groups: ${list.length}`,
+      metaItems: [
+        { label: 'Date', value: new Date().toLocaleDateString() },
+        { label: 'Filter', value: groupStatusFilter.toUpperCase() },
+      ],
+      columns: [
+        { header: 'Group Name', accessor: 'name' },
+        { header: 'Group Code', accessor: (r) => r.groupCode || r.routeCode || '—' },
+        { header: 'Assigned Staff', accessor: (r) => {
+          const assignedStaff = salesmen.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
+          return r.assignedStaffName || r.salesmanName || assignedStaff?.name || 'Unassigned';
+        }},
+        { header: 'Total Customers', accessor: (r) => String(r.customerIds?.length || 0), align: 'center' },
+        { header: 'Status', accessor: (r) => (r.isActive !== false ? 'Active' : 'Inactive'), align: 'center' },
+      ],
+      data: list,
+    });
+  };
+
+  const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ACTIVE');
   const handleResetFilters = () => {
     setSearchTerm('');
-    setStatusFilter('ALL');
+    setStatusFilter('ACTIVE');
   };
 
   return (
@@ -1185,10 +1226,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             overflow: 'hidden',
           }}
         >
-          {/* Top Filter & Actions Bar (Fixed / Sticky to Desktop Screen) */}
+          {/* Top Filter & Actions Bar (White Card Look - Matching Employees Page Theme) */}
           <div
             style={{
-              padding: '4px 0 12px 0',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1198,6 +1242,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               boxSizing: 'border-box',
               flexWrap: 'wrap',
               flexShrink: 0,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
             }}
           >
             {/* Left Control: Search Input extending directly up to All Routes dropdown */}
@@ -1335,28 +1380,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </button>
               )}
 
-              {/* Export CSV */}
+              {/* Export CSV (Icon Only) */}
               <button
                 type="button"
                 onClick={handleExportCSV}
                 style={{
                   height: '34px',
-                  padding: '0 14px',
+                  width: '36px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
                   transition: 'all 0.15s ease',
+                  padding: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1370,31 +1412,98 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
                 title="Export customers to CSV"
               >
-                <Download size={13} /> Export
+                <Download size={14} />
               </button>
 
-              {/* Refresh Customer Records */}
+              {/* Print Customer Directory A4 (Icon Only) */}
+              <button
+                type="button"
+                onClick={() => pdfApi.printCustomerList()}
+                style={{
+                  height: '34px',
+                  width: '36px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Print Customer Directory (A4)"
+              >
+                <Printer size={14} />
+              </button>
+
+              {/* Download Customer Directory PDF A4 (Icon Only) */}
+              <button
+                type="button"
+                onClick={() => pdfApi.downloadCustomerList()}
+                style={{
+                  height: '34px',
+                  width: '36px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                  padding: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Download Customer Directory PDF (A4)"
+              >
+                <FileDown size={14} />
+              </button>
+
+              {/* Refresh Customer Records (Icon Only) */}
               <button
                 type="button"
                 onClick={loadInitialData}
                 style={{
                   height: '34px',
-                  padding: '0 14px',
+                  width: '36px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
                   transition: 'all 0.15s ease',
+                  padding: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1408,7 +1517,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
                 title="Refresh customer records"
               >
-                <RefreshCw size={13} /> Refresh
+                <RefreshCw size={14} />
               </button>
             </div>
           </div>
@@ -1431,7 +1540,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
@@ -1446,12 +1555,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       PHONE NUMBER
                     </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ADDRESS
+                    </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CREDIT LIMIT
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      BALANCE
-                    </th>
+
                     <th style={{ padding: '12px 12px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
@@ -1560,20 +1670,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             {c.email && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{c.email}</div>}
                           </td>
 
+                          <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.address || ''}>
+                            {c.address ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <MapPin size={12} color="#64748b" style={{ flexShrink: 0 }} /> {c.address}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#94a3b8' }}>—</span>
+                            )}
+                          </td>
+
                           <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem', fontWeight: 500, textAlign: 'right' }}>
                             LKR {Number(c.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          <td style={{ padding: '12px 14px', fontSize: '0.84rem', fontWeight: 600, textAlign: 'right', color: Number(c.currentBalance || 0) > 0 ? '#dc2626' : '#16a34a' }}>
-                            LKR {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
 
                           <td style={{ padding: '12px 12px' }}>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleToggleCustomerActive(c.id, active);
+                                setConfirmStatusModal({ isOpen: true, customer: c });
                               }}
                               style={{
                                 background: 'none',
@@ -1588,7 +1705,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 color: active ? '#16a34a' : '#dc2626',
                                 whiteSpace: 'nowrap',
                               }}
-                              title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
+                              title={`Status: ${active ? 'Active' : 'Inactive'} (Click to change status)`}
                             >
                               <span
                                 style={{
@@ -1605,6 +1722,73 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                           <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              {/* Print Customer Profile A4 */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  pdfApi.printCustomer(c.id);
+                                }}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#334155',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f1f5f9';
+                                  e.currentTarget.style.color = '#0f172a';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#ffffff';
+                                  e.currentTarget.style.color = '#334155';
+                                }}
+                                title="Print Customer Statement (A4)"
+                              >
+                                <Printer size={13} />
+                              </button>
+
+                              {/* Download Customer PDF A4 */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  pdfApi.downloadCustomer(c.id, c.name);
+                                }}
+                                style={{
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  color: '#334155',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f1f5f9';
+                                  e.currentTarget.style.color = '#0f172a';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#ffffff';
+                                  e.currentTarget.style.color = '#334155';
+                                }}
+                                title="Download Customer PDF (A4)"
+                              >
+                                <FileDown size={13} />
+                              </button>
+
+                              {/* History */}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1630,6 +1814,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               >
                                 <History size={13} />
                               </button>
+
+                              {/* Edit */}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1729,10 +1915,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </button>
           </div>
 
-          {/* Routes Toolbar: Search Input + Export CSV Icon */}
+          {/* Routes Toolbar: Search Input + Action Icons (White Card Look - Matching Employees Page Theme) */}
           <div
             style={{
-              padding: '4px 0 12px 0',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1742,10 +1931,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               boxSizing: 'border-box',
               flexWrap: 'wrap',
               flexShrink: 0,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
             }}
           >
             {/* Search bar filling width */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
               <Search
                 size={17}
                 style={{
@@ -1805,30 +1995,43 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               )}
             </div>
 
-            {/* Right Controls: Group Status Filter & Export CSV Icon */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {/* Right Controls: Group Status Filter & Icon Buttons (Export CSV, Print, Download PDF, Refresh) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               <select
                 value={groupStatusFilter}
                 onChange={(e) => setGroupStatusFilter(e.target.value)}
                 style={{
                   height: '34px',
-                  padding: '0 28px 0 12px',
+                  padding: '0 30px 0 12px',
+                  width: '135px',
+                  minWidth: '115px',
                   borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.84rem',
+                  fontSize: '0.86rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
                   cursor: 'pointer',
                   outline: 'none',
+                  flexShrink: 0,
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
                   appearance: 'none',
                   WebkitAppearance: 'none',
+                  MozAppearance: 'none',
                   backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
+                  backgroundPosition: 'right 10px center',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
                 }}
               >
                 <option value="all">All Groups</option>
@@ -1836,17 +2039,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <option value="inactive">Inactive Only</option>
               </select>
 
+              {/* Export CSV (Icon Only) */}
               <button
                 type="button"
                 onClick={handleExportRoutesCSV}
                 style={{
                   height: '34px',
-                  width: '38px',
+                  width: '36px',
+                  minWidth: '36px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   padding: 0,
-                  color: '#64748b',
+                  color: '#334155',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1863,11 +2068,119 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
+                  e.currentTarget.style.color = '#334155';
                 }}
                 title="Export customer groups to CSV"
               >
                 <Download size={14} />
+              </button>
+
+              {/* Print Groups Directory A4 (Icon Only) */}
+              <button
+                type="button"
+                onClick={handlePrintCustomerGroupsReport}
+                style={{
+                  height: '34px',
+                  width: '36px',
+                  minWidth: '36px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Print Customer Groups Directory (A4)"
+              >
+                <Printer size={14} />
+              </button>
+
+              {/* Download Groups Directory PDF A4 (Icon Only) */}
+              <button
+                type="button"
+                onClick={handlePrintCustomerGroupsReport}
+                style={{
+                  height: '34px',
+                  width: '36px',
+                  minWidth: '36px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Download Customer Groups PDF (A4)"
+              >
+                <FileDown size={14} />
+              </button>
+
+              {/* Refresh Groups (Icon Only) */}
+              <button
+                type="button"
+                onClick={loadInitialData}
+                style={{
+                  height: '34px',
+                  width: '36px',
+                  minWidth: '36px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Refresh customer groups"
+              >
+                <RefreshCw size={14} />
               </button>
             </div>
           </div>
@@ -2044,11 +2357,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </p>
                       </div>
 
-                      {/* Card Footer: View link */}
+                      {/* Card Footer: View link & Print/Download icons */}
                       <div
                         style={{
                           display: 'flex',
-                          justifyContent: 'flex-start',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
                           paddingTop: '10px',
                           borderTop: '1px solid #f1f5f9',
@@ -2057,6 +2370,81 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <Eye size={13} /> View Group Details →
                         </span>
+
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              pdfApi.printCustomerGroup(route.id);
+                            }}
+                            style={{
+                              width: '30px',
+                              height: '30px',
+                              minWidth: '30px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              backgroundColor: '#ffffff',
+                              color: '#334155',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              padding: 0,
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
+                            }}
+                            title="Print Customer Group (A4)"
+                          >
+                            <Printer size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              pdfApi.downloadCustomerGroup(route.id, route.name);
+                            }}
+                            style={{
+                              width: '30px',
+                              height: '30px',
+                              minWidth: '30px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              backgroundColor: '#ffffff',
+                              color: '#334155',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              padding: 0,
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
+                            }}
+                            title="Download Customer Group PDF (A4)"
+                          >
+                            <FileDown size={13} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2185,33 +2573,75 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {/* Top Update Group Button */}
-                    {canEditCustomer && (
-                      <button
-                        type="button"
-                        onClick={() => setRouteModalMode('edit')}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
-                          transition: 'background-color 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-                        title="Click to update/edit this customer group"
-                      >
-                        <Edit2 size={13} /> Update Group
-                      </button>
-                    )}
+                    {/* Print Customer Group A4 */}
+                    <button
+                      type="button"
+                      onClick={() => pdfApi.printCustomerGroup(selectedRoute?.id)}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        color: '#334155',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        padding: 0,
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.color = '#0f172a';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.color = '#334155';
+                      }}
+                      title="Print Customer Group (A4)"
+                    >
+                      <Printer size={14} />
+                    </button>
+
+                    {/* Download Customer Group PDF A4 */}
+                    <button
+                      type="button"
+                      onClick={() => pdfApi.downloadCustomerGroup(selectedRoute?.id, selectedRoute?.name)}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        minWidth: '34px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        color: '#334155',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        padding: 0,
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.color = '#0f172a';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.color = '#334155';
+                      }}
+                      title="Download Customer Group PDF (A4)"
+                    >
+                      <FileDown size={14} />
+                    </button>
 
                     <button
                       type="button"
@@ -2718,51 +3148,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </select>
                       </div>
 
-                      {/* Active / Inactive Status Selector */}
-                      <div style={{ marginBottom: '14px' }}>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                          Status (Active / Inactive)
-                        </label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            onClick={() => setRouteEditForm({ ...routeEditForm, isActive: true })}
-                            style={{
-                              flex: 1,
-                              padding: '7px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              border: routeEditForm.isActive !== false ? '1px solid #16a34a' : '1px solid #cbd5e1',
-                              backgroundColor: routeEditForm.isActive !== false ? '#f0fdf4' : '#ffffff',
-                              color: routeEditForm.isActive !== false ? '#15803d' : '#64748b',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            ● Active
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRouteEditForm({ ...routeEditForm, isActive: false })}
-                            style={{
-                              flex: 1,
-                              padding: '7px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              border: routeEditForm.isActive === false ? '1px solid #dc2626' : '1px solid #cbd5e1',
-                              backgroundColor: routeEditForm.isActive === false ? '#fff1f2' : '#ffffff',
-                              color: routeEditForm.isActive === false ? '#b91c1c' : '#64748b',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            ○ Inactive
-                          </button>
-                        </div>
-                      </div>
-
                       {/* Description Input */}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
@@ -3100,7 +3485,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '720px',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -3115,7 +3500,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             {/* Header */}
             <div
               style={{
-                padding: '14px 18px',
+                padding: '14px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -3123,11 +3508,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               }}
             >
               <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                   Assign Customers to Group
                 </h4>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Search and add customers to {routeEditForm.name || 'this customer group'}.
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                  Search and add active customers to {routeEditForm.name || 'this customer group'}.
                 </p>
               </div>
               <button
@@ -3147,13 +3532,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </div>
 
             {/* Search Input */}
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
               <div style={{ position: 'relative' }}>
                 <Search
-                  size={13}
+                  size={14}
                   style={{
                     position: 'absolute',
-                    left: '10px',
+                    left: '12px',
                     top: '10px',
                     color: '#94a3b8',
                     pointerEvents: 'none',
@@ -3161,17 +3546,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 />
                 <input
                   type="text"
-                  placeholder="Search by name, code, phone..."
+                  placeholder="Search by customer name, code, address..."
                   value={assignCustomerSearch}
                   onChange={(e) => setAssignCustomerSearch(e.target.value)}
                   autoFocus
                   style={{
                     width: '100%',
                     height: '34px',
-                    padding: '0 28px 0 32px',
+                    padding: '0 28px 0 34px',
                     borderRadius: '6px',
                     border: '1px solid #e2e8f0',
-                    fontSize: '0.84rem',
+                    fontSize: '0.85rem',
                     backgroundColor: '#ffffff',
                     boxSizing: 'border-box',
                   }}
@@ -3198,10 +3583,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </div>
 
             {/* Customers List */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 12px', maxHeight: '360px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', maxHeight: '380px' }}>
               {availableCustomersToAssign.length === 0 ? (
-                <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
-                  No matching customers found.
+                <div style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>
+                  No active customers found matching search.
                 </div>
               ) : (
                 availableCustomersToAssign.map((c) => {
@@ -3219,18 +3604,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         borderRadius: '6px',
                         borderBottom: '1px solid #f1f5f9',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                         <div
                           style={{
-                            width: '26px',
-                            height: '26px',
+                            width: '30px',
+                            height: '30px',
                             borderRadius: '50%',
                             backgroundColor: '#e0f2fe',
                             color: '#0284c7',
@@ -3239,19 +3624,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 600,
-                            fontSize: '0.74rem',
+                            fontSize: '0.78rem',
                             flexShrink: 0,
                           }}
                         >
                           {(c.name || 'C').slice(0, 1).toUpperCase()}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {c.name}
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>{c.code || c.customerCode}</span>
-                            {c.phone && <span>• {c.phone}</span>}
+                          <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
+                              {c.code || c.customerCode || 'NO CODE'}
+                            </span>
+                            <span style={{ color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <MapPin size={11} color="#64748b" /> {c.address || 'No address'}
+                            </span>
                             {otherRoutes.length > 0 && (
                               <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
                                 Also in: {otherRoutes.map((r) => r.name).join(', ')}
@@ -3638,17 +4027,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
-                        <span style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                          {selectedHistoryCustomer.name}
-                        </span>
                         <span
                           style={{
                             fontFamily: 'monospace',
-                            fontSize: '0.72rem',
+                            fontSize: '0.75rem',
                             fontWeight: 700,
-                            padding: '1px 6px',
+                            padding: '2px 8px',
                             backgroundColor: '#f1f5f9',
-                            color: '#334155',
+                            color: '#1e293b',
                             borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             whiteSpace: 'nowrap',
@@ -3671,6 +4057,22 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           }}
                         >
                           {isCustomerActive(selectedHistoryCustomer) ? 'Active' : 'Inactive'}
+                        </span>
+                        <span
+                          style={{
+                            color: '#475569',
+                            fontSize: '0.78rem',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          title={selectedHistoryCustomer.address || 'No address registered'}
+                        >
+                          <MapPin size={12} color="#64748b" style={{ flexShrink: 0 }} />
+                          {selectedHistoryCustomer.address || 'No address'}
                         </span>
                       </div>
 
@@ -3873,17 +4275,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     return (
                       <div
                         style={{
+                          backgroundColor: '#ffffff',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                          padding: '8px 12px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: '10px',
-                          borderBottom: '1px solid #e2e8f0',
-                          padding: '4px 0 10px 0',
-                          marginTop: '2px',
-                          flexWrap: 'wrap',
+                          gap: '8px',
                           width: '100%',
                           boxSizing: 'border-box',
+                          flexWrap: 'nowrap',
                           flexShrink: 0,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                          overflowX: 'auto',
                         }}
                       >
                         {/* Sub-nav tabs */}
@@ -3891,12 +4296,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            flexWrap: 'wrap',
-                            overflowX: 'auto',
-                            padding: '3px',
+                            gap: '3px',
+                            flexShrink: 0,
+                            padding: '2px',
                             backgroundColor: '#f1f5f9',
-                            borderRadius: '8px',
+                            borderRadius: '6px',
                           }}
                         >
                           {[
@@ -3915,15 +4319,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 style={{
                                   backgroundColor: isSel ? '#ffffff' : 'transparent',
                                   border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '5px 11px',
-                                  fontSize: '0.84rem',
+                                  borderRadius: '5px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.8rem',
                                   fontWeight: isSel ? 600 : 500,
                                   color: isSel ? '#0284c7' : '#64748b',
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '6px',
+                                  gap: '4px',
                                   boxShadow: isSel ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
                                   transition: 'all 0.15s ease',
                                   whiteSpace: 'nowrap',
@@ -3932,9 +4336,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <span>{tab.label}</span>
                                 <span
                                   style={{
-                                    fontSize: '0.72rem',
+                                    fontSize: '0.7rem',
                                     fontWeight: 600,
-                                    padding: '1px 6px',
+                                    padding: '1px 5px',
                                     borderRadius: '9999px',
                                     backgroundColor: isSel ? '#e0f2fe' : '#e2e8f0',
                                     color: isSel ? '#0284c7' : '#64748b',
@@ -3947,25 +4351,24 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           })}
                         </div>
 
-                        {/* Search, Filter, Reset, Export (Right-aligned in the same line) */}
+                        {/* Search, Filter, Reset, Export (Single-line right-aligned) */}
                         <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            flexWrap: 'wrap',
+                            gap: '6px',
                             flexShrink: 0,
                             marginLeft: 'auto',
                           }}
                         >
-                          {/* Search Input */}
-                          <div style={{ position: 'relative', width: '200px', minWidth: '150px' }}>
+                          {/* Search Input (Generous width) */}
+                          <div style={{ position: 'relative', width: '210px', minWidth: '160px' }}>
                             <Search
-                              size={15}
+                              size={13}
                               style={{
                                 position: 'absolute',
-                                left: '10px',
-                                top: '10px',
+                                left: '8px',
+                                top: '9px',
                                 color: '#94a3b8',
                                 pointerEvents: 'none',
                               }}
@@ -3977,16 +4380,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               onChange={(e) => currentSearchSetter(e.target.value)}
                               style={{
                                 width: '100%',
-                                height: '34px',
-                                padding: '0 28px 0 32px',
+                                height: '32px',
+                                padding: '0 24px 0 26px',
                                 borderRadius: '6px',
-                                border: '1px solid #cbd5e1',
-                                fontSize: '0.84rem',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '0.8rem',
                                 outline: 'none',
                                 backgroundColor: '#ffffff',
                                 color: '#0f172a',
                                 boxSizing: 'border-box',
+                                transition: 'border-color 0.15s ease',
                               }}
+                              onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                              onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
                             />
                             {currentSearchVal && (
                               <button
@@ -3994,8 +4400,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 onClick={() => currentSearchSetter('')}
                                 style={{
                                   position: 'absolute',
-                                  right: '8px',
-                                  top: '9px',
+                                  right: '6px',
+                                  top: '8px',
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
@@ -4003,7 +4409,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   padding: 0,
                                 }}
                               >
-                                <X size={14} />
+                                <X size={13} />
                               </button>
                             )}
                           </div>
@@ -4013,12 +4419,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             value={currentStatusVal}
                             onChange={(e) => currentStatusSetter(e.target.value)}
                             style={{
-                              height: '34px',
-                              padding: '0 28px 0 10px',
-                              width: '128px',
+                              height: '32px',
+                              padding: '0 24px 0 8px',
+                              width: '105px',
+                              minWidth: '95px',
                               borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.84rem',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.8rem',
                               fontFamily: 'inherit',
                               fontWeight: 500,
                               color: '#334155',
@@ -4031,8 +4438,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               MozAppearance: 'none',
                               backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
                               backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 8px center',
+                              backgroundPosition: 'right 6px center',
+                              transition: 'border-color 0.15s ease',
                             }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
                           >
                             {currentStatusOptions.map((opt) => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -4048,45 +4458,176 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 currentStatusSetter('ALL');
                               }}
                               style={{
-                                height: '34px',
-                                padding: '0 10px',
+                                height: '32px',
+                                padding: '0 8px',
                                 borderRadius: '6px',
                                 border: '1px solid #e2e8f0',
                                 backgroundColor: '#f1f5f9',
                                 color: '#64748b',
-                                fontSize: '0.82rem',
+                                fontSize: '0.78rem',
                                 fontWeight: 500,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
+                                gap: '3px',
+                                whiteSpace: 'nowrap',
                               }}
                               title="Reset filter and search"
                             >
-                              <X size={13} /> Reset
+                              <X size={12} /> Reset
                             </button>
                           )}
 
-                          {/* CSV Export Button */}
+                          {/* CSV Export Button (Icon Only) */}
                           <button
                             type="button"
                             onClick={() => handleExportTableCSV(historyTableTab)}
                             style={{
-                              height: '34px',
-                              width: '36px',
+                              height: '32px',
+                              width: '32px',
+                              minWidth: '32px',
                               backgroundColor: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              border: '1px solid #e2e8f0',
                               borderRadius: '6px',
                               padding: 0,
-                              color: '#64748b',
+                              color: '#334155',
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
                             }}
                             title={`Export ${historyTableTab} to CSV`}
                           >
-                            <Download size={14} />
+                            <Download size={13} />
+                          </button>
+
+                          {/* Print Customer Ledger / History A4 (Icon Only) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedHistoryCustomer?.id) {
+                                pdfApi.printCustomerHistory(selectedHistoryCustomer.id);
+                              } else {
+                                addToast('Please select a customer first', 'warning');
+                              }
+                            }}
+                            style={{
+                              height: '32px',
+                              width: '32px',
+                              minWidth: '32px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              padding: 0,
+                              color: '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
+                            }}
+                            title="Print Customer Ledger History (A4)"
+                          >
+                            <Printer size={13} />
+                          </button>
+
+                          {/* Download Customer Ledger History PDF A4 (Icon Only) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedHistoryCustomer?.id) {
+                                pdfApi.downloadCustomerHistory(selectedHistoryCustomer.id);
+                              } else {
+                                addToast('Please select a customer first', 'warning');
+                              }
+                            }}
+                            style={{
+                              height: '32px',
+                              width: '32px',
+                              minWidth: '32px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              padding: 0,
+                              color: '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
+                            }}
+                            title="Download Customer Ledger PDF (A4)"
+                          >
+                            <FileDown size={13} />
+                          </button>
+
+                          {/* Refresh Customer History (Icon Only) */}
+                          <button
+                            type="button"
+                            onClick={loadInitialData}
+                            style={{
+                              height: '32px',
+                              width: '32px',
+                              minWidth: '32px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              padding: 0,
+                              color: '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                              e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.color = '#334155';
+                            }}
+                            title="Refresh Customer Records"
+                          >
+                            <RefreshCw size={13} />
                           </button>
                         </div>
                       </div>
@@ -5241,6 +5782,150 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Customer Status Change Confirmation Modal             */}
+      {/* ------------------------------------------------------------- */}
+      {confirmStatusModal.isOpen && confirmStatusModal.customer && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '16px', zIndex: 1200, backgroundColor: 'rgba(15, 23, 42, 0.6)' }}
+          onClick={() => setConfirmStatusModal({ isOpen: false, customer: null })}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '460px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  backgroundColor: isCustomerActive(confirmStatusModal.customer) ? '#fee2e2' : '#dcfce7',
+                  color: isCustomerActive(confirmStatusModal.customer) ? '#dc2626' : '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {isCustomerActive(confirmStatusModal.customer) ? (
+                  <AlertTriangle size={22} />
+                ) : (
+                  <CheckCircle size={22} />
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  {isCustomerActive(confirmStatusModal.customer)
+                    ? 'Deactivate Customer?'
+                    : 'Activate Customer?'}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#475569', lineHeight: 1.5 }}>
+                  Are you sure you want to change the status of customer{' '}
+                  <strong style={{ color: '#0f172a' }}>
+                    {confirmStatusModal.customer.name}
+                  </strong>{' '}
+                  ({confirmStatusModal.customer.code || confirmStatusModal.customer.customerCode || `#${confirmStatusModal.customer.id}`}) to{' '}
+                  <strong
+                    style={{
+                      color: isCustomerActive(confirmStatusModal.customer) ? '#dc2626' : '#16a34a',
+                    }}
+                  >
+                    {isCustomerActive(confirmStatusModal.customer) ? 'Inactive' : 'Active'}
+                  </strong>
+                  ?
+                </p>
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.78rem',
+                    color: '#64748b',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {isCustomerActive(confirmStatusModal.customer)
+                    ? '⚠️ When marked Inactive, this customer will be hidden from customer lists, sales invoicing, quotations, and assignments until reactivated.'
+                    : '✓ When marked Active, this customer will be visible and available across all transactions and modules.'}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                borderTop: '1px solid #f1f5f9',
+                paddingTop: '14px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setConfirmStatusModal({ isOpen: false, customer: null })}
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const cust = confirmStatusModal.customer;
+                  setConfirmStatusModal({ isOpen: false, customer: null });
+                  if (cust) {
+                    await handleToggleCustomerActive(cust.id, isCustomerActive(cust));
+                  }
+                }}
+                style={{
+                  backgroundColor: isCustomerActive(confirmStatusModal.customer) ? '#dc2626' : '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 18px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: isCustomerActive(confirmStatusModal.customer)
+                    ? '0 2px 6px rgba(220, 38, 38, 0.25)'
+                    : '0 2px 6px rgba(22, 163, 74, 0.25)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {isCustomerActive(confirmStatusModal.customer)
+                  ? 'Yes, Deactivate'
+                  : 'Yes, Activate'}
+              </button>
+            </div>
           </div>
         </div>
       )}

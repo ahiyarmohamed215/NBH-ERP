@@ -33,6 +33,8 @@ public class PdfGenerationService {
     private final InvoiceRepository invoiceRepository;
     private final GrnRepository grnRepository;
     private final GtnRepository gtnRepository;
+    private final com.nbh.erp.customer.repository.CustomerRepository customerRepository;
+    private final com.nbh.erp.customergroup.repository.CustomerGroupRepository customerGroupRepository;
 
     @Value("${app.company.name:NBH Warehouse & Distribution}")
     private String companyName;
@@ -316,6 +318,356 @@ public class PdfGenerationService {
         } catch (Exception e) {
             log.error("Failed to generate GTN PDF: " + gtnId, e);
             throw new RuntimeException("Could not generate GTN PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCustomerPdf(Long customerId) {
+        var customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone, subHeaderFont);
+            address.setSpacingAfter(12);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("CUSTOMER STATEMENT & PROFILE", titleFont);
+            docTitle.setSpacingAfter(10);
+            document.add(docTitle);
+
+            PdfPTable infoTable = new PdfPTable(2);
+            infoTable.setWidthPercentage(100);
+
+            PdfPCell leftCell = new PdfPCell();
+            leftCell.setBorder(Rectangle.NO_BORDER);
+            leftCell.addElement(new Paragraph("CUSTOMER DETAILS", boldBody));
+            leftCell.addElement(new Paragraph("Customer ID: #" + customer.getId(), bodyFont));
+            leftCell.addElement(new Paragraph("Code: " + customer.getCustomerCode(), boldBody));
+            leftCell.addElement(new Paragraph("Name: " + customer.getName(), bodyFont));
+            leftCell.addElement(new Paragraph("Address: " + (customer.getAddress() != null && !customer.getAddress().isBlank() ? customer.getAddress() : "—"), bodyFont));
+            leftCell.addElement(new Paragraph("Phone: " + (customer.getPhone() != null ? customer.getPhone() : "—"), bodyFont));
+            leftCell.addElement(new Paragraph("Contact Person: " + (customer.getContactPerson() != null ? customer.getContactPerson() : "—"), bodyFont));
+
+            PdfPCell rightCell = new PdfPCell();
+            rightCell.setBorder(Rectangle.NO_BORDER);
+            rightCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            rightCell.addElement(new Paragraph("ACCOUNT SUMMARY", boldBody));
+            rightCell.addElement(new Paragraph("Status: " + (Boolean.TRUE.equals(customer.getIsActive()) ? "ACTIVE" : "INACTIVE"), boldBody));
+            rightCell.addElement(new Paragraph("Credit Limit: " + currencySymbol + " " + NumberUtils.formatCurrency(customer.getCreditLimit()), bodyFont));
+            rightCell.addElement(new Paragraph("Current Balance: " + currencySymbol + " " + NumberUtils.formatCurrency(customer.getCurrentBalance()), boldBody));
+            rightCell.addElement(new Paragraph("Generated: " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), bodyFont));
+
+            infoTable.addCell(leftCell);
+            infoTable.addCell(rightCell);
+            infoTable.setSpacingAfter(15);
+            document.add(infoTable);
+
+            var invoices = invoiceRepository.findByCustomerId(customerId);
+            Paragraph invTitle = new Paragraph("TRANSACTION HISTORY", titleFont);
+            invTitle.setSpacingAfter(8);
+            document.add(invTitle);
+
+            PdfPTable itemsTable = new PdfPTable(6);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setWidths(new float[]{1.5f, 2.2f, 1.8f, 1.8f, 1.8f, 1.5f});
+
+            String[] headers = {"Date", "Invoice No", "Net Total", "Paid", "Balance", "Status"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, tableHeadFont));
+                cell.setBackgroundColor(new Color(2, 132, 199));
+                cell.setPadding(5);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(cell);
+            }
+
+            if (invoices.isEmpty()) {
+                PdfPCell emptyCell = new PdfPCell(new Phrase("No transaction records found for this customer.", bodyFont));
+                emptyCell.setColspan(6);
+                emptyCell.setPadding(10);
+                emptyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(emptyCell);
+            } else {
+                for (var inv : invoices) {
+                    addTableCell(itemsTable, DateUtils.formatDate(inv.getInvoiceDate()), bodyFont, Element.ALIGN_CENTER);
+                    addTableCell(itemsTable, inv.getInvoiceNumber(), bodyFont, Element.ALIGN_LEFT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getNetTotal()), bodyFont, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getPaidAmount()), bodyFont, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getBalanceAmount()), boldBody, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, inv.getStatus(), bodyFont, Element.ALIGN_CENTER);
+                }
+            }
+
+            itemsTable.setSpacingAfter(15);
+            document.add(itemsTable);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Customer PDF: " + customerId, e);
+            throw new RuntimeException("Could not generate Customer PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCustomerListPdf() {
+        var customers = customerRepository.findAll();
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4.rotate(), 28, 28, 28, 28);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 8, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 8, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone + " | Date: " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), subHeaderFont);
+            address.setSpacingAfter(8);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("CUSTOMER DIRECTORY & MASTER LIST (A4)", titleFont);
+            docTitle.setSpacingAfter(8);
+            document.add(docTitle);
+
+            PdfPTable itemsTable = new PdfPTable(8);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setWidths(new float[]{1.4f, 2.8f, 3.2f, 1.8f, 1.8f, 1.6f, 1.6f, 1.2f});
+
+            String[] headers = {"Code", "Customer Name", "Address", "Contact Person", "Phone", "Credit Limit", "Balance", "Status"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, tableHeadFont));
+                cell.setBackgroundColor(new Color(2, 132, 199));
+                cell.setPadding(4);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(cell);
+            }
+
+            java.math.BigDecimal totalCredit = java.math.BigDecimal.ZERO;
+            java.math.BigDecimal totalBal = java.math.BigDecimal.ZERO;
+
+            for (var c : customers) {
+                addTableCell(itemsTable, c.getCustomerCode(), boldBody, Element.ALIGN_CENTER);
+                addTableCell(itemsTable, c.getName(), bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, c.getAddress() != null && !c.getAddress().isBlank() ? c.getAddress() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, c.getContactPerson() != null ? c.getContactPerson() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, c.getPhone() != null ? c.getPhone() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, NumberUtils.formatCurrency(c.getCreditLimit()), bodyFont, Element.ALIGN_RIGHT);
+                addTableCell(itemsTable, NumberUtils.formatCurrency(c.getCurrentBalance()), boldBody, Element.ALIGN_RIGHT);
+                addTableCell(itemsTable, Boolean.TRUE.equals(c.getIsActive()) ? "Active" : "Inactive", bodyFont, Element.ALIGN_CENTER);
+
+                if (c.getCreditLimit() != null) totalCredit = totalCredit.add(c.getCreditLimit());
+                if (c.getCurrentBalance() != null) totalBal = totalBal.add(c.getCurrentBalance());
+            }
+
+            itemsTable.setSpacingAfter(10);
+            document.add(itemsTable);
+
+            Paragraph summary = new Paragraph(String.format("Total Customers: %d | Total Credit Limit: %s %s | Total Outstanding: %s %s",
+                    customers.size(), currencySymbol, NumberUtils.formatCurrency(totalCredit), currencySymbol, NumberUtils.formatCurrency(totalBal)), boldBody);
+            summary.setAlignment(Element.ALIGN_RIGHT);
+            document.add(summary);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Customer Directory PDF", e);
+            throw new RuntimeException("Could not generate Customer Directory PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCustomerGroupPdf(Long groupId) {
+        var group = customerGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", groupId));
+
+        var members = customerRepository.findByCustomerGroupId(groupId);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone, subHeaderFont);
+            address.setSpacingAfter(10);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("CUSTOMER GROUP ROSTER: " + group.getGroupName(), titleFont);
+            document.add(docTitle);
+
+            String rep = group.getAssignedStaff() != null ? group.getAssignedStaff().getFullName() : "Unassigned";
+            Paragraph meta = new Paragraph(String.format("Group Code: %s | Assigned Staff: %s | Total Customers: %d",
+                    group.getGroupCode(), rep, members.size()), subHeaderFont);
+            meta.setSpacingAfter(12);
+            document.add(meta);
+
+            PdfPTable itemsTable = new PdfPTable(6);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setWidths(new float[]{1.4f, 2.6f, 3.0f, 1.8f, 1.8f, 1.2f});
+
+            String[] headers = {"Code", "Customer Name", "Address", "Phone", "Balance", "Status"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, tableHeadFont));
+                cell.setBackgroundColor(new Color(2, 132, 199));
+                cell.setPadding(5);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(cell);
+            }
+
+            java.math.BigDecimal totalBal = java.math.BigDecimal.ZERO;
+            for (var c : members) {
+                addTableCell(itemsTable, c.getCustomerCode(), boldBody, Element.ALIGN_CENTER);
+                addTableCell(itemsTable, c.getName(), bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, c.getAddress() != null && !c.getAddress().isBlank() ? c.getAddress() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, c.getPhone() != null ? c.getPhone() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, NumberUtils.formatCurrency(c.getCurrentBalance()), boldBody, Element.ALIGN_RIGHT);
+                addTableCell(itemsTable, Boolean.TRUE.equals(c.getIsActive()) ? "Active" : "Inactive", bodyFont, Element.ALIGN_CENTER);
+                if (c.getCurrentBalance() != null) totalBal = totalBal.add(c.getCurrentBalance());
+            }
+
+            itemsTable.setSpacingAfter(12);
+            document.add(itemsTable);
+
+            Paragraph summary = new Paragraph("Total Group Outstanding Balance: " + currencySymbol + " " + NumberUtils.formatCurrency(totalBal), boldBody);
+            summary.setAlignment(Element.ALIGN_RIGHT);
+            document.add(summary);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Customer Group PDF: " + groupId, e);
+            throw new RuntimeException("Could not generate Customer Group PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateCustomerHistoryPdf(Long customerId) {
+        var customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone, subHeaderFont);
+            address.setSpacingAfter(10);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("CUSTOMER STATEMENT & TRANSACTION LEDGER", titleFont);
+            docTitle.setSpacingAfter(8);
+            document.add(docTitle);
+
+            // In customer history the customer details no need to show customer name show the id only and also add the address to that
+            PdfPTable infoTable = new PdfPTable(2);
+            infoTable.setWidthPercentage(100);
+
+            PdfPCell leftCell = new PdfPCell();
+            leftCell.setBorder(Rectangle.NO_BORDER);
+            leftCell.addElement(new Paragraph("CUSTOMER ID: #" + customer.getId(), boldBody));
+            leftCell.addElement(new Paragraph("Code: " + customer.getCustomerCode(), boldBody));
+            leftCell.addElement(new Paragraph("Address: " + (customer.getAddress() != null && !customer.getAddress().isBlank() ? customer.getAddress() : "—"), bodyFont));
+            leftCell.addElement(new Paragraph("Phone: " + (customer.getPhone() != null ? customer.getPhone() : "—"), bodyFont));
+
+            PdfPCell rightCell = new PdfPCell();
+            rightCell.setBorder(Rectangle.NO_BORDER);
+            rightCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            rightCell.addElement(new Paragraph("Status: " + (Boolean.TRUE.equals(customer.getIsActive()) ? "ACTIVE" : "INACTIVE"), boldBody));
+            rightCell.addElement(new Paragraph("Credit Limit: " + currencySymbol + " " + NumberUtils.formatCurrency(customer.getCreditLimit()), bodyFont));
+            rightCell.addElement(new Paragraph("Current Balance: " + currencySymbol + " " + NumberUtils.formatCurrency(customer.getCurrentBalance()), boldBody));
+            rightCell.addElement(new Paragraph("Report Date: " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), bodyFont));
+
+            infoTable.addCell(leftCell);
+            infoTable.addCell(rightCell);
+            infoTable.setSpacingAfter(14);
+            document.add(infoTable);
+
+            var invoices = invoiceRepository.findByCustomerId(customerId);
+            PdfPTable itemsTable = new PdfPTable(6);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setWidths(new float[]{1.5f, 2.2f, 1.8f, 1.8f, 1.8f, 1.5f});
+
+            String[] headers = {"Date", "Invoice No", "Net Total", "Paid", "Balance", "Status"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, tableHeadFont));
+                cell.setBackgroundColor(new Color(2, 132, 199));
+                cell.setPadding(5);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(cell);
+            }
+
+            if (invoices.isEmpty()) {
+                PdfPCell emptyCell = new PdfPCell(new Phrase("No invoices found for this customer.", bodyFont));
+                emptyCell.setColspan(6);
+                emptyCell.setPadding(10);
+                emptyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(emptyCell);
+            } else {
+                for (var inv : invoices) {
+                    addTableCell(itemsTable, DateUtils.formatDate(inv.getInvoiceDate()), bodyFont, Element.ALIGN_CENTER);
+                    addTableCell(itemsTable, inv.getInvoiceNumber(), bodyFont, Element.ALIGN_LEFT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getNetTotal()), bodyFont, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getPaidAmount()), bodyFont, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, NumberUtils.formatCurrency(inv.getBalanceAmount()), boldBody, Element.ALIGN_RIGHT);
+                    addTableCell(itemsTable, inv.getStatus(), bodyFont, Element.ALIGN_CENTER);
+                }
+            }
+
+            itemsTable.setSpacingAfter(12);
+            document.add(itemsTable);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Customer History PDF: " + customerId, e);
+            throw new RuntimeException("Could not generate Customer History PDF", e);
         }
 
         return out.toByteArray();

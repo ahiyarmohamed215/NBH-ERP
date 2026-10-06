@@ -26,6 +26,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     boolean existsByCustomerId(Long customerId);
 
+    List<Invoice> findByCustomerId(Long customerId);
+
     @Query("SELECT i FROM Invoice i WHERE " +
             "(:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR i.customer.id = :customerId) AND " +
