@@ -31,8 +31,17 @@ public class CustomerGroupService {
 
     @Transactional(readOnly = true)
     public List<CustomerGroupDto> getAllGroups() {
-        return customerGroupRepository.findAll().stream().map(group -> {
+        return getAllGroups(true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerGroupDto> getAllGroups(boolean includeInactive) {
+        List<CustomerGroup> groups = includeInactive
+                ? customerGroupRepository.findAll()
+                : customerGroupRepository.findByIsActiveTrue();
+        return groups.stream().map(group -> {
             List<Long> custIds = customerRepository.findByCustomerGroupId(group.getId()).stream()
+                    .filter(c -> includeInactive || Boolean.TRUE.equals(c.getIsActive()))
                     .map(com.nbh.erp.customer.entity.Customer::getId)
                     .toList();
             return CustomerGroupDto.from(group, custIds);

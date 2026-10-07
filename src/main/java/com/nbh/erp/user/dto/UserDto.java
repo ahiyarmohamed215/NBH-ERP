@@ -25,10 +25,20 @@ public class UserDto {
     private Boolean isActive;
     private String approvalStatus;
     private List<String> roles;
+    private List<String> permissions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static UserDto from(User user) {
+        List<String> perms = user.getRoles() != null
+                ? user.getRoles().stream()
+                        .filter(r -> r.getPermissions() != null)
+                        .flatMap(r -> r.getPermissions().stream())
+                        .map(p -> p.getName())
+                        .distinct()
+                        .collect(Collectors.toList())
+                : java.util.Collections.emptyList();
+
         return UserDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -40,6 +50,7 @@ public class UserDto {
                 .isActive(user.getIsActive())
                 .approvalStatus(user.getApprovalStatus())
                 .roles(user.getRoles().stream().map(r -> r.getName()).collect(Collectors.toList()))
+                .permissions(perms)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

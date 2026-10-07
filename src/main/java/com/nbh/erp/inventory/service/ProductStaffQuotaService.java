@@ -92,6 +92,26 @@ public class ProductStaffQuotaService {
             warehouse = product.getDefaultWarehouse();
         }
 
+        // Validate inventory stock availability
+        BigDecimal availableStock;
+        if (warehouse != null) {
+            availableStock = stockService.getAvailableStock(warehouse.getId(), product.getId());
+        } else {
+            BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
+            availableStock = tot != null ? tot : BigDecimal.ZERO;
+        }
+        if (availableStock == null) {
+            availableStock = BigDecimal.ZERO;
+        }
+
+        if (availableStock.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Product '" + product.getName() + "' is out of stock (0 available). Cannot allocate inventory.");
+        }
+
+        if (request.getAllocatedQuantity() != null && request.getAllocatedQuantity().compareTo(availableStock) > 0) {
+            throw new BusinessException("Cannot allocate " + request.getAllocatedQuantity() + " units. Only " + availableStock + " units available in inventory stock for '" + product.getName() + "'.");
+        }
+
         // Check if an existing quota already exists for this (product, user, warehouse)
         Optional<ProductStaffQuota> existingOpt = (warehouse != null)
                 ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(), user.getId(), warehouse.getId())
@@ -137,6 +157,26 @@ public class ProductStaffQuotaService {
                 .orElseThrow(() -> new ResourceNotFoundException("ProductStaffQuota", "id", id));
 
         if (request.getAllocatedQuantity() != null) {
+            Product product = quota.getProduct();
+            Warehouse warehouse = quota.getWarehouse();
+            BigDecimal availableStock;
+            if (warehouse != null) {
+                availableStock = stockService.getAvailableStock(warehouse.getId(), product.getId());
+            } else {
+                BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
+                availableStock = tot != null ? tot : BigDecimal.ZERO;
+            }
+            if (availableStock == null) {
+                availableStock = BigDecimal.ZERO;
+            }
+
+            if (availableStock.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("Product '" + product.getName() + "' is out of stock (0 available). Cannot allocate inventory.");
+            }
+
+            if (request.getAllocatedQuantity().compareTo(availableStock) > 0) {
+                throw new BusinessException("Cannot allocate " + request.getAllocatedQuantity() + " units. Only " + availableStock + " units available in inventory stock for '" + product.getName() + "'.");
+            }
             quota.setAllocatedQuantity(request.getAllocatedQuantity());
         }
         if (request.getSoldQuantity() != null) {
@@ -339,6 +379,46 @@ public class ProductStaffQuotaService {
                 .totalRemainingUnits(totalRem)
                 .distinctProductsRestricted(distinctProds)
                 .distinctStaffRestricted(distinctStaff)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ProductStockAvailabilityDto getProductStockAvailability(Long productId, Long warehouseId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
+
+        Warehouse warehouse = null;
+        if (warehouseId != null) {
+            warehouse = warehouseRepository.findById(warehouseId).orElse(null);
+        }
+        if (warehouse == null && product.getDefaultWarehouse() != null) {
+            warehouse = product.getDefaultWarehouse();
+        }
+
+        BigDecimal availableStock;
+        if (warehouse != null) {
+            availableStock = stockService.getAvailableStock(warehouse.getId(), product.getId());
+        } else {
+            BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
+            availableStock = tot != null ? tot : BigDecimal.ZERO;
+        }
+        if (availableStock == null) {
+            availableStock = BigDecimal.ZERO;
+        }
+
+        BigDecimal totEnterprise = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
+        BigDecimal totalEnterpriseStock = totEnterprise != null ? totEnterprise : BigDecimal.ZERO;
+
+        boolean isOutOfStock = availableStock.compareTo(BigDecimal.ZERO) <= 0;
+
+        return ProductStockAvailabilityDto.builder()
+                .productId(product.getId())
+                .productName(product.getName())
+                .productSku(product.getSku())
+                .warehouseId(warehouse != null ? warehouse.getId() : null)
+                .availableStock(availableStock)
+                .totalEnterpriseStock(totalEnterpriseStock)
+                .outOfStock(isOutOfStock)
                 .build();
     }
 }

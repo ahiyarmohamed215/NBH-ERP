@@ -102,6 +102,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers()));
     }
 
+    @GetMapping("/pos-staff")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('INVENTORY_MANAGE') or hasAuthority('SALES_CREATE')")
+    @Operation(summary = "Get list of active staff members with POS access")
+    public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getPosStaff() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getPosStaff()));
+    }
+
     @GetMapping("/active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_VIEW') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Get list of all active approved users")

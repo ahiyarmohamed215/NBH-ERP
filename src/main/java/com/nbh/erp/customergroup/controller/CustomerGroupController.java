@@ -25,9 +25,11 @@ public class CustomerGroupController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
-    @Operation(summary = "Get all customer groups")
-    public ResponseEntity<ApiResponse<List<CustomerGroupDto>>> getAllGroups() {
-        return ResponseEntity.ok(ApiResponse.ok(customerGroupService.getAllGroups()));
+    @Operation(summary = "Get customer groups (defaults to all groups)")
+    public ResponseEntity<ApiResponse<List<CustomerGroupDto>>> getAllGroups(
+            @RequestParam(required = false, defaultValue = "true") boolean includeInactive
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(customerGroupService.getAllGroups(includeInactive)));
     }
 
     @GetMapping("/active")

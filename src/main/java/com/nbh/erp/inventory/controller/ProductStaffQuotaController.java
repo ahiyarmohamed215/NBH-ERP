@@ -62,6 +62,17 @@ public class ProductStaffQuotaController {
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
+    @GetMapping("/product-stock/{productId}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('INVENTORY_MANAGE')")
+    @Operation(summary = "Get available inventory stock for a product before allocation")
+    public ResponseEntity<ApiResponse<ProductStockAvailabilityDto>> getProductStockAvailability(
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long warehouseId
+    ) {
+        ProductStockAvailabilityDto dto = quotaService.getProductStockAvailability(productId, warehouseId);
+        return ResponseEntity.ok(ApiResponse.ok(dto));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW')")
     @Operation(summary = "Get a specific quota allocation by ID")

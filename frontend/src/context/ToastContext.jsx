@@ -21,16 +21,23 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div style={{
-        position: 'fixed',
-        bottom: '24px',
-        right: '24px',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        maxWidth: '380px',
-      }}>
+      <div
+        style={{
+          position: 'fixed',
+          top: '20px',
+          left: 0,
+          right: 0,
+          margin: '0 auto',
+          zIndex: 999999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          maxWidth: '540px',
+          width: 'max-content',
+          pointerEvents: 'none',
+        }}
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -39,22 +46,56 @@ export const ToastProvider = ({ children }) => {
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              padding: '12px 18px',
-              background: 'rgba(255, 255, 255, 0.95)',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-              borderLeft: `4px solid ${toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6'}`,
-              animation: 'fadeIn 0.2s ease-out',
+              padding: '11px 18px',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              borderLeft: `5px solid ${
+                toast.type === 'success'
+                  ? '#10b981'
+                  : toast.type === 'error'
+                  ? '#ef4444'
+                  : toast.type === 'warning'
+                  ? '#f59e0b'
+                  : '#3b82f6'
+              }`,
+              boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.14), 0 4px 10px -2px rgba(0, 0, 0, 0.06)',
+              pointerEvents: 'auto',
+              minWidth: '280px',
+              maxWidth: '520px',
             }}
           >
-            {toast.type === 'success' && <CheckCircle2 size={20} color="#10b981" />}
-            {toast.type === 'error' && <AlertCircle size={20} color="#ef4444" />}
-            {toast.type === 'info' && <Info size={20} color="#3b82f6" />}
-            <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#1e293b', flex: 1 }}>{toast.message}</span>
+            {toast.type === 'success' && <CheckCircle2 size={19} color="#10b981" style={{ flexShrink: 0 }} />}
+            {toast.type === 'error' && <AlertCircle size={19} color="#ef4444" style={{ flexShrink: 0 }} />}
+            {(toast.type === 'info' || !toast.type) && <Info size={19} color="#3b82f6" style={{ flexShrink: 0 }} />}
+            {toast.type === 'warning' && <AlertCircle size={19} color="#f59e0b" style={{ flexShrink: 0 }} />}
+            <span
+              style={{
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                color: '#0f172a',
+                flex: 1,
+                lineHeight: 1.4,
+              }}
+            >
+              {toast.message}
+            </span>
             <button
               onClick={() => removeToast(toast.id)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8',
+                padding: '2px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+              }}
+              title="Dismiss"
             >
-              <X size={16} />
+              <X size={15} />
             </button>
           </div>
         ))}

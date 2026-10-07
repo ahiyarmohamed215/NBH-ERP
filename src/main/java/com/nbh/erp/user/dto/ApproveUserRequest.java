@@ -1,6 +1,5 @@
 package com.nbh.erp.user.dto;
 
-import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,6 +11,10 @@ import java.util.List;
 @AllArgsConstructor
 public class ApproveUserRequest {
 
-    @NotEmpty(message = "At least one role must be assigned to approved user")
+    // Roles are optional: staff who don't access ERP can be approved without system roles
     private List<String> roles;
+    private String fullName;
+    private String email;
+    private String phone;
+    private String employeeCode;
 }

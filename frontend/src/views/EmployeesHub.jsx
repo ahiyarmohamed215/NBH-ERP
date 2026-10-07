@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { userApi, roleApi } from '../api/apiClient';
+import { userApi, roleApi, pdfApi } from '../api/apiClient';
 import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
+import { printA4Report } from '../utils/printReport';
+import { ToolbarActions, TableRowActions } from '../components/ToolbarActions';
+import RoleSearchSelector from '../components/RoleSearchSelector';
 import RolesView from './RolesView';
 import {
   Users,
@@ -31,6 +34,9 @@ import {
   UserCheck,
   UserX,
   Sparkles,
+  Printer,
+  FileDown,
+  Eye,
 } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
@@ -57,6 +63,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [roleFilter, setRoleFilter] = useState('ALL');
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -170,7 +177,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       const userMatch = emp.username && emp.username.toLowerCase().includes(q);
       const emailMatch = emp.email && emp.email.toLowerCase().includes(q);
       const phoneMatch = emp.phone && emp.phone.includes(q);
-      const roleMatch = emp.roles && emp.roles.some((r) => r.toLowerCase().includes(q));
+      const roleMatch = emp.roles && emp.roles.some((r) => {
+        const str = typeof r === 'string' ? r : (r?.name || '');
+        return str.toLowerCase().includes(q);
+      });
       return nameMatch || userMatch || emailMatch || phoneMatch || roleMatch;
     });
   }, [employees, searchQuery, statusFilter]);
@@ -217,6 +227,140 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     link.click();
     document.body.removeChild(link);
     addToast('Employee CSV exported successfully', 'success');
+  };
+
+  // Print Employee Directory Report (A4)
+  const handlePrintEmployeeList = () => {
+    const listToPrint = filteredEmployees.length > 0 ? filteredEmployees : employees;
+    if (listToPrint.length === 0) {
+      addToast('No employee records to print', 'info');
+      return;
+    }
+    try {
+      pdfApi.printEmployeeList();
+    } catch {
+      printA4Report({
+        title: 'Employee Directory & Staff Roster',
+        subtitle: `Total Staff: ${listToPrint.length}`,
+        metaItems: [
+          { label: 'Date', value: new Date().toLocaleDateString() },
+          { label: 'Status Filter', value: statusFilter },
+        ],
+        columns: [
+          { header: 'Employee', accessor: (e) => e.fullName || e.username },
+          { header: 'Username', accessor: (e) => `@${e.username}` },
+          { header: 'Role', accessor: (e) => getPrimaryRole(e) },
+          { header: 'Phone', accessor: (e) => e.phone || '—' },
+          { header: 'Email', accessor: (e) => e.email || '—' },
+          { header: 'Joined', accessor: (e) => formatJoinedDate(e.createdAt) },
+          { header: 'Status', accessor: (e) => (e.isActive ? 'Active' : 'Inactive'), align: 'center' },
+        ],
+        data: listToPrint,
+      });
+    }
+  };
+
+  // Download Employee Directory PDF (A4)
+  const handleDownloadEmployeeListPdf = () => {
+    try {
+      pdfApi.downloadEmployeeList();
+    } catch (err) {
+      addToast('Failed to download Employee Directory PDF: ' + err.message, 'error');
+    }
+  };
+
+  // Print Single Employee Profile (A4)
+  const handlePrintEmployee = (emp) => {
+    if (!emp) return;
+    try {
+      pdfApi.printEmployee(emp.id);
+    } catch {
+      printA4Report({
+        title: 'Employee Personnel Record',
+        subtitle: `${emp.fullName || emp.username} (@${emp.username})`,
+        metaItems: [
+          { label: 'Employee ID', value: `#${emp.id}` },
+          { label: 'Code', value: emp.employeeCode || `EMP-${emp.id}` },
+          { label: 'Primary Role', value: getPrimaryRole(emp) },
+          { label: 'Status', value: emp.isActive ? 'Active' : 'Inactive' },
+          { label: 'Phone', value: emp.phone || '—' },
+          { label: 'Email', value: emp.email || '—' },
+          { label: 'Joined', value: formatJoinedDate(emp.createdAt) },
+        ],
+        columns: [
+          { header: 'Field', accessor: 'key' },
+          { header: 'Details', accessor: 'val' },
+        ],
+        data: [
+          { key: 'Full Name', val: emp.fullName || emp.username },
+          { key: 'Username', val: `@${emp.username}` },
+          { key: 'Phone Number', val: emp.phone || '—' },
+          { key: 'Email Address', val: emp.email || '—' },
+          { key: 'Assigned Roles', val: (emp.roles || []).join(', ') || 'Employee' },
+          { key: 'Approval Status', val: emp.approvalStatus || 'APPROVED' },
+          { key: 'Account Status', val: emp.isActive ? 'Active (Operational)' : 'Inactive / Disabled' },
+        ],
+      });
+    }
+  };
+
+  // Download Single Employee Profile PDF (A4)
+  const handleDownloadEmployeePdf = (emp) => {
+    if (!emp) return;
+    try {
+      pdfApi.downloadEmployee(emp.id, emp.fullName || emp.username);
+    } catch (err) {
+      addToast('Failed to download Employee PDF: ' + err.message, 'error');
+    }
+  };
+
+  // Export Pending Registrations to CSV
+  const handleExportPendingCSV = () => {
+    if (filteredPendingList.length === 0) {
+      addToast('No pending registrations to export', 'info');
+      return;
+    }
+    const headers = ['USERNAME', 'FULL_NAME', 'EMAIL', 'PHONE', 'REGISTERED_DATE'];
+    const rows = filteredPendingList.map((u) => [
+      `"${u.username || ''}"`,
+      `"${u.fullName || ''}"`,
+      `"${u.email || ''}"`,
+      `"${u.phone || ''}"`,
+      `"${formatJoinedDate(u.createdAt)}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `pending_approvals_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Pending registrations CSV exported', 'success');
+  };
+
+  // Print Pending Registrations (A4)
+  const handlePrintPendingList = () => {
+    if (filteredPendingList.length === 0) {
+      addToast('No pending registrations to print', 'info');
+      return;
+    }
+    printA4Report({
+      title: 'Pending Employee Registrations & Approval Queue',
+      subtitle: `Total Pending: ${filteredPendingList.length}`,
+      metaItems: [
+        { label: 'Date', value: new Date().toLocaleDateString() },
+        { label: 'Status', value: 'PENDING ROLE ASSIGNMENT' },
+      ],
+      columns: [
+        { header: 'Username', accessor: (u) => `@${u.username}` },
+        { header: 'Full Name', accessor: (u) => u.fullName || '—' },
+        { header: 'Email', accessor: (u) => u.email || '—' },
+        { header: 'Phone', accessor: (u) => u.phone || '—' },
+        { header: 'Registered On', accessor: (u) => formatJoinedDate(u.createdAt) },
+      ],
+      data: filteredPendingList,
+    });
   };
 
   // Toggle active
@@ -476,42 +620,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
         <button
           type="button"
-          onClick={() => handleTabChange('pending-approvals')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'pending-approvals' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'pending-approvals' ? 700 : 500,
-            color: activeTab === 'pending-approvals' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <UserCheck size={16} /> Pending Approvals & Roles
-          {pendingApprovals.length > 0 && (
-            <span
-              style={{
-                backgroundColor: activeTab === 'pending-approvals' ? '#0284c7' : '#f59e0b',
-                color: '#ffffff',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                padding: '1px 7px',
-                borderRadius: '9999px',
-                lineHeight: 1.2,
-              }}
-            >
-              {pendingApprovals.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
           onClick={() => handleTabChange('roles')}
           style={{
             background: 'none',
@@ -528,7 +636,43 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             marginBottom: '-1px',
           }}
         >
-          <Shield size={16} /> Roles
+          <Shield size={16} /> Employee Roles
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('pending-approvals')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'pending-approvals' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'pending-approvals' ? 700 : 500,
+            color: activeTab === 'pending-approvals' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <UserCheck size={16} /> Pending Approvals
+          {pendingApprovals.length > 0 && (
+            <span
+              style={{
+                backgroundColor: activeTab === 'pending-approvals' ? '#0284c7' : '#f59e0b',
+                color: '#ffffff',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '1px 7px',
+                borderRadius: '9999px',
+                lineHeight: 1.2,
+              }}
+            >
+              {pendingApprovals.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -730,19 +874,19 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               )}
             </div>
 
-            {/* Right Controls: Status Filter, Reset, Export CSV (icon only), & Refresh (icon only) */}
+            {/* Right Controls: Status Filter, Reset, & Global Toolbar Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Status Filter Dropdown */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
-                  height: '38px',
+                  height: '34px',
                   padding: '0 30px 0 12px',
-                  width: '140px',
-                  minWidth: '120px',
+                  width: '135px',
+                  minWidth: '115px',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e2e8f0',
                   fontSize: '0.86rem',
                   fontFamily: 'inherit',
                   fontWeight: 500,
@@ -769,6 +913,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
                 }}
+                title="Filter by account status"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="ACTIVE">Active Only</option>
@@ -784,7 +929,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     setSearchQuery('');
                   }}
                   style={{
-                    height: '38px',
+                    height: '34px',
                     padding: '0 12px',
                     borderRadius: '6px',
                     border: '1px solid #e2e8f0',
@@ -807,81 +952,18 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </button>
               )}
 
-              {/* Export CSV */}
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                style={{
-                  height: '38px',
-                  padding: '0 14px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Export employees to CSV"
-              >
-                <Download size={14} /> Export
-              </button>
-
-              {/* Refresh Employee Records */}
-              <button
-                type="button"
-                onClick={loadData}
-                style={{
-                  height: '38px',
-                  padding: '0 14px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Refresh employee records"
-              >
-                <RefreshCw size={14} /> Refresh
-              </button>
+              {/* Global Reusable Toolbar Action Buttons (Export CSV, Print A4, Download PDF, Refresh) */}
+              <ToolbarActions
+                onExportCsv={handleExportCSV}
+                onPrint={handlePrintEmployeeList}
+                onDownloadPdf={handleDownloadEmployeeListPdf}
+                onRefresh={loadData}
+                loading={loading}
+                exportTitle="Export employees to CSV"
+                printTitle="Print Employee Directory (A4)"
+                pdfTitle="Download Employee Directory PDF (A4)"
+                refreshTitle="Refresh employee records"
+              />
             </div>
           </div>
 
@@ -1037,31 +1119,17 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           </button>
                         </td>
 
-                        <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit(emp);
-                              }}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#475569',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title="Edit Employee"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <TableRowActions
+                            onPrint={() => handlePrintEmployee(emp)}
+                            onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
+                            onView={() => setViewingEmployee(emp)}
+                            onEdit={() => handleOpenEdit(emp)}
+                            printTitle="Print Employee Record (A4)"
+                            pdfTitle="Download Employee PDF (A4)"
+                            viewTitle="View Employee Profile"
+                            editTitle="Edit Employee"
+                          />
                         </td>
                       </tr>
                     );
@@ -1079,37 +1147,36 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {/* ------------------------------------------------------------- */}
       {activeTab === 'pending-approvals' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
-          {/* Top Info & Search Bar */}
+          {/* Top Bar: Title, Search, & Toolbar Actions in ONE clean line without description */}
           <div
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
               border: '1px solid #e2e8f0',
-              padding: '12px 18px',
+              padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '14px',
+              gap: '12px',
               flexShrink: 0,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck size={22} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldCheck size={18} />
               </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a', fontWeight: 700 }}>
-                  Pending Employee Registrations & Role Assignments
-                </h3>
-                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  Newly registered users become active employees once assigned roles and approved.
-                </span>
-              </div>
+              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#0f172a', fontWeight: 700 }}>
+                Pending Employee Registrations
+              </h3>
+              <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
+                {filteredPendingList.length} Pending
+              </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ position: 'relative', width: '260px' }}>
-                <Search size={15} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
+              <div style={{ position: 'relative', width: '240px' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
                 <input
                   type="text"
                   placeholder="Search pending users..."
@@ -1118,7 +1185,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   style={{
                     width: '100%',
                     height: '34px',
-                    padding: '0 10px 0 32px',
+                    padding: '0 10px 0 30px',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     fontSize: '0.85rem',
@@ -1128,52 +1195,41 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={loadData}
-                style={{
-                  height: '34px',
-                  padding: '0 12px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  color: '#475569',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                }}
-              >
-                <RefreshCw size={14} /> Refresh
-              </button>
+              <ToolbarActions
+                onExportCsv={handleExportPendingCSV}
+                onPrint={handlePrintPendingList}
+                onRefresh={loadData}
+                loading={loading}
+                exportTitle="Export pending approvals to CSV"
+                printTitle="Print Pending Approvals (A4)"
+                refreshTitle="Refresh pending approvals"
+              />
             </div>
           </div>
 
           {/* Pending List or Empty State */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredPendingList.length === 0 ? (
               <div
                 style={{
                   backgroundColor: '#ffffff',
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   border: '1px solid #e2e8f0',
-                  padding: '60px 20px',
+                  padding: '50px 20px',
                   textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '12px',
+                  gap: '10px',
                 }}
               >
-                <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CheckCircle size={32} />
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle size={26} />
                 </div>
-                <h4 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 700 }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a', fontWeight: 700 }}>
                   {pendingSearchQuery ? 'No matching pending registrations' : 'All registrations are up to date!'}
                 </h4>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', maxWidth: '440px' }}>
+                <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', maxWidth: '420px' }}>
                   {pendingSearchQuery
                     ? 'Try searching by a different name, username, or email.'
                     : 'There are currently no new employee registrations awaiting approval.'}
@@ -1185,92 +1241,91 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   key={pUser.id}
                   style={{
                     backgroundColor: '#ffffff',
-                    borderRadius: '10px',
+                    borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    padding: '18px 22px',
+                    padding: '8px 16px',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div
-                        style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '10px',
-                          backgroundColor: '#e0f2fe',
-                          color: '#0284c7',
-                          fontWeight: 800,
-                          fontSize: '1.2rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>
-                            {pUser.fullName || pUser.username}
-                          </span>
-                          <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 9px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
-                            PENDING APPROVAL
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '0.84rem', color: '#64748b', flexWrap: 'wrap' }}>
-                          <span>Username: <strong style={{ color: '#0f172a' }}>@{pUser.username}</strong></span>
-                          {pUser.email && <span>Email: <strong style={{ color: '#0f172a' }}>{pUser.email}</strong></span>}
-                          {pUser.phone && <span>Phone: <strong style={{ color: '#0f172a' }}>{pUser.phone}</strong></span>}
-                          {pUser.createdAt && <span>Registered: <strong style={{ color: '#0f172a' }}>{new Date(pUser.createdAt).toLocaleDateString()}</strong></span>}
-                        </div>
-                      </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: '#e0f2fe',
+                        color: '#0284c7',
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenApprove(pUser)}
-                        style={{
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          fontWeight: 600,
-                          fontSize: '0.88rem',
-                          padding: '8px 18px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                        }}
-                      >
-                        <ShieldCheck size={16} /> Assign Roles & Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleReject(pUser)}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          color: '#ef4444',
-                          fontWeight: 600,
-                          fontSize: '0.88rem',
-                          padding: '8px 14px',
-                          border: '1px solid #fecaca',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <UserX size={15} /> Reject
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
+                        {pUser.fullName || pUser.username}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        (@{pUser.username})
+                      </span>
                     </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {pUser.email && <span>{pUser.email}</span>}
+                      {pUser.phone && <span>• {pUser.phone}</span>}
+                      {pUser.createdAt && <span>• {new Date(pUser.createdAt).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenApprove(pUser)}
+                      style={{
+                        backgroundColor: '#0284c7',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
+                      }}
+                    >
+                      <ShieldCheck size={14} /> Assign Roles & Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReject(pUser)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        color: '#ef4444',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        padding: '6px 12px',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <UserX size={14} /> Reject
+                    </button>
                   </div>
                 </div>
               ))
@@ -1279,20 +1334,20 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
-      {/* Tab 2: Roles (Renders RolesView with Sticky Header & Scrollable Cards) */}
+      {/* Tab 2: Employee Roles (Matches Customer Groups structure in Customer Page) */}
       {(activeTab === 'roles' || activeTab === 'groups') && (
         <div
           style={{
-            flex: 1,
-            minHeight: 0,
-            height: '100%',
-            maxHeight: '100%',
-            overflow: 'hidden',
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
             display: 'flex',
             flexDirection: 'column',
+            gap: '16px',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
           }}
         >
           <RolesView onRoleChange={loadData} />
@@ -1524,40 +1579,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label className="label">Assigned Roles / Groups</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                  {roles.map((r) => {
-                    const isSelected = formData.roles.includes(r.name);
-                    return (
-                      <button
-                        key={r.id || r.name}
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            roles: isSelected
-                              ? formData.roles.filter((name) => name !== r.name)
-                              : [...formData.roles, r.name],
-                          });
-                        }}
-                        style={{
-                          backgroundColor: isSelected ? '#0284c7' : '#f1f5f9',
-                          color: isSelected ? '#ffffff' : '#334155',
-                          border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {formatRoleName(r.name)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <RoleSearchSelector
+                assignedRoles={formData.roles || []}
+                allRoles={roles}
+                onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
+                label="Assigned Roles / Groups"
+                formatRoleName={formatRoleName}
+                placeholder="Search and assign role by name or description..."
+              />
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
@@ -1580,135 +1609,231 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
-      {/* Edit Employee Modal */}
+      {/* Edit Employee Modal - Split 2-Column Layout (Matching Customer Groups style) */}
       {showEditModal && selectedEmployee && (
         <div
           className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
             className="glass-modal"
-            style={{ width: 'min(620px, 96vw)', maxWidth: '620px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
+            style={{
+              width: '100%',
+              maxWidth: '960px',
+              maxHeight: 'min(700px, 90vh)',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
-                Edit Employee: {selectedEmployee.fullName || selectedEmployee.username}
-              </h2>
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  {(formData.fullName || selectedEmployee.username || 'E').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                    Edit Employee: {selectedEmployee.fullName || selectedEmployee.username}
+                  </h2>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                    @{selectedEmployee.username} • Update personal information and access roles
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label className="label">Full Name</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  />
-                </div>
+            {/* Split Form: Left side details, Right side role assignment */}
+            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(330px, 1.05fr) minmax(320px, 1fr)',
+                  gap: '20px',
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  flex: 1,
+                }}
+              >
+                {/* Left Side: Employee Information Card */}
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    Employee Profile
+                  </div>
 
-                <div>
-                  <label className="label">Username</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    disabled
-                    value={formData.username}
-                    style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                  />
-                </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label className="label">Full Name</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Username</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        disabled
+                        value={formData.username}
+                        style={{ backgroundColor: '#e2e8f0', cursor: 'not-allowed', color: '#64748b' }}
+                      />
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="label">Email Address</label>
-                  <input
-                    type="email"
-                    className="input-glass"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label className="label">Email Address</label>
+                      <input
+                        type="email"
+                        className="input-glass"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Phone Number</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="label">Phone Number</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Reset Password (optional)</label>
-                  <input
-                    type="password"
-                    className="input-glass"
-                    placeholder="Leave blank to keep current"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Employee Type</label>
-                  <select
-                    className="input-glass"
-                    value={formData.employeeType}
-                    onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
-                  >
-                    <option value="Full-time">Full-time</option>
-                    <option value="Part-time">Part-time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Intern">Intern</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '22px' }}>
-                <label className="label">Assigned Roles / Groups</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                  {roles.map((r) => {
-                    const isSelected = formData.roles.includes(r.name);
-                    return (
-                      <button
-                        key={r.id || r.name}
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            roles: isSelected
-                              ? formData.roles.filter((name) => name !== r.name)
-                              : [...formData.roles, r.name],
-                          });
-                        }}
-                        style={{
-                          backgroundColor: isSelected ? '#0284c7' : '#f1f5f9',
-                          color: isSelected ? '#ffffff' : '#334155',
-                          border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                          padding: '6px 14px',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label className="label">Reset Password</label>
+                      <input
+                        type="password"
+                        className="input-glass"
+                        placeholder="Leave blank to keep"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Employee Type</label>
+                      <select
+                        className="input-glass"
+                        value={formData.employeeType}
+                        onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
                       >
-                        {formatRoleName(r.name)}
-                      </button>
-                    );
-                  })}
+                        <option value="Full-time">Full-time</option>
+                        <option value="Part-time">Part-time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Intern">Intern</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Role Assignment Card (Splitted side-by-side like Customer Groups) */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    minHeight: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
+                      Assign Roles & Permissions
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        backgroundColor: '#f0f9ff',
+                        color: '#0284c7',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        border: '1px solid #bae6fd',
+                      }}
+                    >
+                      {(formData.roles || []).length} Assigned
+                    </span>
+                  </div>
+
+                  <RoleSearchSelector
+                    assignedRoles={formData.roles || []}
+                    allRoles={roles}
+                    onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
+                    label=""
+                    formatRoleName={formatRoleName}
+                    placeholder="Search roles to assign..."
+                  />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {/* Footer */}
+              <div
+                style={{
+                  padding: '12px 24px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  backgroundColor: '#f8fafc',
+                  flexShrink: 0,
+                }}
+              >
                 <button
                   type="button"
                   className="btn btn-glass"
@@ -1792,39 +1917,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               </select>
             </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label className="label">Assign Roles *</label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                {roles.map((r) => {
-                  const isSelected = selectedApproveRoles.includes(r.name);
-                  return (
-                    <button
-                      key={r.id || r.name}
-                      type="button"
-                      onClick={() => {
-                        setSelectedApproveRoles(
-                          isSelected
-                            ? selectedApproveRoles.filter((n) => n !== r.name)
-                            : [...selectedApproveRoles, r.name]
-                        );
-                      }}
-                      style={{
-                        backgroundColor: isSelected ? '#0284c7' : '#f1f5f9',
-                        color: isSelected ? '#ffffff' : '#334155',
-                        border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                        padding: '7px 14px',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {formatRoleName(r.name)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <RoleSearchSelector
+              assignedRoles={selectedApproveRoles}
+              allRoles={roles}
+              onChange={(newRoles) => setSelectedApproveRoles(newRoles)}
+              label="Assign Roles"
+              required={true}
+              formatRoleName={formatRoleName}
+              placeholder="Search and assign role by name or description..."
+            />
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button

@@ -68,6 +68,7 @@ public class UserService {
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .isActive(true)
+                .approvalStatus("APPROVED")
                 .roles(roles)
                 .build();
 
@@ -104,11 +105,17 @@ public class UserService {
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             Set<Role> roles = new HashSet<>();
             for (String roleName : request.getRoles()) {
-                Role role = roleRepository.findByName(roleName)
-                        .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
-                roles.add(role);
+                String cleanName = roleName != null ? roleName.trim() : "";
+                if (!cleanName.isEmpty()) {
+                    Role role = roleRepository.findByName(cleanName)
+                            .or(() -> roleRepository.findByName("ROLE_" + cleanName))
+                            .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
+                    roles.add(role);
+                }
             }
-            user.setRoles(roles);
+            if (!roles.isEmpty()) {
+                user.setRoles(roles);
+            }
         }
 
         User updatedUser = userRepository.save(user);
@@ -146,12 +153,36 @@ public class UserService {
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
 
+        if (StringUtils.hasText(request.getFullName())) {
+            user.setFullName(request.getFullName().trim());
+        }
+        if (StringUtils.hasText(request.getPhone())) {
+            user.setPhone(request.getPhone().trim());
+        }
+        if (StringUtils.hasText(request.getEmail())) {
+            String newEmail = request.getEmail().trim();
+            userRepository.findByEmail(newEmail)
+                    .ifPresent(existing -> {
+                        if (!existing.getId().equals(id)) {
+                            throw new DuplicateResourceException("User", "email", newEmail);
+                        }
+                    });
+            user.setEmail(newEmail);
+        }
+        if (StringUtils.hasText(request.getEmployeeCode())) {
+            user.setEmployeeCode(request.getEmployeeCode().trim());
+        }
+
         Set<Role> roles = new HashSet<>();
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             for (String roleName : request.getRoles()) {
-                Role role = roleRepository.findByName(roleName)
-                        .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
-                roles.add(role);
+                String cleanName = roleName != null ? roleName.trim() : "";
+                if (!cleanName.isEmpty()) {
+                    Role role = roleRepository.findByName(cleanName)
+                            .or(() -> roleRepository.findByName("ROLE_" + cleanName))
+                            .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
+                    roles.add(role);
+                }
             }
         }
 
@@ -166,7 +197,7 @@ public class UserService {
                 "EMPLOYEES",
                 "User",
                 user.getUsername(),
-                String.format("User '%s' approved with roles: %s", user.getUsername(), request.getRoles())
+                String.format("User '%s' approved with roles: %s", user.getUsername(), request.getRoles() != null ? request.getRoles() : "None")
         );
 
         return UserDto.from(approvedUser);
@@ -204,6 +235,26 @@ public class UserService {
     public java.util.List<UserDto> getActiveUsers() {
         return userRepository.findAll().stream()
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && "APPROVED".equalsIgnoreCase(u.getApprovalStatus()))
+                .map(UserDto::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UserDto> getPosStaff() {
+        return userRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && "APPROVED".equalsIgnoreCase(u.getApprovalStatus()))
+                .filter(u -> {
+                    boolean isPrivileged = u.getRoles().stream().anyMatch(r -> {
+                        String name = r.getName().toUpperCase();
+                        return name.contains("ADMIN") || name.contains("SUPER") || name.contains("MANAGER") || name.contains("DIRECTOR") || name.contains("CASHIER") || name.contains("POS") || name.contains("SALES");
+                    });
+                    if (isPrivileged) return true;
+                    return u.getRoles().stream().anyMatch(r ->
+                            r.getPermissions() != null && r.getPermissions().stream().anyMatch(p ->
+                                    "SALES_CREATE".equalsIgnoreCase(p.getName()) || "SALES".equalsIgnoreCase(p.getModule())
+                            )
+                    );
+                })
                 .map(UserDto::from)
                 .toList();
     }

@@ -4,7 +4,9 @@ import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
-import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye } from 'lucide-react';
+import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye, Printer, FileDown } from 'lucide-react';
+import { ToolbarActions } from '../components/ToolbarActions';
+import { printA4Report } from '../utils/printReport';
 
 export default function RolesView({ onRoleChange }) {
   const { user } = useAuth();
@@ -47,6 +49,87 @@ export default function RolesView({ onRoleChange }) {
   }, []);
 
   useDataSync(fetchData, ['erp:roles_updated']);
+
+  const handleExportRolesCSV = () => {
+    if (roles.length === 0) {
+      addToast('No roles to export', 'info');
+      return;
+    }
+    const headers = ['ROLE_NAME', 'DESCRIPTION', 'PERMISSIONS_COUNT'];
+    const rows = (filteredRoles.length > 0 ? filteredRoles : roles).map((r) => [
+      `"${r.name || ''}"`,
+      `"${(r.description || '').replace(/"/g, '""')}"`,
+      r.permissions?.length || 0,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `roles_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Roles exported to CSV', 'success');
+  };
+
+  const handlePrintRolesReport = () => {
+    const listToPrint = filteredRoles.length > 0 ? filteredRoles : roles;
+    if (listToPrint.length === 0) {
+      addToast('No roles to print', 'info');
+      return;
+    }
+    printA4Report({
+      title: 'Security Roles & Permissions Directory',
+      subtitle: `Total Roles: ${listToPrint.length}`,
+      metaItems: [
+        { label: 'Date', value: new Date().toLocaleDateString() },
+        { label: 'System Access', value: 'ENTERPRISE ROLE HIERARCHY' },
+      ],
+      columns: [
+        { header: 'Role Title', accessor: (r) => r.name?.replace('ROLE_', '') || r.name },
+        { header: 'Description', accessor: (r) => r.description || '—' },
+        { header: 'Assigned Permissions', accessor: (r) => String(r.permissions?.length || 0), align: 'center' },
+      ],
+      data: listToPrint,
+    });
+  };
+
+  const handlePrintSingleRole = (role) => {
+    const perms = role.permissions || [];
+    printA4Report({
+      title: `Security Role: ${role.name?.replace('ROLE_', '') || role.name}`,
+      subtitle: role.description || 'System role access specification',
+      metaItems: [
+        { label: 'Role Name', value: role.name },
+        { label: 'Permissions Count', value: String(perms.length) },
+        { label: 'Printed Date', value: new Date().toLocaleDateString() },
+      ],
+      columns: [
+        { header: 'Permission Name', accessor: (p) => p.name || p },
+        { header: 'Description', accessor: (p) => p.description || p.category || '—' },
+      ],
+      data: perms,
+    });
+  };
+
+  const handleExportSingleRole = (role) => {
+    const perms = role.permissions || [];
+    const headers = ['PERMISSION_NAME', 'CATEGORY', 'DESCRIPTION'];
+    const rows = perms.map((p) => [
+      `"${p.name || p || ''}"`,
+      `"${p.category || ''}"`,
+      `"${(p.description || '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `role_${role.name || 'export'}_permissions.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast(`Exported ${role.name} permissions to CSV`, 'success');
+  };
 
   const openCreateModal = () => {
     setEditingRole(null);
@@ -162,47 +245,51 @@ export default function RolesView({ onRoleChange }) {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        padding: '20px 24px',
         boxSizing: 'border-box',
       }}
     >
-      {/* Header (Sticky / Fixed at Top) */}
+      {/* Header row with Title, subtitle and Create Role button (Matches Customer Groups style) */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '16px',
+          alignItems: 'center',
+          marginBottom: '4px',
+          flexWrap: 'wrap',
+          gap: '12px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>Role Management</h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Create and configure company roles with fine-grained access permissions
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
+            Employee Roles
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
+            Configure company roles and manage fine-grained access permissions for staff.
           </p>
         </div>
         <button
           type="button"
-          className="btn btn-primary"
           onClick={openCreateModal}
           style={{
             backgroundColor: '#0284c7',
             color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '9px 18px',
             fontWeight: 600,
             fontSize: '0.88rem',
-            padding: '9px 18px',
-            borderRadius: '8px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-            border: 'none',
             cursor: 'pointer',
-            flexShrink: 0,
+            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+            transition: 'background-color 0.15s ease',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
         >
-          <Plus size={16} /> Create New Role
+          <Plus size={16} /> Create Employee Role
         </button>
       </div>
 
@@ -271,8 +358,19 @@ export default function RolesView({ onRoleChange }) {
             </button>
           )}
         </div>
-        <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>
-          {filteredRoles.length} Role{filteredRoles.length === 1 ? '' : 's'} Configured
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {filteredRoles.length} Role{filteredRoles.length === 1 ? '' : 's'} Configured
+          </div>
+          <ToolbarActions
+            onExportCsv={handleExportRolesCSV}
+            onPrint={handlePrintRolesReport}
+            onRefresh={fetchData}
+            loading={loading}
+            exportTitle="Export roles to CSV"
+            printTitle="Print Roles Summary (A4)"
+            refreshTitle="Refresh roles"
+          />
         </div>
       </div>
 
@@ -423,31 +521,132 @@ export default function RolesView({ onRoleChange }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                    <button
-                      type="button"
-                      style={{
-                        flex: 1,
-                        height: '30px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '5px',
-                        color: '#334155',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditModal(role);
-                      }}
-                    >
-                      <Edit2 size={12} /> Edit
-                    </button>
+                  {/* Card Footer: View link & Action Icons (Edit, Print, Download) matching Customer Group cards */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '10px',
+                      borderTop: '1px solid #f1f5f9',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.80rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Eye size={13} /> View Permissions →
+                    </span>
+
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {canEditRole && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(role);
+                          }}
+                          style={{
+                            width: '30px',
+                            height: '30px',
+                            minWidth: '30px',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#ffffff',
+                            color: '#334155',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            padding: 0,
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#94a3b8';
+                            e.currentTarget.style.color = '#0f172a';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.color = '#334155';
+                          }}
+                          title="Edit Role & Permissions"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrintSingleRole(role);
+                        }}
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          minWidth: '30px',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                          backgroundColor: '#ffffff',
+                          color: '#334155',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#94a3b8';
+                          e.currentTarget.style.color = '#0f172a';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.color = '#334155';
+                        }}
+                        title="Print Role Specification (A4)"
+                      >
+                        <Printer size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExportSingleRole(role);
+                        }}
+                        style={{
+                          width: '30px',
+                          height: '30px',
+                          minWidth: '30px',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0',
+                          backgroundColor: '#ffffff',
+                          color: '#334155',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#94a3b8';
+                          e.currentTarget.style.color = '#0f172a';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.color = '#334155';
+                        }}
+                        title="Export Role Permissions to CSV"
+                      >
+                        <FileDown size={13} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

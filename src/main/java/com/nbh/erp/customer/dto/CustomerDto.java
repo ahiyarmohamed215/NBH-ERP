@@ -49,17 +49,27 @@ public class CustomerDto {
     }
 
     public static CustomerDto from(Customer c) {
-        Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = c.getCustomerGroups();
-        List<Long> groupIds = groups != null
-                ? groups.stream().map(com.nbh.erp.customergroup.entity.CustomerGroup::getId).filter(Objects::nonNull).toList()
-                : List.of();
-        List<String> groupNames = groups != null
-                ? groups.stream().map(com.nbh.erp.customergroup.entity.CustomerGroup::getGroupName).filter(Objects::nonNull).toList()
+        Set<com.nbh.erp.customergroup.entity.CustomerGroup> rawGroups = c.getCustomerGroups();
+        List<com.nbh.erp.customergroup.entity.CustomerGroup> activeGroups = rawGroups != null
+                ? rawGroups.stream().filter(g -> Boolean.TRUE.equals(g.getIsActive())).toList()
                 : List.of();
 
-        Long groupId = c.getCustomerGroup() != null ? c.getCustomerGroup().getId() : (!groupIds.isEmpty() ? groupIds.get(0) : null);
-        String groupName = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupName() : (!groupNames.isEmpty() ? groupNames.get(0) : null);
-        String groupCode = c.getCustomerGroup() != null ? c.getCustomerGroup().getGroupCode() : null;
+        List<Long> groupIds = activeGroups.stream()
+                .map(com.nbh.erp.customergroup.entity.CustomerGroup::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        List<String> groupNames = activeGroups.stream()
+                .map(com.nbh.erp.customergroup.entity.CustomerGroup::getGroupName)
+                .filter(Objects::nonNull)
+                .toList();
+
+        com.nbh.erp.customergroup.entity.CustomerGroup activeGroup = (c.getCustomerGroup() != null && Boolean.TRUE.equals(c.getCustomerGroup().getIsActive()))
+                ? c.getCustomerGroup()
+                : (!activeGroups.isEmpty() ? activeGroups.get(0) : null);
+
+        Long groupId = activeGroup != null ? activeGroup.getId() : null;
+        String groupName = activeGroup != null ? activeGroup.getGroupName() : null;
+        String groupCode = activeGroup != null ? activeGroup.getGroupCode() : null;
 
         Long delRouteId = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getId() : null;
         String delRouteName = c.getDeliveryRoute() != null ? c.getDeliveryRoute().getRouteName() : null;

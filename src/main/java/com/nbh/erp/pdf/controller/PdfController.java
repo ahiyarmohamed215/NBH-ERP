@@ -128,4 +128,35 @@ public class PdfController {
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }
+
+    @GetMapping("/employees")
+    @Operation(summary = "Generate and stream or download PDF for employee directory")
+    public ResponseEntity<byte[]> getEmployeeListPdf(
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateEmployeeListPdf();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"employees-directory.pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/employees/{id}")
+    @Operation(summary = "Generate and stream or download PDF for employee profile card")
+    public ResponseEntity<byte[]> getEmployeePdf(
+            @PathVariable Long id,
+            @RequestParam(value = "download", defaultValue = "false") boolean download
+    ) {
+        byte[] pdf = pdfService.generateEmployeePdf(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String disposition = download ? "attachment" : "inline";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"employee-" + id + ".pdf\"");
+
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
 }

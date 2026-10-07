@@ -98,13 +98,17 @@ export const userApi = {
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   toggleActive: (id) => api.patch(`/users/${id}/toggle-active`),
-  approve: (id, roles) => api.post(`/users/${id}/approve`, { roles }),
+  approve: (id, dataOrRoles) => {
+    const payload = Array.isArray(dataOrRoles) ? { roles: dataOrRoles } : (dataOrRoles || {});
+    return api.post(`/users/${id}/approve`, payload);
+  },
   reject: (id) => api.post(`/users/${id}/reject`),
   delete: (id) => api.delete(`/users/${id}`),
 };
 
 export const roleApi = {
-  getAll: () => api.get('/roles'),
+  getAll: (params) => api.get('/roles', { params }),
+  search: (query) => api.get('/roles/search', { params: { query } }),
   getPermissions: () => api.get('/roles/permissions'),
   create: (data) => api.post('/roles', data),
   update: (id, data) => api.put(`/roles/${id}`, data),
@@ -181,6 +185,7 @@ export const supplierApi = {
 export const salesmanApi = {
   getAll: () => api.get('/users/sales-reps'),
   getActive: () => api.get('/users/sales-reps'),
+  getPosStaff: () => api.get('/users/pos-staff'),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   toggleActive: (id) => api.delete(`/users/${id}`),
@@ -199,6 +204,7 @@ export const staffQuotaApi = {
   getSummary: () => api.get('/inventory/staff-quotas/summary'),
   getById: (id) => api.get(`/inventory/staff-quotas/${id}`),
   check: (params) => api.get('/inventory/staff-quotas/check', { params }),
+  getProductStock: (productId, warehouseId) => api.get(`/inventory/staff-quotas/product-stock/${productId}`, { params: { warehouseId } }),
   create: (data) => api.post('/inventory/staff-quotas', data),
   update: (id, data) => api.put(`/inventory/staff-quotas/${id}`, data),
   delete: (id) => api.delete(`/inventory/staff-quotas/${id}`),
@@ -409,12 +415,16 @@ export const pdfApi = {
   downloadCustomerGroup: (id, name) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customer-groups/${id}?download=true`, `CustomerGroup-${id}${name ? '-' + name.replace(/[^a-zA-Z0-9_-]/g, '_') : ''}.pdf`),
   printCustomerHistory: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}/history`),
   downloadCustomerHistory: (id) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/customers/${id}/history?download=true`, `Customer-History-${id}.pdf`),
+  printEmployeeList: () => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/employees`),
+  downloadEmployeeList: () => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/employees?download=true`, 'Employees-Directory.pdf'),
+  printEmployee: (id) => printPdfDocument(`${API_ORIGIN}/api/v1/pdf/employees/${id}`),
+  downloadEmployee: (id, name) => downloadPdfDocument(`${API_ORIGIN}/api/v1/pdf/employees/${id}?download=true`, `Employee-${id}${name ? '-' + name.replace(/[^a-zA-Z0-9_-]/g, '_') : ''}.pdf`),
   printPdf: printPdfDocument,
   downloadPdf: downloadPdfDocument,
 };
 
 export const customerGroupApi = {
-  getAll: () => api.get('/customer-groups'),
+  getAll: (includeInactive = true) => api.get('/customer-groups', { params: { includeInactive } }),
   getActive: () => api.get('/customer-groups/active'),
   getById: (id) => api.get(`/customer-groups/${id}`),
   create: (data) => api.post('/customer-groups', data),

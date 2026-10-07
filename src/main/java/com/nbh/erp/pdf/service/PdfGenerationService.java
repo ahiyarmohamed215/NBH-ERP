@@ -35,6 +35,7 @@ public class PdfGenerationService {
     private final GtnRepository gtnRepository;
     private final com.nbh.erp.customer.repository.CustomerRepository customerRepository;
     private final com.nbh.erp.customergroup.repository.CustomerGroupRepository customerGroupRepository;
+    private final com.nbh.erp.user.repository.UserRepository userRepository;
 
     @Value("${app.company.name:NBH Warehouse & Distribution}")
     private String companyName;
@@ -668,6 +669,163 @@ public class PdfGenerationService {
         } catch (Exception e) {
             log.error("Failed to generate Customer History PDF: " + customerId, e);
             throw new RuntimeException("Could not generate Customer History PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateEmployeeListPdf() {
+        var employees = userRepository.findAll();
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4.rotate(), 28, 28, 28, 28);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 8, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, new Color(15, 23, 42));
+            Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 8, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone + " | Date: " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), subHeaderFont);
+            address.setSpacingAfter(8);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("EMPLOYEE DIRECTORY & STAFF ROSTER (A4)", titleFont);
+            docTitle.setSpacingAfter(8);
+            document.add(docTitle);
+
+            PdfPTable itemsTable = new PdfPTable(7);
+            itemsTable.setWidthPercentage(100);
+            itemsTable.setWidths(new float[]{1.4f, 2.5f, 1.8f, 2.3f, 1.8f, 2.6f, 1.2f});
+
+            String[] headers = {"Code", "Full Name", "Username", "Assigned Roles", "Phone", "Email", "Status"};
+            for (String h : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(h, tableHeadFont));
+                cell.setBackgroundColor(new Color(2, 132, 199));
+                cell.setPadding(4);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                itemsTable.addCell(cell);
+            }
+
+            int activeCount = 0;
+            int inactiveCount = 0;
+
+            for (var emp : employees) {
+                String code = emp.getEmployeeCode() != null && !emp.getEmployeeCode().isBlank() ? emp.getEmployeeCode() : "EMP-" + emp.getId();
+                String roleNames = emp.getRoles() != null && !emp.getRoles().isEmpty()
+                        ? emp.getRoles().stream().map(r -> r.getName().replace("ROLE_", "")).collect(java.util.stream.Collectors.joining(", "))
+                        : "Employee";
+                boolean isActive = Boolean.TRUE.equals(emp.getIsActive());
+                if (isActive) activeCount++; else inactiveCount++;
+
+                addTableCell(itemsTable, code, boldBody, Element.ALIGN_CENTER);
+                addTableCell(itemsTable, emp.getFullName() != null ? emp.getFullName() : emp.getUsername(), bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, "@" + emp.getUsername(), bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, roleNames, bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, emp.getPhone() != null && !emp.getPhone().isBlank() ? emp.getPhone() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, emp.getEmail() != null && !emp.getEmail().isBlank() ? emp.getEmail() : "—", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(itemsTable, isActive ? "Active" : "Inactive", boldBody, Element.ALIGN_CENTER);
+            }
+
+            itemsTable.setSpacingAfter(10);
+            document.add(itemsTable);
+
+            Paragraph summary = new Paragraph(String.format("Total Employees: %d | Active: %d | Inactive: %d",
+                    employees.size(), activeCount, inactiveCount), boldBody);
+            summary.setAlignment(Element.ALIGN_RIGHT);
+            document.add(summary);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Employee Directory PDF", e);
+            throw new RuntimeException("Could not generate Employee Directory PDF", e);
+        }
+
+        return out.toByteArray();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateEmployeePdf(Long userId) {
+        var emp = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 36, 36, 36, 36);
+
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, new Color(30, 41, 59));
+            Font subHeaderFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(100, 116, 139));
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new Color(15, 23, 42));
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, new Color(15, 23, 42));
+
+            Paragraph title = new Paragraph(companyName, headerFont);
+            Paragraph address = new Paragraph(companyAddress + " | Tel: " + companyPhone + " | Date: " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), subHeaderFont);
+            address.setSpacingAfter(12);
+            document.add(title);
+            document.add(address);
+
+            Paragraph docTitle = new Paragraph("EMPLOYEE PERSONNEL RECORD & STATEMENT", titleFont);
+            docTitle.setSpacingAfter(12);
+            document.add(docTitle);
+
+            // Information Table Box
+            PdfPTable infoTable = new PdfPTable(2);
+            infoTable.setWidthPercentage(100);
+            infoTable.setWidths(new float[]{1.1f, 0.9f});
+
+            PdfPCell leftCell = new PdfPCell();
+            leftCell.setBorder(Rectangle.NO_BORDER);
+            leftCell.addElement(new Paragraph("EMPLOYEE DETAILS", boldBody));
+            leftCell.addElement(new Paragraph("System ID: #" + emp.getId(), bodyFont));
+            leftCell.addElement(new Paragraph("Code: " + (emp.getEmployeeCode() != null ? emp.getEmployeeCode() : "EMP-" + emp.getId()), boldBody));
+            leftCell.addElement(new Paragraph("Full Name: " + (emp.getFullName() != null ? emp.getFullName() : emp.getUsername()), boldBody));
+            leftCell.addElement(new Paragraph("Username: @" + emp.getUsername(), bodyFont));
+            leftCell.addElement(new Paragraph("Phone: " + (emp.getPhone() != null && !emp.getPhone().isBlank() ? emp.getPhone() : "—"), bodyFont));
+            leftCell.addElement(new Paragraph("Email: " + (emp.getEmail() != null && !emp.getEmail().isBlank() ? emp.getEmail() : "—"), bodyFont));
+
+            PdfPCell rightCell = new PdfPCell();
+            rightCell.setBorder(Rectangle.NO_BORDER);
+            rightCell.addElement(new Paragraph("EMPLOYMENT STATUS & ROLES", boldBody));
+            rightCell.addElement(new Paragraph("Status: " + (Boolean.TRUE.equals(emp.getIsActive()) ? "ACTIVE (OPERATIONAL)" : "INACTIVE"), boldBody));
+            rightCell.addElement(new Paragraph("Approval Status: " + (emp.getApprovalStatus() != null ? emp.getApprovalStatus() : "APPROVED"), bodyFont));
+
+            String roleNames = emp.getRoles() != null && !emp.getRoles().isEmpty()
+                    ? emp.getRoles().stream().map(r -> r.getName().replace("ROLE_", "")).collect(java.util.stream.Collectors.joining(", "))
+                    : "Employee";
+            rightCell.addElement(new Paragraph("Assigned Roles: " + roleNames, boldBody));
+            if (emp.getCommissionRate() != null && emp.getCommissionRate().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                rightCell.addElement(new Paragraph("Commission Rate: " + emp.getCommissionRate().toPlainString() + "%", boldBody));
+            }
+            if (emp.getCreatedAt() != null) {
+                rightCell.addElement(new Paragraph("Joined Date: " + DateUtils.formatDateTime(emp.getCreatedAt()), bodyFont));
+            }
+
+            infoTable.addCell(leftCell);
+            infoTable.addCell(rightCell);
+            infoTable.setSpacingAfter(18);
+            document.add(infoTable);
+
+            // Footer note
+            Paragraph footer = new Paragraph("Confidential Internal Personnel Document • " + companyName + " • Generated on " + DateUtils.formatDateTime(java.time.LocalDateTime.now()), subHeaderFont);
+            footer.setAlignment(Element.ALIGN_CENTER);
+            document.add(footer);
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Failed to generate Employee PDF for ID: " + userId, e);
+            throw new RuntimeException("Could not generate Employee PDF", e);
         }
 
         return out.toByteArray();

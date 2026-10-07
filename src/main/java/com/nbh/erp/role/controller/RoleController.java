@@ -26,11 +26,23 @@ public class RoleController {
     private final RoleService roleService;
 
     @GetMapping
-    @Operation(summary = "Get all available system roles and their permissions")
-    public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles() {
-        List<RoleDto> roles = roleService.getAllRoles();
+    @Operation(summary = "Get all available system roles and their permissions, optionally filtered by search query")
+    public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles(
+            @RequestParam(value = "search", required = false) String search
+    ) {
+        List<RoleDto> roles = roleService.getAllRoles(search);
         return ResponseEntity.ok(ApiResponse.ok(roles));
     }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search roles by name or description")
+    public ResponseEntity<ApiResponse<List<RoleDto>>> searchRoles(
+            @RequestParam("query") String query
+    ) {
+        List<RoleDto> roles = roleService.getAllRoles(query);
+        return ResponseEntity.ok(ApiResponse.ok(roles));
+    }
+
 
     @GetMapping("/permissions")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")

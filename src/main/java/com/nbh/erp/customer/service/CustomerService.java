@@ -47,7 +47,7 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public List<CustomerDto> searchCustomers(String query) {
         if (!StringUtils.hasText(query)) {
-            return getActiveCustomers();
+            return getAllCustomers();
         }
         return customerRepository.searchCustomers(query).stream()
                 .map(CustomerDto::from)

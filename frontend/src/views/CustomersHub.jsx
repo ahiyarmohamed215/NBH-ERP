@@ -68,9 +68,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [salesmen, setSalesmen] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Customer List Filters (Defaults to ACTIVE so inactive customers are hidden until reactivated)
+  // Customer List Filters (Defaults to ALL so all statuses and all groups are shown by default)
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ACTIVE'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
+  const [groupFilter, setGroupFilter] = useState('ALL'); // 'ALL' | groupId
 
   // Customer Status Change Confirmation Modal
   const [confirmStatusModal, setConfirmStatusModal] = useState({
@@ -135,9 +136,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     selectedCustomerIds: [],
   });
   const [customerSearchInRoute, setCustomerSearchInRoute] = useState('');
-  const [showAssignCustomerModal, setShowAssignCustomerModal] = useState(false);
-  const [assignCustomerSearch, setAssignCustomerSearch] = useState('');
   const [routeSearchTerm, setRouteSearchTerm] = useState('');
+
+  // Staff search state in group edit form
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [isStaffSearchOpen, setIsStaffSearchOpen] = useState(false);
+  const staffSearchRef = useRef(null);
+
+  // Inline customer search & add state (No separate modal popup)
+  const [inlineCustomerSearch, setInlineCustomerSearch] = useState('');
+  const [isInlineCustomerSearchOpen, setIsInlineCustomerSearchOpen] = useState(false);
+  const inlineCustomerSearchRef = useRef(null);
 
   // Sync subTab prop
   useEffect(() => {
@@ -153,11 +162,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   }, [activeSubTab]);
 
 
-  // Close customer search dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
         setIsCustomerSearchOpen(false);
+      }
+      if (staffSearchRef.current && !staffSearchRef.current.contains(e.target)) {
+        setIsStaffSearchOpen(false);
+      }
+      if (inlineCustomerSearchRef.current && !inlineCustomerSearchRef.current.contains(e.target)) {
+        setIsInlineCustomerSearchOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -171,7 +186,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         customerApi.getAll(),
         salesmanApi.getAll(),
         userApi.getAll({ page: 0, size: 200 }),
-        customerGroupApi.getAll(),
+        customerGroupApi.getAll(true),
       ]);
 
       let loadedCustomers = [];
@@ -269,11 +284,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
-  // Helper to find all customer groups a customer belongs to
+  // Helper to find all customer groups a customer belongs to (Active only)
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
     const cObj = customers.find((c) => String(c.id) === cid);
-    const routesByArray = routes.filter((r) =>
+    const activeRoutes = routes.filter((r) => r.isActive !== false);
+    const routesByArray = activeRoutes.filter((r) =>
       Array.isArray(r.customerIds) && r.customerIds.some((id) => String(id) === cid)
     );
     const directGroupIds = [
@@ -283,20 +299,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       ...(cObj?.routeId ? [cObj.routeId] : []),
     ].map(String);
 
-    const directRoutes = routes.filter((r) => directGroupIds.includes(String(r.id)));
+    const directRoutes = activeRoutes.filter((r) => directGroupIds.includes(String(r.id)));
     const combined = [...directRoutes, ...routesByArray];
     return Array.from(new Map(combined.map((r) => [String(r.id), r])).values());
   };
 
-  // Helper for single customer group fallback
+  // Helper for single customer group fallback (Active only)
   const getCustomerRoute = (customerId) => {
     const assigned = getCustomerRoutes(customerId);
     if (assigned.length > 0) return assigned[0];
     const cid = String(customerId);
     const cObj = customers.find((c) => String(c.id) === cid);
+    const groupId = cObj?.customerGroupId || cObj?.routeId;
+    if (groupId) {
+      const g = routes.find((r) => String(r.id) === String(groupId));
+      if (g && g.isActive === false) return null;
+    }
     const groupName = cObj?.customerGroupName || cObj?.routeName;
     if (groupName) {
-      return { id: cObj.customerGroupId || cObj.routeId, name: groupName, groupName: groupName, groupCode: cObj.customerGroupCode || cObj.routeCode || '', routeCode: cObj.customerGroupCode || cObj.routeCode || '' };
+      const gByName = routes.find((r) => (r.name || '').trim().toLowerCase() === groupName.trim().toLowerCase());
+      if (gByName && gByName.isActive === false) return null;
+      return { id: groupId, name: groupName, groupName: groupName, groupCode: cObj.customerGroupCode || cObj.routeCode || '', routeCode: cObj.customerGroupCode || cObj.routeCode || '' };
     }
     return null;
   };
@@ -648,6 +671,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       const cRoutes = getCustomerRoutes(c.id);
 
+      if (groupFilter !== 'ALL') {
+        const matchesGroup =
+          cRoutes.some((r) => String(r.id) === String(groupFilter)) ||
+          String(c.customerGroupId || c.routeId) === String(groupFilter) ||
+          (Array.isArray(c.customerGroupIds) && c.customerGroupIds.some((id) => String(id) === String(groupFilter))) ||
+          (Array.isArray(c.routeIds) && c.routeIds.some((id) => String(id) === String(groupFilter)));
+        if (!matchesGroup) return false;
+      }
+
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const code = (c.code || c.customerCode || '').toLowerCase();
@@ -663,7 +695,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
       return true;
     });
-  }, [customers, statusFilter, searchTerm, routes]);
+  }, [customers, statusFilter, groupFilter, searchTerm, routes]);
 
   // Filtered Routes based on route search term and status filter
   const filteredRoutes = useMemo(() => {
@@ -775,17 +807,21 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setSelectedRoute(route);
     setIsCreatingRoute(false);
     setRouteModalMode('view'); // Show read-only view mode first, not edit mode
+    const staffId = route.salesmanId || route.assignedStaffId || '';
+    const st = salesmen.find((s) => String(s.id) === String(staffId));
     setRouteEditForm({
       name: route.name || route.routeName || '',
       routeCode: route.routeCode || route.groupCode || '',
       description: route.description || '',
-      salesmanId: route.salesmanId || route.assignedStaffId || '',
+      salesmanId: staffId,
       isActive: route.isActive !== false,
       selectedCustomerIds: route.customerIds ? [...route.customerIds] : [],
     });
+    setStaffSearchQuery(st ? st.name : '');
+    setIsStaffSearchOpen(false);
+    setInlineCustomerSearch('');
+    setIsInlineCustomerSearchOpen(false);
     setCustomerSearchInRoute('');
-    setShowAssignCustomerModal(false);
-    setAssignCustomerSearch('');
   };
 
   const handleOpenCreateRouteView = () => {
@@ -800,9 +836,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       isActive: true,
       selectedCustomerIds: [],
     });
+    setStaffSearchQuery('');
+    setIsStaffSearchOpen(false);
+    setInlineCustomerSearch('');
+    setIsInlineCustomerSearchOpen(false);
     setCustomerSearchInRoute('');
-    setShowAssignCustomerModal(false);
-    setAssignCustomerSearch('');
   };
 
   const handleCloseRouteView = () => {
@@ -810,8 +848,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setIsCreatingRoute(false);
     setRouteModalMode('view');
     setCustomerSearchInRoute('');
-    setShowAssignCustomerModal(false);
-    setAssignCustomerSearch('');
+    setStaffSearchQuery('');
+    setIsStaffSearchOpen(false);
+    setInlineCustomerSearch('');
+    setIsInlineCustomerSearchOpen(false);
   };
 
   const handleToggleRouteActive = async (route, e) => {
@@ -947,21 +987,43 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return list;
   }, [customers, routeEditForm.selectedCustomerIds, customerSearchInRoute, selectedRoute, isCreatingRoute]);
 
-  // Available customers for Assign Customer popup (ACTIVE only, includes address search)
-  const availableCustomersToAssign = useMemo(() => {
-    if (!showAssignCustomerModal) return [];
+  // Filtered staff list for searchable Staff Member autocomplete
+  const filteredStaffList = useMemo(() => {
+    const q = staffSearchQuery.trim().toLowerCase();
+    if (!q) return salesmen;
+    return salesmen.filter((s) => {
+      const name = (s.name || '').toLowerCase();
+      const code = (s.salesmanCode || '').toLowerCase();
+      const role = (s.role || '').toLowerCase();
+      const phone = (s.phone || '').toLowerCase();
+      return name.includes(q) || code.includes(q) || role.includes(q) || phone.includes(q);
+    });
+  }, [salesmen, staffSearchQuery]);
+
+  // Currently assigned staff member object
+  const currentAssignedStaff = useMemo(() => {
+    if (!routeEditForm.salesmanId) return null;
+    return salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId)) || null;
+  }, [salesmen, routeEditForm.salesmanId]);
+
+  // Available customers for inline customer search & assignment (ACTIVE only)
+  const inlineCustomerSearchResults = useMemo(() => {
     const activeCustomers = customers.filter((c) => isCustomerActive(c));
-    const q = assignCustomerSearch.trim().toLowerCase();
-    if (!q) return activeCustomers;
+    const q = inlineCustomerSearch.trim().toLowerCase();
+    if (!q) {
+      const assignedSet = new Set((routeEditForm.selectedCustomerIds || []).map(String));
+      return activeCustomers.filter((c) => !assignedSet.has(String(c.id))).slice(0, 25);
+    }
     return activeCustomers.filter(
       (c) =>
         (c.name && c.name.toLowerCase().includes(q)) ||
         (c.code && c.code.toLowerCase().includes(q)) ||
         (c.customerCode && c.customerCode.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
         (c.address && c.address.toLowerCase().includes(q)) ||
         (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
-    );
-  }, [customers, assignCustomerSearch, showAssignCustomerModal]);
+    ).slice(0, 30);
+  }, [customers, inlineCustomerSearch, routeEditForm.selectedCustomerIds]);
 
   // Export CSV matching EmployeesHub style
   const handleExportCSV = () => {
@@ -1058,10 +1120,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     });
   };
 
-  const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ACTIVE');
+  const isFiltered = Boolean(searchTerm.trim() || statusFilter !== 'ALL' || groupFilter !== 'ALL');
   const handleResetFilters = () => {
     setSearchTerm('');
-    setStatusFilter('ACTIVE');
+    setStatusFilter('ALL');
+    setGroupFilter('ALL');
   };
 
   return (
@@ -1308,6 +1371,53 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
             {/* Right Controls: Filters (to the left of Export CSV), Export CSV (icon only), & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              {/* Customer Group Filter Dropdown */}
+              <select
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+                style={{
+                  height: '34px',
+                  padding: '0 30px 0 12px',
+                  width: '145px',
+                  minWidth: '120px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.86rem',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  color: '#334155',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 10px center',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
+                }}
+                title="Filter customers by customer group"
+              >
+                <option value="ALL">All Groups</option>
+                {routes.map((r) => (
+                  <option key={r.id} value={String(r.id)}>
+                    {r.name || r.groupName || r.routeName}
+                  </option>
+                ))}
+              </select>
+
               {/* Status Filter Dropdown */}
               <select
                 value={statusFilter}
@@ -1345,6 +1455,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
                 }}
+                title="Filter customers by status"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="ACTIVE">Active Only</option>
@@ -2035,8 +2146,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 }}
               >
                 <option value="all">All Groups</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
+                <option value="active">Active Groups</option>
+                <option value="inactive">Inactive Groups</option>
               </select>
 
               {/* Export CSV (Icon Only) */}
@@ -2965,7 +3076,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {canEditCustomer && (
                     <button
                       type="button"
-                      onClick={() => setRouteModalMode('edit')}
+                      onClick={() => {
+                        const staffId = routeEditForm.salesmanId || selectedRoute?.assignedStaffId || selectedRoute?.salesmanId || '';
+                        const st = salesmen.find((s) => String(s.id) === String(staffId));
+                        setStaffSearchQuery(st ? st.name : '');
+                        setIsStaffSearchOpen(false);
+                        setInlineCustomerSearch('');
+                        setIsInlineCustomerSearchOpen(false);
+                        setRouteModalMode('edit');
+                      }}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -3116,36 +3235,176 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         />
                       </div>
 
-                      {/* Responsible Staff Dropdown */}
-                      <div style={{ marginBottom: '14px' }}>
+                      {/* Responsible Staff Search Box with Autocomplete Dropdown */}
+                      <div ref={staffSearchRef} style={{ marginBottom: '14px', position: 'relative' }}>
                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                           Assigned Staff Member
                         </label>
-                        <select
-                          value={routeEditForm.salesmanId}
-                          onChange={(e) => setRouteEditForm({ ...routeEditForm, salesmanId: e.target.value })}
-                          style={{
-                            width: '100%',
-                            height: '34px',
-                            padding: '0 28px 0 12px',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            fontSize: '0.88rem',
-                            backgroundColor: '#ffffff',
-                            boxSizing: 'border-box',
-                            appearance: 'none',
-                            backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 10px center',
-                          }}
-                        >
-                          <option value="">None (Unassigned)</option>
-                          {salesmen.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} {s.role ? `— ${s.role}` : (s.salesmanCode ? `(${s.salesmanCode})` : '')}
-                            </option>
-                          ))}
-                        </select>
+                        <div style={{ position: 'relative' }}>
+                          <Search
+                            size={14}
+                            style={{
+                              position: 'absolute',
+                              left: '10px',
+                              top: '10px',
+                              color: '#94a3b8',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Search staff by name, code, role..."
+                            value={
+                              isStaffSearchOpen
+                                ? staffSearchQuery
+                                : (currentAssignedStaff ? `${currentAssignedStaff.name} (${currentAssignedStaff.role || currentAssignedStaff.salesmanCode})` : '')
+                            }
+                            onChange={(e) => {
+                              setStaffSearchQuery(e.target.value);
+                              setIsStaffSearchOpen(true);
+                            }}
+                            onFocus={() => {
+                              setStaffSearchQuery(currentAssignedStaff?.name || '');
+                              setIsStaffSearchOpen(true);
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '34px',
+                              padding: '0 30px 0 32px',
+                              borderRadius: '6px',
+                              border: isStaffSearchOpen ? '1px solid #0284c7' : '1px solid #e2e8f0',
+                              fontSize: '0.86rem',
+                              backgroundColor: '#ffffff',
+                              boxSizing: 'border-box',
+                              outline: 'none',
+                              boxShadow: isStaffSearchOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : 'none',
+                              transition: 'all 0.15s ease',
+                            }}
+                          />
+                          {(routeEditForm.salesmanId || staffSearchQuery) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRouteEditForm((prev) => ({ ...prev, salesmanId: '' }));
+                                setStaffSearchQuery('');
+                                setIsStaffSearchOpen(false);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                right: '8px',
+                                top: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94a3b8',
+                                padding: 0,
+                              }}
+                              title="Clear assigned staff"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Autocomplete Dropdown List */}
+                        {isStaffSearchOpen && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 4px)',
+                              left: 0,
+                              right: 0,
+                              maxHeight: '220px',
+                              overflowY: 'auto',
+                              backgroundColor: '#ffffff',
+                              borderRadius: '8px',
+                              border: '1px solid #cbd5e1',
+                              boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.15), 0 4px 8px -2px rgba(15, 23, 42, 0.06)',
+                              zIndex: 100,
+                            }}
+                          >
+                            <div
+                              onClick={() => {
+                                setRouteEditForm((prev) => ({ ...prev, salesmanId: '' }));
+                                setStaffSearchQuery('');
+                                setIsStaffSearchOpen(false);
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                fontSize: '0.82rem',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid #f1f5f9',
+                                fontStyle: 'italic',
+                                backgroundColor: !routeEditForm.salesmanId ? '#f0f9ff' : '#ffffff',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = !routeEditForm.salesmanId ? '#f0f9ff' : '#ffffff')}
+                            >
+                              — None (Unassigned) —
+                            </div>
+
+                            {filteredStaffList.length === 0 ? (
+                              <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                                No staff members found matching "{staffSearchQuery}"
+                              </div>
+                            ) : (
+                              filteredStaffList.map((s) => {
+                                const isSelected = String(routeEditForm.salesmanId) === String(s.id);
+                                return (
+                                  <div
+                                    key={s.id}
+                                    onClick={() => {
+                                      setRouteEditForm((prev) => ({ ...prev, salesmanId: String(s.id) }));
+                                      setStaffSearchQuery(s.name);
+                                      setIsStaffSearchOpen(false);
+                                    }}
+                                    style={{
+                                      padding: '8px 12px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '8px',
+                                      cursor: 'pointer',
+                                      backgroundColor: isSelected ? '#f0f9ff' : '#ffffff',
+                                      borderBottom: '1px solid #f1f5f9',
+                                      transition: 'background-color 0.1s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!isSelected) e.currentTarget.style.backgroundColor = '#f8fafc';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!isSelected) e.currentTarget.style.backgroundColor = isSelected ? '#f0f9ff' : '#ffffff';
+                                    }}
+                                  >
+                                    <div style={{ minWidth: 0 }}>
+                                      <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a' }}>
+                                        {s.name}
+                                      </div>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                        <span style={{ fontFamily: 'monospace' }}>{s.salesmanCode}</span>
+                                        {s.phone && <span>• {s.phone}</span>}
+                                      </div>
+                                    </div>
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#e0f2fe',
+                                        color: '#0284c7',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {s.role || 'Staff'}
+                                    </span>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Description Input */}
@@ -3203,38 +3462,200 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           {routeEditForm.selectedCustomerIds.length} Assigned
                         </span>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAssignCustomerModal(true);
-                          setAssignCustomerSearch('');
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '0 14px',
-                          height: '34px',
-                          borderRadius: '6px',
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontSize: '0.84rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
-                          transition: 'background-color 0.15s ease',
-                          whiteSpace: 'nowrap',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-                      >
-                        <Plus size={13} /> Assign Customer
-                      </button>
                     </div>
 
-                    {/* Table Side Search */}
+                    {/* Inline Customer Search & Add Box with Dropdown */}
+                    <div ref={inlineCustomerSearchRef} style={{ position: 'relative', width: '100%' }}>
+                      <Search
+                        size={14}
+                        style={{
+                          position: 'absolute',
+                          left: '10px',
+                          top: '10px',
+                          color: '#0284c7',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search customer by name, code, phone to add to group..."
+                        value={inlineCustomerSearch}
+                        onChange={(e) => {
+                          setInlineCustomerSearch(e.target.value);
+                          setIsInlineCustomerSearchOpen(true);
+                        }}
+                        onFocus={() => setIsInlineCustomerSearchOpen(true)}
+                        style={{
+                          width: '100%',
+                          height: '34px',
+                          padding: '0 30px 0 32px',
+                          borderRadius: '6px',
+                          border: isInlineCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                          fontSize: '0.84rem',
+                          backgroundColor: '#ffffff',
+                          boxSizing: 'border-box',
+                          outline: 'none',
+                          boxShadow: isInlineCustomerSearchOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : 'none',
+                          transition: 'all 0.15s ease',
+                        }}
+                      />
+                      {inlineCustomerSearch && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInlineCustomerSearch('');
+                            setIsInlineCustomerSearchOpen(false);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '8px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            padding: 0,
+                          }}
+                          title="Clear search"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+
+                      {/* Dropdown with matching customers to add */}
+                      {isInlineCustomerSearchOpen && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            left: 0,
+                            right: 0,
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #cbd5e1',
+                            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 8px -2px rgba(15, 23, 42, 0.08)',
+                            zIndex: 100,
+                          }}
+                        >
+                          {inlineCustomerSearchResults.length === 0 ? (
+                            <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                              {inlineCustomerSearch ? `No active customers found matching "${inlineCustomerSearch}"` : 'Type customer name, code, phone or address to search'}
+                            </div>
+                          ) : (
+                            inlineCustomerSearchResults.map((c) => {
+                              const isAlreadyAssigned = (routeEditForm.selectedCustomerIds || []).some(
+                                (id) => String(id) === String(c.id)
+                              );
+                              return (
+                                <div
+                                  key={c.id}
+                                  onClick={() => {
+                                    if (isAlreadyAssigned) return;
+                                    setRouteEditForm((prev) => ({
+                                      ...prev,
+                                      selectedCustomerIds: [...prev.selectedCustomerIds, String(c.id)],
+                                    }));
+                                    addToast(`Added "${c.name}" to group`, 'success');
+                                    setInlineCustomerSearch('');
+                                    setIsInlineCustomerSearchOpen(false);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '10px',
+                                    cursor: isAlreadyAssigned ? 'default' : 'pointer',
+                                    backgroundColor: isAlreadyAssigned ? '#f8fafc' : '#ffffff',
+                                    borderBottom: '1px solid #f1f5f9',
+                                    transition: 'background-color 0.1s ease',
+                                    opacity: isAlreadyAssigned ? 0.7 : 1,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isAlreadyAssigned) e.currentTarget.style.backgroundColor = '#f0f9ff';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isAlreadyAssigned) e.currentTarget.style.backgroundColor = isAlreadyAssigned ? '#f8fafc' : '#ffffff';
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                    <div
+                                      style={{
+                                        width: '26px',
+                                        height: '26px',
+                                        borderRadius: '50%',
+                                        backgroundColor: '#e0f2fe',
+                                        color: '#0284c7',
+                                        border: '1px solid #bae6fd',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: 600,
+                                        fontSize: '0.74rem',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {(c.name || 'C').slice(0, 1).toUpperCase()}
+                                    </div>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                      <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {c.name}
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#64748b' }}>
+                                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
+                                          {c.code || c.customerCode || 'NO CODE'}
+                                        </span>
+                                        {c.phone && <span>📞 {c.phone}</span>}
+                                        {c.address && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>📍 {c.address}</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ flexShrink: 0 }}>
+                                    {isAlreadyAssigned ? (
+                                      <span
+                                        style={{
+                                          fontSize: '0.7rem',
+                                          fontWeight: 600,
+                                          color: '#15803d',
+                                          backgroundColor: '#dcfce7',
+                                          padding: '2px 8px',
+                                          borderRadius: '9999px',
+                                          border: '1px solid #bbf7d0',
+                                        }}
+                                      >
+                                        ✓ Assigned
+                                      </span>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          fontSize: '0.74rem',
+                                          fontWeight: 600,
+                                          color: '#0284c7',
+                                          backgroundColor: '#e0f2fe',
+                                          padding: '3px 10px',
+                                          borderRadius: '6px',
+                                          border: '1px solid #bae6fd',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                        }}
+                                      >
+                                        <Plus size={12} /> Add
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Filter already assigned table */}
                     <div style={{ position: 'relative', width: '100%' }}>
                       <Search
                         size={13}
@@ -3248,17 +3669,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       />
                       <input
                         type="text"
-                        placeholder="Search assigned customers..."
+                        placeholder="Filter assigned members below..."
                         value={customerSearchInRoute}
                         onChange={(e) => setCustomerSearchInRoute(e.target.value)}
                         style={{
                           width: '100%',
-                          height: '34px',
+                          height: '32px',
                           padding: '0 28px 0 30px',
                           borderRadius: '6px',
                           border: '1px solid #e2e8f0',
-                          fontSize: '0.82rem',
-                          backgroundColor: '#ffffff',
+                          fontSize: '0.8rem',
+                          backgroundColor: '#f8fafc',
                           boxSizing: 'border-box',
                         }}
                       />
@@ -3269,7 +3690,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           style={{
                             position: 'absolute',
                             right: '8px',
-                            top: '8px',
+                            top: '7px',
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
@@ -3473,269 +3894,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* SMALL POPUP: Search & Assign Customers to Route               */}
-      {/* ------------------------------------------------------------- */}
-      {showAssignCustomerModal && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, backgroundColor: 'rgba(15, 23, 42, 0.55)', overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '720px',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.25), 0 10px 15px -6px rgba(15, 23, 42, 0.1)',
-              maxHeight: '80vh',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '14px 20px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                  Assign Customers to Group
-                </h4>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Search and add active customers to {routeEditForm.name || 'this customer group'}.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAssignCustomerModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  padding: '4px',
-                }}
-                title="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Search Input */}
-            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-              <div style={{ position: 'relative' }}>
-                <Search
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '10px',
-                    color: '#94a3b8',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search by customer name, code, address..."
-                  value={assignCustomerSearch}
-                  onChange={(e) => setAssignCustomerSearch(e.target.value)}
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    height: '34px',
-                    padding: '0 28px 0 34px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '0.85rem',
-                    backgroundColor: '#ffffff',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                {assignCustomerSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setAssignCustomerSearch('')}
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '8px',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#94a3b8',
-                      padding: 0,
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Customers List */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', maxHeight: '380px' }}>
-              {availableCustomersToAssign.length === 0 ? (
-                <div style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>
-                  No active customers found matching search.
-                </div>
-              ) : (
-                availableCustomersToAssign.map((c) => {
-                  const isAssigned = (routeEditForm.selectedCustomerIds || []).some((id) => String(id) === String(c.id));
-                  const otherRoutes = routes.filter(
-                    (r) => String(r.id) !== String(selectedRoute?.id) &&
-                      Array.isArray(r.customerIds) &&
-                      r.customerIds.some((id) => String(id) === String(c.id))
-                  );
-
-                  return (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        borderBottom: '1px solid #f1f5f9',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                        <div
-                          style={{
-                            width: '30px',
-                            height: '30px',
-                            borderRadius: '50%',
-                            backgroundColor: '#e0f2fe',
-                            color: '#0284c7',
-                            border: '1px solid #bae6fd',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 600,
-                            fontSize: '0.78rem',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {(c.name || 'C').slice(0, 1).toUpperCase()}
-                        </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {c.name}
-                          </div>
-                          <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
-                              {c.code || c.customerCode || 'NO CODE'}
-                            </span>
-                            <span style={{ color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <MapPin size={11} color="#64748b" /> {c.address || 'No address'}
-                            </span>
-                            {otherRoutes.length > 0 && (
-                              <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
-                                Also in: {otherRoutes.map((r) => r.name).join(', ')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isAssigned) {
-                            setRouteEditForm({
-                              ...routeEditForm,
-                              selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
-                            });
-                          } else {
-                            setRouteEditForm({
-                              ...routeEditForm,
-                              selectedCustomerIds: [...routeEditForm.selectedCustomerIds, String(c.id)],
-                            });
-                          }
-                        }}
-                        style={{
-                          marginLeft: '10px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '4px 10px',
-                          borderRadius: '5px',
-                          fontSize: '0.76rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          border: isAssigned ? '1px solid #bbf7d0' : 'none',
-                          backgroundColor: isAssigned ? '#f0fdf4' : '#0284c7',
-                          color: isAssigned ? '#15803d' : '#ffffff',
-                          flexShrink: 0,
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {isAssigned ? (
-                          <>
-                            <Check size={12} /> Assigned
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={12} /> Add
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Footer */}
-            <div
-              style={{
-                padding: '10px 18px',
-                borderTop: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                <strong style={{ color: '#0f172a' }}>{routeEditForm.selectedCustomerIds.length}</strong> customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'} in route
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAssignCustomerModal(false)}
-                style={{
-                  padding: '6px 18px',
-                  borderRadius: '6px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 3: Customer History (Dedicated Multi-Table & Search)      */}

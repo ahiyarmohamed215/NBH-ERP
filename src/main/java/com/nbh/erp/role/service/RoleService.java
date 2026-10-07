@@ -30,10 +30,22 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
+        return getAllRoles(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoleDto> getAllRoles(String search) {
+        if (search != null && !search.trim().isEmpty()) {
+            String q = search.trim();
+            return roleRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(q, q).stream()
+                    .map(RoleDto::from)
+                    .collect(Collectors.toList());
+        }
         return roleRepository.findAll().stream()
                 .map(RoleDto::from)
                 .collect(Collectors.toList());
     }
+
 
     @Transactional(readOnly = true)
     public List<PermissionDto> getAllPermissions() {
