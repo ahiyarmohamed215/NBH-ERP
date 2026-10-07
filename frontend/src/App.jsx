@@ -162,6 +162,7 @@ export default function App() {
           { id: 'list', label: 'Employee List', permission: 'USER_MANAGE' },
           { id: 'pending-approvals', label: 'Pending Approvals & Roles', permission: 'USER_MANAGE' },
           { id: 'roles', label: 'Roles', permission: 'ROLE_MANAGE' },
+          { id: 'targets', label: 'Sales Targets', permission: 'USER_MANAGE' },
           { id: 'attendance', label: 'Attendance', permission: 'USER_MANAGE' },
           { id: 'payroll', label: 'Payroll', permission: 'USER_MANAGE' },
           { id: 'commissions', label: 'Commission Templates', permission: 'USER_MANAGE' },
@@ -302,6 +303,9 @@ export default function App() {
     } else if (view === 'roles' || view === 'groups') {
       setCurrentView('employees');
       setSubTab('roles');
+    } else if (view === 'targets' || view === 'sales-targets') {
+      setCurrentView('employees');
+      setSubTab('targets');
     } else if (view === 'pending-approvals' || view === 'pending_approvals') {
       setCurrentView('employees');
       setSubTab('pending-approvals');

@@ -37,6 +37,12 @@ import {
   Printer,
   FileDown,
   Eye,
+  Target,
+  UserPlus,
+  Info,
+  CheckSquare,
+  Square,
+  Lock,
 } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
@@ -44,10 +50,11 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const canEditUser = canEditModule(currentUser, 'USER');
   const { addToast } = useToast();
 
-  // Active sub-tab state: 'list' | 'roles' | 'pending-approvals' | 'attendance' | 'payroll' | 'commissions'
+  // Active sub-tab state: 'list' | 'roles' | 'pending-approvals' | 'targets' | 'attendance' | 'payroll' | 'commissions'
   const [activeTab, setActiveTab] = useState(() => {
     if (activeSubTab === 'roles' || activeSubTab === 'groups') return 'roles';
     if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') return 'pending-approvals';
+    if (activeSubTab === 'targets') return 'targets';
     if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') return activeSubTab;
     return 'list';
   });
@@ -65,25 +72,29 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
-  // Modals state
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
+  // Unified Modal state: 'add' | 'edit' | 'approve' | null
+  const [modalMode, setModalMode] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [viewingEmployee, setViewingEmployee] = useState(null);
 
-  // Add / Edit form data
+  // Form data for Add / Edit / Approve
   const [formData, setFormData] = useState({
     username: '',
     fullName: '',
     email: '',
     phone: '',
+    employeeCode: '',
     password: '',
     employeeType: 'Full-time',
     roles: [],
   });
-  const [selectedApproveRoles, setSelectedApproveRoles] = useState([]);
-  const [approveType, setApproveType] = useState('Full-time');
+
+  // Inline role creation in modal
+  const [roleSearchQuery, setRoleSearchQuery] = useState('');
+  const [showInlineCreateRole, setShowInlineCreateRole] = useState(false);
+  const [newRoleForm, setNewRoleForm] = useState({ name: '', description: '' });
+  const [creatingRole, setCreatingRole] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
 
   // Sync external tab changes
@@ -92,6 +103,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       setActiveTab('roles');
     } else if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') {
       setActiveTab('pending-approvals');
+    } else if (activeSubTab === 'targets') {
+      setActiveTab('targets');
     } else if (activeSubTab === 'users' || activeSubTab === 'list') {
       setActiveTab('list');
     } else if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') {
@@ -166,6 +179,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   // Filtered employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
+      // Unapproved / pending registrations must not be displayed in the main Employee List
+      if (emp.approvalStatus && emp.approvalStatus.toUpperCase() !== 'APPROVED') return false;
+
       // Status filter
       if (statusFilter === 'ACTIVE' && !emp.isActive) return false;
       if (statusFilter === 'INACTIVE' && emp.isActive) return false;
@@ -378,57 +394,109 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
-  // Add Employee
-  const handleOpenAdd = async () => {
-    let currentRoles = roles;
-    try {
-      const rolesRes = await roleApi.getAll();
-      if (rolesRes.data && Array.isArray(rolesRes.data)) {
-        currentRoles = rolesRes.data;
-        setRoles(currentRoles);
-      }
-    } catch (e) {
-      console.warn('Failed to load fresh roles for add modal:', e);
-    }
-    setFormData({
-      username: '',
-      fullName: '',
-      email: '',
-      phone: '',
-      password: '',
-      employeeType: 'Full-time',
-      roles: currentRoles.length > 0 ? [currentRoles[0].name] : ['ROLE_CASHIER'],
+  // Toggle role assignment selection in modal
+  const toggleRoleAssignment = (roleName) => {
+    setFormData((prev) => {
+      const current = prev.roles || [];
+      const exists = current.includes(roleName);
+      const next = exists ? current.filter((r) => r !== roleName) : [...current, roleName];
+      return { ...prev, roles: next };
     });
-    setShowAddModal(true);
   };
 
-  const handleSaveAdd = async (e) => {
-    e.preventDefault();
-    if (!formData.username.trim() || !formData.password) {
-      addToast('Username and password are required', 'error');
+  // Filter roles inside modal search
+  const modalFilteredRoles = useMemo(() => {
+    if (!roleSearchQuery.trim()) return roles;
+    const q = roleSearchQuery.toLowerCase().trim();
+    return roles.filter((r) => {
+      const nameMatch = r.name && r.name.toLowerCase().includes(q);
+      const descMatch = r.description && r.description.toLowerCase().includes(q);
+      return nameMatch || descMatch;
+    });
+  }, [roles, roleSearchQuery]);
+
+  // Create role inline directly from the modal
+  const handleCreateRoleInline = async (e) => {
+    e?.preventDefault?.();
+    if (!newRoleForm.name.trim()) {
+      addToast('Please enter a role name', 'error');
+      return;
+    }
+    try {
+      setCreatingRole(true);
+      let rName = newRoleForm.name.trim();
+      if (!rName.toUpperCase().startsWith('ROLE_')) {
+        rName = 'ROLE_' + rName.toUpperCase().replace(/\s+/g, '_');
+      }
+      await roleApi.create({
+        name: rName,
+        description: newRoleForm.description?.trim() || '',
+        permissions: [],
+      });
+      addToast(`Role "${rName}" created successfully`, 'success');
+      // Refresh roles list
+      const rolesRes = await roleApi.getAll();
+      const freshRoles = rolesRes.data || [];
+      setRoles(freshRoles);
+      // Automatically assign the newly created role
+      setFormData((prev) => ({
+        ...prev,
+        roles: Array.from(new Set([...(prev.roles || []), rName])),
+      }));
+      setNewRoleForm({ name: '', description: '' });
+      setShowInlineCreateRole(false);
+    } catch (err) {
+      addToast(err.message || 'Failed to create role', 'error');
+    } finally {
+      setCreatingRole(false);
+    }
+  };
+
+  // Quick Approve staff without assigning any roles (for drivers, helpers, etc.)
+  const handleQuickApprove = async (pendingUser) => {
+    if (!window.confirm(`Approve "${pendingUser.fullName || pendingUser.username}" without system roles? They will be registered as active staff but will not have ERP access.`)) {
       return;
     }
     try {
       setSubmitting(true);
-      await userApi.create({
-        username: formData.username,
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        password: formData.password,
-        roles: formData.roles,
-      });
-      addToast(`Employee "${formData.fullName || formData.username}" created successfully`, 'success');
-      setShowAddModal(false);
+      await userApi.approve(pendingUser.id, { roles: [] });
+      addToast(`Staff member "${pendingUser.fullName || pendingUser.username}" approved successfully without system roles`, 'success');
       loadData();
     } catch (err) {
-      addToast(err.message || 'Failed to create employee', 'error');
+      addToast(err.message || 'Approval failed: ' + err.message, 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Edit Employee
+  // Open modal in Add mode
+  const handleOpenAdd = async () => {
+    try {
+      const rolesRes = await roleApi.getAll();
+      if (rolesRes.data && Array.isArray(rolesRes.data)) {
+        setRoles(rolesRes.data);
+      }
+    } catch (e) {
+      console.warn('Failed to load fresh roles for add modal:', e);
+    }
+    setSelectedEmployee(null);
+    setFormData({
+      username: '',
+      fullName: '',
+      email: '',
+      phone: '',
+      employeeCode: '',
+      password: '',
+      employeeType: 'Full-time',
+      roles: [],
+    });
+    setRoleSearchQuery('');
+    setShowInlineCreateRole(false);
+    setNewRoleForm({ name: '', description: '' });
+    setModalMode('add');
+  };
+
+  // Open modal in Edit mode
   const handleOpenEdit = async (emp) => {
     setSelectedEmployee(emp);
     try {
@@ -440,78 +508,116 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       console.warn('Failed to load fresh roles for edit modal:', e);
     }
     setFormData({
-      username: emp.username,
+      username: emp.username || '',
       fullName: emp.fullName || '',
       email: emp.email || '',
       phone: emp.phone || '',
+      employeeCode: emp.employeeCode || '',
       password: '',
       employeeType: 'Full-time',
-      roles: emp.roles || [],
+      roles: (emp.roles || []).map((r) => (typeof r === 'string' ? r : r.name)),
     });
-    setShowEditModal(true);
+    setRoleSearchQuery('');
+    setShowInlineCreateRole(false);
+    setNewRoleForm({ name: '', description: '' });
+    setModalMode('edit');
   };
 
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
-    if (!selectedEmployee) return;
-    if (!canEditUser) {
-      addToast('Permission denied: Only authorized staff can edit existing employee accounts.', 'error');
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await userApi.update(selectedEmployee.id, {
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        password: formData.password || undefined,
-        roles: formData.roles,
-      });
-      addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
-      setShowEditModal(false);
-      loadData();
-    } catch (err) {
-      addToast(err.message || 'Failed to update employee', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Complete & Approve
+  // Open modal in Review & Approve mode
   const handleOpenApprove = async (pendingUser) => {
     setSelectedEmployee(pendingUser);
-    let currentRoles = roles;
     try {
       const rolesRes = await roleApi.getAll();
       if (rolesRes.data && Array.isArray(rolesRes.data)) {
-        currentRoles = rolesRes.data;
-        setRoles(currentRoles);
+        setRoles(rolesRes.data);
       }
     } catch (e) {
       console.warn('Failed to load fresh roles for approve modal:', e);
     }
-    const defaultRole = currentRoles.find((r) => r.name !== 'ROLE_ADMIN') || currentRoles[0];
-    setSelectedApproveRoles(defaultRole ? [defaultRole.name] : ['ROLE_CASHIER']);
-    setApproveType('Full-time');
-    setShowApproveModal(true);
+    setFormData({
+      username: pendingUser.username || '',
+      fullName: pendingUser.fullName || '',
+      email: pendingUser.email || '',
+      phone: pendingUser.phone || '',
+      employeeCode: pendingUser.employeeCode || '',
+      password: '',
+      employeeType: 'Full-time',
+      roles: (pendingUser.roles || []).map((r) => (typeof r === 'string' ? r : r.name)),
+    });
+    setRoleSearchQuery('');
+    setShowInlineCreateRole(false);
+    setNewRoleForm({ name: '', description: '' });
+    setModalMode('approve');
   };
 
-  const handleCompleteApprove = async () => {
-    if (!selectedEmployee) return;
-    if (selectedApproveRoles.length === 0) {
-      addToast('Please assign at least one role to this employee', 'error');
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await userApi.approve(selectedEmployee.id, selectedApproveRoles);
-      addToast(`Employee "${selectedEmployee.fullName || selectedEmployee.username}" approved successfully`, 'success');
-      setShowApproveModal(false);
-      loadData();
-    } catch (err) {
-      addToast(err.message || 'Approval failed', 'error');
-    } finally {
-      setSubmitting(false);
+  // Unified Save handler for Add / Edit / Approve
+  const handleSaveModal = async (e) => {
+    e.preventDefault();
+    if (modalMode === 'add') {
+      if (!formData.username.trim() || !formData.password) {
+        addToast('Username and password are required', 'error');
+        return;
+      }
+      try {
+        setSubmitting(true);
+        await userApi.create({
+          username: formData.username,
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          roles: formData.roles || [],
+        });
+        addToast(`Employee "${formData.fullName || formData.username}" created successfully`, 'success');
+        setModalMode(null);
+        loadData();
+      } catch (err) {
+        addToast(err.message || 'Failed to create employee', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (modalMode === 'approve') {
+      if (!selectedEmployee) return;
+      try {
+        setSubmitting(true);
+        await userApi.approve(selectedEmployee.id, {
+          roles: formData.roles || [],
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          employeeCode: formData.employeeCode,
+        });
+        addToast(`Employee "${formData.fullName || selectedEmployee.username}" approved and activated successfully`, 'success');
+        setModalMode(null);
+        loadData();
+      } catch (err) {
+        addToast(err.message || 'Approval failed: ' + err.message, 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (modalMode === 'edit') {
+      if (!selectedEmployee) return;
+      if (!canEditUser) {
+        addToast('Permission denied: Only authorized staff can edit existing employee accounts.', 'error');
+        return;
+      }
+      try {
+        setSubmitting(true);
+        await userApi.update(selectedEmployee.id, {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password || undefined,
+          roles: formData.roles || [],
+        });
+        addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
+        setModalMode(null);
+        loadData();
+      } catch (err) {
+        addToast(err.message || 'Failed to update employee', 'error');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -673,6 +779,27 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               {pendingApprovals.length}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('targets')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'targets' ? 700 : 500,
+            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <Target size={16} /> Sales Targets
         </button>
 
         <button
@@ -1008,134 +1135,134 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     </th>
                   </tr>
                 </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading employee records...
-                    </td>
-                  </tr>
-                ) : filteredEmployees.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      No employees found matching criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEmployees.map((emp) => {
-                    const primaryRole = getPrimaryRole(emp);
-                    return (
-                      <tr
-                        key={emp.id}
-                        onClick={() => setViewingEmployee(emp)}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view employee profile"
-                      >
-                        <td style={{ padding: '14px 20px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div
-                              style={{
-                                width: '34px',
-                                height: '34px',
-                                borderRadius: '50%',
-                                backgroundColor: '#f0fdf4',
-                                color: '#16a34a',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 700,
-                                fontSize: '0.82rem',
-                                border: '1px solid #bbf7d0',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {(emp.fullName || emp.username).slice(0, 1).toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.92rem' }}>
-                                {emp.fullName || emp.username}
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                        Loading employee records...
+                      </td>
+                    </tr>
+                  ) : filteredEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                        No employees found matching criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEmployees.map((emp) => {
+                      const primaryRole = getPrimaryRole(emp);
+                      return (
+                        <tr
+                          key={emp.id}
+                          onClick={() => setViewingEmployee(emp)}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.1s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          title="Click row to view employee profile"
+                        >
+                          <td style={{ padding: '14px 20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div
+                                style={{
+                                  width: '34px',
+                                  height: '34px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#f0fdf4',
+                                  color: '#16a34a',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '0.82rem',
+                                  border: '1px solid #bbf7d0',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {(emp.fullName || emp.username).slice(0, 1).toUpperCase()}
                               </div>
-                              {emp.fullName && (
-                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>@{emp.username}</div>
-                              )}
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.92rem' }}>
+                                  {emp.fullName || emp.username}
+                                </div>
+                                {emp.fullName && (
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>@{emp.username}</div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td style={{ padding: '14px 16px', color: '#334155', fontWeight: 500, fontSize: '0.9rem' }}>
-                          {primaryRole}
-                        </td>
+                          <td style={{ padding: '14px 16px', color: '#334155', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {primaryRole}
+                          </td>
 
-                        <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.88rem' }}>
-                          Full-time
-                        </td>
+                          <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.88rem' }}>
+                            Full-time
+                          </td>
 
-                        <td style={{ padding: '14px 16px', color: '#334155', fontSize: '0.88rem' }}>
-                          {emp.phone || emp.email || '—'}
-                        </td>
+                          <td style={{ padding: '14px 16px', color: '#334155', fontSize: '0.88rem' }}>
+                            {emp.phone || emp.email || '—'}
+                          </td>
 
-                        <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.85rem' }}>
-                          {formatJoinedDate(emp.createdAt)}
-                        </td>
+                          <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.85rem' }}>
+                            {formatJoinedDate(emp.createdAt)}
+                          </td>
 
-                        <td style={{ padding: '14px 16px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(emp);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: emp.isActive ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: emp.isActive ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
+                          <td style={{ padding: '14px 16px' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleActive(emp);
                               }}
-                            />
-                            {emp.isActive ? 'Active' : 'Inactive'}
-                          </button>
-                        </td>
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '0.82rem',
+                                fontWeight: 600,
+                                color: emp.isActive ? '#16a34a' : '#dc2626',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}
+                            >
+                              <span
+                                style={{
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  backgroundColor: emp.isActive ? '#16a34a' : '#dc2626',
+                                  display: 'inline-block',
+                                }}
+                              />
+                              {emp.isActive ? 'Active' : 'Inactive'}
+                            </button>
+                          </td>
 
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <TableRowActions
-                            onPrint={() => handlePrintEmployee(emp)}
-                            onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
-                            onView={() => setViewingEmployee(emp)}
-                            onEdit={() => handleOpenEdit(emp)}
-                            printTitle="Print Employee Record (A4)"
-                            pdfTitle="Download Employee PDF (A4)"
-                            viewTitle="View Employee Profile"
-                            editTitle="Edit Employee"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
+                          <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                            <TableRowActions
+                              onPrint={() => handlePrintEmployee(emp)}
+                              onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
+                              onView={() => setViewingEmployee(emp)}
+                              onEdit={() => handleOpenEdit(emp)}
+                              printTitle="Print Employee Record (A4)"
+                              pdfTitle="Download Employee PDF (A4)"
+                              viewTitle="View Employee Profile"
+                              editTitle="Edit Employee"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
               </table>
             </div>
           </div>
@@ -1241,91 +1368,235 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   key={pUser.id}
                   style={{
                     backgroundColor: '#ffffff',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     border: '1px solid #e2e8f0',
-                    padding: '8px 16px',
+                    padding: '16px 20px',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    flexDirection: 'column',
                     gap: '12px',
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#93c5fd';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.08)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '6px',
-                        backgroundColor: '#e0f2fe',
-                        color: '#0284c7',
-                        fontWeight: 700,
-                        fontSize: '0.88rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
+                  {/* Card Top: Avatar, Name, Username, Status Badge, Registration Time */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: '10px',
+                          backgroundColor: '#e0f2fe',
+                          color: '#0284c7',
+                          fontWeight: 800,
+                          fontSize: '1.15rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          border: '1px solid #bae6fd',
+                        }}
+                      >
+                        {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
+                            {pUser.fullName || pUser.username}
+                          </span>
+                          <span style={{ fontSize: '0.82rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            @{pUser.username}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '9999px',
+                              backgroundColor: '#fef3c7',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Clock size={11} /> Awaiting Approval
+                          </span>
+                          {pUser.employeeCode && (
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                backgroundColor: '#f1f5f9',
+                                color: '#475569',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {pUser.employeeCode}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                          Registered on {formatJoinedDate(pUser.createdAt)} • Self-registration account
+                        </div>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
-                        {pUser.fullName || pUser.username}
-                      </span>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        (@{pUser.username})
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {pUser.email && <span>{pUser.email}</span>}
-                      {pUser.phone && <span>• {pUser.phone}</span>}
-                      {pUser.createdAt && <span>• {new Date(pUser.createdAt).toLocaleDateString()}</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.8rem' }}>
+                      <Clock size={14} color="#94a3b8" />
+                      <span>Waiting for admin approval & role assignment</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenApprove(pUser)}
-                      style={{
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        padding: '6px 14px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
-                      }}
-                    >
-                      <ShieldCheck size={14} /> Assign Roles & Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleReject(pUser)}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        color: '#ef4444',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        padding: '6px 12px',
-                        border: '1px solid #fecaca',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <UserX size={14} /> Reject
-                    </button>
+                  {/* Card Middle: Detailed Info Grid */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px',
+                      padding: '10px 14px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '8px',
+                      border: '1px solid #f1f5f9',
+                      fontSize: '0.83rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
+                      <Mail size={15} color="#0284c7" />
+                      <span style={{ color: '#64748b' }}>Email:</span>
+                      <strong style={{ color: '#0f172a' }}>{pUser.email || '—'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
+                      <Phone size={15} color="#0284c7" />
+                      <span style={{ color: '#64748b' }}>Phone:</span>
+                      <strong style={{ color: '#0f172a' }}>{pUser.phone || '—'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
+                      <Shield size={15} color="#64748b" />
+                      <span style={{ color: '#64748b' }}>Roles:</span>
+                      <span style={{ fontStyle: 'italic', color: '#64748b' }}>None assigned (Optional)</span>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom: Actions Bar */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '6px',
+                      borderTop: '1px solid #f1f5f9',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#64748b' }}>
+                      <Info size={13} color="#0284c7" />
+                      <span>Staff who don't need ERP access can be approved directly without assigning roles.</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Quick Approve Without Roles */}
+                      <button
+                        type="button"
+                        onClick={() => handleQuickApprove(pUser)}
+                        disabled={submitting}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          color: '#16a34a',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          padding: '7px 14px',
+                          borderRadius: '6px',
+                          border: '1px solid #bbf7d0',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f0fdf4';
+                          e.currentTarget.style.borderColor = '#86efac';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.borderColor = '#bbf7d0';
+                        }}
+                        title="Approve staff without assigning ERP system roles (e.g. drivers, helpers)"
+                      >
+                        <Check size={14} /> Quick Approve (No Roles)
+                      </button>
+
+                      {/* Review & Assign Roles (Primary) */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenApprove(pUser)}
+                        disabled={submitting}
+                        style={{
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          padding: '7px 16px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                          transition: 'background-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
+                      >
+                        <ShieldCheck size={15} /> Review & Assign Roles
+                      </button>
+
+                      {/* Reject */}
+                      <button
+                        type="button"
+                        onClick={() => handleReject(pUser)}
+                        disabled={submitting}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          color: '#ef4444',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          padding: '7px 12px',
+                          border: '1px solid #fecaca',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#fef2f2';
+                          e.currentTarget.style.borderColor = '#fca5a5';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.borderColor = '#fecaca';
+                        }}
+                      >
+                        <UserX size={14} /> Reject
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
