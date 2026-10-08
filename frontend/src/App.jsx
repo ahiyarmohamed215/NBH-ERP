@@ -806,5 +806,3 @@ export default function App() {
     </div>
   );
 }
-
-export default function App() { return <Suspense fallback={<div role="status" style={{padding:32}}>Loading…</div>}><AppContent /></Suspense>; }
