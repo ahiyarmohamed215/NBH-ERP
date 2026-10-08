@@ -1,3 +1,4 @@
+import { useWorkspaceActive } from '../components/RetainedWorkspaces';
 import React, { useState, useEffect, useRef } from 'react';
 import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi, staffQuotaApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -44,6 +45,7 @@ import {
 } from 'lucide-react';
 
 export default function PosView({ onExitPos, initialHeldInvoice }) {
+  const workspaceActive = useWorkspaceActive();
   const { addToast } = useToast();
   const { user } = useAuth();
   const isSupervisor = user?.roles?.includes('ROLE_ADMIN') || user?.permissions?.includes('SALES_VIEW_ALL');
@@ -634,6 +636,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   useEffect(() => {
     const handlePosKeys = (e) => {
+      if (!workspaceActive) return;
       if (e.key === 'F2') {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -684,7 +687,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
     window.addEventListener('keydown', handlePosKeys);
     return () => window.removeEventListener('keydown', handlePosKeys);
-  }, [cart, stagedItem, searchResults, showCustomerSearch, activeCircleModal, showHeldModal, selectedInvoiceDetail, onExitPos]);
+  }, [workspaceActive, cart, stagedItem, searchResults, showCustomerSearch, activeCircleModal, showHeldModal, selectedInvoiceDetail, onExitPos]);
 
   return (
     <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '100vh', boxSizing: 'border-box' }}>

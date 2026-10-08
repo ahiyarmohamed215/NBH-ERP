@@ -1,0 +1,22 @@
+.grn-page, .grn-page-content, .grn-form-body, .grn-form-content { display:flex; flex-direction:column; flex:1; min-height:0; min-width:0; }
+.grn-page { background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; }
+.grn-form-body { padding:12px; }
+.grn-form-content { gap:12px; }
+.grn-header-fields { display:grid; grid-template-columns:1.3fr 1.15fr 1fr 1.4fr 1fr; gap:12px; flex-shrink:0; }
+.grn-header-fields label, .grn-line-fields label { display:flex; flex-direction:column; gap:6px; font-size:.73rem; font-weight:600; color:#475569; min-width:0; }
+.grn-header-fields .input-glass, .grn-line-fields .input-glass { width:100%; height:36px; padding:6px 8px; font-size:.85rem; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box; }
+.grn-workspace { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(350px,1fr); gap:12px; flex:1; min-height:0; }
+.grn-entry { grid-column:2; grid-row:1; min-width:0; align-self:start; }
+.grn-items { grid-column:1; grid-row:1; min-width:0; min-height:0; display:flex; flex-direction:column; }
+.grn-items > div:first-child { flex-wrap:wrap; gap:8px; flex-shrink:0; }
+.grn-table-scroll { flex:1; min-height:0; overflow:auto; border:1px solid #e2e8f0; border-radius:8px; }
+.grn-table-scroll thead { position:sticky; top:0; z-index:1; background:#f8fafc; }
+.grn-line-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.grn-line-total { display:flex; align-items:center; height:36px; padding:6px 8px; box-sizing:border-box; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; font-weight:700; }
+.grn-add-item { width:100%; justify-content:center; min-height:36px; }
+@media(max-width:1000px) { .grn-workspace { grid-template-columns:minmax(0,1fr) minmax(320px,1fr); } .grn-header-fields { gap:6px; } }
+@media(max-width:760px) { .grn-header-fields { grid-template-columns:repeat(3,minmax(0,1fr)); } .grn-workspace { display:flex; flex-direction:column; } .grn-entry { width:100%; padding:8px !important; box-sizing:border-box; gap:6px !important; } .grn-items { flex:1; min-height:80px; } .grn-line-fields { grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; } }
+
+.grn-selected-product { display:flex; flex-direction:column; gap:3px; height:38px; color:#0369a1; font-size:.8rem; }
+.grn-selected-product span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.grn-selected-product small { color:#64748b; }

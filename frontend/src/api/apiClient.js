@@ -144,6 +144,7 @@ export const authApi = {
 export const userApi = {
   getAll: (params) => fetchAllPages('/users', params),
   getPending: (params) => fetchAllPages('/users/pending', params),
+  getPendingCount: () => api.get('/users/pending/count'),
   getById: (id) => api.get(`/users/${id}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),

@@ -10,7 +10,7 @@ class MigrationTest {
     @Test void freshDatabaseMigratesAndCanRestart() throws Exception {
         String url="jdbc:h2:mem:migration-fresh;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1";
         var flyway=Flyway.configure().dataSource(url,"sa","").load();
-        assertEquals(2,flyway.migrate().migrationsExecuted);
+        assertEquals(3,flyway.migrate().migrationsExecuted);
         assertEquals(0,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
             s.executeQuery("select source_grn_id from prns");
@@ -38,7 +38,7 @@ class MigrationTest {
             s.execute("insert into brands (is_active,created_at,code,name) values (true,current_timestamp,'LEGACY','Preserved brand')");
         }
         var flyway=Flyway.configure().dataSource(url,"sa","").baselineOnMigrate(true).baselineVersion("1").load();
-        assertEquals(1,flyway.migrate().migrationsExecuted);
+        assertEquals(2,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
             try(var rows=s.executeQuery("select name,record_version from brands where code='LEGACY'")) { assertTrue(rows.next());assertEquals("Preserved brand",rows.getString(1));assertEquals(0,rows.getLong(2)); }
             s.executeQuery("select source_grn_id from prns");

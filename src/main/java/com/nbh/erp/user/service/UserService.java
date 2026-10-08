@@ -152,8 +152,16 @@ public class UserService {
         return PagedResponse.from(page);
     }
 
+    @Transactional(readOnly = true)
+    public long getPendingUsersCount() {
+        return userRepository.countByApprovalStatus("PENDING");
+    }
+
     @Transactional
     public UserDto approveUser(Long id, com.nbh.erp.user.dto.ApproveUserRequest request) {
+        if (request == null) {
+            request = new com.nbh.erp.user.dto.ApproveUserRequest();
+        }
         User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
@@ -181,8 +189,8 @@ public class UserService {
             user.setEmployeeCode(request.getEmployeeCode().trim());
         }
 
-        Set<Role> roles = new HashSet<>();
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+        if (request.getRoles() != null) {
+            Set<Role> roles = new HashSet<>();
             for (String roleName : request.getRoles()) {
                 String cleanName = roleName != null ? roleName.trim() : "";
                 if (!cleanName.isEmpty()) {
@@ -193,9 +201,9 @@ public class UserService {
                     roles.add(role);
                 }
             }
+            user.setRoles(roles);
         }
 
-        user.setRoles(roles);
         user.setApprovalStatus("APPROVED");
         user.setIsActive(true);
 

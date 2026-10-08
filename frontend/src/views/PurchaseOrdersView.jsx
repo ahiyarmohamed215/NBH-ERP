@@ -1,3 +1,4 @@
+import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { supplierApi, warehouseApi, productApi, purchaseOrderApi } from '../api/apiClient';
@@ -27,7 +28,8 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [editingPoId, setEditingPoId] = useState(null);
   // Modal State for Inspecting PO
   const [selectedPo, setSelectedPo] = useState(null);
@@ -37,7 +39,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   React.useImperativeHandle(ref, () => ({
     openCreate: () => {
       resetForm();
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     },
     refresh: loadData,
   }));
@@ -53,19 +55,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     items: [],
   });
 
-  const [stagingItem, setStagingItem] = useState({
-    productId: '',
-    quantity: 10,
-    unitCost: 0,
-  });
-
   useEffect(() => {
     loadData();
   }, []);
-
-  const persistOrders = (orders) => {
-    setPurchaseOrders(orders);
-  };
 
   const loadData = async () => {
     try {
@@ -92,13 +84,6 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           warehouseId: wList.length > 0 ? wList[0].id : '',
         }));
       }
-      if (pList.length > 0 && !stagingItem.productId) {
-        setStagingItem({
-          productId: pList[0].id,
-          quantity: 10,
-          unitCost: pList[0].costPrice || 0,
-        });
-      }
     } catch (err) {
       addToast(err.message, 'error');
     } finally {
@@ -109,7 +94,6 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const resetForm = () => {
     const sId = suppliers.length > 0 ? suppliers[0].id : '';
     const wId = warehouses.length > 0 ? warehouses[0].id : '';
-    const p = products.length > 0 ? products[0] : null;
 
     setEditingPoId(null);
     setFormData({
@@ -122,13 +106,6 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       items: [],
     });
 
-    if (p) {
-      setStagingItem({
-        productId: p.id,
-        quantity: 10,
-        unitCost: p.costPrice || 0,
-      });
-    }
   };
 
   const handleEditPo = (po) => {
@@ -142,52 +119,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       notes: po.notes || '',
       items: po.items || [],
     });
-    setShowCreateModal(true);
-  };
-
-  const handleProductSelectChange = (productId) => {
-    const p = products.find((prod) => String(prod.id) === String(productId));
-    setStagingItem({
-      productId,
-      quantity: stagingItem.quantity || 10,
-      unitCost: p ? p.costPrice || 0 : 0,
-    });
-  };
-
-  const handleAddItemToPo = () => {
-    if (!stagingItem.productId) {
-      addToast('Please choose a product to order', 'error');
-      return;
-    }
-    const p = products.find((prod) => String(prod.id) === String(stagingItem.productId));
-    if (!p) return;
-
-    const qty = Number(stagingItem.quantity) || 1;
-    const cost = Number(stagingItem.unitCost) || 0;
-
-    const newItem = {
-      productId: p.id,
-      productName: p.name,
-      sku: p.sku,
-      quantity: qty,
-      unitCost: cost,
-      totalCost: qty * cost,
-    };
-
-    setFormData((prev) => ({
-      ...prev,
-      items: [...prev.items, newItem],
-    }));
-
-    addToast(`Added ${p.name} to order lines`, 'success');
-  };
-
-  const handleRemoveItem = (index) => {
-    setFormData((prev) => {
-      const copy = [...prev.items];
-      copy.splice(index, 1);
-      return { ...prev, items: copy };
-    });
+    setShowCreateForm(true);
   };
 
   const calculateGrandTotal = () => {
@@ -201,7 +133,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       const payload = { ...formData, status, supplierId: Number(formData.supplierId), warehouseId: Number(formData.warehouseId),
         items: formData.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) };
       if(editingPoId) await purchaseOrderApi.update(editingPoId, payload); else await purchaseOrderApi.create(payload);
-      await loadData(); setShowCreateModal(false); resetForm(); addToast('Purchase order saved', 'success');
+      await loadData(); setShowCreateForm(false); resetForm(); addToast('Purchase order saved', 'success');
     } catch(e) { addToast(e.message, 'error'); } finally { setLoading(false); }
   };
 
@@ -242,6 +174,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {!showCreateForm && <>
       {/* Top Filter & Actions Bar (Sticky Toolbar Card - Customer/Employee Style) */}
       <div
         style={{
@@ -392,7 +325,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             type="button"
             onClick={() => {
               resetForm();
-              setShowCreateModal(true);
+              setShowCreateForm(true);
             }}
             style={{
               height: '38px',
@@ -700,41 +633,14 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         </div>
       </div>
 
-      {/* FULL-WIDTH & FULL-HEIGHT CREATE PO MODAL POPUP */}
-      {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1380px, 98vw)',
-              maxWidth: '1380px',
-              height: 'min(95vh, calc(100vh - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+      </>}
+      {showCreateForm && (
+        <div className="purchase-document">
+          <div className="purchase-document-content">
             {/* Modal Header */}
             <div
               style={{
-                padding: '16px 24px',
+                padding: '12px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -769,7 +675,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               </div>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => setShowCreateForm(false)}
                 style={{
                   width: '32px',
                   height: '32px',
@@ -787,238 +693,16 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               </button>
             </div>
 
-            {/* Modal Body (Scrollable Workstation) */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* SECTION 1: Order Details & Destination */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  1. Order & Supplier Information
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      SUPPLIER / VENDOR *
-                    </label>
-                    <select
-                      value={formData.supplierId}
-                      onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem', fontWeight: 600 }}
-                    >
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.code || 'Vendor'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      DELIVERY WAREHOUSE *
-                    </label>
-                    <select
-                      value={formData.warehouseId}
-                      onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem', fontWeight: 600 }}
-                    >
-                      {warehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      ORDER DATE
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.orderDate}
-                      onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      EXPECTED DELIVERY DATE
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.expectedDate}
-                      onChange={(e) => setFormData({ ...formData, expectedDate: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      PAYMENT TERMS
-                    </label>
-                    <select
-                      value={formData.terms}
-                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem' }}
-                    >
-                      <option value="Net 30 Days">Net 30 Days</option>
-                      <option value="Net 15 Days">Net 15 Days</option>
-                      <option value="COD">Cash on Delivery (COD)</option>
-                      <option value="Advance Payment">Advance Payment</option>
-                      <option value="End of Month">End of Month</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      REMARKS / PO NOTES
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Special delivery instructions, contact info..."
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem' }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: Add Line Items */}
-              <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '10px', padding: '20px', boxShadow: '0 4px 14px rgba(2, 132, 199, 0.08)' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0284c7', margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  2. Select Item & Add to Purchase Order
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr auto', gap: '14px', alignItems: 'flex-end' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      SELECT PRODUCT (SKU / TRADE NAME)
-                    </label>
-                    <select
-                      value={stagingItem.productId}
-                      onChange={(e) => handleProductSelectChange(e.target.value)}
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.88rem', fontWeight: 600 }}
-                    >
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.sku} — {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      ORDER QUANTITY
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={stagingItem.quantity}
-                      onChange={(e) => setStagingItem({ ...stagingItem, quantity: e.target.value })}
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.95rem', fontWeight: 700 }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      EXPECTED UNIT COST ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={stagingItem.unitCost}
-                      onChange={(e) => setStagingItem({ ...stagingItem, unitCost: e.target.value })}
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.95rem', fontWeight: 700 }}
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddItemToPo}
-                    style={{
-                      height: '40px',
-                      padding: '0 20px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                    }}
-                  >
-                    <Plus size={16} /> Add Item
-                  </button>
-                </div>
-              </div>
-
-              {/* SECTION 3: Line Items Table */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Ordered Line Items ({formData.items.length})
-                  </h3>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0284c7' }}>
-                    Estimated Total: ${calculateGrandTotal().toFixed(2)}
-                  </span>
-                </div>
-
-                {formData.items.length === 0 ? (
-                  <div style={{ padding: '32px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', border: '1.5px dashed #cbd5e1', color: '#64748b', fontSize: '0.88rem' }}>
-                    No items added to this purchase order yet. Select a product above and click <strong>"+ Add Item"</strong>.
-                  </div>
-                ) : (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                      <thead style={{ backgroundColor: '#fafbfc', borderBottom: '1px solid #e2e8f0' }}>
-                        <tr>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>#</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>SKU</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>PRODUCT NAME</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700, textAlign: 'right' }}>ORDER QTY</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700, textAlign: 'right' }}>UNIT COST</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', fontWeight: 700, textAlign: 'right' }}>LINE TOTAL</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'right' }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formData.items.map((it, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '10px 14px', fontSize: '0.84rem', color: '#64748b' }}>{idx + 1}</td>
-                            <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7', fontSize: '0.85rem' }}>{it.sku}</td>
-                            <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{it.productName}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{it.quantity}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', color: '#334155', fontSize: '0.88rem' }}>${Number(it.unitCost).toFixed(2)}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#0284c7', fontSize: '0.92rem' }}>${Number(it.totalCost).toFixed(2)}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(idx)}
-                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
-                                title="Remove line item"
-                              >
-                                <X size={15} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+            <div className="purchase-body">
+              <div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Delivery warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Order date<input type="date" value={formData.orderDate || ''} onChange={e=>setFormData({...formData, orderDate:e.target.value})}/></label><label>Expected date<input type="date" value={formData.expectedDate || ''} onChange={e=>setFormData({...formData, expectedDate:e.target.value})}/></label><label>Payment terms<select value={formData.terms} onChange={e=>setFormData({...formData, terms:e.target.value})}>{['Net 30 Days','Net 15 Days','COD','Advance Payment','End of Month'].map(t=><option key={t} value={t}>{t}</option>)}</select></label><label>Remarks / notes<input type="text" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})}/></label></div>
+              <PurchaseLines products={products} items={formData.items} quantityField="quantity" withCost={true}
+                onChange={items=>setFormData(previous=>({...previous,items}))} />
             </div>
 
             {/* Modal Footer Actions */}
             <div
               style={{
-                padding: '14px 24px',
+                padding: '12px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#ffffff',
                 display: 'flex',
@@ -1033,7 +717,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowCreateForm(false)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -1045,11 +729,12 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  Back to list
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSavePurchaseOrder('PENDING')}
+                  disabled={loading}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -1066,6 +751,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 <button
                   type="button"
                   onClick={() => handleSavePurchaseOrder('APPROVED')}
+                  disabled={loading}
                   style={{
                     padding: '8px 20px',
                     borderRadius: '6px',

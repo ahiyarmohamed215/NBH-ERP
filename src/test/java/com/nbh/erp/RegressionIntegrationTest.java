@@ -64,7 +64,7 @@ class RegressionIntegrationTest {
   customer=customers.save(Customer.builder().customerCode("REG-C").name("Regression customer").creditLimit(n("10000")).currentBalance(BigDecimal.ZERO).isActive(true).build());
   warehouse=warehouses.save(Warehouse.builder().code("REG-W").name("Regression warehouse").isActive(true).build());
   Category category=categories.save(Category.builder().code("REG-CAT").name("Regression category").build());
-  product=products.save(Product.builder().sku("REG-P").name("Regression product").category(category).sellingPrice(n("10")).costPrice(n("4")).isActive(true).build());
+  product=products.save(Product.builder().sku("REG-P").name("Regression product").category(category).defaultWarehouse(warehouse).sellingPrice(n("10")).costPrice(n("4")).isActive(true).build());
   supplier=suppliers.save(Supplier.builder().supplierCode("REG-S").name("Regression supplier").isActive(true).build());
   stock.increaseStock(warehouse.getId(),product.getId(),n("100"),n("4"),"GRN","REG-OPEN","Test stock");
  }
@@ -125,6 +125,54 @@ class RegressionIntegrationTest {
   assertEquals(0,customers.findById(customer.getId()).orElseThrow().getCurrentBalance().signum());
   assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
   assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->invoices.voidInvoice(invoice.getId(),"Retry"));
+ }
+ com.nbh.erp.grn.dto.CreateGrnRequest automaticReceiptRequest() {
+  var req=new com.nbh.erp.grn.dto.CreateGrnRequest();
+  req.setSupplierId(supplier.getId());req.setReceivedDate(LocalDate.now());req.setGrnType("Import Shipment");req.setNotes("Container 42");
+  var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(product.getId());line.setQuantityReceived(n("5"));line.setUnitCost(n("4"));req.setItems(List.of(line));
+  return req;
+ }
+ @Test void duplicateGrnProductsMergeOnCreateAndDraftUpdate() {
+  var req=automaticReceiptRequest();
+  var extra=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();extra.setProductId(product.getId());extra.setQuantityReceived(n("5"));extra.setUnitCost(n("6"));
+  req.setItems(List.of(req.getItems().getFirst(),extra));
+  var draft=grns.createGrn(req,false);
+  assertEquals(1,draft.getItems().size());assertEquals(0,n("10").compareTo(draft.getItems().getFirst().getQuantityReceived()));
+  assertEquals(0,n("5").compareTo(draft.getItems().getFirst().getUnitCost()));assertEquals(0,n("50").compareTo(draft.getTotalAmount()));
+  var posted=grns.updateGrn(draft.getId(),req,true);
+  assertEquals(1,posted.getItems().size());assertEquals(0,n("50").compareTo(posted.getTotalAmount()));
+  assertEquals(0,n("110").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void automaticGrnWarehouseAndTypeSurviveDraftEditAndPosting() {
+  var req=automaticReceiptRequest();var draft=grns.createGrn(req,false);
+  assertEquals(warehouse.getId(),draft.getWarehouseId());assertEquals("Import Shipment",draft.getGrnType());
+  req.setGrnType("Direct Purchase");req.setNotes("Updated note");
+  var posted=grns.updateGrn(draft.getId(),req,true);
+  assertEquals("Direct Purchase",grns.getGrnById(posted.getId()).getGrnType());assertEquals("Updated note",posted.getNotes());
+  assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void automaticGrnRejectsMissingProductWarehouse() {
+  product.setDefaultWarehouse(null);products.save(product);
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(automaticReceiptRequest(),true));
+ }
+ @Test void automaticGrnRejectsInactiveWarehouse() {
+  warehouse.setIsActive(false);warehouses.save(warehouse);
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(automaticReceiptRequest(),true));
+ }
+ @Test void automaticGrnRejectsMixedWarehouses() {
+  var otherWarehouse=warehouses.save(Warehouse.builder().code("OTHER-W").name("Other warehouse").build());
+  var other=products.save(Product.builder().sku("OTHER-P").name("Other product").category(product.getCategory()).defaultWarehouse(otherWarehouse).sellingPrice(n("10")).costPrice(n("4")).build());
+  var req=automaticReceiptRequest();var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(other.getId());line.setQuantityReceived(n("1"));line.setUnitCost(n("4"));req.setItems(List.of(req.getItems().getFirst(),line));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,true));
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void automaticGrnRejectsWarehouseOverride() {
+  var req=automaticReceiptRequest();req.setWarehouseId(-1L);
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,true));
+ }
+ @Test void automaticGrnRejectsInvalidType() {
+  var req=automaticReceiptRequest();req.setGrnType("Unknown type");
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,false));
  }
  com.nbh.erp.grn.dto.GrnDto receipt() {
   var req=new com.nbh.erp.grn.dto.CreateGrnRequest();req.setSupplierId(supplier.getId());req.setWarehouseId(warehouse.getId());req.setReceivedDate(LocalDate.now());

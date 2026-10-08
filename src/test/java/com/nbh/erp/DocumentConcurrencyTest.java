@@ -23,7 +23,7 @@ class DocumentConcurrencyTest {
   var warehouse=warehouses.save(com.nbh.erp.warehouse.entity.Warehouse.builder().code(key).name("Concurrent warehouse").isActive(true).build());
   var supplier=suppliers.save(com.nbh.erp.supplier.entity.Supplier.builder().supplierCode(key).name("Concurrent supplier").isActive(true).build());
   var category=categories.save(com.nbh.erp.category.entity.Category.builder().code(key).name("Concurrent category").build());
-  var product=products.save(com.nbh.erp.product.entity.Product.builder().sku(key).name("Concurrent product").category(category).sellingPrice(BigDecimal.TEN).costPrice(BigDecimal.ONE).isActive(true).build());
+  var product=products.save(com.nbh.erp.product.entity.Product.builder().sku(key).name("Concurrent product").category(category).defaultWarehouse(warehouse).sellingPrice(BigDecimal.TEN).costPrice(BigDecimal.ONE).isActive(true).build());
   var request=new com.nbh.erp.grn.dto.CreateGrnRequest();request.setSupplierId(supplier.getId());request.setWarehouseId(warehouse.getId());request.setReceivedDate(LocalDate.now());
   var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(product.getId());line.setQuantityReceived(BigDecimal.TEN);line.setUnitCost(BigDecimal.ONE);request.setItems(List.of(line));
   var receipt=grns.createGrn(request,false);

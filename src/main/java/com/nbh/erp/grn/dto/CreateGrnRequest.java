@@ -21,8 +21,9 @@ public class CreateGrnRequest {
     private Long supplierId;
     private Long purchaseOrderId;
 
-    @NotNull(message = "Warehouse ID is required")
     private Long warehouseId;
+
+    private String grnType;
 
     private String supplierInvoiceNumber;
 

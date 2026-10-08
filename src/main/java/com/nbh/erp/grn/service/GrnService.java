@@ -16,7 +16,6 @@ import com.nbh.erp.sequence.service.DocumentSequenceService;
 import com.nbh.erp.supplier.entity.Supplier;
 import com.nbh.erp.supplier.repository.SupplierRepository;
 import com.nbh.erp.warehouse.entity.Warehouse;
-import com.nbh.erp.warehouse.repository.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.nbh.erp.security.SecurityUtils;
@@ -40,11 +39,67 @@ public class GrnService {
     private final com.nbh.erp.purchasereturn.repository.PurchaseReturnRepository purchaseReturns;
     private final com.nbh.erp.payment.repository.SupplierPaymentRepository supplierPayments;
     private final SupplierRepository supplierRepository;
-    private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
     private final AuditLogService auditLogService;
+
+    private void replaceItems(Grn grn, CreateGrnRequest request) {
+        var merged = new java.util.LinkedHashMap<Long, GrnItem>();
+        for (var incoming : request.getItems()) {
+            Product product = productRepository.findById(incoming.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", incoming.getProductId()));
+            BigDecimal value = incoming.getQuantityReceived().multiply(incoming.getUnitCost());
+            GrnItem line = merged.get(product.getId());
+            if (line == null) {
+                line = GrnItem.builder().grn(grn).product(product)
+                        .quantityReceived(incoming.getQuantityReceived()).unitCost(incoming.getUnitCost())
+                        .totalCost(value).notes(incoming.getNotes()).build();
+                merged.put(product.getId(), line);
+            } else {
+                line.setQuantityReceived(line.getQuantityReceived().add(incoming.getQuantityReceived()));
+                line.setTotalCost(line.getTotalCost().add(value));
+                line.setUnitCost(line.getTotalCost().divide(line.getQuantityReceived(), 8, java.math.RoundingMode.HALF_UP));
+                if (incoming.getNotes() != null) line.setNotes(incoming.getNotes());
+            }
+        }
+        grn.getItems().clear();
+        grn.getItems().addAll(merged.values());
+        grn.setTotalAmount(merged.values().stream().map(GrnItem::getTotalCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+    }
+
+    private String resolveGrnType(String type) {
+        if (type == null || type.isBlank()) return "Standard Inward";
+        if (!java.util.Set.of("Standard Inward", "Import Shipment", "Direct Purchase",
+                "Consignment Intake", "Inter-Branch Transfer In", "Sample / Promotional").contains(type)) {
+            throw new BusinessException("Invalid GRN type");
+        }
+        return type;
+    }
+
+    private Warehouse resolveWarehouse(CreateGrnRequest request) {
+        Warehouse warehouse = null;
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BusinessException("GRN must have at least one line item");
+        }
+        for (var item : request.getItems()) {
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", item.getProductId()));
+            Warehouse destination = product.getDefaultWarehouse();
+            if (!Boolean.TRUE.equals(product.getIsActive())) throw new BusinessException("Product is inactive: " + product.getSku());
+            if (destination == null || !Boolean.TRUE.equals(destination.getIsActive())) {
+                throw new BusinessException("Set an active default warehouse on product " + product.getSku() + " before receiving goods");
+            }
+            if (warehouse != null && !warehouse.getId().equals(destination.getId())) {
+                throw new BusinessException("Products belong to different warehouses. Create a separate GRN for each warehouse");
+            }
+            warehouse = destination;
+        }
+        if (request.getWarehouseId() != null && !request.getWarehouseId().equals(warehouse.getId())) {
+            throw new BusinessException("Warehouse must match the selected products' default warehouse");
+        }
+        return warehouse;
+    }
 
     @Transactional(readOnly = true)
     public PagedResponse<GrnDto> searchGrns(
@@ -73,13 +128,13 @@ public class GrnService {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
-        Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+        Warehouse warehouse = resolveWarehouse(request);
 
         String grnNumber = sequenceService.generateGrnNumber();
 
         Grn grn = Grn.builder()
                 .grnNumber(grnNumber)
+                .grnType(resolveGrnType(request.getGrnType()))
                 .purchaseOrderId(request.getPurchaseOrderId())
                 .supplier(supplier)
                 .warehouse(warehouse)
@@ -91,28 +146,7 @@ public class GrnService {
                 .items(new ArrayList<>())
                 .build();
 
-        BigDecimal grandTotal = BigDecimal.ZERO;
-
-        for (CreateGrnRequest.CreateGrnItemRequest itemReq : request.getItems()) {
-            Product product = productRepository.findById(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
-
-            BigDecimal totalCost = itemReq.getQuantityReceived().multiply(itemReq.getUnitCost());
-            grandTotal = grandTotal.add(totalCost);
-
-            GrnItem item = GrnItem.builder()
-                    .grn(grn)
-                    .product(product)
-                    .quantityReceived(itemReq.getQuantityReceived())
-                    .unitCost(itemReq.getUnitCost())
-                    .totalCost(totalCost)
-                    .notes(itemReq.getNotes())
-                    .build();
-
-            grn.getItems().add(item);
-        }
-
-        grn.setTotalAmount(grandTotal);
+        replaceItems(grn, request);
         Grn savedGrn = grnRepository.save(grn);
 
         if (autoProcess) {
@@ -136,40 +170,17 @@ public class GrnService {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
-        Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+        Warehouse warehouse = resolveWarehouse(request);
 
         grn.setPurchaseOrderId(request.getPurchaseOrderId());
+        grn.setGrnType(resolveGrnType(request.getGrnType()));
         grn.setSupplier(supplier);
         grn.setWarehouse(warehouse);
         grn.setSupplierInvoiceNumber(request.getSupplierInvoiceNumber());
         grn.setReceivedDate(request.getReceivedDate());
         grn.setNotes(request.getNotes());
 
-        // Replace existing line items
-        grn.getItems().clear();
-        BigDecimal grandTotal = BigDecimal.ZERO;
-
-        for (CreateGrnRequest.CreateGrnItemRequest itemReq : request.getItems()) {
-            Product product = productRepository.findById(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
-
-            BigDecimal totalCost = itemReq.getQuantityReceived().multiply(itemReq.getUnitCost());
-            grandTotal = grandTotal.add(totalCost);
-
-            GrnItem item = GrnItem.builder()
-                    .grn(grn)
-                    .product(product)
-                    .quantityReceived(itemReq.getQuantityReceived())
-                    .unitCost(itemReq.getUnitCost())
-                    .totalCost(totalCost)
-                    .notes(itemReq.getNotes())
-                    .build();
-
-            grn.getItems().add(item);
-        }
-
-        grn.setTotalAmount(grandTotal);
+        replaceItems(grn, request);
         Grn savedGrn = grnRepository.save(grn);
 
         auditLogService.log(

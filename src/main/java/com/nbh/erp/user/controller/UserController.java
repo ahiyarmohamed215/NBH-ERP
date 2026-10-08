@@ -76,13 +76,24 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @GetMapping("/pending/count")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @Operation(summary = "Get count of pending user approval requests")
+    public ResponseEntity<ApiResponse<Long>> getPendingUsersCount() {
+        long count = userService.getPendingUsersCount();
+        return ResponseEntity.ok(ApiResponse.ok(count));
+    }
+
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
     @Operation(summary = "Approve pending user registration and assign roles")
     public ResponseEntity<ApiResponse<UserDto>> approveUser(
             @PathVariable Long id,
-            @Valid @RequestBody com.nbh.erp.user.dto.ApproveUserRequest request
+            @RequestBody(required = false) com.nbh.erp.user.dto.ApproveUserRequest request
     ) {
+        if (request == null) {
+            request = new com.nbh.erp.user.dto.ApproveUserRequest();
+        }
         UserDto approved = userService.approveUser(id, request);
         return ResponseEntity.ok(ApiResponse.ok("User registration approved successfully", approved));
     }

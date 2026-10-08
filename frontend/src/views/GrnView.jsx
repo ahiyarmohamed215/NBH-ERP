@@ -1,6 +1,8 @@
+import { mergeGrnItems } from '../utils/grnItems';
+import './GrnView.css';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useRef } from 'react';
-import { grnApi, supplierApi, warehouseApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
+import { grnApi, supplierApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
@@ -31,10 +33,10 @@ import {
 
 const GRN_TYPES = [
   'Standard Inward',
+  'Import Shipment',
   'Direct Purchase',
   'Consignment Intake',
   'Inter-Branch Transfer In',
-  'Import Shipment',
   'Sample / Promotional',
 ];
 
@@ -73,13 +75,14 @@ const INITIAL_STAGING_ITEM = {
 const GrnView = React.forwardRef(function GrnView(props, ref) {
   const { user } = useAuth();
   const canEditGrn = canEditModule(user, 'GRN');
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGrnForm, setShowGrnForm] = useState(false);
+  useEffect(() => {
+    props.onFormModeChange?.(showGrnForm);
+  }, [showGrnForm, props.onFormModeChange]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [grns, setGrns] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
-  const [warehouseStock, setWarehouseStock] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
@@ -92,14 +95,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const [stagingItem, setStagingItem] = useState({ ...INITIAL_STAGING_ITEM });
   const [productQuery, setProductQuery] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [showAdvancedStaging, setShowAdvancedStaging] = useState(false);
   const productSearchRef = useRef(null);
 
   const resetStagingItem = () => {
     setStagingItem({ ...INITIAL_STAGING_ITEM });
     setProductQuery('');
     setShowProductDropdown(false);
-    setShowAdvancedStaging(false);
   };
 
   useEffect(() => {
@@ -116,23 +117,22 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     openCreate: () => {
       resetAll();
       resetStagingItem();
-      setShowCreateModal(true);
+      setShowGrnForm(true);
     },
     openIntake: () => {
       resetAll();
       resetStagingItem();
-      setShowCreateModal(true);
+      setShowGrnForm(true);
     },
-    openList: () => setShowCreateModal(false),
+    openList: () => setShowGrnForm(false),
     refresh: loadData,
   }));
 
-  // Split-view Left Panel: GRN Header Form State
+  // GRN header and received items
   const [formData, setFormData] = useState({
     grnNumber: '',
     grnDate: formatBusinessDate(),
     supplierId: '',
-    warehouseId: '',
     grnType: GRN_TYPES[0],
     supplierInvoiceNumber: '',
     remarks: '',
@@ -161,7 +161,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       (res.data || []).forEach((b) => {
         stockMap[b.productId] = b.quantity || 0;
       });
-      setWarehouseStock(stockMap);
       return stockMap;
     } catch (err) {
       console.error('Failed to load warehouse stock:', err);
@@ -172,48 +171,30 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [grnRes, supRes, whRes, prodRes] = await Promise.all([
+      const [grnRes, supRes, prodRes] = await Promise.all([
         grnApi.search({ size: 100 }),
         supplierApi.getActive(),
-        warehouseApi.getActive(),
         productApi.getProducts({ size: 300, activeOnly: true }),
       ]);
 
       const gList = grnRes.data?.content || grnRes.data || [];
       const sList = supRes.data || [];
-      const wList = whRes.data || [];
       const pList = prodRes.data?.content || prodRes.data || [];
 
       setGrns(gList);
       setSuppliers(sList);
-      setWarehouses(wList);
       setProducts(pList);
 
-      const targetWh = formData.warehouseId || (wList.length > 0 ? wList[0].id : '');
       const targetSup = formData.supplierId || (sList.length > 0 ? sList[0].id : '');
 
       setFormData((prev) => ({
         ...prev,
-        warehouseId: prev.warehouseId || targetWh,
         supplierId: prev.supplierId || targetSup,
       }));
-
-      await loadStockForWarehouse(targetWh);
     } catch (err) {
       addToast('Failed to load GRN intake data: ' + err.message, 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleWarehouseChange = async (whId) => {
-    setFormData((prev) => ({ ...prev, warehouseId: whId }));
-    const stockMap = await loadStockForWarehouse(whId);
-    if (stagingItem.productId) {
-      setStagingItem((prev) => ({
-        ...prev,
-        currentQuantity: stockMap[prev.productId] || 0,
-      }));
     }
   };
 
@@ -259,9 +240,20 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     };
   };
 
-  const selectProductForStaging = (prod, whId = formData.warehouseId, stockMap = warehouseStock, grnList = grns) => {
+  const selectProductForStaging = async (prod) => {
     if (!prod) return;
-    const currentStock = stockMap[prod.id] || 0;
+    const warehouseId = prod.defaultWarehouseId || prod.warehouseId;
+    if (!warehouseId) {
+      addToast('Set a default warehouse on this product before creating a GRN.', 'error');
+      return;
+    }
+    const existingWarehouse = formData.items.map(item => products.find(p => String(p.id) === String(item.productId)))
+      .find(p => p?.defaultWarehouseId || p?.warehouseId);
+    if (existingWarehouse && String(existingWarehouse.defaultWarehouseId || existingWarehouse.warehouseId) !== String(warehouseId)) {
+      addToast('Use a separate GRN for products in a different warehouse.', 'error');
+      return;
+    }
+    const currentStock = 0;
     const cost = Number(prod.costPrice) || 0;
     const sale = Number(prod.sellingPrice) || 0;
     const wholesale = Number(prod.wholesalePrice) || (sale ? sale * 0.9 : cost * 1.15);
@@ -269,7 +261,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     const markup = sale > cost ? sale - cost : 0;
     const gp = sale > 0 ? ((sale - cost) / sale) * 100 : 0;
 
-    const hist = findLastGrnDetails(prod.id, grnList);
+    const hist = findLastGrnDetails(prod.id);
 
     const qty = stagingItem.quantity || 1;
     const free = stagingItem.freeQuantity || 0;
@@ -308,6 +300,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
     setProductQuery('');
     setShowProductDropdown(false);
+    const stockMap = await loadStockForWarehouse(warehouseId);
+    setStagingItem(prev => String(prev.productId) === String(prod.id)
+      ? { ...prev, currentQuantity: stockMap[prod.id] || 0 } : prev);
   };
 
   // Recalculate staging calculations whenever quantities, prices, or discounts change
@@ -407,7 +402,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
     setFormData((prev) => ({
       ...prev,
-      items: [...prev.items, newItem],
+      items: mergeGrnItems([...prev.items, newItem]),
     }));
 
     addToast(`Added "${stagingItem.tradeName}" to GRN intake!`, 'success');
@@ -441,13 +436,11 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const resetAll = () => {
     setEditingGrnId(null);
     const defaultSup = suppliers.length > 0 ? suppliers[0].id : '';
-    const defaultWh = warehouses.length > 0 ? warehouses[0].id : '';
 
     setFormData({
       grnNumber: '',
       grnDate: formatBusinessDate(),
       supplierId: defaultSup,
-      warehouseId: defaultWh,
       grnType: GRN_TYPES[0],
       supplierInvoiceNumber: '',
       remarks: '',
@@ -458,8 +451,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const handleSaveGrn = async (processImmediately = true) => {
-    if (!formData.supplierId || !formData.warehouseId) {
-      addToast('Please select both Supplier and Warehouse', 'error');
+    if (!formData.supplierId) {
+      addToast('Please select a supplier', 'error');
+      return;
+    }
+    if (!formData.grnDate) {
+      addToast('Select a GRN date', 'error');
       return;
     }
     if (formData.items.length === 0) {
@@ -472,14 +469,14 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       const payload = {
         purchaseOrderId: formData.purchaseOrderId ? Number(formData.purchaseOrderId) : null,
         supplierId: Number(formData.supplierId),
-        warehouseId: Number(formData.warehouseId),
+        grnType: formData.grnType,
         supplierInvoiceNumber: formData.supplierInvoiceNumber.trim() || null,
         receivedDate: formData.grnDate || formatBusinessDate(),
-        notes: `Type: ${formData.grnType} | Ref: ${formData.supplierInvoiceNumber || 'N/A'}${formData.remarks ? ' | ' + formData.remarks : ''}`,
+        notes: formData.remarks.trim() || null,
         items: formData.items.map((it) => ({
           productId: Number(it.productId),
           quantityReceived: Number(it.quantityReceived) + (Number(it.freeQuantity) || 0), // Include free issue into received inventory count
-          unitCost: Number(it.unitCost),
+          unitCost: Number((Number(it.amount) / (Number(it.quantityReceived) + (Number(it.freeQuantity) || 0))).toFixed(8)),
           notes: it.notes,
         })),
       };
@@ -499,7 +496,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
       resetAll();
       loadData();
-      setShowCreateModal(false);
+      setShowGrnForm(false);
     } catch (err) {
       addToast(err.message || 'Failed to save GRN', 'error');
     } finally {
@@ -543,11 +540,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
         grnDate: fullGrn.receivedDate || formatBusinessDate(),
         purchaseOrderId: fullGrn.purchaseOrderId || '',
         supplierId: fullGrn.supplierId || '',
-        warehouseId: fullGrn.warehouseId || '',
-        grnType: GRN_TYPES[0],
+        grnType: fullGrn.grnType || GRN_TYPES[0],
         supplierInvoiceNumber: fullGrn.supplierInvoiceNumber || '',
         remarks: fullGrn.notes || '',
-        items: (fullGrn.items || []).map((it) => ({
+        items: mergeGrnItems((fullGrn.items || []).map((it) => ({
           productId: it.productId,
           productCode: it.productSku || '',
           tradeName: it.productName || '',
@@ -568,10 +564,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           freeCostPrice: Number(it.unitCost || 0),
           priceCode: '',
           notes: it.notes || '',
-        })),
+        }))),
       });
       resetStagingItem();
-      setShowCreateModal(true);
+      setShowGrnForm(true);
     } catch (err) {
       addToast('Failed to load GRN for editing: ' + err.message, 'error');
     }
@@ -689,7 +685,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
       setFormData((prev) => ({
         ...prev,
-        items: [...prev.items, ...parsedItems],
+        items: mergeGrnItems([...prev.items, ...parsedItems]),
       }));
 
       addToast(`Successfully imported ${parsedItems.length} items from spreadsheet!`, 'success');
@@ -793,6 +789,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
         overflow: 'hidden',
       }}
     >
+      {!showGrnForm && <>
           {/* Top Filter & Actions Bar (Sticky Toolbar Card - Exact CustomersHub Look) */}
           <div
             style={{
@@ -942,7 +939,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 type="button"
                 onClick={() => {
                   resetAll();
-                  setShowCreateModal(true);
+                  setShowGrnForm(true);
                 }}
                 style={{
                   height: '38px',
@@ -1278,37 +1275,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </div>
           </div>
 
-      {/* FULL WIDTH & HEIGHT CREATE GRN MODAL POPUP */}
-      {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1380px, 98vw)',
-              maxWidth: '1380px',
-              height: 'min(95vh, calc(100vh - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Modal Header */}
+      </>}
+      {showGrnForm && (
+        <div className="grn-page">
+          <div className="grn-page-content">
+            {/* Form heading */}
+
             <div
               style={{
                 padding: '12px 20px',
@@ -1370,7 +1342,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowGrnForm(false)}
                   style={{
                     width: '32px',
                     height: '32px',
@@ -1389,141 +1361,23 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               </div>
             </div>
 
-            {/* Modal Body: Scrollable Workstation */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-          <div
-            className="glass-card"
-            style={{
-              width: '100%',
-              padding: '16px',
-              background: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              boxSizing: 'border-box',
-            }}
-          >
-          {/* SECTION 1: Common Header Controls (Date, Warehouse, Supplier, Type, Invoice #) */}
-          <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
-              <Package size={16} color="#2563eb" />
-              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                1. Inward Shipment & Warehouse Details
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '10px' }}>
-              {/* GRN Date */}
-              <div>
-                <label>Purchase order ID (optional)<input type="number" min="1" value={formData.purchaseOrderId || ''} onChange={e => setFormData({...formData,purchaseOrderId:e.target.value})} /></label>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  GRN DATE *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="date"
-                    className="input-glass"
-                    style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                    value={formData.grnDate}
-                    onChange={(e) => setFormData({ ...formData, grnDate: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Destination Warehouse */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  DESTINATION WAREHOUSE *
-                </label>
-                <select
-                  className="input-glass"
-                  style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                  value={formData.warehouseId}
-                  onChange={(e) => handleWarehouseChange(e.target.value)}
-                >
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Supplier */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  SUPPLIER *
-                </label>
-                <select
-                  className="input-glass"
-                  style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                  value={formData.supplierId}
-                  onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code || s.supplierCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* GRN Type */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  GRN TYPE *
-                </label>
-                <select
-                  className="input-glass"
-                  style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                  value={formData.grnType}
-                  onChange={(e) => setFormData({ ...formData, grnType: e.target.value })}
-                >
-                  {GRN_TYPES.map((t, i) => (
-                    <option key={i} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Supplier Invoice / Ref # */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  SUPPLIER INVOICE #
-                </label>
-                <input
-                  type="text"
-                  className="input-glass"
-                  style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                  placeholder="e.g. INV-89241"
-                  value={formData.supplierInvoiceNumber}
-                  onChange={(e) => setFormData({ ...formData, supplierInvoiceNumber: e.target.value })}
-                />
-              </div>
-
-              {/* Remarks / Notes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  REMARKS / NOTES
-                </label>
-                <input
-                  type="text"
-                  className="input-glass"
-                  style={{ fontSize: '0.88rem', padding: '7px 10px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 600, color: '#0f172a' }}
-                  placeholder="Delivery note / batch ref..."
-                  value={formData.remarks}
-                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                />
-              </div>
-            </div>
+            <div className="grn-form-body">
+          <div className="grn-form-content">
+          <div className="grn-header-fields">
+            <label>Supplier *<select className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
+              <option value="">Select supplier</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></label>
+            <label>GRN type<select className="input-glass" value={formData.grnType} onChange={e => setFormData({...formData, grnType:e.target.value})}>
+              {GRN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select></label>
+            <label>Supplier invoice<input className="input-glass" maxLength={100} placeholder="Invoice reference" value={formData.supplierInvoiceNumber} onChange={e => setFormData({...formData, supplierInvoiceNumber:e.target.value})} /></label>
+            <label>Remarks / notes<input className="input-glass" placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
+            <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
           </div>
-
-          {/* SECTION 2: Product Intake Workstation */}
-          <div
+          <div className="grn-workspace">
+          {/* Product search and entry */}
+          <div className="grn-entry"
             style={{
               padding: '14px 16px',
               borderRadius: '10px',
@@ -1539,7 +1393,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <div ref={productSearchRef} style={{ position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Search size={15} color="#2563eb" /> 2. Product Search & Intake *
+                  <Search size={15} color="#2563eb" /> Product search & intake
                 </label>
                 {stagingItem.productId && (
                   <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1652,7 +1506,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '12px' }}>
                           <span>Cost: <strong style={{ color: '#0f172a' }}>${Number(p.costPrice || 0).toFixed(2)}</strong></span>
-                          <span>Stock: <strong style={{ color: '#2563eb' }}>{warehouseStock[p.id] || 0}</strong> {p.unitOfMeasure || 'PCS'}</span>
+                          <span>{p.defaultWarehouseName || 'No default warehouse'}</span>
                         </div>
                       </div>
                     ))
@@ -1661,322 +1515,37 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               )}
             </div>
 
-            {/* Active Staging Product Banner */}
-            {stagingItem.productId && (
-              <div
-                style={{
-                  padding: '9px 12px',
-                  background: '#f0f9ff',
-                  borderRadius: '8px',
-                  border: '1px solid #bae6fd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  fontSize: '0.82rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 800, color: '#0369a1', fontSize: '0.88rem' }}>
-                    {stagingItem.tradeName}
-                  </span>
-                  <span style={{ fontFamily: 'monospace', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, fontSize: '0.76rem' }}>
-                    {stagingItem.productCode}
-                  </span>
-                  <span style={{ color: '#64748b' }}>
-                    Current Stock: <strong style={{ color: stagingItem.currentQuantity > 0 ? '#15803d' : '#b45309' }}>{stagingItem.currentQuantity} {stagingItem.unitOfMeasure}</strong>
-                  </span>
-                  {stagingItem.lastGrnQuantity !== null && (
-                    <span style={{ color: '#475569', background: '#ffffff', padding: '1px 8px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.76rem' }}>
-                      Last GRN: <strong>{stagingItem.lastGrnQuantity} units</strong> @ <strong>${Number(stagingItem.lastGrnRealCost || 0).toFixed(2)}</strong>
-                      {stagingItem.lastGrnDiscount ? ` (${stagingItem.lastGrnDiscount} disc)` : ''}
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={resetStagingItem}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#ef4444',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: '2px 6px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <X size={13} /> Change Product
-                </button>
-              </div>
-            )}
+            <div className="grn-selected-product">
+              <span title={stagingItem.tradeName}>{stagingItem.productId ? `${stagingItem.productCode} — ${stagingItem.tradeName}` : 'Select a product to add a receipt line'}</span>
+              {stagingItem.productId && <small>In stock: {stagingItem.currentQuantity} {stagingItem.unitOfMeasure}</small>}
+            </div>
 
-            {/* Row 2: Intake Line Inputs */}
-            {stagingItem.productId ? (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-                  gap: '10px',
-                  alignItems: 'end',
-                }}
-              >
-                {/* Received Qty */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    RECEIVED QTY *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="input-glass"
-                    style={{ padding: '7px 10px', fontSize: '0.92rem', fontWeight: 700, height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    value={stagingItem.quantity}
-                    onChange={(e) => handleStagingChange('quantity', e.target.value)}
-                  />
-                </div>
-
-                {/* Free Qty (FOC) */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#16a34a', marginBottom: '4px' }}>
-                    FREE (FOC)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="input-glass"
-                    style={{ padding: '7px 10px', fontSize: '0.92rem', color: '#15803d', fontWeight: 700, height: '38px', borderRadius: '6px', border: '1px solid #86efac', background: '#f0fdf4' }}
-                    value={stagingItem.freeQuantity}
-                    onChange={(e) => handleStagingChange('freeQuantity', e.target.value)}
-                  />
-                </div>
-
-                {/* Unit Cost ($) */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    UNIT COST ($) *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="input-glass"
-                    style={{ padding: '7px 10px', fontSize: '0.92rem', fontWeight: 700, height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    value={stagingItem.costPrice}
-                    onChange={(e) => handleStagingChange('costPrice', e.target.value)}
-                  />
-                </div>
-
-                {/* Discount % */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    DISCOUNT %
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="input-glass"
-                    style={{ padding: '7px 10px', fontSize: '0.9rem', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    value={stagingItem.discountPercent}
-                    onChange={(e) => handleStagingChange('discountPercent', e.target.value)}
-                  />
-                </div>
-
-                {/* Selling Price ($) */}
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    SALE PRICE ($)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="input-glass"
-                    style={{ padding: '7px 10px', fontSize: '0.9rem', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                    value={stagingItem.salePrice}
-                    onChange={(e) => handleStagingChange('salePrice', e.target.value)}
-                  />
-                </div>
-
-                {/* Line Total */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1e40af' }}>LINE TOTAL</span>
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 800,
-                        padding: '1px 5px',
-                        borderRadius: '4px',
-                        background: stagingItem.gpPercent >= 20 ? '#dcfce7' : stagingItem.gpPercent >= 10 ? '#fef3c7' : '#fee2e2',
-                        color: stagingItem.gpPercent >= 20 ? '#15803d' : stagingItem.gpPercent >= 10 ? '#b45309' : '#b91c1c',
-                      }}
-                    >
-                      {stagingItem.gpPercent}% GP
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      padding: '7px 10px',
-                      background: '#eff6ff',
-                      borderRadius: '6px',
-                      fontSize: '0.95rem',
-                      fontWeight: 800,
-                      color: '#1d4ed8',
-                      height: '38px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      border: '1px solid #bfdbfe',
-                    }}
-                  >
-                    ${Number(stagingItem.amount || 0).toFixed(2)}
-                  </div>
-                </div>
-
-                {/* Add Item Button */}
-                <div>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{
-                      width: '100%',
-                      height: '38px',
-                      fontSize: '0.88rem',
-                      fontWeight: 700,
-                      justifyContent: 'center',
-                      background: '#2563eb',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                    onClick={handleAddItemToGrn}
-                  >
-                    <Plus size={16} /> + Add Item
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  padding: '14px',
-                  textAlign: 'center',
-                  background: '#f8fafc',
-                  borderRadius: '6px',
-                  border: '1px dashed #cbd5e1',
-                  color: '#64748b',
-                  fontSize: '0.82rem',
-                }}
-              >
-                Search and select a product above to configure received quantity and pricing.
-              </div>
-            )}
-
-            {/* Optional Advanced Pack / Wholesale Details */}
-            {stagingItem.productId && (
-              <div style={{ marginTop: '2px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedStaging(!showAdvancedStaging)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#2563eb',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    padding: '2px 0',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  {showAdvancedStaging ? '▾ Hide pack size & wholesale prices' : '▸ Show pack size & wholesale prices'}
-                </button>
-
-                {showAdvancedStaging && (
-                  <div
-                    style={{
-                      marginTop: '8px',
-                      padding: '10px',
-                      background: '#f8fafc',
-                      borderRadius: '6px',
-                      border: '1px solid #e2e8f0',
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-                      gap: '8px',
-                    }}
-                  >
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>PACK QTY</label>
-                      <input
-                        type="number"
-                        min="1"
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '0.84rem', height: '32px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        value={stagingItem.packQty}
-                        onChange={(e) => handleStagingChange('packQty', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>PACK SIZE</label>
-                      <input
-                        type="number"
-                        min="1"
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '0.84rem', height: '32px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        value={stagingItem.packSize}
-                        onChange={(e) => handleStagingChange('packSize', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>WHOLESALE ($)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '0.84rem', height: '32px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        value={stagingItem.wholesalePrice}
-                        onChange={(e) => handleStagingChange('wholesalePrice', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>CREDIT PRICE ($)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '0.84rem', height: '32px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        value={stagingItem.creditPrice}
-                        onChange={(e) => handleStagingChange('creditPrice', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#475569', marginBottom: '2px' }}>PRICE CODE</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. PC-01"
-                        style={{ width: '100%', padding: '5px 8px', fontSize: '0.84rem', height: '32px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
-                        value={stagingItem.priceCode}
-                        onChange={(e) => handleStagingChange('priceCode', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="grn-line-fields">
+              {[
+                ['quantity', 'RECEIVED QTY *', 0, '1'],
+                ['freeQuantity', 'FREE (FOC)', 0, '1'],
+                ['costPrice', 'UNIT COST ($) *', 0, '0.01'],
+                ['discountPercent', 'DISCOUNT %', 0, '0.1'],
+                ['salePrice', 'SALE PRICE ($)', 0, '0.01'],
+              ].map(([field, label, min, step]) => (
+                <label key={field}>{label}
+                  <input className="input-glass" type="number" min={min} step={step}
+                    max={field === 'discountPercent' ? 100 : undefined}
+                    value={stagingItem[field]} onChange={e => handleStagingChange(field, e.target.value)} />
+                </label>
+              ))}
+              <label>LINE TOTAL<output className="grn-line-total">${Number(stagingItem.amount || 0).toFixed(2)}</output></label>
+            </div>
+            <button type="button" className="btn btn-primary grn-add-item" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
+              <Plus size={16} /> Add item
+            </button>
           </div>
 
-          {/* SECTION 3: Added Items Grid */}
-          <div>
+          {/* Received items */}
+          <div className="grn-items">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                ADDED GRN INWARD ITEMS ({formData.items.length})
+                Received items ({formData.items.length})
               </span>
               <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px' }}>
                 Total Received Units: <strong style={{ color: '#0f172a' }}>{totals.totalQty}</strong> + <strong style={{ color: '#15803d' }}>{totals.totalFree} FOC</strong> = <strong style={{ color: '#1d4ed8' }}>{totals.totalQty + totals.totalFree} units</strong>
@@ -1995,10 +1564,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   fontSize: '0.86rem',
                 }}
               >
-                No items added yet. Search a product above and click <strong>"+ Add Item"</strong> or upload a sheet.
+                No items added yet. Search a product and click <strong>"Add item"</strong> or upload a sheet.
               </div>
             ) : (
-              <div style={{ maxHeight: '240px', overflowY: 'auto', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', maxWidth: '100%' }}>
+              <div className="grn-table-scroll">
                 <table className="glass-table" style={{ margin: 0, minWidth: '650px', width: '100%' }}>
                   <thead>
                     <tr>
@@ -2059,7 +1628,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </div>
           </div>
 
-            {/* Modal Footer: Sticky Totals & Action Buttons (Clean, Single Location for Totals) */}
+            </div>
+            {/* Pinned totals and actions */}
             <div
               style={{
                 padding: '12px 20px',
@@ -2097,7 +1667,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowGrnForm(false)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -2109,7 +1679,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     cursor: 'pointer',
                   }}
                 >
-                  Close
+                  Back to GRNs
                 </button>
                 <button
                   type="button"
@@ -2148,7 +1718,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   }}
                 >
                   <CheckCircle size={16} />
-                  {saving ? 'Processing...' : (editingGrnId ? 'Update & Post Inventory' : 'Direct GRN Intake & Post Inventory')}
+                  {saving ? 'Processing...' : (editingGrnId ? 'Update & Post Inventory' : 'Save & post inventory')}
                 </button>
               </div>
             </div>
@@ -2581,7 +2151,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   onClick={() => setSelectedGrn(null)}
                   style={{ fontSize: '0.84rem', padding: '7px 14px' }}
                 >
-                  Close
+                  Back to GRNs
                 </button>
               </div>
             </div>

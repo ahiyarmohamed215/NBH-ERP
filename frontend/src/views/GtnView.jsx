@@ -1,3 +1,4 @@
+import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { gtnApi, warehouseApi, productApi, pdfApi } from '../api/apiClient';
@@ -18,7 +19,8 @@ import {
 } from 'lucide-react';
 
 const GtnView = React.forwardRef(function GtnView(props, ref) {
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [gtns, setGtns] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
@@ -26,16 +28,15 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [saving, setSaving] = useState(false);
-  const formRef = React.useRef(null);
 
   React.useImperativeHandle(ref, () => ({
     openCreate: () => {
       resetForm();
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     },
     focusForm: () => {
       resetForm();
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     },
     refresh: loadData,
   }));
@@ -60,18 +61,12 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   const resetForm = (whList = warehouses, prodList = products) => {
     const srcId = whList.length > 0 ? whList[0].id : '';
     const dstId = whList.length > 1 ? whList[1].id : (whList[0]?.id || '');
-    const defaultProd = prodList.length > 0 ? prodList[0] : null;
 
     setFormData({
       sourceWarehouseId: srcId,
       destinationWarehouseId: dstId,
       remarks: '',
-      items: [
-        {
-          productId: defaultProd ? defaultProd.id : '',
-          quantityTransferred: 1,
-        },
-      ],
+      items: [],
     });
   };
 
@@ -100,40 +95,6 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddItem = () => {
-    const defaultProd = products.length > 0 ? products[0] : null;
-    setFormData((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          productId: defaultProd ? defaultProd.id : '',
-          quantityTransferred: 1,
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveItem = (index) => {
-    setFormData((prev) => {
-      const updated = [...prev.items];
-      updated.splice(index, 1);
-      return { ...prev, items: updated };
-    });
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const updated = [...formData.items];
-    const row = { ...updated[index] };
-    if (field === 'productId') {
-      row.productId = Number(value);
-    } else if (field === 'quantityTransferred') {
-      row.quantityTransferred = Math.max(1, parseInt(value, 10) || 1);
-    }
-    updated[index] = row;
-    setFormData({ ...formData, items: updated });
   };
 
   const calculateTotalUnits = () => {
@@ -174,7 +135,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
       );
       resetForm();
       loadData();
-      setShowCreateModal(false);
+      setShowCreateForm(false);
     } catch (err) {
       addToast(err.message || 'Failed to create GTN', 'error');
     } finally {
@@ -222,7 +183,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
           quantity: Number(it.quantity || 1),
         })),
       });
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     } catch (err) {
       addToast('Failed to load GTN for editing: ' + err.message, 'error');
     }
@@ -273,6 +234,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {!showCreateForm && <>
       {/* Top Filter & Actions Bar (Sticky Toolbar Card) */}
       <div
         style={{
@@ -421,7 +383,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 type="button"
                 onClick={() => {
                   resetForm();
-                  setShowCreateModal(true);
+                  setShowCreateForm(true);
                 }}
                 style={{
                   height: '38px',
@@ -731,41 +693,14 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             </div>
           </div>
 
-      {/* FULL WIDTH & HEIGHT STOCK TRANSFER (GTN) MODAL POPUP */}
-      {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1280px, 98vw)',
-              maxWidth: '1280px',
-              height: 'min(95vh, calc(100vh - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+      </>}
+      {showCreateForm && (
+        <div className="purchase-document">
+          <div className="purchase-document-content">
             {/* Modal Header */}
             <div
               style={{
-                padding: '16px 24px',
+                padding: '12px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -821,7 +756,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowCreateForm(false)}
                   style={{
                     width: '32px',
                     height: '32px',
@@ -840,176 +775,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               </div>
             </div>
 
-            {/* Modal Body (Scrollable Form) */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Warehouse Route Card */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 14px 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  1. Transfer Route & Warehouse Locations
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      SOURCE WAREHOUSE (FROM) *
-                    </label>
-                    <select
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
-                      value={formData.sourceWarehouseId}
-                      onChange={(e) => setFormData({ ...formData, sourceWarehouseId: e.target.value })}
-                    >
-                      {warehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} ({w.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      DESTINATION WAREHOUSE (TO) *
-                    </label>
-                    <select
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
-                      value={formData.destinationWarehouseId}
-                      onChange={(e) => setFormData({ ...formData, destinationWarehouseId: e.target.value })}
-                    >
-                      {warehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} ({w.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      REMARKS / TRANSFER REASON
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem' }}
-                      placeholder="e.g. Branch stock replenishment, high demand..."
-                      value={formData.remarks}
-                      onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {isSameWarehouse && (
-                  <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 600 }}>
-                    Source and destination warehouse must be different.
-                  </div>
-                )}
-              </div>
-
-              {/* Items Card */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    2. Transfer Items ({formData.items.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddItem}
-                    style={{
-                      padding: '6px 14px',
-                      backgroundColor: '#eff6ff',
-                      color: '#0284c7',
-                      border: '1px solid #bfdbfe',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Plus size={14} /> + Add Another Item Line
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {formData.items.map((item, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '3fr 1fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                        padding: '12px',
-                        background: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                          Product (SKU / Name)
-                        </label>
-                        <select
-                          className="input-glass"
-                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.88rem', fontWeight: 600 }}
-                          value={item.productId}
-                          onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                        >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.sku} — {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                          Transfer Quantity
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          className="input-glass"
-                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.95rem', fontWeight: 700 }}
-                          value={item.quantityTransferred}
-                          onChange={(e) => handleItemChange(index, 'quantityTransferred', e.target.value)}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: '2px' }}>
-                        {formData.items.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#94a3b8',
-                              cursor: 'pointer',
-                              padding: '8px',
-                            }}
-                            title="Remove line"
-                          >
-                            <X size={18} />
-                          </button>
-                        ) : (
-                          <div style={{ width: '34px' }} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="purchase-body">
+              <div className="purchase-fields"><label>Source warehouse *<select value={formData.sourceWarehouseId} onChange={e=>setFormData({...formData, sourceWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Destination warehouse *<select value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Remarks / transfer reason<input type="text" value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>
+              <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false}
+                onChange={items=>setFormData(previous=>({...previous,items}))} />
             </div>
 
             {/* Modal Footer */}
             <div
               style={{
-                padding: '14px 24px',
+                padding: '12px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#ffffff',
                 display: 'flex',
@@ -1024,7 +799,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowCreateForm(false)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -1036,7 +811,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  Back to list
                 </button>
                 <button
                   type="button"

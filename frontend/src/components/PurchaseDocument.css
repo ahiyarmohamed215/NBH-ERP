@@ -1,0 +1,20 @@
+.purchase-document,.purchase-document-content,.purchase-body { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; }
+.purchase-document { border:1px solid #e2e8f0; border-radius:10px; background:white; overflow:hidden; }
+.purchase-body { padding:12px; gap:12px; }
+.purchase-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; flex-shrink:0; }
+.purchase-document label { display:flex; flex-direction:column; gap:6px; font-size:.75rem; font-weight:600; color:#475569; min-width:0; }
+.purchase-document input,.purchase-document select,.purchase-document output { box-sizing:border-box; width:100%; min-width:0; height:38px; padding:7px 9px; border:1px solid #cbd5e1; border-radius:6px; font-size:.85rem; background:white; }
+.purchase-document output { background:#eff6ff; color:#1d4ed8; font-weight:700; }
+.purchase-lines { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(300px,1fr); gap:12px; flex:1; min-height:0; }
+.purchase-items { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.purchase-lines h3 { margin:0 0 10px; font-size:.85rem; color:#1e293b; }
+.purchase-table-scroll { overflow:auto; flex:1; min-height:0; border:1px solid #e2e8f0; border-radius:8px; }
+.purchase-table-scroll table { width:100%; margin:0; }
+.purchase-table-scroll thead { position:sticky; top:0; background:#f8fafc; z-index:1; }
+.purchase-table-scroll td small { display:block; color:#64748b; }
+.purchase-table-scroll td button { background:none; border:0; padding:6px; cursor:pointer; color:#64748b; }
+.purchase-entry { display:flex; flex-direction:column; gap:12px; padding:14px; border:1px solid #e2e8f0; border-radius:10px; align-self:start; min-width:0; }
+.purchase-entry-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.purchase-entry > button { justify-content:center; }
+.purchase-empty { text-align:center; padding:24px; color:#64748b; font-size:.85rem; }
+@media(max-width:760px) { .purchase-lines { display:flex; flex-direction:column-reverse; } .purchase-entry { align-self:stretch; } .purchase-items { flex:1; min-height:80px; } }

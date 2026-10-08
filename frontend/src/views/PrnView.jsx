@@ -1,3 +1,4 @@
+import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { prnApi, supplierApi, warehouseApi, productApi } from '../api/apiClient';
@@ -25,7 +26,8 @@ const COMMON_REASONS = [
 ];
 
 const PrnView = React.forwardRef(function PrnView(props, ref) {
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [prns, setPrns] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
@@ -34,16 +36,15 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [saving, setSaving] = useState(false);
-  const formRef = React.useRef(null);
 
   React.useImperativeHandle(ref, () => ({
     openCreate: () => {
       resetForm();
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     },
     focusForm: () => {
       resetForm();
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     },
     refresh: loadData,
   }));
@@ -70,7 +71,6 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
   const resetForm = (supList = suppliers, whList = warehouses, prodList = products) => {
     const defaultSup = supList.length > 0 ? supList[0].id : '';
     const defaultWh = whList.length > 0 ? whList[0].id : '';
-    const defaultProd = prodList.length > 0 ? prodList[0] : null;
 
     setFormData({
       supplierId: defaultSup,
@@ -78,13 +78,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
       originalGrnNumber: '',
       reason: COMMON_REASONS[0],
       remarks: '',
-      items: [
-        {
-          productId: defaultProd ? defaultProd.id : '',
-          quantityReturned: 1,
-          unitCost: defaultProd ? defaultProd.costPrice || 0 : 0,
-        },
-      ],
+      items: [],
     });
   };
 
@@ -116,47 +110,6 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddItem = () => {
-    const defaultProd = products.length > 0 ? products[0] : null;
-    setFormData((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          productId: defaultProd ? defaultProd.id : '',
-          quantityReturned: 1,
-          unitCost: defaultProd ? defaultProd.costPrice || 0 : 0,
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveItem = (index) => {
-    setFormData((prev) => {
-      const updated = [...prev.items];
-      updated.splice(index, 1);
-      return { ...prev, items: updated };
-    });
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const updated = [...formData.items];
-    const row = { ...updated[index] };
-    if (field === 'productId') {
-      row.productId = Number(value);
-      const prod = products.find((p) => p.id === Number(value));
-      if (prod) {
-        row.unitCost = prod.costPrice || 0;
-      }
-    } else if (field === 'quantityReturned') {
-      row.quantityReturned = Math.max(1, parseInt(value, 10) || 1);
-    } else if (field === 'unitCost') {
-      row.unitCost = Math.max(0, parseFloat(value) || 0);
-    }
-    updated[index] = row;
-    setFormData({ ...formData, items: updated });
   };
 
   const calculateTotal = () => {
@@ -200,7 +153,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
       );
       resetForm();
       loadData();
-      setShowCreateModal(false);
+      setShowCreateForm(false);
     } catch (err) {
       addToast(err.message || 'Failed to create PRN', 'error');
     } finally {
@@ -252,7 +205,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
           reason: it.reason || 'Defective batch / Damaged on arrival',
         })),
       });
-      setShowCreateModal(true);
+      setShowCreateForm(true);
     } catch (err) {
       addToast('Failed to load PRN for editing: ' + err.message, 'error');
     }
@@ -304,6 +257,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {!showCreateForm && <>
       {/* Top Filter & Actions Bar (Sticky Toolbar Card) */}
       <div
         style={{
@@ -451,7 +405,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             type="button"
             onClick={() => {
               resetForm();
-              setShowCreateModal(true);
+              setShowCreateForm(true);
             }}
             style={{
               height: '38px',
@@ -764,41 +718,14 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             </div>
           </div>
 
-      {/* FULL WIDTH & HEIGHT PURCHASE RETURN (PRN) MODAL POPUP */}
-      {showCreateModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(1280px, 98vw)',
-              maxWidth: '1280px',
-              height: 'min(95vh, calc(100vh - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+      </>}
+      {showCreateForm && (
+        <div className="purchase-document">
+          <div className="purchase-document-content">
             {/* Modal Header */}
             <div
               style={{
-                padding: '16px 24px',
+                padding: '12px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -854,7 +781,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowCreateForm(false)}
                   style={{
                     width: '32px',
                     height: '32px',
@@ -873,218 +800,16 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               </div>
             </div>
 
-            {/* Modal Body (Scrollable Form) */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px', backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Return Supplier & Warehouse Card */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 14px 0', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  1. Return Destination & Reason
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <label>Original GRN ID<input type="number" required min="1" value={formData.sourceGrnId || ''} onChange={e=>setFormData({...formData,sourceGrnId:e.target.value})}/></label>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      SUPPLIER / VENDOR *
-                    </label>
-                    <select
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
-                      value={formData.supplierId}
-                      onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                    >
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.code || 'Vendor'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      DISPATCH WAREHOUSE *
-                    </label>
-                    <select
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
-                      value={formData.warehouseId}
-                      onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
-                    >
-                      {warehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name} ({w.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      ORIGINAL GRN / INVOICE REF #
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem' }}
-                      placeholder="e.g. GRN-2026-004..."
-                      value={formData.originalGrnNumber}
-                      onChange={(e) => setFormData({ ...formData, originalGrnNumber: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                      RETURN REASON *
-                    </label>
-                    <select
-                      className="input-glass"
-                      style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem', fontWeight: 600 }}
-                      value={formData.reason}
-                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    >
-                      {COMMON_REASONS.map((r, i) => (
-                        <option key={i} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                    REMARKS / DEBIT NOTE NOTES
-                  </label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    style={{ width: '100%', height: '40px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.9rem' }}
-                    placeholder="Debit note reference, supplier contact notes..."
-                    value={formData.remarks}
-                    onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Return Items Card */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    2. Return Items ({formData.items.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddItem}
-                    style={{
-                      padding: '6px 14px',
-                      backgroundColor: '#eff6ff',
-                      color: '#0284c7',
-                      border: '1px solid #bfdbfe',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Plus size={14} /> + Add Another Item Line
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {formData.items.map((item, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '2.5fr 1fr 1fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                        padding: '12px',
-                        background: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                          Product (SKU / Name)
-                        </label>
-                        <select
-                          className="input-glass"
-                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.88rem', fontWeight: 600 }}
-                          value={item.productId}
-                          onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                        >
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.sku} — {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                          Return Quantity
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          className="input-glass"
-                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.95rem', fontWeight: 700 }}
-                          value={item.quantityReturned}
-                          onChange={(e) => handleItemChange(index, 'quantityReturned', e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px', fontWeight: 600 }}>
-                          Unit Cost ($)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="input-glass"
-                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.95rem', fontWeight: 700 }}
-                          value={item.unitCost}
-                          onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', paddingBottom: '2px' }}>
-                        {formData.items.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#94a3b8',
-                              cursor: 'pointer',
-                              padding: '8px',
-                            }}
-                            title="Remove line"
-                          >
-                            <X size={18} />
-                          </button>
-                        ) : (
-                          <div style={{ width: '34px' }} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="purchase-body">
+              <div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Dispatch warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Original GRN ID *<input type="number" value={formData.sourceGrnId || ''} onChange={e=>setFormData({...formData, sourceGrnId:e.target.value})}/></label><label>GRN / invoice reference<input type="text" value={formData.originalGrnNumber || ''} onChange={e=>setFormData({...formData, originalGrnNumber:e.target.value})}/></label><label>Return reason *<select value={formData.reason} onChange={e=>setFormData({...formData, reason:e.target.value})}>{COMMON_REASONS.map(r=><option key={r} value={r}>{r}</option>)}</select></label><label>Remarks / notes<input type="text" value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>
+              <PurchaseLines products={products} items={formData.items} quantityField="quantityReturned" withCost={true}
+                onChange={items=>setFormData(previous=>({...previous,items}))} />
             </div>
 
             {/* Modal Footer */}
             <div
               style={{
-                padding: '14px 24px',
+                padding: '12px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#ffffff',
                 display: 'flex',
@@ -1099,7 +824,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => setShowCreateForm(false)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -1111,7 +836,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  Back to list
                 </button>
                 <button
                   type="button"

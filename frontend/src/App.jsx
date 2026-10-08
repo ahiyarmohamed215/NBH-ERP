@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import RetainedWorkspaces from './components/RetainedWorkspaces';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
@@ -30,6 +31,15 @@ export default function App() {
     const initialView = p.get('view') || 'dashboard';
     return initialView === 'dashboard' ? '' : (p.get('tab') || '');
   });
+
+  const rememberedTabs = useRef({});
+  const tabOwner = useRef(null);
+  const identity = user?.id ?? user?.username ?? null;
+  if (tabOwner.current !== identity) {
+    rememberedTabs.current = {};
+    tabOwner.current = identity;
+  }
+  rememberedTabs.current[currentView] = subTab;
 
   useEffect(() => {
     if (currentView === 'dashboard') {
@@ -234,6 +244,11 @@ export default function App() {
 
   // Seamless navigation helper supporting legacy and restructured routes
   const navigateTo = useCallback((view, sub = '') => {
+    if (!sub && Object.prototype.hasOwnProperty.call(rememberedTabs.current, view)) {
+      setCurrentView(view);
+      setSubTab(rememberedTabs.current[view]);
+      return;
+    }
     if (view === 'pos') {
       setCurrentView('invoicing');
       setSubTab('pos');
@@ -380,16 +395,16 @@ export default function App() {
     setIsSidebarCollapsed((prev) => !prev);
   }, []);
 
-  const isModalOpen = Boolean(document.querySelector('.modal-backdrop') || showShortcutsModal);
+  const isModalOpen = Boolean([...document.querySelectorAll('.modal-backdrop')].some(node => node.getClientRects().length) || showShortcutsModal);
 
   const closeModals = useCallback(() => {
     if (showShortcutsModal) {
       setShowShortcutsModal(false);
       return;
     }
-    const closeBtn = document.querySelector(
+    const closeBtn = [...document.querySelectorAll(
       '.modal-backdrop button[title*="Close"], .modal-backdrop button:has(svg.lucide-x), .modal-backdrop button.btn-glass'
-    );
+    )].find(node => node.getClientRects().length);
     if (closeBtn) closeBtn.click();
   }, [showShortcutsModal]);
 
@@ -423,8 +438,8 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-      {/* Sidebar Navigation - Hidden in POS Mode */}
-      {!isPosMode && (
+      {/* Persistent sidebar navigation */}
+      {(
         <aside
           className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
           style={{
@@ -542,7 +557,7 @@ export default function App() {
                     type="button"
                     title={isSidebarCollapsed ? mod.label : undefined}
                     onClick={() => {
-                      navigateTo(mod.id, mod.subItems?.[0]?.id || '');
+                      navigateTo(mod.id);
                     }}
                     style={{
                       display: 'flex',
@@ -664,33 +679,27 @@ export default function App() {
               </p>
             </div>
           ) : (
-            <>
-              {currentView === 'dashboard' && <DashboardView onNavigate={navigateTo} />}
-              {currentView === 'invoicing' && (
-                <InvoicingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'customers' && (
-                <CustomersHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'employees' && (
-                <EmployeesHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'inventory' && (
-                <InventoryHub activeSubTab={subTab} onSubTabChange={setSubTab} onNavigate={navigateTo} />
-              )}
-              {currentView === 'purchasing' && (
-                <PurchasingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'delivery' && (
-                <DeliveryHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'accounting' && (
-                <AccountingHub activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-              {currentView === 'reports' && (
-                <ReportsView activeSubTab={subTab} onSubTabChange={setSubTab} />
-              )}
-            </>
+            <RetainedWorkspaces key={identity} current={currentView} allowed={allowedModuleIds} render={view => {
+              const props = {
+                activeSubTab: view === currentView ? subTab : rememberedTabs.current[view],
+                onSubTabChange: tab => {
+                  rememberedTabs.current[view] = tab;
+                  if (view === currentView) setSubTab(tab);
+                },
+              };
+              switch (view) {
+                case 'dashboard': return <DashboardView onNavigate={navigateTo} />;
+                case 'invoicing': return <InvoicingHub {...props} />;
+                case 'customers': return <CustomersHub {...props} />;
+                case 'employees': return <EmployeesHub {...props} />;
+                case 'inventory': return <InventoryHub {...props} onNavigate={navigateTo} />;
+                case 'purchasing': return <PurchasingHub {...props} />;
+                case 'delivery': return <DeliveryHub {...props} />;
+                case 'accounting': return <AccountingHub {...props} />;
+                case 'reports': return <ReportsView {...props} />;
+                default: return null;
+              }
+            }} />
           )}
         </main>
       </div>

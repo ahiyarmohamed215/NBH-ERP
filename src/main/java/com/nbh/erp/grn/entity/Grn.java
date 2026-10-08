@@ -30,6 +30,10 @@ public class Grn extends BaseEntity {
 
     private Long purchaseOrderId;
 
+    @Column(name = "grn_type", nullable = false, length = 40)
+    @Builder.Default
+    private String grnType = "Standard Inward";
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id", nullable = false)
     private Supplier supplier;

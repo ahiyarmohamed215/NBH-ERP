@@ -406,15 +406,32 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
-  // Quick Approve staff without assigning any roles (for drivers, helpers, etc.)
+  // Quick Approve staff (preserves assigned roles if already set, or approves without roles)
   const handleQuickApprove = async (pendingUser) => {
-    if (!window.confirm(`Approve "${pendingUser.fullName || pendingUser.username}" without system roles? They will be registered as active staff but will not have ERP access.`)) {
+    const hasRoles = pendingUser.roles && pendingUser.roles.length > 0;
+    const roleLabels = hasRoles
+      ? pendingUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')
+      : null;
+
+    const confirmMsg = hasRoles
+      ? `Approve "${pendingUser.fullName || pendingUser.username}" with role: ${roleLabels}?`
+      : `Approve "${pendingUser.fullName || pendingUser.username}" without ERP system roles? They will be registered as active staff without module login.`;
+
+    if (!window.confirm(confirmMsg)) {
       return;
     }
     try {
       setSubmitting(true);
-      await userApi.approve(pendingUser.id, { roles: [] });
-      addToast(`Staff member "${pendingUser.fullName || pendingUser.username}" approved successfully without system roles`, 'success');
+      const payload = hasRoles
+        ? { roles: pendingUser.roles.map((r) => (typeof r === 'string' ? r : r.name)) }
+        : { roles: [] };
+      await userApi.approve(pendingUser.id, payload);
+      addToast(
+        hasRoles
+          ? `Staff member "${pendingUser.fullName || pendingUser.username}" approved successfully with role: ${roleLabels}`
+          : `Staff member "${pendingUser.fullName || pendingUser.username}" approved successfully without system roles`,
+        'success'
+      );
       loadData();
     } catch (err) {
       addToast(err.message || 'Approval failed: ' + err.message, 'error');
@@ -1239,235 +1256,249 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   key={pUser.id}
                   style={{
                     backgroundColor: '#ffffff',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     border: '1px solid #e2e8f0',
                     padding: '16px 20px',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    transition: 'all 0.15s ease',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '20px',
+                    flexWrap: 'wrap',
+                    transition: 'all 0.18s ease',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = '#93c5fd';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.08)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(2, 132, 199, 0.08)';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = '#e2e8f0';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
+                    e.currentTarget.style.transform = 'none';
                   }}
                 >
-                  {/* Card Top: Avatar, Name, Username, Status Badge, Registration Time */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div
-                        style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '10px',
-                          backgroundColor: '#e0f2fe',
-                          color: '#0284c7',
-                          fontWeight: 800,
-                          fontSize: '1.15rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          border: '1px solid #bae6fd',
-                        }}
-                      >
-                        {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
-                      </div>
+                  {/* Left Section: Staff Profile Avatar & Info Details */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 520px', minWidth: '300px' }}>
+                    {/* Modern Profile Avatar */}
+                    <div
+                      style={{
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow: '0 3px 8px rgba(2, 132, 199, 0.28)',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {(pUser.fullName || pUser.username || '?').charAt(0).toUpperCase()}
+                    </div>
 
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
-                            {pUser.fullName || pUser.username}
-                          </span>
-                          <span style={{ fontSize: '0.82rem', color: '#64748b', fontFamily: 'monospace' }}>
-                            @{pUser.username}
-                          </span>
+                    {/* Staff Profile Header & Details */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                      {/* Name, Handle, Employee Code & Status Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.02rem', color: '#0f172a' }}>
+                          {pUser.fullName || pUser.username}
+                        </span>
+                        <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 500 }}>
+                          @{pUser.username}
+                        </span>
+                        {pUser.employeeCode && (
                           <span
                             style={{
                               fontSize: '0.72rem',
                               fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: '9999px',
-                              backgroundColor: '#fef3c7',
-                              color: '#b45309',
-                              border: '1px solid #fde68a',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
+                              padding: '2px 7px',
+                              borderRadius: '5px',
+                              backgroundColor: '#f1f5f9',
+                              color: '#334155',
+                              fontFamily: 'monospace',
+                              border: '1px solid #e2e8f0',
                             }}
                           >
-                            <Clock size={11} /> Awaiting Approval
+                            {pUser.employeeCode}
                           </span>
-                          {pUser.employeeCode && (
-                            <span
-                              style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                padding: '2px 7px',
-                                borderRadius: '4px',
-                                backgroundColor: '#f1f5f9',
-                                color: '#475569',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              {pUser.employeeCode}
+                        )}
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '2px 9px',
+                            borderRadius: '9999px',
+                            backgroundColor: '#fef3c7',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <Clock size={11} /> Awaiting Approval
+                        </span>
+                      </div>
+
+                      {/* Staff Contact Details & Registration Info Row */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '16px',
+                          flexWrap: 'wrap',
+                          fontSize: '0.82rem',
+                          color: '#475569',
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Mail size={14} color="#0284c7" />
+                          <strong style={{ color: '#1e293b', fontWeight: 600 }}>{pUser.email || '—'}</strong>
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Phone size={14} color="#0284c7" />
+                          <strong style={{ color: '#1e293b', fontWeight: 600 }}>{pUser.phone || '—'}</strong>
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#64748b' }}>
+                          <Clock size={13} color="#94a3b8" />
+                          <span>Joined {formatJoinedDate(pUser.createdAt)}</span>
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
+                          <Shield size={13} color={pUser.roles && pUser.roles.length > 0 ? '#0284c7' : '#94a3b8'} />
+                          {pUser.roles && pUser.roles.length > 0 ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ color: '#64748b' }}>Assigned:</span>
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  color: '#0369a1',
+                                  backgroundColor: '#e0f2fe',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '5px',
+                                  padding: '1px 8px',
+                                  fontSize: '0.76rem',
+                                }}
+                              >
+                                {pUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')}
+                              </span>
                             </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No role assigned</span>
                           )}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                          Registered on {formatJoinedDate(pUser.createdAt)} • Self-registration account
-                        </div>
+                        </span>
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.8rem' }}>
-                      <Clock size={14} color="#94a3b8" />
-                      <span>Waiting for admin approval & role assignment</span>
-                    </div>
                   </div>
 
-                  {/* Card Middle: Detailed Info Grid */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '12px',
-                      padding: '10px 14px',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '8px',
-                      border: '1px solid #f1f5f9',
-                      fontSize: '0.83rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
-                      <Mail size={15} color="#0284c7" />
-                      <span style={{ color: '#64748b' }}>Email:</span>
-                      <strong style={{ color: '#0f172a' }}>{pUser.email || '—'}</strong>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
-                      <Phone size={15} color="#0284c7" />
-                      <span style={{ color: '#64748b' }}>Phone:</span>
-                      <strong style={{ color: '#0f172a' }}>{pUser.phone || '—'}</strong>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#334155' }}>
-                      <Shield size={15} color="#64748b" />
-                      <span style={{ color: '#64748b' }}>Roles:</span>
-                      <span style={{ fontStyle: 'italic', color: '#64748b' }}>None assigned (Optional)</span>
-                    </div>
-                  </div>
+                  {/* Right Section: Action Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+                    {/* Quick Approve Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleQuickApprove(pUser)}
+                      disabled={submitting}
+                      style={{
+                        backgroundColor: '#f0fdf4',
+                        color: '#15803d',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        padding: '8px 14px',
+                        borderRadius: '7px',
+                        border: '1px solid #bbf7d0',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#dcfce7';
+                        e.currentTarget.style.borderColor = '#86efac';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f0fdf4';
+                        e.currentTarget.style.borderColor = '#bbf7d0';
+                      }}
+                      title={
+                        pUser.roles && pUser.roles.length > 0
+                          ? `Approve staff keeping assigned role (${pUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')})`
+                          : 'Approve staff without assigning ERP system roles'
+                      }
+                    >
+                      <Check size={14} />
+                      {pUser.roles && pUser.roles.length > 0
+                        ? `Approve (${formatRoleName(typeof pUser.roles[0] === 'string' ? pUser.roles[0] : pUser.roles[0].name)})`
+                        : 'Approve (No Role)'}
+                    </button>
 
-                  {/* Card Bottom: Actions Bar */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingTop: '6px',
-                      borderTop: '1px solid #f1f5f9',
-                      flexWrap: 'wrap',
-                      gap: '10px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: '#64748b' }}>
-                      <Info size={13} color="#0284c7" />
-                      <span>Staff who don't need ERP access can be approved directly without assigning roles.</span>
-                    </div>
+                    {/* Review & Assign Roles (Primary) */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenApprove(pUser)}
+                      disabled={submitting}
+                      style={{
+                        backgroundColor: '#0284c7',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        padding: '8px 16px',
+                        borderRadius: '7px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 5px rgba(2, 132, 199, 0.28)',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#0369a1';
+                        e.currentTarget.style.boxShadow = '0 4px 10px rgba(2, 132, 199, 0.35)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#0284c7';
+                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(2, 132, 199, 0.28)';
+                      }}
+                    >
+                      <ShieldCheck size={15} />
+                      {pUser.roles && pUser.roles.length > 0 ? 'Change Role & Details' : 'Assign Roles & Approve'}
+                    </button>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {/* Quick Approve Without Roles */}
-                      <button
-                        type="button"
-                        onClick={() => handleQuickApprove(pUser)}
-                        disabled={submitting}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          color: '#16a34a',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          padding: '7px 14px',
-                          borderRadius: '6px',
-                          border: '1px solid #bbf7d0',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f0fdf4';
-                          e.currentTarget.style.borderColor = '#86efac';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                          e.currentTarget.style.borderColor = '#bbf7d0';
-                        }}
-                        title="Approve staff without assigning ERP system roles (e.g. drivers, helpers)"
-                      >
-                        <Check size={14} /> Quick Approve (No Roles)
-                      </button>
-
-                      {/* Review & Assign Roles (Primary) */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenApprove(pUser)}
-                        disabled={submitting}
-                        style={{
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          padding: '7px 16px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
-                          transition: 'background-color 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-                      >
-                        <ShieldCheck size={15} /> Review & Assign Roles
-                      </button>
-
-                      {/* Reject */}
-                      <button
-                        type="button"
-                        onClick={() => handleReject(pUser)}
-                        disabled={submitting}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          color: '#ef4444',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          padding: '7px 12px',
-                          border: '1px solid #fecaca',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          transition: 'all 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#fef2f2';
-                          e.currentTarget.style.borderColor = '#fca5a5';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                          e.currentTarget.style.borderColor = '#fecaca';
-                        }}
-                      >
-                        <UserX size={14} /> Reject
-                      </button>
-                    </div>
+                    {/* Reject */}
+                    <button
+                      type="button"
+                      onClick={() => handleReject(pUser)}
+                      disabled={submitting}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        color: '#dc2626',
+                        fontWeight: 600,
+                        fontSize: '0.82rem',
+                        padding: '8px 12px',
+                        border: '1px solid #fecaca',
+                        borderRadius: '7px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                        e.currentTarget.style.borderColor = '#f87171';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#fecaca';
+                      }}
+                    >
+                      <UserX size={14} /> Reject
+                    </button>
                   </div>
                 </div>
               ))

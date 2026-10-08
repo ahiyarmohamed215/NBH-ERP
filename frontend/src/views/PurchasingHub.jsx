@@ -19,6 +19,9 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
   const userPermissions = user?.permissions || [];
 
+  const [editingForms, setEditingForms] = useState({});
+  const formCallbacks = React.useMemo(() => Object.fromEntries(['grn','gtn','prn','purchase-orders'].map(id => [id, open => setEditingForms(previous=>({...previous,[id]:open}))])), []);
+
   const mastersRef = useRef(null);
   const grnRef = useRef(null);
   const gtnRef = useRef(null);
@@ -74,6 +77,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
     return allowedTabs.length > 0 ? allowedTabs[0].id : 'suppliers';
   });
 
+  const focusedDocument = Boolean(editingForms[currentTab]);
+
   const [visitedTabs, setVisitedTabs] = useState(() => new Set([currentTab]));
 
   useEffect(() => {
@@ -111,7 +116,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   return (
     <div
       style={{
-        padding: '24px 32px',
+        padding: focusedDocument ? '12px' : '24px 32px',
         flex: 1,
         height: '100%',
         maxHeight: '100%',
@@ -126,6 +131,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
         overflow: 'hidden',
       }}
     >
+      {!focusedDocument && <>
       {/* Page Header (Fixed / Sticky to Desktop Screen - Exact CustomerHub Look) */}
       <div
         style={{
@@ -321,6 +327,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
         })}
       </div>
 
+      </>}
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         {visitedTabs.has('suppliers') && (
@@ -336,22 +343,22 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
         )}
         {visitedTabs.has('grn') && (
           <div style={{ display: currentTab === 'grn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <GrnView ref={grnRef} />
+            <GrnView ref={grnRef} onFormModeChange={formCallbacks.grn} />
           </div>
         )}
         {visitedTabs.has('gtn') && (
           <div style={{ display: currentTab === 'gtn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <GtnView ref={gtnRef} />
+            <GtnView ref={gtnRef} onFormModeChange={formCallbacks.gtn} />
           </div>
         )}
         {visitedTabs.has('prn') && (
           <div style={{ display: currentTab === 'prn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <PrnView ref={prnRef} />
+            <PrnView ref={prnRef} onFormModeChange={formCallbacks.prn} />
           </div>
         )}
         {visitedTabs.has('purchase-orders') && (
           <div style={{ display: currentTab === 'purchase-orders' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <PurchaseOrdersView ref={poRef} />
+            <PurchaseOrdersView ref={poRef} onFormModeChange={formCallbacks['purchase-orders']} />
           </div>
         )}
       </div>
