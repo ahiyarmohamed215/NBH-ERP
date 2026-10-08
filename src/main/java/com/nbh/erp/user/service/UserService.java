@@ -97,7 +97,15 @@ public class UserService {
         user.setFullName(request.getFullName());
         user.setPhone(request.getPhone());
 
-        if (request.getIsActive() != null) {
+        boolean isSuperAdmin = SecurityUtils.isSuperAdmin(user);
+
+        if (isSuperAdmin) {
+            if (Boolean.FALSE.equals(request.getIsActive())) {
+                throw new BusinessException("Super Administrator cannot be deactivated. Full system access must remain active.");
+            }
+            user.setIsActive(true);
+            user.setApprovalStatus("APPROVED");
+        } else if (request.getIsActive() != null) {
             user.setIsActive(request.getIsActive());
         }
 
@@ -106,6 +114,13 @@ public class UserService {
         }
 
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            if (isSuperAdmin) {
+                boolean hasSuperAdminRole = request.getRoles().stream().anyMatch(r ->
+                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r != null ? r.trim() : "") || "SUPER_ADMIN".equalsIgnoreCase(r != null ? r.trim() : ""));
+                if (!hasSuperAdminRole) {
+                    throw new BusinessException("Super Administrator role cannot be modified or removed. Full system access is permanent.");
+                }
+            }
             Set<Role> roles = new HashSet<>();
             for (String roleName : request.getRoles()) {
                 String cleanName = roleName != null ? roleName.trim() : "";
@@ -120,6 +135,9 @@ public class UserService {
             if (!roles.isEmpty()) {
                 user.setRoles(roles);
             }
+        } else if (isSuperAdmin) {
+            // Keep existing super admin roles intact if empty roles passed
+            log.info("Preserving Super Admin roles for user: {}", user.getUsername());
         }
 
         User updatedUser = userRepository.save(user);
@@ -137,7 +155,9 @@ public class UserService {
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
         SecurityUtils.protectUser(user);
-        user.setTokenVersion(user.getTokenVersion() + 1);
+        if (SecurityUtils.isSuperAdmin(user)) {
+            throw new BusinessException("Super Administrator cannot be deactivated. Full access to all system modules must remain active at all times.");
+        }
 
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
@@ -227,7 +247,9 @@ public class UserService {
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
         SecurityUtils.protectUser(user);
-        user.setTokenVersion(user.getTokenVersion() + 1);
+        if (SecurityUtils.isSuperAdmin(user)) {
+            throw new BusinessException("Super Administrator cannot be rejected.");
+        }
 
         user.setApprovalStatus("REJECTED");
         user.setIsActive(false);

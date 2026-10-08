@@ -142,6 +142,10 @@ export default function RolesView({ onRoleChange }) {
   };
 
   const openEditModal = (role) => {
+    if (role.name === 'ROLE_SUPER_ADMIN' || role.name === 'SUPER_ADMIN') {
+      addToast('The Super Administrator system role is protected and cannot be modified. It permanently retains full access across all system modules.', 'warning');
+      return;
+    }
     setEditingRole(role);
     setFormData({
       name: role.name,
@@ -536,7 +540,25 @@ export default function RolesView({ onRoleChange }) {
                     </span>
 
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      {canEditRole && (
+                      {role.name === 'ROLE_SUPER_ADMIN' || role.name === 'SUPER_ADMIN' ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                          }}
+                          title="System protected role with permanent full module access"
+                        >
+                          <ShieldCheck size={12} /> System Protected
+                        </span>
+                      ) : canEditRole && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -734,13 +756,14 @@ export default function RolesView({ onRoleChange }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = viewingRole;
-                    setViewingRole(null);
-                    openEditModal(r);
-                  }}
+                {viewingRole.name !== 'ROLE_SUPER_ADMIN' && viewingRole.name !== 'SUPER_ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = viewingRole;
+                      setViewingRole(null);
+                      openEditModal(r);
+                    }}
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
@@ -757,6 +780,7 @@ export default function RolesView({ onRoleChange }) {
                 >
                   <Edit2 size={13} /> Edit Permissions
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setViewingRole(null)}

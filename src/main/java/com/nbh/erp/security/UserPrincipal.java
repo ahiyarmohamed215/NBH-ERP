@@ -29,6 +29,10 @@ public class UserPrincipal implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
+        boolean isSuperAdmin = "admin".equalsIgnoreCase(user.getUsername()) ||
+                (user.getRoles() != null && user.getRoles().stream().anyMatch(r ->
+                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
+
         Set<GrantedAuthority> authorities = new HashSet<>();
 
         user.getRoles().forEach(role -> {
@@ -40,13 +44,18 @@ public class UserPrincipal implements UserDetails {
             }
         });
 
+        if (isSuperAdmin) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
+
         return UserPrincipal.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .password(user.getPassword())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .active(Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus()))
+                .active(isSuperAdmin || (Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus())))
                 .tokenVersion(user.getTokenVersion())
                 .authorities(authorities)
                 .build();

@@ -91,6 +91,10 @@ public class RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "id", id));
 
+        if ("ROLE_SUPER_ADMIN".equalsIgnoreCase(role.getName()) || "SUPER_ADMIN".equalsIgnoreCase(role.getName())) {
+            throw new BusinessException("The Super Administrator system role is protected and cannot be modified. It must retain unrestricted access to all system modules.");
+        }
+
         com.nbh.erp.security.SecurityUtils.enforceCanEdit("ROLE", "Role: " + role.getName());
 
         com.nbh.erp.security.SecurityUtils.checkRoleGrant(role);
@@ -113,6 +117,11 @@ public class RoleService {
 
     @Transactional
     public void deleteRole(Long id) {
+        Role role = roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", "id", id));
+        if ("ROLE_SUPER_ADMIN".equalsIgnoreCase(role.getName()) || "SUPER_ADMIN".equalsIgnoreCase(role.getName())) {
+            throw new BusinessException("The Super Administrator system role cannot be deleted.");
+        }
         com.nbh.erp.security.SecurityUtils.enforceNoDelete("Role", id);
     }
 }

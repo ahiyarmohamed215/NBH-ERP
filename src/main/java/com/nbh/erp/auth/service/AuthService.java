@@ -32,6 +32,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.nbh.erp.auth.repository.RefreshSessionRepository refreshSessions;
+    private final com.nbh.erp.role.repository.PermissionRepository permissionRepository;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -105,14 +106,28 @@ public class AuthService {
                 .orElse(null);
 
         if (candidateUser != null) {
-            if ("PENDING".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                throw new BusinessException("Your account is pending administrator approval. Please contact your system admin.");
-            }
-            if ("REJECTED".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                throw new BusinessException("Your account registration request has been rejected. Please contact support.");
-            }
-            if (Boolean.FALSE.equals(candidateUser.getIsActive())) {
-                throw new BusinessException("Your account is deactivated. Please contact an administrator.");
+            boolean isSuperAdmin = "admin".equalsIgnoreCase(candidateUser.getUsername()) ||
+                    (candidateUser.getRoles() != null && candidateUser.getRoles().stream().anyMatch(r ->
+                            "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
+
+            if (!isSuperAdmin) {
+                if ("PENDING".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
+                    throw new BusinessException("Your account is pending administrator approval. Please contact your system admin.");
+                }
+                if ("REJECTED".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
+                    throw new BusinessException("Your account registration request has been rejected. Please contact support.");
+                }
+                if (Boolean.FALSE.equals(candidateUser.getIsActive())) {
+                    throw new BusinessException("Your account is deactivated. Please contact an administrator.");
+                }
+            } else {
+                // Self-heal: ensure super admin is permanently active and approved in DB
+                if (!Boolean.TRUE.equals(candidateUser.getIsActive()) || !"APPROVED".equals(candidateUser.getApprovalStatus())) {
+                    candidateUser.setIsActive(true);
+                    candidateUser.setApprovalStatus("APPROVED");
+                    userRepository.save(candidateUser);
+                    log.info("Auto-restored active and approved status for super administrator '{}'", candidateUser.getUsername());
+                }
             }
         }
 
@@ -129,15 +144,25 @@ public class AuthService {
         User user = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
 
+        boolean isSuperAdmin = "admin".equalsIgnoreCase(user.getUsername()) ||
+                (user.getRoles() != null && user.getRoles().stream().anyMatch(r ->
+                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
+
         List<String> roles = user.getRoles().stream()
                 .map(r -> r.getName())
                 .collect(Collectors.toList());
 
-        List<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getName())
-                .distinct()
-                .collect(Collectors.toList());
+        if (isSuperAdmin && !roles.contains("ROLE_SUPER_ADMIN")) {
+            roles.add("ROLE_SUPER_ADMIN");
+        }
+
+        List<String> permissions = isSuperAdmin
+                ? permissionRepository.findAll().stream().map(p -> p.getName()).distinct().collect(Collectors.toList())
+                : user.getRoles().stream()
+                        .flatMap(r -> r.getPermissions().stream())
+                        .map(p -> p.getName())
+                        .distinct()
+                        .collect(Collectors.toList());
 
         return LoginResponse.builder()
                 .accessToken(accessToken)

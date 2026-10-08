@@ -150,12 +150,30 @@ public final class SecurityUtils {
         );
     }
 
-    public static boolean isAdministrator() { return hasRole("ADMIN") || hasRole("SUPER_ADMIN"); }
+    public static boolean isSuperAdmin() {
+        Set<String> authorities = getCurrentUserAuthorities();
+        if (authorities.contains("ROLE_SUPER_ADMIN") || authorities.contains("SUPER_ADMIN")) {
+            return true;
+        }
+        return getCurrentUsername().map(u -> "admin".equalsIgnoreCase(u)).orElse(false);
+    }
+
+    public static boolean isSuperAdmin(com.nbh.erp.user.entity.User user) {
+        if (user == null) return false;
+        if ("admin".equalsIgnoreCase(user.getUsername())) return true;
+        if (user.getRoles() != null) {
+            return user.getRoles().stream().anyMatch(r ->
+                    "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName()));
+        }
+        return false;
+    }
+
+    public static boolean isAdministrator() { return isSuperAdmin() || hasRole("ADMIN") || hasRole("SUPER_ADMIN"); }
     public static void requirePermission(String permission) {
         if (!isAdministrator() && !hasAuthority(permission)) throw new AccessDeniedException("Missing permission: " + permission);
     }
     public static void checkRoleGrant(com.nbh.erp.role.entity.Role role) {
-        if (hasRole("SUPER_ADMIN")) return;
+        if (hasRole("SUPER_ADMIN") || isSuperAdmin()) return;
         if ("ROLE_SUPER_ADMIN".equals(role.getName())) throw new AccessDeniedException("Only a super administrator can grant this role");
         if (hasRole("ADMIN")) return;
         if (java.util.Set.of("ROLE_ADMIN", "ROLE_MANAGER", "ROLE_DIRECTOR").contains(role.getName()) ||
@@ -163,6 +181,9 @@ public final class SecurityUtils {
             throw new AccessDeniedException("Cannot grant privileges beyond your own");
     }
     public static void protectUser(com.nbh.erp.user.entity.User user) {
+        if (isSuperAdmin(user) && !isSuperAdmin()) {
+            throw new AccessDeniedException("Only a Super Administrator can manage Super Administrator accounts");
+        }
         user.getRoles().forEach(SecurityUtils::checkRoleGrant);
     }
     public static void checkPermissionGrant(java.util.Collection<String> permissions) {

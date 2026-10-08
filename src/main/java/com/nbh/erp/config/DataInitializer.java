@@ -49,6 +49,17 @@ public class DataInitializer implements ApplicationRunner {
         log.info("Checking system authorization & permissions initialization...");
         ensureLegacyUserColumnsHaveDefaults();
 
+        // Remove retired supplier payment permission if previously present
+        permissionRepository.findByName("SUPPLIER_PAYMENT_MANAGE").ifPresent(p -> {
+            roleRepository.findAll().forEach(r -> {
+                if (r.getPermissions().remove(p)) {
+                    roleRepository.save(r);
+                }
+            });
+            permissionRepository.delete(p);
+            log.info("Retired and removed SUPPLIER_PAYMENT_MANAGE permission from system.");
+        });
+
         // 1. Seed system permissions (required for @PreAuthorize and frontend Role permission builder)
         Map<String, Permission> permissionMap = seedPermissions();
 
@@ -66,6 +77,19 @@ public class DataInitializer implements ApplicationRunner {
             log.info("Initial super admin user creation is disabled via configuration (initial-admin.enabled=false).");
         }
 
+        // Ensure primary admin and any super admin users are active, approved, and granted superAdminRole
+        userRepository.findByUsername(adminUsername).ifPresent(admin -> {
+            boolean changed = false;
+            if (!Boolean.TRUE.equals(admin.getIsActive())) { admin.setIsActive(true); changed = true; }
+            if (!"APPROVED".equals(admin.getApprovalStatus())) { admin.setApprovalStatus("APPROVED"); changed = true; }
+            if (admin.getRoles() == null) { admin.setRoles(new HashSet<>()); }
+            if (!admin.getRoles().contains(superAdminRole)) { admin.getRoles().add(superAdminRole); changed = true; }
+            if (changed) {
+                userRepository.save(admin);
+                log.info("Guaranteed super administrator '{}' is ACTIVE and APPROVED with full system access.", adminUsername);
+            }
+        });
+
         // 4. Seed initial distribution fleet vehicles and routes
         vehicleService.seedDefaultVehiclesIfEmpty();
         deliveryRouteService.seedDefaultRoutesIfEmpty();
@@ -77,7 +101,6 @@ public class DataInitializer implements ApplicationRunner {
 
     private Map<String, Permission> seedPermissions() {
         List<PermItem> defs = List.of(
-                new PermItem("PURCHASING", "SUPPLIER_PAYMENT_MANAGE", "Manage supplier payments and settlements"),
                 new PermItem("USER", "USER_VIEW", "View user accounts and profiles"),
                 new PermItem("USER", "USER_MANAGE", "Create, edit, approve, and deactivate system users"),
                 new PermItem("ROLE", "ROLE_VIEW", "View roles and assigned permissions"),

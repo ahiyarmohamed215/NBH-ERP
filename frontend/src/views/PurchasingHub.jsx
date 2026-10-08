@@ -1,4 +1,3 @@
-import SettlementPanel from '../components/SettlementPanel';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import MastersView from './MastersView';
@@ -17,7 +16,12 @@ import {
 
 export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   const { user } = useAuth();
-  const isSuperAdmin = user?.roles?.includes('ROLE_ADMIN');
+  const isSuperAdmin = Boolean(
+    user?.username === 'admin' ||
+    user?.roles?.includes('ROLE_SUPER_ADMIN') ||
+    user?.roles?.includes('SUPER_ADMIN') ||
+    user?.roles?.includes('ROLE_ADMIN')
+  );
   const userPermissions = user?.permissions || [];
 
   const [editingForms, setEditingForms] = useState({});
@@ -60,7 +64,6 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
       icon: ShoppingBag,
       permission: 'PURCHASE_MANAGE',
     },
-    { id: 'supplier-payments', label: 'Supplier Payments', icon: ShoppingBag, permission: 'SUPPLIER_PAYMENT_MANAGE' },
   ];
 
   // Filter accessible tabs
@@ -332,11 +335,6 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
       </>}
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-        {visitedTabs.has('supplier-payments') && (
-          <div style={{display:currentTab === 'supplier-payments' ? 'flex' : 'none',flex:1,minHeight:0,overflow:'auto',flexDirection:'column'}}>
-            <SettlementPanel supplier />
-          </div>
-        )}
         {visitedTabs.has('suppliers') && (
           <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
             <MastersView

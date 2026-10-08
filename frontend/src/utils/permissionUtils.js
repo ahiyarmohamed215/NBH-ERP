@@ -8,8 +8,19 @@
  *    - Or staff with explicit manage/edit permission for that specific module.
  */
 
+export function isSuperAdmin(user) {
+  if (!user) return false;
+  if (user.username === 'admin') return true;
+  const roles = user.roles || [];
+  return roles.some((r) => {
+    const s = String(typeof r === 'string' ? r : r?.name || '').toUpperCase();
+    return s === 'ROLE_SUPER_ADMIN' || s === 'SUPER_ADMIN';
+  });
+}
+
 export function canEditModule(user, module) {
   if (!user) return false;
+  if (isSuperAdmin(user)) return true; // Super Admin has permanent full access to edit all modules
   const roles = user.roles || [];
   const permissions = user.permissions || [];
 
@@ -51,6 +62,7 @@ export function canEditModule(user, module) {
  */
 export function canViewCostPrice(user) {
   if (!user) return false;
+  if (isSuperAdmin(user)) return true;
   const roles = user.roles || [];
   const permissions = user.permissions || [];
 

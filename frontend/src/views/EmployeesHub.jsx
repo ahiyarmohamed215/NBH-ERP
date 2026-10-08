@@ -15,6 +15,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const canEditUser = canEditModule(currentUser, 'USER');
   const { addToast } = useToast();
 
+  const isSuperAdminUser = (emp) => {
+    if (!emp) return false;
+    if (emp.username === 'admin') return true;
+    const rList = emp.roles || [];
+    return rList.some((r) => {
+      const name = typeof r === 'string' ? r : r?.name;
+      return name === 'ROLE_SUPER_ADMIN' || name === 'SUPER_ADMIN';
+    });
+  };
+
   // Old links to unfinished modules fall back to the employee list.
   const resolveTab = tab => {
     if (tab === 'roles' || tab === 'groups') return 'roles';
@@ -40,6 +50,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const [modalMode, setModalMode] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [viewingEmployee, setViewingEmployee] = useState(null);
+  const [viewingPendingEmployee, setViewingPendingEmployee] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'approve' | 'reject', user: Object }
 
   // Form data for Add / Edit / Approve
   const [formData, setFormData] = useState({
@@ -335,6 +347,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   // Toggle active
   const handleToggleActive = async (emp) => {
+    if (isSuperAdminUser(emp)) {
+      addToast('Super Administrator cannot be deactivated. Full access to all modules is permanent.', 'warning');
+      return;
+    }
     if (!canEditUser) {
       addToast('Permission denied: Only authorized staff can change employee status.', 'error');
       return;
@@ -406,20 +422,28 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
-  // Quick Approve staff (preserves assigned roles if already set, or approves without roles)
-  const handleQuickApprove = async (pendingUser) => {
+  // Request approval with confirmation popup
+  const handleRequestApprove = (pendingUser) => {
+    setConfirmAction({ type: 'approve', user: pendingUser });
+  };
+
+  // Request rejection with confirmation popup
+  const handleRequestReject = (pendingUser) => {
+    if (isSuperAdminUser(pendingUser)) {
+      addToast('Super Administrator cannot be rejected.', 'warning');
+      return;
+    }
+    setConfirmAction({ type: 'reject', user: pendingUser });
+  };
+
+  // Execute confirmed approval
+  const executeApprove = async () => {
+    if (!confirmAction?.user) return;
+    const pendingUser = confirmAction.user;
     const hasRoles = pendingUser.roles && pendingUser.roles.length > 0;
     const roleLabels = hasRoles
       ? pendingUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')
       : null;
-
-    const confirmMsg = hasRoles
-      ? `Approve "${pendingUser.fullName || pendingUser.username}" with role: ${roleLabels}?`
-      : `Approve "${pendingUser.fullName || pendingUser.username}" without ERP system roles? They will be registered as active staff without module login.`;
-
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
     try {
       setSubmitting(true);
       const payload = hasRoles
@@ -432,9 +456,29 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           : `Staff member "${pendingUser.fullName || pendingUser.username}" approved successfully without system roles`,
         'success'
       );
+      setConfirmAction(null);
+      setViewingPendingEmployee(null);
       loadData();
     } catch (err) {
       addToast(err.message || 'Approval failed: ' + err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Execute confirmed rejection
+  const executeReject = async () => {
+    if (!confirmAction?.user) return;
+    const pendingUser = confirmAction.user;
+    try {
+      setSubmitting(true);
+      await userApi.reject(pendingUser.id);
+      addToast(`Registration for ${pendingUser.username} was rejected`, 'info');
+      setConfirmAction(null);
+      setViewingPendingEmployee(null);
+      loadData();
+    } catch (err) {
+      addToast(err.message || 'Rejection failed', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -574,12 +618,19 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       }
       try {
         setSubmitting(true);
+        const rolesToSave = formData.roles || [];
+        if (isSuperAdminUser(selectedEmployee)) {
+          if (!rolesToSave.some((r) => r === 'ROLE_SUPER_ADMIN' || r === 'SUPER_ADMIN')) {
+            rolesToSave.push('ROLE_SUPER_ADMIN');
+          }
+        }
         await userApi.update(selectedEmployee.id, {
           fullName: formData.fullName,
           email: formData.email,
           phone: formData.phone,
           password: formData.password || undefined,
-          roles: formData.roles || [],
+          roles: rolesToSave,
+          isActive: isSuperAdminUser(selectedEmployee) ? true : undefined,
         });
         addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
         setModalMode(null);
@@ -592,17 +643,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
-  // Reject approval
-  const handleReject = async (pendingUser) => {
-    if (!window.confirm(`Are you sure you want to reject registration for "${pendingUser.username}"?`)) return;
-    try {
-      await userApi.reject(pendingUser.id);
-      addToast(`Registration for ${pendingUser.username} was rejected`, 'info');
-      loadData();
-    } catch (err) {
-      addToast(err.message || 'Rejection failed', 'error');
-    }
-  };
 
   return (
     <div
@@ -1100,49 +1140,73 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           </td>
 
                           <td style={{ padding: '14px 16px' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleActive(emp);
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                fontSize: '0.82rem',
-                                fontWeight: 600,
-                                color: emp.isActive ? '#16a34a' : '#dc2626',
-                                whiteSpace: 'nowrap',
-                              }}
-                              title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}
-                            >
+                            {isSuperAdminUser(emp) ? (
                               <span
                                 style={{
-                                  width: '7px',
-                                  height: '7px',
-                                  borderRadius: '50%',
-                                  backgroundColor: emp.isActive ? '#16a34a' : '#dc2626',
-                                  display: 'inline-block',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  whiteSpace: 'nowrap',
                                 }}
-                              />
-                              {emp.isActive ? 'Active' : 'Inactive'}
-                            </button>
+                                title="Status: Active"
+                              >
+                                <span
+                                  style={{
+                                    width: '7px',
+                                    height: '7px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#16a34a',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                Active
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleActive(emp);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  color: emp.isActive ? '#16a34a' : '#dc2626',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}
+                              >
+                                <span
+                                  style={{
+                                    width: '7px',
+                                    height: '7px',
+                                    borderRadius: '50%',
+                                    backgroundColor: emp.isActive ? '#16a34a' : '#dc2626',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                {emp.isActive ? 'Active' : 'Inactive'}
+                              </button>
+                            )}
                           </td>
 
                           <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                             <TableRowActions
                               onPrint={() => handlePrintEmployee(emp)}
                               onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
-                              onView={() => setViewingEmployee(emp)}
                               onEdit={() => handleOpenEdit(emp)}
                               printTitle="Print Employee Record (A4)"
                               pdfTitle="Download Employee PDF (A4)"
-                              viewTitle="View Employee Profile"
                               editTitle="Edit Employee"
                             />
                           </td>
@@ -1254,6 +1318,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               filteredPendingList.map((pUser) => (
                 <div
                   key={pUser.id}
+                  onClick={() => setViewingPendingEmployee(pUser)}
                   style={{
                     backgroundColor: '#ffffff',
                     borderRadius: '12px',
@@ -1266,6 +1331,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     gap: '20px',
                     flexWrap: 'wrap',
                     transition: 'all 0.18s ease',
+                    cursor: 'pointer',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = '#93c5fd';
@@ -1277,6 +1343,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.04)';
                     e.currentTarget.style.transform = 'none';
                   }}
+                  title="Click to view registration details"
                 >
                   {/* Left Section: Staff Profile Avatar & Info Details */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 520px', minWidth: '300px' }}>
@@ -1400,7 +1467,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     {/* Quick Approve Button */}
                     <button
                       type="button"
-                      onClick={() => handleQuickApprove(pUser)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestApprove(pUser);
+                      }}
                       disabled={submitting}
                       style={{
                         backgroundColor: '#f0fdf4',
@@ -1424,11 +1494,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         e.currentTarget.style.backgroundColor = '#f0fdf4';
                         e.currentTarget.style.borderColor = '#bbf7d0';
                       }}
-                      title={
-                        pUser.roles && pUser.roles.length > 0
-                          ? `Approve staff keeping assigned role (${pUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')})`
-                          : 'Approve staff without assigning ERP system roles'
-                      }
+                      title="Quick approve employee registration"
                     >
                       <Check size={14} />
                       {pUser.roles && pUser.roles.length > 0
@@ -1439,7 +1505,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     {/* Review & Assign Roles (Primary) */}
                     <button
                       type="button"
-                      onClick={() => handleOpenApprove(pUser)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenApprove(pUser);
+                      }}
                       disabled={submitting}
                       style={{
                         backgroundColor: '#0284c7',
@@ -1453,16 +1522,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 2px 5px rgba(2, 132, 199, 0.28)',
                         transition: 'all 0.15s ease',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#0369a1';
-                        e.currentTarget.style.boxShadow = '0 4px 10px rgba(2, 132, 199, 0.35)';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = '#0284c7';
-                        e.currentTarget.style.boxShadow = '0 2px 5px rgba(2, 132, 199, 0.28)';
                       }}
                     >
                       <ShieldCheck size={15} />
@@ -1472,7 +1538,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     {/* Reject */}
                     <button
                       type="button"
-                      onClick={() => handleReject(pUser)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestReject(pUser);
+                      }}
                       disabled={submitting}
                       style={{
                         backgroundColor: '#ffffff',
@@ -1531,111 +1600,241 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {modalMode === 'add' && (
         <div
           className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
             className="glass-modal"
-            style={{ width: 'min(620px, 96vw)', maxWidth: '620px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
+            style={{
+              width: '100%',
+              maxWidth: '1080px',
+              height: 'min(760px, 92vh)',
+              maxHeight: 'min(760px, 92vh)',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
-                Add New Employee
-              </h2>
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                    Add New Employee
+                  </h2>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                    Register a new staff member and assign system permissions
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setModalMode(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                title="Close"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveModal}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                <div>
-                  <label className="label">Full Name *</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    required
-                    placeholder="e.g. Abdul Rahman"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  />
+            {/* Split Form: Left side details, Right side role assignment */}
+            <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(330px, 0.85fr) minmax(490px, 1.4fr)',
+                  gap: '20px',
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                {/* Left Side: Employee Information Card */}
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    overflowY: 'auto',
+                    minHeight: 0,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    Employee Information
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label className="label">Full Name *</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        required
+                        placeholder="e.g. Abdul Rahman"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="label">Username (Login ID) *</label>
+                        <input
+                          type="text"
+                          className="input-glass"
+                          required
+                          placeholder="e.g. abdul"
+                          value={formData.username}
+                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Temporary Password *</label>
+                        <input
+                          type="password"
+                          className="input-glass"
+                          required
+                          placeholder="Min 6 characters"
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="label">Email Address</label>
+                        <input
+                          type="email"
+                          className="input-glass"
+                          placeholder="abdul@company.com"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Phone / Contact</label>
+                        <input
+                          type="text"
+                          className="input-glass"
+                          placeholder="077xxxxxxx"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="label">Employee Type</label>
+                      <select
+                        className="input-glass"
+                        value={formData.employeeType}
+                        onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
+                      >
+                        <option value="Full-time">Full-time</option>
+                        <option value="Part-time">Part-time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Intern">Intern</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="label">Username (Login ID) *</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    required
-                    placeholder="e.g. abdul"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  />
-                </div>
+                {/* Right Side: Role Assignment Card */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    minHeight: 0,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                        Assign Roles & Permissions
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                        Select roles below to grant module permissions to this employee
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        backgroundColor: '#eff6ff',
+                        color: '#0284c7',
+                        padding: '3px 10px',
+                        borderRadius: '9999px',
+                        border: '1px solid #bae6fd',
+                      }}
+                    >
+                      {(formData.roles || []).length} Assigned
+                    </span>
+                  </div>
 
-                <div>
-                  <label className="label">Email Address</label>
-                  <input
-                    type="email"
-                    className="input-glass"
-                    placeholder="e.g. abdul@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  <RoleSearchSelector
+                    assignedRoles={formData.roles || []}
+                    allRoles={roles}
+                    onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
+                    label=""
+                    formatRoleName={formatRoleName}
+                    placeholder="Search roles by title, code (e.g. ROLE_SALES), or keywords..."
                   />
-                </div>
-
-                <div>
-                  <label className="label">Phone / Contact</label>
-                  <input
-                    type="text"
-                    className="input-glass"
-                    placeholder="e.g. 0785677332"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Temporary Password *</label>
-                  <input
-                    type="password"
-                    className="input-glass"
-                    required
-                    placeholder="At least 6 characters"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="label">Employee Type</label>
-                  <select
-                    className="input-glass"
-                    value={formData.employeeType}
-                    onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
-                  >
-                    <option value="Full-time">Full-time</option>
-                    <option value="Part-time">Part-time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Intern">Intern</option>
-                  </select>
                 </div>
               </div>
 
-              <RoleSearchSelector
-                assignedRoles={formData.roles || []}
-                allRoles={roles}
-                onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
-                label="Assigned Roles / Groups"
-                formatRoleName={formatRoleName}
-                placeholder="Search and assign role by name or description..."
-              />
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {/* Footer */}
+              <div
+                style={{
+                  padding: '12px 24px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  backgroundColor: '#f8fafc',
+                  flexShrink: 0,
+                }}
+              >
                 <button
                   type="button"
                   className="btn btn-glass"
@@ -1666,12 +1865,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '960px',
-              maxHeight: 'min(700px, 90vh)',
+              maxWidth: '1080px',
+              height: 'min(760px, 92vh)',
+              maxHeight: 'min(760px, 92vh)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -1731,11 +1930,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(330px, 1.05fr) minmax(320px, 1fr)',
+                  gridTemplateColumns: 'minmax(330px, 0.85fr) minmax(490px, 1.4fr)',
                   gap: '20px',
                   padding: '20px 24px',
                   overflowY: 'auto',
                   flex: 1,
+                  minHeight: 0,
                 }}
               >
                 {/* Left Side: Employee Information Card */}
@@ -1744,17 +1944,297 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     backgroundColor: '#f8fafc',
                     border: '1px solid #e2e8f0',
                     borderRadius: '10px',
-                    padding: '16px',
+                    padding: '18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    overflowY: 'auto',
+                    minHeight: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
+                      Employee Profile
+                    </div>
+                    <span style={{ fontSize: '0.72rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                      ID: #{selectedEmployee.id || '—'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label className="label">Full Name *</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        required
+                        placeholder="e.g. John Doe"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">Username</label>
+                      <input
+                        type="text"
+                        className="input-glass"
+                        disabled
+                        value={formData.username}
+                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
+                        System username cannot be modified
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="label">Email Address *</label>
+                        <input
+                          type="email"
+                          className="input-glass"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          required
+                          placeholder="email@company.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Phone Number</label>
+                        <input
+                          type="text"
+                          className="input-glass"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="077xxxxxxx"
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="label">Reset Password</label>
+                        <input
+                          type="password"
+                          className="input-glass"
+                          placeholder="Leave blank to keep"
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Employee Type</label>
+                        <select
+                          className="input-glass"
+                          value={formData.employeeType}
+                          onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
+                        >
+                          <option value="Full-time">Full-time</option>
+                          <option value="Part-time">Part-time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Intern">Intern</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Role Assignment Card (Splitted side-by-side like Customer Groups) */}
+                <div
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '18px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
+                    minHeight: 0,
+                    overflow: 'hidden',
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    Employee Profile
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                        Assign Roles & Permissions
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                        Select roles below to grant module permissions to this employee
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        backgroundColor: '#eff6ff',
+                        color: '#0284c7',
+                        padding: '3px 10px',
+                        borderRadius: '9999px',
+                        border: '1px solid #bae6fd',
+                      }}
+                    >
+                      {(formData.roles || []).length} Assigned
+                    </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <RoleSearchSelector
+                    assignedRoles={formData.roles || []}
+                    allRoles={roles}
+                    onChange={(newRoles) => {
+                      if (isSuperAdminUser(selectedEmployee) && !newRoles.some((r) => r === 'ROLE_SUPER_ADMIN' || r === 'SUPER_ADMIN')) {
+                        addToast('Super Administrator role cannot be removed. Full access to all modules is permanent.', 'info');
+                        newRoles = [...newRoles, 'ROLE_SUPER_ADMIN'];
+                      }
+                      setFormData({ ...formData, roles: newRoles });
+                    }}
+                    label=""
+                    formatRoleName={formatRoleName}
+                    placeholder="Search roles by title, code (e.g. ROLE_SALES), or keywords..."
+                    isSuperAdmin={isSuperAdminUser(selectedEmployee)}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  padding: '12px 24px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                  backgroundColor: '#f8fafc',
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-glass"
+                  onClick={() => setModalMode(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Complete & Approve Modal - Split 2-Column Layout */}
+      {modalMode === 'approve' && selectedEmployee && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '1080px',
+              height: 'min(760px, 92vh)',
+              maxHeight: 'min(760px, 92vh)',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '1.1rem',
+                  }}
+                >
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                    Complete & Approve Employee: {selectedEmployee.fullName || selectedEmployee.username}
+                  </h2>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                    @{selectedEmployee.username} • Assign system roles and approve access to ERP
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalMode(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Split Form: Left side details, Right side role assignment */}
+            <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(330px, 0.85fr) minmax(490px, 1.4fr)',
+                  gap: '20px',
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                {/* Left Side: Employee Information Card */}
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '18px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    overflowY: 'auto',
+                    minHeight: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
+                      Registration Details
+                    </div>
+                    <span style={{ fontSize: '0.72rem', backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                      Awaiting Approval
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
                       <label className="label">Full Name</label>
                       <input
@@ -1765,6 +2245,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         required
                       />
                     </div>
+
                     <div>
                       <label className="label">Username</label>
                       <input
@@ -1772,44 +2253,31 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         className="input-glass"
                         disabled
                         value={formData.username}
-                        style={{ backgroundColor: '#e2e8f0', cursor: 'not-allowed', color: '#64748b' }}
+                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
                       />
                     </div>
-                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label className="label">Email Address</label>
-                      <input
-                        type="email"
-                        className="input-glass"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required
-                      />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="label">Email Address</label>
+                        <input
+                          type="email"
+                          className="input-glass"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Phone Number</label>
+                        <input
+                          type="text"
+                          className="input-glass"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="label">Phone Number</label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      />
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label className="label">Reset Password</label>
-                      <input
-                        type="password"
-                        className="input-glass"
-                        placeholder="Leave blank to keep"
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      />
-                    </div>
                     <div>
                       <label className="label">Employee Type</label>
                       <select
@@ -1826,30 +2294,36 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   </div>
                 </div>
 
-                {/* Right Side: Role Assignment Card (Splitted side-by-side like Customer Groups) */}
+                {/* Right Side: Role Assignment Card */}
                 <div
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '10px',
-                    padding: '16px',
+                    padding: '18px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
                     minHeight: 0,
+                    overflow: 'hidden',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
-                      Assign Roles & Permissions
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                        Assign Roles & Permissions
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                        Select roles below to grant module permissions upon approval
+                      </div>
                     </div>
                     <span
                       style={{
                         fontSize: '0.74rem',
                         fontWeight: 700,
-                        backgroundColor: '#f0f9ff',
+                        backgroundColor: '#eff6ff',
                         color: '#0284c7',
-                        padding: '2px 8px',
+                        padding: '3px 10px',
                         borderRadius: '9999px',
                         border: '1px solid #bae6fd',
                       }}
@@ -1893,7 +2367,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   className="btn btn-primary"
                   disabled={submitting}
                 >
-                  {submitting ? 'Saving...' : 'Save Changes'}
+                  {submitting ? 'Approving...' : 'Complete & Approve'}
                 </button>
               </div>
             </form>
@@ -1901,94 +2375,289 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
-      {/* Complete & Approve Modal */}
-      {modalMode === 'approve' && selectedEmployee && (
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: View Awaiting Approval Card (Minimal & Nice)           */}
+      {/* ------------------------------------------------------------- */}
+      {viewingPendingEmployee && (
         <div
           className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
             className="glass-modal"
-            style={{ width: 'min(540px, 96vw)', maxWidth: '540px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto', padding: '24px' }}
+            style={{
+              width: '100%',
+              maxWidth: '540px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', color: '#0f172a', margin: '0 0 2px 0', fontWeight: 700 }}>
-                  Complete & Approve Employee
-                </h2>
-                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  Assign roles and approve registration for {selectedEmployee.fullName || selectedEmployee.username}
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '10px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '1.2rem',
+                    flexShrink: 0,
+                  }}
+                >
+                  {(viewingPendingEmployee.fullName || viewingPendingEmployee.username || 'E').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.15rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                      {viewingPendingEmployee.fullName || viewingPendingEmployee.username}
+                    </h2>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: '#fef3c7',
+                        color: '#b45309',
+                        border: '1px solid #fde68a',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Clock size={11} /> Awaiting Approval
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                    @{viewingPendingEmployee.username}
+                    {viewingPendingEmployee.employeeCode && ` • ${viewingPendingEmployee.employeeCode}`}
+                  </div>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setModalMode(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                onClick={() => setViewingPendingEmployee(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
+                title="Close"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', marginBottom: '18px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '0.85rem' }}>
-                <div>
-                  <span style={{ color: '#64748b' }}>Name: </span>
-                  <strong style={{ color: '#0f172a' }}>{selectedEmployee.fullName || selectedEmployee.username}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Username: </span>
-                  <strong style={{ color: '#0f172a' }}>@{selectedEmployee.username}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Email: </span>
-                  <strong style={{ color: '#0f172a' }}>{selectedEmployee.email || '—'}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b' }}>Phone: </span>
-                  <strong style={{ color: '#0f172a' }}>{selectedEmployee.phone || '—'}</strong>
-                </div>
+            {/* Details Box */}
+            <div
+              style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '16px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '12px',
+                fontSize: '0.85rem',
+              }}
+            >
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Email Address</span>
+                <strong style={{ color: '#0f172a' }}>{viewingPendingEmployee.email || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Phone Number</span>
+                <strong style={{ color: '#0f172a' }}>{viewingPendingEmployee.phone || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Registered On</span>
+                <strong style={{ color: '#0f172a' }}>{formatJoinedDate(viewingPendingEmployee.createdAt)}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Requested Role</span>
+                <strong style={{ color: '#0284c7' }}>
+                  {viewingPendingEmployee.roles && viewingPendingEmployee.roles.length > 0
+                    ? viewingPendingEmployee.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')
+                    : 'None (Unassigned)'}
+                </strong>
               </div>
             </div>
 
-            <div style={{ marginBottom: '18px' }}>
-              <label className="label">Employee Type</label>
-              <select
-                className="input-glass"
-                value={formData.employeeType}
-                onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const u = viewingPendingEmployee;
+                  setViewingPendingEmployee(null);
+                  handleRequestReject(u);
+                }}
+                className="btn"
+                style={{
+                  backgroundColor: '#ffffff',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  fontSize: '0.82rem',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
               >
-                <option value="Full-time">Full-time</option>
-                <option value="Part-time">Part-time</option>
-                <option value="Contract">Contract</option>
-              </select>
+                Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const u = viewingPendingEmployee;
+                  setViewingPendingEmployee(null);
+                  handleOpenApprove(u);
+                }}
+                className="btn"
+                style={{
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  padding: '7px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Assign Roles & Details
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const u = viewingPendingEmployee;
+                  setViewingPendingEmployee(null);
+                  handleRequestApprove(u);
+                }}
+                className="btn"
+                style={{
+                  backgroundColor: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  padding: '7px 16px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Quick Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Minimal Confirmation Popup (Approve & Reject)          */}
+      {/* ------------------------------------------------------------- */}
+      {confirmAction && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '16px', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '430px',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  backgroundColor: confirmAction.type === 'approve' ? '#dcfce7' : '#fee2e2',
+                  color: confirmAction.type === 'approve' ? '#15803d' : '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {confirmAction.type === 'approve' ? <UserCheck size={22} /> : <UserX size={22} />}
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  {confirmAction.type === 'approve' ? 'Approve Registration?' : 'Reject Registration?'}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                  {confirmAction.type === 'approve' ? (
+                    <>
+                      Confirm approval for <strong>{confirmAction.user.fullName || confirmAction.user.username}</strong> (@{confirmAction.user.username}).
+                      {confirmAction.user.roles && confirmAction.user.roles.length > 0 ? (
+                        <span style={{ display: 'block', marginTop: '6px', color: '#0284c7', fontWeight: 600 }}>
+                          Assigned: {confirmAction.user.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'block', marginTop: '6px', color: '#64748b' }}>
+                          Will be approved as staff without ERP system roles.
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Are you sure you want to reject the registration request for{' '}
+                      <strong>{confirmAction.user.fullName || confirmAction.user.username}</strong> (@{confirmAction.user.username})?
+                      This user will not be granted access to the system.
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
 
-            <RoleSearchSelector
-              assignedRoles={formData.roles || []}
-              allRoles={roles}
-              onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
-              label="Assign Roles"
-              required={true}
-              formatRoleName={formatRoleName}
-              placeholder="Search and assign role by name or description..."
-            />
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
               <button
                 type="button"
                 className="btn btn-glass"
-                onClick={() => setModalMode(null)}
+                onClick={() => setConfirmAction(null)}
+                disabled={submitting}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
-                disabled={submitting || formData.roles.length === 0}
-                onClick={handleSaveModal}
+                onClick={confirmAction.type === 'approve' ? executeApprove : executeReject}
+                disabled={submitting}
+                style={{
+                  backgroundColor: confirmAction.type === 'approve' ? '#16a34a' : '#dc2626',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
-                {submitting ? 'Approving...' : 'Complete & Approve'}
+                {submitting
+                  ? 'Processing...'
+                  : confirmAction.type === 'approve'
+                  ? 'Confirm & Approve'
+                  : 'Confirm & Reject'}
               </button>
             </div>
           </div>
@@ -2260,29 +2929,48 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 borderTop: '1px solid #f1f5f9',
               }}
             >
-              <button
-                type="button"
-                onClick={async () => {
-                  await handleToggleActive(viewingEmployee);
-                  setViewingEmployee((prev) => (prev ? { ...prev, isActive: !prev.isActive } : null));
-                }}
-                style={{
-                  backgroundColor: viewingEmployee.isActive ? '#fff1f2' : '#f0fdf4',
-                  color: viewingEmployee.isActive ? '#e11d48' : '#16a34a',
-                  border: `1px solid ${viewingEmployee.isActive ? '#fecdd3' : '#bbf7d0'}`,
-                  borderRadius: '6px',
-                  padding: '7px 14px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                {viewingEmployee.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
-                {viewingEmployee.isActive ? 'Deactivate Employee' : 'Activate Employee'}
-              </button>
+              {isSuperAdminUser(viewingEmployee) ? (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#0284c7',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    backgroundColor: '#f0f9ff',
+                    padding: '7px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid #bae6fd',
+                  }}
+                >
+                  <Shield size={14} /> Super Administrator (Permanent Full Access)
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleToggleActive(viewingEmployee);
+                    setViewingEmployee((prev) => (prev ? { ...prev, isActive: !prev.isActive } : null));
+                  }}
+                  style={{
+                    backgroundColor: viewingEmployee.isActive ? '#fff1f2' : '#f0fdf4',
+                    color: viewingEmployee.isActive ? '#e11d48' : '#16a34a',
+                    border: `1px solid ${viewingEmployee.isActive ? '#fecdd3' : '#bbf7d0'}`,
+                    borderRadius: '6px',
+                    padding: '7px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {viewingEmployee.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                  {viewingEmployee.isActive ? 'Deactivate Employee' : 'Activate Employee'}
+                </button>
+              )}
 
               <button
                 type="button"

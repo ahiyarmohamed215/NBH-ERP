@@ -96,9 +96,14 @@ export default function App() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const isSuperAdmin = Boolean(
+    user?.username === 'admin' ||
     user?.roles?.includes('ROLE_SUPER_ADMIN') ||
+    user?.roles?.includes('SUPER_ADMIN') ||
     user?.roles?.includes('ROLE_ADMIN') ||
-    (Array.isArray(user?.roles) && user.roles.some((r) => typeof r === 'string' && (r === 'ROLE_ADMIN' || r === 'ROLE_SUPER_ADMIN')))
+    (Array.isArray(user?.roles) && user.roles.some((r) => {
+      const name = typeof r === 'string' ? r : r?.name;
+      return name === 'ROLE_ADMIN' || name === 'ROLE_SUPER_ADMIN' || name === 'SUPER_ADMIN';
+    }))
   );
   const userPermissions = user?.permissions || [];
 
@@ -167,14 +172,13 @@ export default function App() {
         id: 'purchasing',
         label: 'Purchasing',
         icon: ShoppingCart,
-        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS', 'SUPPLIER_PAYMENT_MANAGE'],
+        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS'],
         subItems: [
           { id: 'suppliers', label: 'Suppliers Directory', permission: 'SUPPLIER_MANAGE' },
           { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
           { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
           { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
           { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_MANAGE' },
-          { id: 'supplier-payments', label: 'Supplier Payments', permission: 'SUPPLIER_PAYMENT_MANAGE' },
         ],
       },
       {
@@ -214,9 +218,10 @@ export default function App() {
         return mod.permissions.some((p) => userPermissions.includes(p));
       })
       .map((mod) => {
+        if (isSuperAdmin) return mod;
         if (!mod.subItems) return mod;
         const allowedSubs = mod.subItems.filter(
-          (sub) => isSuperAdmin || !sub.permission || userPermissions.includes(sub.permission)
+          (sub) => !sub.permission || userPermissions.includes(sub.permission)
         );
         return { ...mod, subItems: allowedSubs };
       });
@@ -276,7 +281,7 @@ export default function App() {
     } else if (view === 'pending-approvals' || view === 'pending_approvals') {
       setCurrentView('employees');
       setSubTab('pending-approvals');
-    } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders' || view === 'supplier-payments') {
+    } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
       setCurrentView('purchasing');
       setSubTab(view);
     } else if (view === 'delivery' || view === 'deliveries') {
