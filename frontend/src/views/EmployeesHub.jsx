@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { userApi, roleApi, pdfApi } from '../api/apiClient';
 import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
@@ -8,56 +8,20 @@ import { printA4Report } from '../utils/printReport';
 import { ToolbarActions, TableRowActions } from '../components/ToolbarActions';
 import RoleSearchSelector from '../components/RoleSearchSelector';
 import RolesView from './RolesView';
-import {
-  Users,
-  Plus,
-  Search,
-  Upload,
-  Download,
-  Edit2,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  X,
-  Phone,
-  Mail,
-  Shield,
-  ShieldCheck,
-  Clock,
-  Calendar,
-  CreditCard,
-  Percent,
-  ListFilter,
-  Check,
-  UserCheck,
-  UserX,
-  Sparkles,
-  Printer,
-  FileDown,
-  Eye,
-  Target,
-  UserPlus,
-  Info,
-  CheckSquare,
-  Square,
-  Lock,
-} from 'lucide-react';
+import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
   const canEditUser = canEditModule(currentUser, 'USER');
   const { addToast } = useToast();
 
-  // Active sub-tab state: 'list' | 'roles' | 'pending-approvals' | 'targets' | 'attendance' | 'payroll' | 'commissions'
-  const [activeTab, setActiveTab] = useState(() => {
-    if (activeSubTab === 'roles' || activeSubTab === 'groups') return 'roles';
-    if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') return 'pending-approvals';
-    if (activeSubTab === 'targets') return 'targets';
-    if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') return activeSubTab;
+  // Old links to unfinished modules fall back to the employee list.
+  const resolveTab = tab => {
+    if (tab === 'roles' || tab === 'groups') return 'roles';
+    if (tab === 'pending-approvals' || tab === 'approvals') return 'pending-approvals';
     return 'list';
-  });
+  };
+  const [activeTab, setActiveTab] = useState(() => resolveTab(activeSubTab));
 
   // Pending approvals card toggle
   const [hidePending, setHidePending] = useState(false);
@@ -97,19 +61,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Sync external tab changes
+  // Sync external tab changes.
   useEffect(() => {
-    if (activeSubTab === 'roles' || activeSubTab === 'groups') {
-      setActiveTab('roles');
-    } else if (activeSubTab === 'pending-approvals' || activeSubTab === 'approvals') {
-      setActiveTab('pending-approvals');
-    } else if (activeSubTab === 'targets') {
-      setActiveTab('targets');
-    } else if (activeSubTab === 'users' || activeSubTab === 'list') {
-      setActiveTab('list');
-    } else if (activeSubTab === 'attendance' || activeSubTab === 'payroll' || activeSubTab === 'commissions') {
-      setActiveTab(activeSubTab);
-    }
+    setActiveTab(resolveTab(activeSubTab));
   }, [activeSubTab]);
 
   const handleTabChange = (tabId) => {
@@ -665,7 +619,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             Employee Management
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
-            Create and manage employee records, role assignments, attendance, and payroll.
+            Manage employee records, role assignments, and registration approvals.
           </p>
         </div>
 
@@ -781,89 +735,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => handleTabChange('targets')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'targets' ? 700 : 500,
-            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <Target size={16} /> Sales Targets
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('attendance')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'attendance' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'attendance' ? 700 : 500,
-            color: activeTab === 'attendance' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <Calendar size={16} /> Attendance
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('payroll')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'payroll' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'payroll' ? 700 : 500,
-            color: activeTab === 'payroll' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <CreditCard size={16} /> Payroll
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange('commissions')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'commissions' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'commissions' ? 700 : 500,
-            color: activeTab === 'commissions' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <Percent size={16} /> Commission Templates
-        </button>
       </div>
 
       {/* Tab 1: Employee List */}
@@ -1622,132 +1493,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           }}
         >
           <RolesView onRoleChange={loadData} />
-        </div>
-      )}
-
-      {/* Tab 3: Attendance (Placeholder) */}
-      {activeTab === 'attendance' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              padding: '60px 24px',
-              textAlign: 'center',
-              maxWidth: '560px',
-              margin: '0 auto',
-            }}
-          >
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: '#eff6ff',
-                color: '#0284c7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              <Calendar size={28} />
-            </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              Staff Attendance & Clock-in
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-              Track daily shifts, check-in timestamps, leave requests, and staff work logs.
-            </p>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', backgroundColor: '#e0f2fe', padding: '4px 12px', borderRadius: '9999px' }}>
-              FEATURE IN PROGRESS
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Payroll (Placeholder) */}
-      {activeTab === 'payroll' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              padding: '60px 24px',
-              textAlign: 'center',
-              maxWidth: '560px',
-              margin: '0 auto',
-            }}
-          >
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: '#ecfdf5',
-                color: '#059669',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              <CreditCard size={28} />
-            </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              Employee Payroll Processing
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-              Manage monthly salary disbursements, deductions, overtime calculations, and pay slip exports.
-            </p>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#059669', backgroundColor: '#d1fae5', padding: '4px 12px', borderRadius: '9999px' }}>
-              FEATURE IN PROGRESS
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Commission Templates (Placeholder) */}
-      {activeTab === 'commissions' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 0' }}>
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              padding: '60px 24px',
-              textAlign: 'center',
-              maxWidth: '560px',
-              margin: '0 auto',
-            }}
-          >
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: '#fef3c7',
-                color: '#d97706',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px auto',
-              }}
-            >
-              <Percent size={28} />
-            </div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              Sales Commission Templates
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 auto 20px auto' }}>
-              Configure commission tiers for POS cashiers, managers, and sales representatives.
-            </p>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#d97706', backgroundColor: '#fef3c7', padding: '4px 12px', borderRadius: '9999px' }}>
-              FEATURE IN PROGRESS
-            </span>
-          </div>
         </div>
       )}
 

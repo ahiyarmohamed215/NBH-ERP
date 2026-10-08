@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
@@ -7,7 +7,7 @@ import InventoryHub from './views/InventoryHub';
 import PurchasingHub from './views/PurchasingHub';
 import InvoicingHub from './views/InvoicingHub';
 import EmployeesHub from './views/EmployeesHub';
-import MastersView from './views/MastersView';
+
 import ReportsView from './views/ReportsView';
 import AccountingHub from './views/AccountingHub';
 import CustomersHub from './views/CustomersHub';
@@ -16,68 +16,7 @@ import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
-import {
-  LayoutDashboard,
-  BookOpen,
-  Users,
-  Contact,
-  Boxes,
-  Truck,
-  FileText,
-  BarChart3,
-  Package,
-  ChevronRight,
-  ShieldAlert,
-  ShieldCheck,
-  Lock,
-  Maximize,
-  Minimize,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from 'lucide-react';
-
-// Reusable coming-soon component for emerging ERP modules
-function ComingSoonModule({ title, description, icon: Icon, color = '#2563eb', bg = '#eff6ff' }) {
-  return (
-    <div style={{ padding: '80px 24px', textAlign: 'center', maxWidth: '540px', margin: '0 auto' }}>
-      <div
-        style={{
-          width: '64px',
-          height: '64px',
-          borderRadius: '50%',
-          backgroundColor: bg,
-          color: color,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 18px auto',
-        }}
-      >
-        <Icon size={30} />
-      </div>
-      <h2 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-        {title}
-      </h2>
-      <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '20px' }}>
-        {description}
-      </p>
-      <span
-        style={{
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          color: color,
-          backgroundColor: bg,
-          padding: '5px 14px',
-          borderRadius: '9999px',
-          letterSpacing: '0.04em',
-          border: `1px solid ${color}30`,
-        }}
-      >
-        MODULE COMING SOON
-      </span>
-    </div>
-  );
-}
+import { LayoutDashboard, BookOpen, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -198,10 +137,6 @@ export default function App() {
           { id: 'list', label: 'Employee List', permission: 'USER_MANAGE' },
           { id: 'pending-approvals', label: 'Pending Approvals & Roles', permission: 'USER_MANAGE' },
           { id: 'roles', label: 'Roles', permission: 'ROLE_MANAGE' },
-          { id: 'targets', label: 'Sales Targets', permission: 'USER_MANAGE' },
-          { id: 'attendance', label: 'Attendance', permission: 'USER_MANAGE' },
-          { id: 'payroll', label: 'Payroll', permission: 'USER_MANAGE' },
-          { id: 'commissions', label: 'Commission Templates', permission: 'USER_MANAGE' },
         ],
       },
       {
@@ -241,7 +176,6 @@ export default function App() {
           { id: 'deliveries', label: 'Delivery Trips', permission: 'DELIVERY_VIEW' },
           { id: 'routes', label: 'Delivery Routes', permission: 'DELIVERY_VIEW' },
           { id: 'vehicles', label: 'Fleet Vehicles', permission: 'DELIVERY_VIEW' },
-          { id: 'gps-tracking', label: 'Live GPS Tracking (Coming Soon)', permission: 'DELIVERY_VIEW' },
         ],
       },
       {
@@ -341,7 +275,7 @@ export default function App() {
       setSubTab('roles');
     } else if (view === 'targets' || view === 'sales-targets') {
       setCurrentView('employees');
-      setSubTab('targets');
+      setSubTab('list');
     } else if (view === 'pending-approvals' || view === 'pending_approvals') {
       setCurrentView('employees');
       setSubTab('pending-approvals');

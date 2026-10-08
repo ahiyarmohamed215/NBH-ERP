@@ -1,4 +1,4 @@
-> Historical audit. Implementation has since changed; see [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) and [README.md](README.md).
+> Historical audit. Implementation has since changed; see [IMPLEMENTATION_NOTES.md](implementation-notes.md) and [README.md](../README.md).
 
 **ERP project review — 8 October 2026**
 

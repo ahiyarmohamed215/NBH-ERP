@@ -14,6 +14,10 @@ test('employee page renders every navigation tab without runtime errors', async 
       const html = renderToString(React.createElement(AuthProvider, null,
         React.createElement(ToastProvider, null, React.createElement(EmployeesHub, { activeSubTab }))));
       assert.ok(html.includes('Employee'), `Employee page should render for ${activeSubTab}`);
+      assert.ok(!html.includes('FEATURE IN PROGRESS'));
+      if (['targets', 'attendance', 'payroll', 'commissions'].includes(activeSubTab)) {
+        assert.ok(html.includes('Loading employee records'), 'Removed modules must fall back to the list');
+      }
     }
   } finally {
     await server.close();

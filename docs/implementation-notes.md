@@ -1,6 +1,8 @@
+> Historical implementation report. Subsequent cleanup removed unused code and unfinished navigation; see the current [project layout](../README.md#project-layout).
+
 # Implementation status — 8 October 2026
 
-The original review is preserved in `PROJECT_REVIEW.md`. This file describes the implemented changes and their limits. Changes are local; no production deployment or operational database migration was performed.
+The original review is preserved in [project review](project-review.md). This file describes the implemented changes and their limits. Changes are local; no production deployment or operational database migration was performed.
 
 ## Audit findings
 
@@ -39,7 +41,7 @@ The original review is preserved in `PROJECT_REVIEW.md`. This file describes the
 - Backend suite passed: 38 executed tests, plus one opt-in schema-export test skipped during ordinary runs. It includes H2-backed transaction and concurrency checks and both migration paths.
 - Frontend: six tests passed; production build passed. These are automated contract/build checks, not a full visual, keyboard, responsive or print audit.
 - Targeted receipt-cancellation valuation and fractional-cent validation regressions are also verified separately after the final corrections.
-- Migration tests use H2 in MySQL compatibility mode. A restored production MySQL copy, representative data volume, historical reconciliation and opening balances are still required before rollout. See README.
+- Migration tests use H2 in MySQL compatibility mode. A restored production MySQL copy, representative data volume, historical reconciliation and opening balances are still required before rollout. See [README](../README.md).
 - Existing data corruption is not automatically guessed or rewritten. V2 defaults new monetary columns to zero and retains original records; historical returns/allocations require reconciliation before reuse. New ledger postings do not retroactively reconstruct old accounts.
 
 ## Remaining product/scale work
