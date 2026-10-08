@@ -43,6 +43,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Token refreshed successfully", response));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        authService.logout();
+        return ResponseEntity.ok(ApiResponse.ok("Signed out of all sessions", null));
+    }
+
     @GetMapping("/me")
     @Operation(summary = "Get currently authenticated user details and permissions")
     public ResponseEntity<ApiResponse<UserProfileDto>> getCurrentUser() {

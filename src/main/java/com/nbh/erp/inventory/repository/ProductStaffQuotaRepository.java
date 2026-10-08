@@ -24,6 +24,17 @@ public interface ProductStaffQuotaRepository extends JpaRepository<ProductStaffQ
             @Param("warehouseId") Long warehouseId
     );
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT q FROM ProductStaffQuota q WHERE q.product.id = :productId AND q.user.id = :userId " +
+           "AND (:warehouseId IS NULL OR q.warehouse.id = :warehouseId OR q.warehouse IS NULL) " +
+           "AND q.isActive = true " +
+           "ORDER BY CASE WHEN q.warehouse.id = :warehouseId THEN 1 ELSE 2 END")
+    List<ProductStaffQuota> lockMatchingActiveQuotas(
+            @Param("productId") Long productId,
+            @Param("userId") Long userId,
+            @Param("warehouseId") Long warehouseId
+    );
+
     Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseId(Long productId, Long userId, Long warehouseId);
 
     Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseIsNull(Long productId, Long userId);

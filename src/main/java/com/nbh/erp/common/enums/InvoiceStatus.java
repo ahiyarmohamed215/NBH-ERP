@@ -6,6 +6,8 @@ import java.util.stream.Collectors;
 
 public enum InvoiceStatus {
     HELD,
+    SENT_TO_WAREHOUSE,
+    STOCK_ADJUSTED,
     COMPLETED,
     PAID,
     PARTIAL,

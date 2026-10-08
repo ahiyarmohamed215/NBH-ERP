@@ -30,8 +30,11 @@ import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 public class PurchaseReturnService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final PurchaseReturnRepository purchaseReturnRepository;
+    private final com.nbh.erp.grn.repository.GrnRepository receipts;
+    private final com.nbh.erp.payment.repository.SupplierPaymentRepository supplierPayments;
     private final SupplierRepository supplierRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
@@ -61,6 +64,9 @@ public class PurchaseReturnService {
 
     @Transactional
     public PurchaseReturnDto createPurchaseReturn(CreatePurchaseReturnRequest request, boolean autoProcess) {
+        var ticket=idempotency.reserve("createPurchaseReturn", request.toString()+"|"+autoProcess);
+        if(ticket!=null && ticket.getResourceId()!=null) return getPurchaseReturnById(ticket.getResourceId());
+
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
@@ -71,6 +77,7 @@ public class PurchaseReturnService {
 
         PurchaseReturn prn = PurchaseReturn.builder()
                 .prnNumber(prnNumber)
+                .sourceGrnId(request.getSourceGrnId())
                 .supplier(supplier)
                 .warehouse(warehouse)
                 .returnDate(request.getReturnDate())
@@ -105,15 +112,15 @@ public class PurchaseReturnService {
         PurchaseReturn saved = purchaseReturnRepository.save(prn);
 
         if (autoProcess) {
-            return processPurchaseReturnInternal(saved);
+            return idempotency.complete(ticket,saved.getId(),processPurchaseReturnInternal(saved));
         }
 
-        return PurchaseReturnDto.from(saved);
+        return idempotency.complete(ticket,saved.getId(),PurchaseReturnDto.from(saved));
     }
 
     @Transactional
     public PurchaseReturnDto processPurchaseReturn(Long id) {
-        PurchaseReturn prn = purchaseReturnRepository.findById(id)
+        PurchaseReturn prn = purchaseReturnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Return", "id", id));
         return processPurchaseReturnInternal(prn);
     }
@@ -126,6 +133,21 @@ public class PurchaseReturnService {
             throw new BusinessException("Cannot process cancelled PRN " + prn.getPrnNumber());
         }
 
+        if(prn.getSourceGrnId()==null) throw new BusinessException("Link an original GRN before processing");
+        var grn=receipts.findByIdForUpdate(prn.getSourceGrnId()).orElseThrow(() -> new BusinessException("Unknown GRN"));
+        if(!"PROCESSED".equals(grn.getStatus()) || !grn.getSupplier().getId().equals(prn.getSupplier().getId()) || !grn.getWarehouse().getId().equals(prn.getWarehouse().getId())) throw new BusinessException("Return must match processed GRN supplier and warehouse");
+        var seen=new java.util.HashSet<Long>(); BigDecimal total=BigDecimal.ZERO;
+        for(var item:prn.getItems()) {
+            if(!seen.add(item.getProduct().getId())) throw new BusinessException("Duplicate return product");
+            var originals=grn.getItems().stream().filter(i -> i.getProduct().getId().equals(item.getProduct().getId())).toList();
+            BigDecimal originalQty=originals.stream().map(com.nbh.erp.grn.entity.GrnItem::getQuantityReceived).reduce(BigDecimal.ZERO,BigDecimal::add);
+            BigDecimal returned=purchaseReturnRepository.returnedQuantity(grn.getId(),item.getProduct().getId());
+            if(returned.add(item.getQuantityReturned()).compareTo(originalQty)>0) throw new BusinessException("Return exceeds original unreturned receipt");
+            BigDecimal cost=originals.stream().map(com.nbh.erp.grn.entity.GrnItem::getTotalCost).reduce(BigDecimal.ZERO,BigDecimal::add).divide(originalQty,6,java.math.RoundingMode.HALF_UP);
+            item.setUnitCost(cost);item.setTotalCost(cost.multiply(item.getQuantityReturned()).setScale(2,java.math.RoundingMode.HALF_UP));total=total.add(item.getTotalCost());
+        }
+        if(total.compareTo(grn.getTotalAmount().subtract(purchaseReturnRepository.totalReturned(grn.getId())).subtract(supplierPayments.totalPaid(grn.getId())))>0) throw new BusinessException("Reverse supplier payment before returning paid goods");
+        prn.setTotalAmount(total);
         Long warehouseId = prn.getWarehouse().getId();
 
         for (PurchaseReturnItem item : prn.getItems()) {
@@ -133,6 +155,7 @@ public class PurchaseReturnService {
                     warehouseId,
                     item.getProduct().getId(),
                     item.getQuantityReturned(),
+                    item.getUnitCost(),
                     "PRN",
                     prn.getPrnNumber(),
                     "Returned to supplier: " + prn.getSupplier().getName() + " (Reason: " + prn.getReason() + ")"
@@ -148,7 +171,7 @@ public class PurchaseReturnService {
 
     @Transactional
     public void cancelPurchaseReturn(Long id) {
-        PurchaseReturn prn = purchaseReturnRepository.findById(id)
+        PurchaseReturn prn = purchaseReturnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase Return", "id", id));
 
         if (!"DRAFT".equals(prn.getStatus())) {

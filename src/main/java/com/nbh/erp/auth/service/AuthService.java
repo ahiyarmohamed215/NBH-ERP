@@ -31,6 +31,7 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.nbh.erp.auth.repository.RefreshSessionRepository refreshSessions;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -58,7 +59,7 @@ public class AuthService {
         log.info("New user registered and pending approval: '{}'", user.getUsername());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         // Pre-check user status to provide helpful error message if pending or rejected
         User candidateUser = userRepository.findByUsername(request.getUsername())
@@ -85,7 +86,7 @@ public class AuthService {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
 
         String accessToken = tokenProvider.generateAccessToken(authentication);
-        String refreshToken = tokenProvider.generateRefreshToken(userPrincipal.getUsername());
+        String refreshToken = newRefreshSession(userPrincipal);
 
         User user = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
@@ -112,10 +113,10 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse refreshToken(RefreshTokenRequest request) {
-        if (!tokenProvider.validateToken(request.getRefreshToken())) {
-            throw new BusinessException("Invalid or expired refresh token");
+        if (!tokenProvider.validateToken(request.getRefreshToken(), "REFRESH")) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid or expired refresh token");
         }
 
         String username = tokenProvider.getUsernameFromToken(request.getRefreshToken());
@@ -123,6 +124,17 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
 
         UserPrincipal principal = UserPrincipal.create(user);
+        if (!principal.isEnabled() || !tokenProvider.matchesVersion(request.getRefreshToken(), user.getTokenVersion()))
+            throw new org.springframework.security.authentication.BadCredentialsException("Session expired");
+        var claims = tokenProvider.claims(request.getRefreshToken());
+        var session = refreshSessions.lockById(claims.get("sid", String.class))
+            .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Session expired"));
+        if (!session.getUsername().equals(username) || !session.getTokenId().equals(claims.getId()) || session.getExpiresAt().isBefore(java.time.Instant.now()))
+            throw new org.springframework.security.authentication.BadCredentialsException("Refresh token already used or expired");
+        session.setTokenId(java.util.UUID.randomUUID().toString());
+        session.setExpiresAt(java.time.Instant.now().plusMillis(tokenProvider.getRefreshMs()));
+        refreshSessions.save(session);
+        String rotated = tokenProvider.generateRefreshToken(username, user.getTokenVersion(), session.getId(), session.getTokenId());
         Authentication authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
 
         String newAccessToken = tokenProvider.generateAccessToken(authentication);
@@ -139,7 +151,7 @@ public class AuthService {
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)
-                .refreshToken(request.getRefreshToken())
+                .refreshToken(rotated)
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -152,7 +164,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserProfileDto getCurrentUserProfile() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) {
             throw new BusinessException("User is not authenticated");
         }
 
@@ -185,7 +197,7 @@ public class AuthService {
     @Transactional
     public UserProfileDto updateCurrentUserProfile(UpdateProfileRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) {
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) {
             throw new BusinessException("User is not authenticated");
         }
 
@@ -217,6 +229,7 @@ public class AuthService {
                 throw new BusinessException("New password must be at least 6 characters.");
             }
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+            user.setTokenVersion(user.getTokenVersion() + 1);
         }
 
         User saved = userRepository.save(user);
@@ -242,5 +255,22 @@ public class AuthService {
                 .roles(roles)
                 .permissions(permissions)
                 .build();
+    }
+    private String newRefreshSession(UserPrincipal principal) {
+        var session = new com.nbh.erp.auth.entity.RefreshSession();
+        session.setId(java.util.UUID.randomUUID().toString());
+        session.setTokenId(java.util.UUID.randomUUID().toString());
+        session.setUsername(principal.getUsername());
+        session.setTokenVersion(principal.getTokenVersion());
+        session.setExpiresAt(java.time.Instant.now().plusMillis(tokenProvider.getRefreshMs()));
+        refreshSessions.save(session);
+        return tokenProvider.generateRefreshToken(principal.getUsername(), principal.getTokenVersion(), session.getId(), session.getTokenId());
+    }
+    @Transactional
+    public void logout() {
+        String username = com.nbh.erp.security.SecurityUtils.getCurrentUsername().orElseThrow();
+        User user = userRepository.findByUsername(username).orElseThrow();
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
     }
 }

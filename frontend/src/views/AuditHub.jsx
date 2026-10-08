@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ShieldCheck,
@@ -29,7 +30,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
   const { addToast } = useToast();
 
   // Selected Day (YYYY-MM-DD)
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getTodayStr = () => formatBusinessDate();
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
 
   // Data states

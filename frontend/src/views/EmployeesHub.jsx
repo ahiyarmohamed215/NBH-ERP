@@ -1752,7 +1752,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       )}
 
       {/* Add Employee Modal */}
-      {showAddModal && (
+      {modalMode === 'add' && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
@@ -1768,14 +1768,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               </h2>
               <button
                 type="button"
-                onClick={() => setShowAddModal(false)}
+                onClick={() => setModalMode(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAdd}>
+            <form onSubmit={handleSaveModal}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label className="label">Full Name *</label>
@@ -1863,7 +1863,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <button
                   type="button"
                   className="btn btn-glass"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => setModalMode(null)}
                 >
                   Cancel
                 </button>
@@ -1881,7 +1881,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       )}
 
       {/* Edit Employee Modal - Split 2-Column Layout (Matching Customer Groups style) */}
-      {showEditModal && selectedEmployee && (
+      {modalMode === 'edit' && selectedEmployee && (
         <div
           className="modal-backdrop"
           style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
@@ -1942,7 +1942,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               </div>
               <button
                 type="button"
-                onClick={() => setShowEditModal(false)}
+                onClick={() => setModalMode(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
                 title="Close"
               >
@@ -1951,7 +1951,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             </div>
 
             {/* Split Form: Left side details, Right side role assignment */}
-            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div
                 style={{
                   display: 'grid',
@@ -2108,7 +2108,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <button
                   type="button"
                   className="btn btn-glass"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => setModalMode(null)}
                 >
                   Cancel
                 </button>
@@ -2126,7 +2126,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       )}
 
       {/* Complete & Approve Modal */}
-      {showApproveModal && selectedEmployee && (
+      {modalMode === 'approve' && selectedEmployee && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
@@ -2147,7 +2147,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               </div>
               <button
                 type="button"
-                onClick={() => setShowApproveModal(false)}
+                onClick={() => setModalMode(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
               >
                 <X size={20} />
@@ -2179,8 +2179,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               <label className="label">Employee Type</label>
               <select
                 className="input-glass"
-                value={approveType}
-                onChange={(e) => setApproveType(e.target.value)}
+                value={formData.employeeType}
+                onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
               >
                 <option value="Full-time">Full-time</option>
                 <option value="Part-time">Part-time</option>
@@ -2189,9 +2189,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             </div>
 
             <RoleSearchSelector
-              assignedRoles={selectedApproveRoles}
+              assignedRoles={formData.roles || []}
               allRoles={roles}
-              onChange={(newRoles) => setSelectedApproveRoles(newRoles)}
+              onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
               label="Assign Roles"
               required={true}
               formatRoleName={formatRoleName}
@@ -2202,15 +2202,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               <button
                 type="button"
                 className="btn btn-glass"
-                onClick={() => setShowApproveModal(false)}
+                onClick={() => setModalMode(null)}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={submitting || selectedApproveRoles.length === 0}
-                onClick={handleCompleteApprove}
+                disabled={submitting || formData.roles.length === 0}
+                onClick={handleSaveModal}
               >
                 {submitting ? 'Approving...' : 'Complete & Approve'}
               </button>

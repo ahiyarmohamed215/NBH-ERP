@@ -13,6 +13,10 @@ import java.util.Optional;
 
 @Repository
 public interface QuotationRepository extends JpaRepository<Quotation, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Quotation e where e.id = :id")
+    java.util.Optional<Quotation> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     Optional<Quotation> findByQuotationNumber(String quotationNumber);
 

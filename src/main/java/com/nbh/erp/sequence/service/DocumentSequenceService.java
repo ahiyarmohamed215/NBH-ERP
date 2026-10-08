@@ -41,42 +41,52 @@ public class DocumentSequenceService {
         return String.format("%s%06d", sequence.getPrefix(), nextVal);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateInvoiceNumber() {
         return getNextNumber("INV");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateGrnNumber() {
         return getNextNumber("GRN");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateGtnNumber() {
         return getNextNumber("GTN");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generatePrnNumber() {
         return getNextNumber("PRN");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateAdjustmentNumber() {
         return getNextNumber("ADJ");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateReturnNumber() {
         return getNextNumber("RTN");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateCreditNoteNumber() {
         return getNextNumber("CRN");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generatePaymentNumber() {
         return getNextNumber("REC");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateQuotationNumber() {
         return getNextNumber("QT");
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateAdvanceVoucherNumber() {
         return getNextNumber("ADV");
     }

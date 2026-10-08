@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { salesApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -23,7 +24,7 @@ export default function SalesAccountingView() {
   const { addToast } = useToast();
 
   // Date filters
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatBusinessDate();
   const firstOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString()
     .split('T')[0];
@@ -342,8 +343,8 @@ export default function SalesAccountingView() {
                               fontSize: '0.7rem',
                               padding: '2px 6px',
                               borderRadius: '4px',
-                              background: r.includes('ADMIN') ? '#fef3c7' : '#e0e7ff',
-                              color: r.includes('ADMIN') ? '#92400e' : '#3730a3',
+                              background: r === 'ROLE_ADMIN' ? '#fef3c7' : '#e0e7ff',
+                              color: r === 'ROLE_ADMIN' ? '#92400e' : '#3730a3',
                               fontWeight: 600,
                             }}
                           >

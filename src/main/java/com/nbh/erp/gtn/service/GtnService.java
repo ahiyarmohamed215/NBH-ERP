@@ -28,6 +28,7 @@ import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 public class GtnService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final GtnRepository gtnRepository;
     private final WarehouseRepository warehouseRepository;
@@ -57,6 +58,9 @@ public class GtnService {
 
     @Transactional
     public GtnDto createGtn(CreateGtnRequest request, boolean autoTransfer) {
+        var ticket=idempotency.reserve("createGtn", request.toString()+"|"+autoTransfer);
+        if(ticket!=null && ticket.getResourceId()!=null) return getGtnById(ticket.getResourceId());
+
         if (request.getSourceWarehouseId().equals(request.getDestinationWarehouseId())) {
             throw new BusinessException("Source and destination warehouses cannot be the same");
         }
@@ -97,15 +101,15 @@ public class GtnService {
         Gtn saved = gtnRepository.save(gtn);
 
         if (autoTransfer) {
-            return executeTransfer(saved);
+            return idempotency.complete(ticket,saved.getId(),executeTransfer(saved));
         }
 
-        return GtnDto.from(saved);
+        return idempotency.complete(ticket,saved.getId(),GtnDto.from(saved));
     }
 
     @Transactional
     public GtnDto transferGtn(Long id) {
-        Gtn gtn = gtnRepository.findById(id)
+        Gtn gtn = gtnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GTN", "id", id));
         return executeTransfer(gtn);
     }
@@ -143,7 +147,7 @@ public class GtnService {
 
     @Transactional
     public void cancelGtn(Long id) {
-        Gtn gtn = gtnRepository.findById(id)
+        Gtn gtn = gtnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GTN", "id", id));
 
         if (!"DRAFT".equals(gtn.getStatus())) {

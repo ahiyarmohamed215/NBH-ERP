@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -13,6 +13,12 @@ export const ToastProvider = ({ children }) => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   }, []);
+
+  useEffect(() => {
+    const showError = event => addToast(event.detail, 'error');
+    window.addEventListener('erp:api_error', showError);
+    return () => window.removeEventListener('erp:api_error', showError);
+  }, [addToast]);
 
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -40,6 +46,7 @@ export const ToastProvider = ({ children }) => {
       >
         {toasts.map((toast) => (
           <div
+            role={toast.type === 'error' ? 'alert' : 'status'}
             key={toast.id}
             className="glass-card"
             style={{

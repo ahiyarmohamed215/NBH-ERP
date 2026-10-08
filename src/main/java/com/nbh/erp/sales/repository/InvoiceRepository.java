@@ -15,9 +15,22 @@ import java.util.Optional;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
+    java.util.List<Invoice> findByStatusIn(java.util.Collection<String> statuses);
+    java.util.List<Invoice> findByStatusInAndCreatedBy(java.util.Collection<String> statuses,String createdBy);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Invoice e where e.id = :id")
+    java.util.Optional<Invoice> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Invoice i where i.invoiceNumber = :number")
+    Optional<Invoice> findByNumberForUpdate(@Param("number") String number);
 
+
+    @Query("select coalesce(sum(i.balanceAmount),0) from Invoice i where i.customer.id=:customerId and i.status in ('COMPLETED','PARTIAL','PAID')")
+    BigDecimal outstandingForCustomer(@Param("customerId") Long customerId);
     List<Invoice> findByStatus(String status);
 
     List<Invoice> findByStatusAndCreatedBy(String status, String createdBy);
@@ -50,17 +63,17 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             Pageable pageable
     );
 
-    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.status = 'COMPLETED' AND i.invoiceDate = :date")
+    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate = :date")
     BigDecimal getTotalSalesForDate(@Param("date") LocalDate date);
 
-    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.status = 'COMPLETED' AND i.invoiceDate BETWEEN :startDate AND :endDate")
+    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate BETWEEN :startDate AND :endDate")
     BigDecimal getTotalSalesBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.status = 'COMPLETED' AND i.invoiceDate = :date")
+    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate = :date")
     long countCompletedInvoicesForDate(@Param("date") LocalDate date);
 
     @Query("SELECT i.createdBy AS cashier, COUNT(i) AS invoiceCount, COALESCE(SUM(i.netTotal), 0) AS totalSales, MAX(i.invoiceDate) AS lastSaleDate " +
-            "FROM Invoice i WHERE i.status = 'COMPLETED' " +
+            "FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') " +
             "AND (:startDate IS NULL OR i.invoiceDate >= :startDate) " +
             "AND (:endDate IS NULL OR i.invoiceDate <= :endDate) " +
             "GROUP BY i.createdBy")
@@ -70,7 +83,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     );
 
     @Query("SELECT i.createdBy AS cashier, COUNT(i) AS heldCount, COALESCE(SUM(i.netTotal), 0) AS totalHeld " +
-            "FROM Invoice i WHERE i.status = 'HELD' " +
+            "FROM Invoice i WHERE i.status in ('HELD','SENT_TO_WAREHOUSE','STOCK_ADJUSTED') " +
             "GROUP BY i.createdBy")
     List<CashierHeldProjection> getCashierHeldSummary();
 

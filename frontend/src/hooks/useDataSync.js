@@ -22,7 +22,7 @@ export function useDataSync(callback, events = ['erp:data_changed'], deps = []) 
       timeoutId = setTimeout(() => {
         if (savedCallback.current) {
           try {
-            savedCallback.current(e);
+            Promise.resolve(savedCallback.current(e)).catch(err => console.error('DataSync auto-refresh failed:', err));
           } catch (err) {
             console.error('DataSync auto-refresh failed:', err);
           }

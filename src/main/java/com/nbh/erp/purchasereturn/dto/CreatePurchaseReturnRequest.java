@@ -19,6 +19,8 @@ public class CreatePurchaseReturnRequest {
 
     @NotNull(message = "Supplier ID is required")
     private Long supplierId;
+    @NotNull(message="Original GRN ID is required")
+    private Long sourceGrnId;
 
     @NotNull(message = "Warehouse ID is required")
     private Long warehouseId;

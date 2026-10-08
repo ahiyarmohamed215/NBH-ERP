@@ -59,6 +59,13 @@ public class Invoice extends BaseEntity {
     @Builder.Default
     private String paymentType = "CASH"; // CASH, CARD, CREDIT, BANK_TRANSFER
 
+    @Column(length = 30)
+    private String paymentMethod;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private BigDecimal returnedAmount = BigDecimal.ZERO;
+
     @Column(nullable = false)
     @Builder.Default
     private BigDecimal subtotal = BigDecimal.ZERO;

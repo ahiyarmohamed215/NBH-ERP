@@ -35,6 +35,7 @@ public class StockService {
     private final StockMovementRepository stockMovementRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
+    private final com.nbh.erp.accounting.service.AccountingService accounting;
 
     @Transactional(readOnly = true)
     public BigDecimal getAvailableStock(Long warehouseId, Long productId) {
@@ -103,7 +104,7 @@ public class StockService {
         StockBalance savedBalance = stockBalanceRepository.save(stockBalance);
 
         // Update product cost price if provided and valid
-        if (unitCost != null && unitCost.compareTo(BigDecimal.ZERO) > 0) {
+        if ("GRN".equals(referenceType) && unitCost != null && unitCost.compareTo(BigDecimal.ZERO) > 0) {
             product.setCostPrice(unitCost);
             productRepository.save(product);
         }
@@ -128,10 +129,17 @@ public class StockService {
     }
 
     @Transactional
+    public StockBalance decreaseStock(Long warehouseId, Long productId, BigDecimal quantity,
+            String referenceType, String referenceNumber, String notes) {
+        return decreaseStock(warehouseId, productId, quantity, null, referenceType, referenceNumber, notes);
+    }
+
+    @Transactional
     public StockBalance decreaseStock(
             Long warehouseId,
             Long productId,
             BigDecimal quantity,
+            BigDecimal unitCost,
             String referenceType,
             String referenceNumber,
             String notes
@@ -166,7 +174,7 @@ public class StockService {
                 quantity.negate(),
                 before,
                 after,
-                product.getCostPrice(),
+                unitCost != null ? unitCost : product.getCostPrice(),
                 referenceType,
                 referenceNumber,
                 notes
@@ -298,6 +306,15 @@ public class StockService {
                 .build();
 
         stockMovementRepository.save(movement);
+        BigDecimal value=quantity.abs().multiply(movement.getUnitCost()).setScale(2,java.math.RoundingMode.HALF_UP);
+        String opposite=switch(referenceType) {
+            case "GRN", "GRN_CANCEL", "PRN" -> "AP";
+            case "SALE", "SALE_RETURN", "VOID_SALE" -> "COGS";
+            case "STOCK_ADJUSTMENT" -> "ADJUSTMENTS";
+            default -> null;
+        };
+        if(opposite!=null) accounting.transfer("STOCK-"+movement.getId(),LocalDate.now(),referenceType+" "+referenceNumber,"STOCK",
+            quantity.signum()>0 ? "INVENTORY" : opposite,quantity.signum()>0 ? opposite : "INVENTORY",value);
     }
 
     @Transactional(readOnly = true)

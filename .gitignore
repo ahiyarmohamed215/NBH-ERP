@@ -40,3 +40,6 @@ frontend/dist-ssr/
 *.env
 *.env.local
 
+
+.build/
+verification-*.log

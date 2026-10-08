@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
 @Setter
 public abstract class BaseEntity {
 
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long recordVersion;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

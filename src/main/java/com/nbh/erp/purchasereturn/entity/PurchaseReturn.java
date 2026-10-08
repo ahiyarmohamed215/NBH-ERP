@@ -26,6 +26,7 @@ public class PurchaseReturn extends BaseEntity {
 
     @Column(name = "prn_number", nullable = false, unique = true, length = 50)
     private String prnNumber;
+    private Long sourceGrnId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id", nullable = false)

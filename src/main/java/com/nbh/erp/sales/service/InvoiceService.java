@@ -43,6 +43,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
+    private static final Set<String> UNPOSTED=Set.of("HELD","SENT_TO_WAREHOUSE","STOCK_ADJUSTED");
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final InvoiceRepository invoiceRepository;
     private final CustomerRepository customerRepository;
@@ -53,6 +55,9 @@ public class InvoiceService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final ProductStaffQuotaService productStaffQuotaService;
+    private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
+    private final com.nbh.erp.accounting.service.AccountingService accounting;
+    private final com.nbh.erp.payment.repository.PaymentRepository payments;
 
     public String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -104,19 +109,19 @@ public class InvoiceService {
     public List<InvoiceDto> getHeldInvoices(String cashier) {
         if (!canViewAllSales()) {
             // Non-supervisor cashiers can ONLY see their own held bills
-            return invoiceRepository.findByStatusAndCreatedBy("HELD", getCurrentUsername()).stream()
+            return invoiceRepository.findByStatusInAndCreatedBy(UNPOSTED, getCurrentUsername()).stream()
                     .map(InvoiceDto::from)
                     .collect(Collectors.toList());
         }
 
         // Supervisor / Admin with SALES_VIEW_ALL
         if (cashier != null && !cashier.isBlank()) {
-            return invoiceRepository.findByStatusAndCreatedBy("HELD", cashier.trim()).stream()
+            return invoiceRepository.findByStatusInAndCreatedBy(UNPOSTED, cashier.trim()).stream()
                     .map(InvoiceDto::from)
                     .collect(Collectors.toList());
         }
 
-        return invoiceRepository.findByStatus("HELD").stream()
+        return invoiceRepository.findByStatusIn(UNPOSTED).stream()
                 .map(InvoiceDto::from)
                 .collect(Collectors.toList());
     }
@@ -125,6 +130,7 @@ public class InvoiceService {
     public InvoiceDto getInvoiceById(Long id) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
+        enforceAccess(invoice);
         return InvoiceDto.from(invoice);
     }
 
@@ -132,22 +138,25 @@ public class InvoiceService {
     public InvoiceDto getInvoiceByNumber(String invoiceNumber) {
         Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
+        enforceAccess(invoice);
         return InvoiceDto.from(invoice);
     }
 
     @Transactional
     public InvoiceDto createInvoice(CreateInvoiceRequest request) {
+        var ticket=idempotency.reserve("createInvoice",request);
+        if(ticket!=null && ticket.getResourceId()!=null) return getInvoiceById(ticket.getResourceId());
+
         Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
 
         Customer customer;
         if (request.getCustomerId() != null) {
-            customer = customerRepository.findById(request.getCustomerId())
+            customer = customerRepository.findByIdForUpdate(request.getCustomerId())
                     .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", request.getCustomerId()));
         } else {
             customer = customerRepository.findByCustomerCode("CUST-0001")
-                    .orElseGet(() -> customerRepository.findAll().stream().findFirst()
-                            .orElseThrow(() -> new BusinessException("No default walk-in customer available")));
+                    .orElseThrow(() -> new BusinessException("Configure the walk-in customer CUST-0001 before making cash sales"));
         }
 
         if (Boolean.FALSE.equals(customer.getIsActive())) {
@@ -162,18 +171,6 @@ public class InvoiceService {
             Long currentUserId = SecurityUtils.getCurrentUserId().orElse(null);
             if (currentUserId != null) {
                 salesman = userRepository.findById(currentUserId).orElse(null);
-            }
-        }
-
-        // Validate staff quota restrictions before processing sale
-        if (!request.isHold() && salesman != null) {
-            for (CreateInvoiceRequest.CreateInvoiceItemRequest itemReq : request.getItems()) {
-                productStaffQuotaService.validateStaffQuota(
-                        itemReq.getProductId(),
-                        salesman.getId(),
-                        warehouse.getId(),
-                        itemReq.getQuantity()
-                );
             }
         }
 
@@ -208,13 +205,15 @@ public class InvoiceService {
                 unitPrice = catalogPrice;
             }
 
+            if (!Boolean.TRUE.equals(product.getIsActive()) || itemReq.getQuantity()==null || itemReq.getQuantity().signum()<=0) throw new BusinessException("Active product and positive quantity required");
             BigDecimal lineGross = itemReq.getQuantity().multiply(unitPrice);
             BigDecimal itemDisc = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
             if (itemReq.getDiscountRate() != null && itemReq.getDiscountRate().compareTo(BigDecimal.ZERO) > 0) {
                 itemDisc = lineGross.multiply(itemReq.getDiscountRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             }
 
-            BigDecimal lineNet = lineGross.subtract(itemDisc);
+            if (itemDisc.signum()<0 || itemDisc.compareTo(lineGross)>0) throw new BusinessException("Invalid discount");
+            BigDecimal lineNet = lineGross.subtract(itemDisc).setScale(2,RoundingMode.HALF_UP);
             if (lineNet.compareTo(BigDecimal.ZERO) < 0) {
                 lineNet = BigDecimal.ZERO;
             }
@@ -235,19 +234,22 @@ public class InvoiceService {
         }
 
         BigDecimal invDiscount = request.getDiscountAmount() != null ? request.getDiscountAmount() : BigDecimal.ZERO;
+        if(invDiscount.signum()<0 || invDiscount.compareTo(subtotal)>0) throw new BusinessException("Invalid invoice discount");
         BigDecimal taxable = subtotal.subtract(invDiscount);
         if (taxable.compareTo(BigDecimal.ZERO) < 0) {
             taxable = BigDecimal.ZERO;
         }
 
         BigDecimal taxRate = request.getTaxRate() != null ? request.getTaxRate() : BigDecimal.ZERO;
+        if(taxRate.signum()<0 || taxRate.compareTo(BigDecimal.valueOf(100))>0) throw new BusinessException("Invalid tax rate");
         BigDecimal taxAmount = taxable.multiply(taxRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
         BigDecimal netTotal = taxable.add(taxAmount);
 
-        BigDecimal paid = request.getPaidAmount();
+        BigDecimal paid = request.isHold() ? BigDecimal.ZERO : request.getPaidAmount();
         if (paid == null) {
             paid = "CREDIT".equalsIgnoreCase(request.getPaymentType()) ? BigDecimal.ZERO : netTotal;
         }
+        if (paid.signum() < 0 || paid.compareTo(netTotal) > 0) throw new BusinessException("Paid amount must be between zero and invoice total; record change separately");
         BigDecimal balance = netTotal.subtract(paid);
 
         invoice.setSubtotal(subtotal);
@@ -258,44 +260,10 @@ public class InvoiceService {
         invoice.setPaidAmount(paid);
         invoice.setBalanceAmount(balance);
 
+        invoice.setPaymentMethod(normalizeMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : request.getPaymentType()));
         Invoice saved = invoiceRepository.save(invoice);
 
-            // If not hold, immediately deduct inventory via StockService and consume staff quota
-        if (!request.isHold()) {
-            Long whId = warehouse.getId();
-            for (InvoiceItem item : saved.getItems()) {
-                stockService.decreaseStock(
-                        whId,
-                        item.getProduct().getId(),
-                        item.getQuantity(),
-                        "SALE",
-                        saved.getInvoiceNumber(),
-                        "Sale to customer " + customer.getName()
-                );
-            }
-
-            // Consume staff quota if a sales rep is assigned
-            if (salesman != null) {
-                for (InvoiceItem item : saved.getItems()) {
-                    productStaffQuotaService.consumeStaffQuota(
-                            item.getProduct().getId(),
-                            salesman.getId(),
-                            whId,
-                            item.getQuantity()
-                    );
-                }
-            }
-
-            // Update customer balance if credit sale
-            if (balance.compareTo(BigDecimal.ZERO) > 0 && customer.getCreditLimit() != null && customer.getCreditLimit().compareTo(BigDecimal.ZERO) > 0) {
-                customer.setCurrentBalance(customer.getCurrentBalance().add(balance));
-                customerRepository.save(customer);
-            }
-
-            log.info("Invoice '{}' completed. Net total: {}, Stock deducted.", saved.getInvoiceNumber(), saved.getNetTotal());
-        } else {
-            log.info("Invoice '{}' saved as HELD cart.", saved.getInvoiceNumber());
-        }
+        if (!request.isHold()) finalizeInvoice(saved);
 
         auditLogService.log(
                 request.isHold() ? "INVOICE_HOLD" : "INVOICE_CREATE",
@@ -305,15 +273,15 @@ public class InvoiceService {
                         saved.getInvoiceNumber(), customer.getName(), saved.getNetTotal(), saved.getPaymentType())
         );
 
-        return InvoiceDto.from(saved);
+        return idempotency.complete(ticket,saved.getId(),InvoiceDto.from(saved));
     }
 
     @Transactional
     public InvoiceDto resumeHeldInvoice(Long id, CreateInvoiceRequest request) {
-        Invoice heldInvoice = invoiceRepository.findById(id)
+        Invoice heldInvoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
 
-        if (!"HELD".equals(heldInvoice.getStatus())) {
+        if (!UNPOSTED.contains(heldInvoice.getStatus())) {
             throw new BusinessException("Invoice " + heldInvoice.getInvoiceNumber() + " is not in HELD status");
         }
 
@@ -323,15 +291,21 @@ public class InvoiceService {
             throw new BusinessException("Access denied: You cannot resume a bill placed on hold by another cashier (" + heldInvoice.getCreatedBy() + ")");
         }
 
-        // Remove old held invoice and re-create with final details or update
-        invoiceRepository.delete(heldInvoice);
-        request.setHold(false);
-        return createInvoice(request);
+        UpdateInvoiceRequest update = new UpdateInvoiceRequest();
+        update.setCustomerId(request.getCustomerId()); update.setWarehouseId(request.getWarehouseId());
+        update.setSalesmanId(request.getSalesmanId()); update.setPaymentType(request.getPaymentType());
+        update.setPaymentMethod(request.getPaymentMethod()); update.setDiscountAmount(request.getDiscountAmount());
+        update.setTaxRate(request.getTaxRate()); update.setPaidAmount(request.getPaidAmount());
+        update.setInvoiceDate(request.getInvoiceDate()); update.setNotes(request.getNotes()); update.setStatus("COMPLETED");
+        update.setItems(request.getItems().stream().map(x -> UpdateInvoiceRequest.UpdateInvoiceItemRequest.builder()
+            .productId(x.getProductId()).quantity(x.getQuantity()).unitPrice(x.getUnitPrice())
+            .discountAmount(x.getDiscountAmount()).discountRate(x.getDiscountRate()).build()).toList());
+        return performUpdateInvoice(heldInvoice, update);
     }
 
     @Transactional
     public void cancelHeldInvoice(Long id) {
-        Invoice invoice = invoiceRepository.findById(id)
+        Invoice invoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
 
         if (!"HELD".equalsIgnoreCase(invoice.getStatus()) 
@@ -372,26 +346,37 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto voidInvoice(Long id, String reason) {
-        Invoice invoice = invoiceRepository.findById(id)
+        Invoice invoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
         return performVoidInvoice(invoice, reason);
     }
 
     @Transactional
     public InvoiceDto voidInvoiceByNumber(String invoiceNumber, String reason) {
-        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+        Invoice invoice = invoiceRepository.findByNumberForUpdate(invoiceNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
         return performVoidInvoice(invoice, reason);
     }
 
+    public void enforceAccess(Invoice invoice) {
+        if (!canViewAllSales() && !Objects.equals(invoice.getCreatedBy(), getCurrentUsername()))
+            throw new org.springframework.security.access.AccessDeniedException("Invoice belongs to another cashier");
+    }
     private InvoiceDto performVoidInvoice(Invoice invoice, String reason) {
+        SecurityUtils.requirePermission("SALES_VOID");
+        enforceAccess(invoice);
+        if (reason == null || reason.isBlank()) throw new BusinessException("A void reason is required");
+        if (invoice.getReturnedAmount().signum() > 0) throw new BusinessException("An invoice with returns cannot be voided");
+        if (invoice.getPaidAmount().signum() > 0) throw new BusinessException("Reverse payments or issue a sales return before voiding a paid invoice");
         String currentStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
         if ("VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
             throw new BusinessException("Invoice " + invoice.getInvoiceNumber() + " is already " + currentStatus);
         }
 
-        // If invoice was completed/paid/partial and deducted stock, revert stock back to warehouse
-        if (!"HELD".equals(currentStatus)) {
+        if (!UNPOSTED.contains(currentStatus) && !InvoiceBalances.POSTED.contains(currentStatus)) throw new BusinessException("Unsupported invoice state for voiding");
+        if (invoice.getDelivery()!=null) throw new BusinessException("Cancel the delivery assignment before voiding");
+        customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
+        if (InvoiceBalances.POSTED.contains(currentStatus)) {
             if (invoice.getWarehouse() != null && invoice.getItems() != null) {
                 Long whId = invoice.getWarehouse().getId();
                 for (InvoiceItem item : invoice.getItems()) {
@@ -419,16 +404,9 @@ public class InvoiceService {
                 }
             }
 
-            // Revert customer balance if credit sale
-            Customer customer = invoice.getCustomer();
-            if (customer != null && invoice.getBalanceAmount() != null && invoice.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                if (customer.getCurrentBalance() != null) {
-                    BigDecimal newBal = customer.getCurrentBalance().subtract(invoice.getBalanceAmount());
-                    customer.setCurrentBalance(newBal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBal);
-                    customerRepository.save(customer);
-                }
-            }
-            invoice.setStatus("VOIDED");
+            accounting.reverseSource("SALE-"+invoice.getId(),reason);
+        accounting.reverseSource("TAX-"+invoice.getId(),reason);
+        invoice.setStatus("VOIDED");
         } else {
             invoice.setStatus("CANCELLED");
         }
@@ -437,7 +415,9 @@ public class InvoiceService {
                 LocalDate.now(), getCurrentUsername(), reason != null && !reason.isBlank() ? reason.trim() : "Manual void");
         invoice.setNotes(invoice.getNotes() != null ? invoice.getNotes() + voidInfo : voidInfo);
 
+        invoice.setBalanceAmount(BigDecimal.ZERO);
         Invoice saved = invoiceRepository.save(invoice);
+        customerBalances.reconcile(invoice.getCustomer().getId());
         log.info("Invoice {} (ID {}) has been VOIDED. Stock and customer balances restored atomically.",
                 saved.getInvoiceNumber(), saved.getId());
 
@@ -454,7 +434,7 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto updateInvoice(Long id, UpdateInvoiceRequest request) {
-        Invoice invoice = invoiceRepository.findById(id)
+        Invoice invoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
         SecurityUtils.enforceCanEdit("SALES", invoice.getInvoiceNumber());
         return performUpdateInvoice(invoice, request);
@@ -462,183 +442,121 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto updateInvoiceByNumber(String invoiceNumber, UpdateInvoiceRequest request) {
-        Invoice invoice = invoiceRepository.findByInvoiceNumber(invoiceNumber)
+        Invoice invoice = invoiceRepository.findByNumberForUpdate(invoiceNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "invoiceNumber", invoiceNumber));
         SecurityUtils.enforceCanEdit("SALES", invoice.getInvoiceNumber());
         return performUpdateInvoice(invoice, request);
     }
 
     private InvoiceDto performUpdateInvoice(Invoice invoice, UpdateInvoiceRequest request) {
-        String currentStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
-        if ("VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) {
-            throw new BusinessException("Cannot update invoice " + invoice.getInvoiceNumber() + " with terminal status " + currentStatus);
-        }
-
-        String targetStatus = null;
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            targetStatus = request.getStatus().trim().toUpperCase();
-            if (!VALID_STATUSES.contains(targetStatus)) {
-                throw new BusinessException("Invalid invoice status: " + request.getStatus() + ". Valid statuses are: " + VALID_STATUSES);
-            }
-            if ("HELD".equals(currentStatus) && "VOIDED".equals(targetStatus)) {
-                throw new BusinessException("Held bills cannot be voided; cancel them instead.");
-            }
-            if (!"HELD".equals(currentStatus) && "HELD".equals(targetStatus)) {
-                throw new BusinessException("Finalized invoices cannot be reverted to HELD status.");
-            }
-            if (!"HELD".equals(currentStatus) && "VOIDED".equals(targetStatus)) {
-                return performVoidInvoice(invoice, request.getNotes() != null ? request.getNotes() : "Voided via status update");
-            }
-        }
-
-        // Customer
-        if (request.getCustomerId() != null) {
-            customerRepository.findById(request.getCustomerId()).ifPresent(invoice::setCustomer);
-        } else if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
-            List<Customer> matching = customerRepository.searchCustomers(request.getCustomerName().trim());
-            if (!matching.isEmpty()) {
-                invoice.setCustomer(matching.get(0));
-            }
-        }
-
-        // Salesman / Sales Rep
-        if (request.getSalesmanId() != null) {
-            userRepository.findById(request.getSalesmanId()).ifPresent(invoice::setSalesman);
-        }
-
-        // Warehouse
-        if (request.getWarehouseId() != null) {
-            warehouseRepository.findById(request.getWarehouseId()).ifPresent(invoice::setWarehouse);
-        }
-
-        // Line Items update: only permitted for HELD invoices
-        if (request.getItems() != null && !request.getItems().isEmpty()) {
-            if (!"HELD".equals(currentStatus)) {
-                throw new BusinessException("Cannot modify line items on finalized invoice (" + currentStatus + "). Void the invoice and create a new one instead.");
-            }
-
-            invoice.getItems().clear();
-            BigDecimal calculatedSubtotal = BigDecimal.ZERO;
-
-            for (UpdateInvoiceRequest.UpdateInvoiceItemRequest itemReq : request.getItems()) {
-                Product product = null;
-                if (itemReq.getProductId() != null) {
-                    product = productRepository.findById(itemReq.getProductId()).orElse(null);
-                } else if (itemReq.getSku() != null && !itemReq.getSku().isBlank()) {
-                    product = productRepository.findBySku(itemReq.getSku()).orElse(null);
+        enforceAccess(invoice);
+        String currentStatus=invoice.getStatus();
+        if ("VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) throw new BusinessException("Terminal invoice cannot be edited");
+        String target=request.getStatus()==null ? currentStatus : request.getStatus().toUpperCase();
+        if (!VALID_STATUSES.contains(target)) throw new BusinessException("Invalid invoice status");
+        if ("VOIDED".equals(target)) return performVoidInvoice(invoice, request.getNotes());
+        if (!UNPOSTED.contains(currentStatus)) {
+            if (!target.equals(currentStatus) || request.getItems()!=null ||
+                (request.getCustomerId()!=null && !request.getCustomerId().equals(invoice.getCustomer().getId())) ||
+                request.getCustomerName()!=null ||
+                (request.getWarehouseId()!=null && !request.getWarehouseId().equals(invoice.getWarehouse().getId())) ||
+                request.getSalesmanId()!=null || different(request.getTotalAmount(),invoice.getNetTotal()) ||
+                different(request.getPaidAmount(),invoice.getPaidAmount()) || different(request.getBalanceAmount(),invoice.getBalanceAmount()) ||
+                different(request.getDiscountAmount(),invoice.getDiscountAmount()) || different(request.getTaxRate(),invoice.getTaxRate()) ||
+                different(request.getTaxAmount(),invoice.getTaxAmount()) ||
+                (request.getPaymentMethod()!=null && !normalizeMethod(request.getPaymentMethod()).equals(invoice.getPaymentMethod())) ||
+                (request.getPaymentType()!=null && !request.getPaymentType().equalsIgnoreCase(invoice.getPaymentType())) ||
+                (request.getInvoiceDate()!=null && !request.getInvoiceDate().equals(invoice.getInvoiceDate())))
+                throw new BusinessException("Posted invoice values are immutable. Use payments, returns, or void and reissue.");
+        } else {
+            if ("CANCELLED".equals(target)) { invoice.setStatus("CANCELLED"); }
+            else {
+                if (request.getCustomerId()!=null) invoice.setCustomer(customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow(() -> new BusinessException("Unknown customer")));
+                if (request.getWarehouseId()!=null) invoice.setWarehouse(warehouseRepository.findById(request.getWarehouseId()).orElseThrow(() -> new BusinessException("Unknown warehouse")));
+                if (request.getSalesmanId()!=null) invoice.setSalesman(userRepository.findById(request.getSalesmanId()).orElseThrow(() -> new BusinessException("Unknown staff member")));
+                if(request.getItems()!=null) {
+                    if(request.getItems().isEmpty()) throw new BusinessException("Invoice requires at least one line");
+                    invoice.getItems().clear();
+                    for(var line:request.getItems()) {
+                        Product product=productRepository.findById(line.getProductId()).orElseThrow(() -> new BusinessException("Unknown product"));
+                        if(!Boolean.TRUE.equals(product.getIsActive()) || line.getQuantity()==null || line.getQuantity().signum()<=0) throw new BusinessException("Active product and positive quantity required");
+                        BigDecimal gross=product.getSellingPrice().multiply(line.getQuantity());
+                        BigDecimal rate=line.getDiscountRate()==null ? BigDecimal.ZERO : line.getDiscountRate();
+                        BigDecimal discount=line.getDiscountAmount()==null ? BigDecimal.ZERO : line.getDiscountAmount();
+                        if(rate.signum()<0 || rate.compareTo(BigDecimal.valueOf(100))>0) throw new BusinessException("Discount rate must be between 0 and 100");
+                        if(rate.signum()>0) discount=gross.multiply(rate).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP);
+                        if(discount.signum()<0 || discount.compareTo(gross)>0) throw new BusinessException("Invalid line discount");
+                        invoice.getItems().add(InvoiceItem.builder().invoice(invoice).product(product).quantity(line.getQuantity())
+                          .unitPrice(product.getSellingPrice()).costPrice(product.getCostPrice()).discountRate(rate).discountAmount(discount).totalPrice(gross.subtract(discount)).build());
+                    }
                 }
-                if (product == null) continue;
-
-                BigDecimal qty = itemReq.getQuantity() != null && itemReq.getQuantity().compareTo(BigDecimal.ZERO) > 0
-                        ? itemReq.getQuantity()
-                        : BigDecimal.ONE;
-                BigDecimal unitPrice = product.getSellingPrice() != null ? product.getSellingPrice() : BigDecimal.ZERO;
-
-                BigDecimal lineGross = qty.multiply(unitPrice);
-                BigDecimal discRate = itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO;
-                BigDecimal discAmt = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
-                if (discRate.compareTo(BigDecimal.ZERO) > 0 && discAmt.compareTo(BigDecimal.ZERO) == 0) {
-                    discAmt = lineGross.multiply(discRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                }
-
-                BigDecimal lineNet = lineGross.subtract(discAmt);
-                if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
-                calculatedSubtotal = calculatedSubtotal.add(lineNet);
-
-                InvoiceItem newItem = InvoiceItem.builder()
-                        .invoice(invoice)
-                        .product(product)
-                        .quantity(qty)
-                        .unitPrice(unitPrice)
-                        .costPrice(product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO)
-                        .discountRate(discRate)
-                        .discountAmount(discAmt)
-                        .totalPrice(lineNet)
-                        .build();
-
-                invoice.getItems().add(newItem);
-            }
-
-            invoice.setSubtotal(calculatedSubtotal);
-
-            // If finalizing from HELD to COMPLETED/PAID, deduct inventory atomically
-            if ("COMPLETED".equals(targetStatus) || "PAID".equals(targetStatus) || "PARTIAL".equals(targetStatus)) {
-                Long whId = invoice.getWarehouse() != null ? invoice.getWarehouse().getId() : 1L;
-                for (InvoiceItem item : invoice.getItems()) {
-                    stockService.decreaseStock(
-                            whId,
-                            item.getProduct().getId(),
-                            item.getQuantity(),
-                            "SALE",
-                            invoice.getInvoiceNumber(),
-                            "Sale finalized from held bill " + invoice.getInvoiceNumber()
-                    );
-                }
+                invoice.setSubtotal(invoice.getItems().stream().map(InvoiceItem::getTotalPrice).reduce(BigDecimal.ZERO,BigDecimal::add));
+                if(request.getDiscountAmount()!=null) invoice.setDiscountAmount(request.getDiscountAmount());
+                if(request.getTaxRate()!=null) invoice.setTaxRate(request.getTaxRate());
+                if(invoice.getDiscountAmount().signum()<0 || invoice.getDiscountAmount().compareTo(invoice.getSubtotal())>0 || invoice.getTaxRate().signum()<0 || invoice.getTaxRate().compareTo(BigDecimal.valueOf(100))>0) throw new BusinessException("Invalid discount or tax rate");
+                BigDecimal taxable=invoice.getSubtotal().subtract(invoice.getDiscountAmount());
+                invoice.setTaxAmount(taxable.multiply(invoice.getTaxRate()).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP));
+                invoice.setNetTotal(taxable.add(invoice.getTaxAmount()));
+                if(request.getPaymentType()!=null) invoice.setPaymentType(request.getPaymentType().toUpperCase());
+                invoice.setPaymentMethod(normalizeMethod(request.getPaymentMethod()!=null ? request.getPaymentMethod() : invoice.getPaymentType()));
+                invoice.setPaidAmount(UNPOSTED.contains(target) ? BigDecimal.ZERO : request.getPaidAmount()!=null ? request.getPaidAmount() : "CREDIT".equals(invoice.getPaymentType()) ? BigDecimal.ZERO : invoice.getNetTotal());
+                if(invoice.getPaidAmount().signum()<0 || invoice.getPaidAmount().compareTo(invoice.getNetTotal())>0) throw new BusinessException("Invalid paid amount");
+                invoice.setBalanceAmount(invoice.getNetTotal().subtract(invoice.getPaidAmount()));
+                if(UNPOSTED.contains(target)) invoice.setStatus(target);
+                else if(Set.of("COMPLETED","PAID","PARTIAL").contains(target)) finalizeInvoice(invoice);
+                else throw new BusinessException("Invalid invoice transition");
             }
         }
-
-        if (request.getDiscountAmount() != null) {
-            invoice.setDiscountAmount(request.getDiscountAmount());
-        }
-        if (request.getTaxRate() != null) {
-            invoice.setTaxRate(request.getTaxRate());
-        }
-        if (request.getTaxAmount() != null) {
-            invoice.setTaxAmount(request.getTaxAmount());
-        }
-
-        if ("HELD".equals(currentStatus)) {
-            BigDecimal taxable = invoice.getSubtotal().subtract(invoice.getDiscountAmount());
-            if (taxable.compareTo(BigDecimal.ZERO) < 0) taxable = BigDecimal.ZERO;
-            BigDecimal tax = taxable.multiply(invoice.getTaxRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-            invoice.setTaxAmount(tax);
-            invoice.setNetTotal(taxable.add(tax));
-        } else if (request.getTotalAmount() != null) {
-            invoice.setNetTotal(request.getTotalAmount());
-        }
-
-        BigDecimal paid = request.getPaidAmount() != null ? request.getPaidAmount() : invoice.getPaidAmount();
-        invoice.setPaidAmount(paid);
-
-        BigDecimal balance = request.getBalanceAmount() != null
-                ? request.getBalanceAmount()
-                : invoice.getNetTotal().subtract(paid);
-        if (balance.compareTo(BigDecimal.ZERO) < 0) balance = BigDecimal.ZERO;
-        invoice.setBalanceAmount(balance);
-
-        if (targetStatus != null) {
-            invoice.setStatus(targetStatus);
-        } else if (!"HELD".equals(currentStatus)) {
-            if (paid.compareTo(invoice.getNetTotal()) >= 0 && invoice.getNetTotal().compareTo(BigDecimal.ZERO) > 0) {
-                invoice.setStatus("PAID");
-            } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
-                invoice.setStatus("PARTIAL");
-            } else {
-                invoice.setStatus("COMPLETED");
-            }
-        }
-
-        if (request.getPaymentType() != null) {
-            invoice.setPaymentType(request.getPaymentType().toUpperCase());
-        }
-        if (request.getInvoiceDate() != null) {
-            invoice.setInvoiceDate(request.getInvoiceDate());
-        }
-        if (request.getNotes() != null) {
-            invoice.setNotes(request.getNotes());
-        }
-
-        Invoice saved = invoiceRepository.save(invoice);
-        auditLogService.log(
-                "INVOICE_UPDATE",
-                "Invoice",
-                saved.getInvoiceNumber(),
-                String.format("Invoice %s updated by %s (Status: %s, Net Total: %s)",
-                        saved.getInvoiceNumber(), getCurrentUsername(), saved.getStatus(), saved.getNetTotal())
-        );
-        log.info("Invoice {} (ID {}) updated successfully in DB. Status: {}, Net Total: {}",
-                saved.getInvoiceNumber(), saved.getId(), saved.getStatus(), saved.getNetTotal());
+        if(request.getNotes()!=null) invoice.setNotes(request.getNotes());
+        Invoice saved=invoiceRepository.save(invoice);
+        auditLogService.log("INVOICE_UPDATE","Invoice",saved.getInvoiceNumber(),"Updated invoice through validated state transition");
         return InvoiceDto.from(saved);
+    }
+    @Transactional
+    public List<InvoiceDto> completeHeldInvoices(List<Long> ids) {
+        if(ids==null || ids.isEmpty() || ids.size()>100) throw new BusinessException("Select 1 to 100 held invoices");
+        var result=new ArrayList<InvoiceDto>();
+        for(Long id:ids.stream().distinct().sorted().toList()) {
+            Invoice invoice=invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new BusinessException("Unknown held invoice"));
+            if(!UNPOSTED.contains(invoice.getStatus())) throw new BusinessException("Only held invoices can be completed");
+            var request=new UpdateInvoiceRequest();request.setStatus("COMPLETED");request.setPaymentType("CREDIT");request.setPaidAmount(BigDecimal.ZERO);
+            result.add(performUpdateInvoice(invoice,request));
+        }
+        return result;
+    }
+
+    private static boolean different(BigDecimal a,BigDecimal b) { return a!=null && a.compareTo(b)!=0; }
+    private static String normalizeMethod(String method) {
+        String value=method==null ? "CASH" : method.toUpperCase().replace(' ','_');
+        if("CREDIT".equals(value)) return "CREDIT";
+        if(!Set.of("CASH","CARD","BANK_TRANSFER","CHEQUE","ONLINE").contains(value)) throw new BusinessException("Invalid payment method");
+        return value;
+    }
+    private void finalizeInvoice(Invoice invoice) {
+        if(!Boolean.TRUE.equals(invoice.getWarehouse().getIsActive()) || !Boolean.TRUE.equals(invoice.getCustomer().getIsActive())) throw new BusinessException("Warehouse and customer must be active");
+        Customer customer=customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
+        BigDecimal outstanding=invoiceRepository.outstandingForCustomer(customer.getId());
+        // New invoices may already be saved in the transaction, exclude their own balance once.
+        if(invoice.getId()!=null && InvoiceBalances.POSTED.contains(invoice.getStatus())) outstanding=outstanding.subtract(invoice.getBalanceAmount()).max(BigDecimal.ZERO);
+        if(invoice.getBalanceAmount().signum()>0 && (customer.getCreditLimit()==null || outstanding.add(invoice.getBalanceAmount()).compareTo(customer.getCreditLimit())>0)) throw new BusinessException("Customer credit limit exceeded (zero means no credit)");
+        for(InvoiceItem item:invoice.getItems()) item.setCostPrice(item.getProduct().getCostPrice());
+        Map<Long,BigDecimal> quantities=new TreeMap<>();
+        for(InvoiceItem item:invoice.getItems()) quantities.merge(item.getProduct().getId(),item.getQuantity(),BigDecimal::add);
+        for(var line:quantities.entrySet()) {
+            if(invoice.getSalesman()!=null) productStaffQuotaService.consumeStaffQuota(line.getKey(),invoice.getSalesman().getId(),invoice.getWarehouse().getId(),line.getValue());
+            stockService.decreaseStock(invoice.getWarehouse().getId(),line.getKey(),line.getValue(),"SALE",invoice.getInvoiceNumber(),"Invoice completion");
+        }
+        InvoiceBalances.recalculate(invoice);
+        invoiceRepository.save(invoice);
+        customerBalances.reconcile(customer.getId());
+        accounting.transfer("SALE-"+invoice.getId(),invoice.getInvoiceDate(),"Sale "+invoice.getInvoiceNumber(),"SALES","AR","SALES",invoice.getNetTotal().subtract(invoice.getTaxAmount()));
+        accounting.transfer("TAX-"+invoice.getId(),invoice.getInvoiceDate(),"Tax "+invoice.getInvoiceNumber(),"SALES","AR","TAX",invoice.getTaxAmount());
+        if(invoice.getPaidAmount().signum()>0) {
+            var receipt=com.nbh.erp.payment.entity.Payment.builder().paymentNumber(sequenceService.generatePaymentNumber()).invoice(invoice).customer(customer)
+                .amount(invoice.getPaidAmount()).paymentMethod(invoice.getPaymentMethod()).paymentType("INVOICE_PAYMENT").paymentDate(invoice.getInvoiceDate()).status("COMPLETED").notes("Initial invoice payment").build();
+            payments.save(receipt);
+            accounting.transfer("PAYMENT-"+receipt.getId(),receipt.getPaymentDate(),receipt.getPaymentNumber(),"PAYMENT",com.nbh.erp.accounting.service.AccountingService.cashAccount(receipt.getPaymentMethod()),"AR",receipt.getAmount());
+        }
     }
 
     @Transactional(readOnly = true)

@@ -29,12 +29,16 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final CustomerRepository customerRepository;
     private final DocumentSequenceService sequenceService;
     private final AuditLogService auditLogService;
+    private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
+    private final com.nbh.erp.accounting.service.AccountingService accounting;
+    private final com.nbh.erp.payment.repository.PaymentAllocationRepository allocations;
 
     @Transactional(readOnly = true)
     public PagedResponse<PaymentDto> searchPayments(
@@ -63,84 +67,32 @@ public class PaymentService {
 
     @Transactional
     public PaymentDto processPayment(CreatePaymentRequest request) {
+        var ticket=idempotency.reserve("processPayment",request);
+        if(ticket!=null && ticket.getResourceId()!=null) return getPaymentById(ticket.getResourceId());
+
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("Payment amount must be greater than zero");
         }
 
         Invoice invoice = null;
-        if (request.getInvoiceId() != null) {
-            invoice = invoiceRepository.findById(request.getInvoiceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", request.getInvoiceId()));
-        } else if (request.getInvoiceNumber() != null && !request.getInvoiceNumber().isBlank()) {
-            invoice = invoiceRepository.findByInvoiceNumber(request.getInvoiceNumber().trim())
-                    .orElse(null);
-        }
-
-        Customer customer = null;
-        if (invoice != null) {
-            customer = invoice.getCustomer();
-            String invStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
-            if ("VOIDED".equals(invStatus) || "CANCELLED".equals(invStatus)) {
-                throw new BusinessException("Cannot accept payment for " + invStatus + " invoice: " + invoice.getInvoiceNumber());
-            }
-            if ("HELD".equals(invStatus)) {
-                throw new BusinessException("Cannot accept payment for held bill: " + invoice.getInvoiceNumber() + ". Resume and complete it first.");
-            }
-            if ("PAID".equals(invStatus) && invoice.getBalanceAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BusinessException("Invoice " + invoice.getInvoiceNumber() + " is already paid in full.");
-            }
-
-            BigDecimal currentBalance = invoice.getBalanceAmount() != null ? invoice.getBalanceAmount() : invoice.getNetTotal();
-            if (request.getAmount().compareTo(currentBalance) > 0) {
-                log.warn("Payment amount {} exceeds invoice balance {}. Capping payment to exact balance.",
-                        request.getAmount(), currentBalance);
-            }
-
-            // Update invoice balances atomically
-            BigDecimal newPaid = (invoice.getPaidAmount() != null ? invoice.getPaidAmount() : BigDecimal.ZERO).add(request.getAmount());
-            invoice.setPaidAmount(newPaid);
-
-            BigDecimal newBal = invoice.getNetTotal().subtract(newPaid);
-            if (newBal.compareTo(BigDecimal.ZERO) <= 0) {
-                newBal = BigDecimal.ZERO;
-                invoice.setStatus("PAID");
-            } else {
-                invoice.setStatus("PARTIAL");
-            }
-            invoice.setBalanceAmount(newBal);
-
-            // Update customer balance if credit sale
-            if (customer != null && customer.getCurrentBalance() != null && customer.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal custBal = customer.getCurrentBalance().subtract(request.getAmount());
-                customer.setCurrentBalance(custBal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : custBal);
-                customerRepository.save(customer);
-            }
-
+        if(request.getInvoiceId()!=null) invoice=invoiceRepository.findByIdForUpdate(request.getInvoiceId()).orElseThrow(() -> new BusinessException("Unknown invoice"));
+        else if(request.getInvoiceNumber()!=null && !request.getInvoiceNumber().isBlank()) invoice=invoiceRepository.findByNumberForUpdate(request.getInvoiceNumber().trim()).orElseThrow(() -> new BusinessException("Unknown invoice number"));
+        Customer customer;
+        if(invoice!=null) {
+            if(!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(invoice.getStatus())) throw new BusinessException("Invoice is not payable");
+            if(request.getCustomerId()!=null && !request.getCustomerId().equals(invoice.getCustomer().getId())) throw new BusinessException("Customer does not match invoice");
+            customer=customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
+            if(request.getAmount().compareTo(invoice.getBalanceAmount())>0) throw new BusinessException("Payment exceeds invoice balance; record excess as a separate advance");
+            invoice.setPaidAmount(invoice.getPaidAmount().add(request.getAmount()));
+            com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);
             invoiceRepository.save(invoice);
-        } else if (request.getCustomerId() != null) {
-            customer = customerRepository.findById(request.getCustomerId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", request.getCustomerId()));
-            if (customer.getCurrentBalance() != null && customer.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal custBal = customer.getCurrentBalance().subtract(request.getAmount());
-                customer.setCurrentBalance(custBal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : custBal);
-                customerRepository.save(customer);
-            }
-        } else if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
-            List<Customer> matching = customerRepository.searchCustomers(request.getCustomerName().trim());
-            if (!matching.isEmpty()) {
-                customer = matching.get(0);
-            }
+        } else {
+            if(request.getCustomerId()==null) throw new BusinessException("Select a valid customer for an advance");
+            customer=customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow(() -> new BusinessException("Unknown customer"));
         }
-
-        if (customer == null) {
-            customer = customerRepository.findByCustomerCode("CUST-0001")
-                    .orElseGet(() -> customerRepository.findAll().stream().findFirst()
-                            .orElseThrow(() -> new BusinessException("No valid customer found for payment receipt")));
-        }
-
-        String pType = request.getPaymentType() != null && !request.getPaymentType().isBlank()
-                ? request.getPaymentType().trim().toUpperCase()
-                : (invoice == null ? "ADVANCE" : "INVOICE_PAYMENT");
+        if(!Boolean.TRUE.equals(customer.getIsActive())) throw new BusinessException("Customer is inactive");
+        String pType=invoice==null ? "ADVANCE" : "INVOICE_PAYMENT";
+        if(request.getPaymentType()!=null && !pType.equalsIgnoreCase(request.getPaymentType())) throw new BusinessException("Payment type does not match invoice selection");
 
         String paymentNumber = "ADVANCE".equals(pType)
                 ? sequenceService.generateAdvanceVoucherNumber()
@@ -148,7 +100,8 @@ public class PaymentService {
 
         LocalDate paymentDate = request.getPaymentDate() != null ? request.getPaymentDate() : LocalDate.now();
         String method = request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()
-                ? request.getPaymentMethod().trim().toUpperCase() : "CASH";
+                ? request.getPaymentMethod().trim().toUpperCase().replace(' ','_') : "CASH";
+        if(!java.util.Set.of("CASH","CARD","BANK_TRANSFER","CHEQUE","ONLINE").contains(method)) throw new BusinessException("Invalid payment method");
 
         Payment payment = Payment.builder()
                 .paymentNumber(paymentNumber)
@@ -164,6 +117,8 @@ public class PaymentService {
                 .build();
 
         Payment saved = paymentRepository.save(payment);
+        accounting.transfer("PAYMENT-"+saved.getId(),saved.getPaymentDate(),saved.getPaymentNumber(),"PAYMENT",com.nbh.erp.accounting.service.AccountingService.cashAccount(saved.getPaymentMethod()),invoice==null?"DEPOSITS":"AR",saved.getAmount());
+        customerBalances.reconcile(customer.getId());
 
         String username = SecurityUtils.getCurrentUsername().orElse("system");
         auditLogService.log(
@@ -182,50 +137,33 @@ public class PaymentService {
         log.info("Payment receipt {} processed for amount {} (Invoice: {})",
                 saved.getPaymentNumber(), saved.getAmount(), invoice != null ? invoice.getInvoiceNumber() : "Direct");
 
-        return PaymentDto.from(saved);
+        return idempotency.complete(ticket,saved.getId(),PaymentDto.from(saved));
     }
 
     @Transactional
     public PaymentDto voidPayment(Long id, String reason) {
-        Payment payment = paymentRepository.findById(id)
+        Payment payment = paymentRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", id));
 
         if ("VOIDED".equalsIgnoreCase(payment.getStatus())) {
             throw new BusinessException("Payment " + payment.getPaymentNumber() + " is already voided.");
         }
 
-        // Revert invoice amounts if linked
-        Invoice invoice = payment.getInvoice();
-        if (invoice != null && !"VOIDED".equalsIgnoreCase(invoice.getStatus())) {
-            BigDecimal newPaid = invoice.getPaidAmount().subtract(payment.getAmount());
-            if (newPaid.compareTo(BigDecimal.ZERO) < 0) newPaid = BigDecimal.ZERO;
-            invoice.setPaidAmount(newPaid);
-
-            BigDecimal newBal = invoice.getNetTotal().subtract(newPaid);
-            if (newBal.compareTo(BigDecimal.ZERO) < 0) newBal = BigDecimal.ZERO;
-            invoice.setBalanceAmount(newBal);
-
-            if (newBal.compareTo(BigDecimal.ZERO) == 0 && newPaid.compareTo(BigDecimal.ZERO) > 0) {
-                invoice.setStatus("PAID");
-            } else if (newPaid.compareTo(BigDecimal.ZERO) > 0) {
-                invoice.setStatus("PARTIAL");
-            } else {
-                invoice.setStatus("COMPLETED");
-            }
-            invoiceRepository.save(invoice);
+        if(reason==null || reason.isBlank()) throw new BusinessException("A reversal reason is required");
+        Customer customer=customerRepository.findByIdForUpdate(payment.getCustomer().getId()).orElseThrow();
+        if(payment.getInvoice()!=null) reverseInvoicePayment(payment.getInvoice().getId(),payment.getAmount());
+        for(var allocation:allocations.findByPaymentIdAndReversedFalse(payment.getId())) {
+            reverseInvoicePayment(allocation.getInvoice().getId(),allocation.getAmount());
+            accounting.reverseSource("ALLOCATION-"+allocation.getId(),reason);
+            allocation.setReversed(true); allocations.save(allocation);
         }
 
-        // Restore customer balance
-        Customer customer = payment.getCustomer();
-        if (customer != null && customer.getCurrentBalance() != null) {
-            customer.setCurrentBalance(customer.getCurrentBalance().add(payment.getAmount()));
-            customerRepository.save(customer);
-        }
-
+        accounting.reverseSource("PAYMENT-"+payment.getId(),reason);
         payment.setStatus("VOIDED");
         String voidNote = String.format(" [VOIDED on %s: %s]", LocalDate.now(), reason != null ? reason : "Manual void");
         payment.setNotes(payment.getNotes() != null ? payment.getNotes() + voidNote : voidNote);
         Payment saved = paymentRepository.save(payment);
+        customerBalances.reconcile(customer.getId());
 
         String username = SecurityUtils.getCurrentUsername().orElse("system");
         auditLogService.log(
@@ -238,5 +176,34 @@ public class PaymentService {
 
         log.info("Payment receipt {} voided.", saved.getPaymentNumber());
         return PaymentDto.from(saved);
+    }
+
+    private void reverseInvoicePayment(Long id, BigDecimal amount) {
+        Invoice invoice=invoiceRepository.findByIdForUpdate(id).orElseThrow();
+        if(!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(invoice.getStatus()) || invoice.getPaidAmount().compareTo(amount)<0)
+            throw new BusinessException("Payment has been refunded or invoice is closed; reverse dependent transactions first");
+        invoice.setPaidAmount(invoice.getPaidAmount().subtract(amount));
+        com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);
+        invoiceRepository.save(invoice);
+    }
+    @Transactional
+    public PaymentDto allocateAdvance(Long paymentId, Long invoiceId, BigDecimal amount) {
+        var ticket=idempotency.reserve("allocateAdvance",paymentId+"|"+invoiceId+"|"+amount);
+        if(ticket!=null && ticket.getResourceId()!=null) return getPaymentById(ticket.getResourceId());
+        if(amount!=null) amount=amount.setScale(2,java.math.RoundingMode.UNNECESSARY);
+        Payment payment=paymentRepository.findByIdForUpdate(paymentId).orElseThrow(() -> new BusinessException("Unknown payment"));
+        if(!"ADVANCE".equals(payment.getPaymentType()) || !"COMPLETED".equals(payment.getStatus())) throw new BusinessException("An active advance is required");
+        var invoice=invoiceRepository.findByIdForUpdate(invoiceId).orElseThrow(() -> new BusinessException("Unknown invoice"));
+        if(!payment.getCustomer().getId().equals(invoice.getCustomer().getId()) || !com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(invoice.getStatus())) throw new BusinessException("Invoice/customer mismatch");
+        BigDecimal used=allocations.findByPaymentIdAndReversedFalse(paymentId).stream().map(com.nbh.erp.payment.entity.PaymentAllocation::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
+        if(amount==null || amount.signum()<=0 || amount.compareTo(payment.getAmount().subtract(used))>0 || amount.compareTo(invoice.getBalanceAmount())>0) throw new BusinessException("Allocation exceeds available credit or invoice balance");
+        customerRepository.findByIdForUpdate(payment.getCustomer().getId()).orElseThrow();
+        var allocation=new com.nbh.erp.payment.entity.PaymentAllocation();
+        allocation.setPayment(payment); allocation.setInvoice(invoice); allocation.setAmount(amount); allocations.save(allocation);
+        accounting.transfer("ALLOCATION-"+allocation.getId(),LocalDate.now(),"Advance allocation","PAYMENT","DEPOSITS","AR",amount);
+        invoice.setPaidAmount(invoice.getPaidAmount().add(amount)); com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);
+        invoiceRepository.save(invoice); customerBalances.reconcile(payment.getCustomer().getId());
+        auditLogService.log("ADVANCE_ALLOCATE","Payment",payment.getPaymentNumber(),"Allocated "+amount+" to "+invoice.getInvoiceNumber());
+        return idempotency.complete(ticket,paymentId,PaymentDto.from(payment));
     }
 }

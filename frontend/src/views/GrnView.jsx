@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useRef } from 'react';
 import { grnApi, supplierApi, warehouseApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -129,7 +130,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   // Split-view Left Panel: GRN Header Form State
   const [formData, setFormData] = useState({
     grnNumber: '',
-    grnDate: new Date().toISOString().split('T')[0],
+    grnDate: formatBusinessDate(),
     supplierId: '',
     warehouseId: '',
     grnType: GRN_TYPES[0],
@@ -444,7 +445,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
     setFormData({
       grnNumber: '',
-      grnDate: new Date().toISOString().split('T')[0],
+      grnDate: formatBusinessDate(),
       supplierId: defaultSup,
       warehouseId: defaultWh,
       grnType: GRN_TYPES[0],
@@ -469,10 +470,11 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     try {
       setSaving(true);
       const payload = {
+        purchaseOrderId: formData.purchaseOrderId ? Number(formData.purchaseOrderId) : null,
         supplierId: Number(formData.supplierId),
         warehouseId: Number(formData.warehouseId),
         supplierInvoiceNumber: formData.supplierInvoiceNumber.trim() || null,
-        receivedDate: formData.grnDate || new Date().toISOString().split('T')[0],
+        receivedDate: formData.grnDate || formatBusinessDate(),
         notes: `Type: ${formData.grnType} | Ref: ${formData.supplierInvoiceNumber || 'N/A'}${formData.remarks ? ' | ' + formData.remarks : ''}`,
         items: formData.items.map((it) => ({
           productId: Number(it.productId),
@@ -538,7 +540,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       setEditingGrnId(g.id);
       setFormData({
         grnNumber: fullGrn.grnNumber || '',
-        grnDate: fullGrn.receivedDate || new Date().toISOString().split('T')[0],
+        grnDate: fullGrn.receivedDate || formatBusinessDate(),
+        purchaseOrderId: fullGrn.purchaseOrderId || '',
         supplierId: fullGrn.supplierId || '',
         warehouseId: fullGrn.warehouseId || '',
         grnType: GRN_TYPES[0],
@@ -766,7 +769,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `grn_records_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `grn_records_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1415,7 +1418,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '10px' }}>
               {/* GRN Date */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                <label>Purchase order ID (optional)<input type="number" min="1" value={formData.purchaseOrderId || ''} onChange={e => setFormData({...formData,purchaseOrderId:e.target.value})} /></label>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
                   GRN DATE *
                 </label>
                 <div style={{ position: 'relative' }}>

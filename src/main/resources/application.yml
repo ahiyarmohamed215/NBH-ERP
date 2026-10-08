@@ -9,7 +9,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/nbhdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -17,9 +17,13 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
+  flyway:
+    enabled: true
+    baseline-on-migrate: ${DB_BASELINE_ON_MIGRATE:true}
+    baseline-version: 1
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${DB_DDL_AUTO:validate}
     show-sql: false
     open-in-view: false
     properties:
@@ -30,17 +34,17 @@ spring:
 # Application-specific configuration
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://*.vercel.app}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}
   jwt:
     # 256-bit secure secret key
-    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:86400000} # 24 hours
+    secret: ${JWT_SECRET:dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZy0xMjM0NTY=}
+    access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:900000} # 15 minutes
     refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 days
   security:
     initial-admin:
-      enabled: ${INITIAL_ADMIN_ENABLED:true}
+      enabled: ${INITIAL_ADMIN_ENABLED:false}
       username: ${INITIAL_ADMIN_USERNAME:admin}
-      password: ${INITIAL_ADMIN_PASSWORD:admin123}
+      password: ${INITIAL_ADMIN_PASSWORD:}
       email: ${INITIAL_ADMIN_EMAIL:admin@nbh.com}
   company:
     name: NBH Warehouse & Distribution

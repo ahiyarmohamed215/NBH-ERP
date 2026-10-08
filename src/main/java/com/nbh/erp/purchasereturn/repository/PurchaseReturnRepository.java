@@ -12,6 +12,14 @@ import java.util.Optional;
 
 @Repository
 public interface PurchaseReturnRepository extends JpaRepository<PurchaseReturn, Long> {
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(i.quantityReturned),0) from PurchaseReturnItem i where i.purchaseReturn.sourceGrnId=:grnId and i.product.id=:productId and i.purchaseReturn.status='PROCESSED'")
+    java.math.BigDecimal returnedQuantity(Long grnId,Long productId);
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(p.totalAmount),0) from PurchaseReturn p where p.sourceGrnId=:id and p.status='PROCESSED'") java.math.BigDecimal totalReturned(Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from PurchaseReturn e where e.id = :id")
+    java.util.Optional<PurchaseReturn> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     Optional<PurchaseReturn> findByPrnNumber(String prnNumber);
 

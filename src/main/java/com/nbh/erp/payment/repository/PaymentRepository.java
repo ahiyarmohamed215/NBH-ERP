@@ -14,6 +14,10 @@ import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Payment e where e.id = :id")
+    java.util.Optional<Payment> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     Optional<Payment> findByPaymentNumber(String paymentNumber);
 

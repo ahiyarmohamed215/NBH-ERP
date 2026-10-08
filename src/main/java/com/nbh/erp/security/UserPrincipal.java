@@ -25,6 +25,7 @@ public class UserPrincipal implements UserDetails {
     private final String email;
     private final String fullName;
     private final boolean active;
+    private final long tokenVersion;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
@@ -45,7 +46,8 @@ public class UserPrincipal implements UserDetails {
                 .password(user.getPassword())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .active(user.getIsActive() != null && user.getIsActive())
+                .active(Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus()))
+                .tokenVersion(user.getTokenVersion())
                 .authorities(authorities)
                 .build();
     }

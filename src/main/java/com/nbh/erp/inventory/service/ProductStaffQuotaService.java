@@ -312,10 +312,12 @@ public class ProductStaffQuotaService {
             return;
         }
 
-        List<ProductStaffQuota> activeQuotas = quotaRepository.findMatchingActiveQuotas(productId, userId, warehouseId);
+        validateStaffQuota(productId,userId,warehouseId,quantity);
+        List<ProductStaffQuota> activeQuotas = quotaRepository.lockMatchingActiveQuotas(productId, userId, warehouseId);
         if (!activeQuotas.isEmpty()) {
             ProductStaffQuota quota = activeQuotas.get(0);
             BigDecimal currentSold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
+            if(currentSold.add(quantity).compareTo(quota.getAllocatedQuantity())>0) throw new BusinessException("Staff quota exceeded");
             quota.setSoldQuantity(currentSold.add(quantity));
             quotaRepository.save(quota);
             log.info("Consumed {} units from quota ID {} for user {}. Total sold: {}/{}",
@@ -332,7 +334,7 @@ public class ProductStaffQuotaService {
             return;
         }
 
-        List<ProductStaffQuota> activeQuotas = quotaRepository.findMatchingActiveQuotas(productId, userId, warehouseId);
+        List<ProductStaffQuota> activeQuotas = quotaRepository.lockMatchingActiveQuotas(productId, userId, warehouseId);
         if (!activeQuotas.isEmpty()) {
             ProductStaffQuota quota = activeQuotas.get(0);
             BigDecimal currentSold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;

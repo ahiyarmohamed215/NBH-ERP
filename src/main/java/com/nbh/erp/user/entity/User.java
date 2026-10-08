@@ -51,6 +51,10 @@ public class User extends BaseEntity {
     @Builder.Default
     private String approvalStatus = "PENDING";
 
+    @Column(nullable = false)
+    @Builder.Default
+    private long tokenVersion = 0;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

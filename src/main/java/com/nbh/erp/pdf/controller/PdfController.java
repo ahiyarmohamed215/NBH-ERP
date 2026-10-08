@@ -17,13 +17,16 @@ import org.springframework.web.bind.annotation.*;
 public class PdfController {
 
     private final PdfGenerationService pdfService;
+    private final com.nbh.erp.sales.service.InvoiceService invoiceService;
 
     @GetMapping("/invoices/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for sales invoice")
     public ResponseEntity<byte[]> getInvoicePdf(
             @PathVariable Long id,
             @RequestParam(value = "download", defaultValue = "false") boolean download
     ) {
+        invoiceService.getInvoiceById(id);
         byte[] pdf = pdfService.generateInvoicePdf(id);
 
         HttpHeaders headers = new HttpHeaders();
@@ -35,6 +38,7 @@ public class PdfController {
     }
 
     @GetMapping("/grns/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','GRN_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for GRN intake")
     public ResponseEntity<byte[]> getGrnPdf(
             @PathVariable Long id,
@@ -51,6 +55,7 @@ public class PdfController {
     }
 
     @GetMapping("/gtns/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','GTN_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for GTN transfer")
     public ResponseEntity<byte[]> getGtnPdf(
             @PathVariable Long id,
@@ -67,6 +72,7 @@ public class PdfController {
     }
 
     @GetMapping("/customers/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','CUSTOMER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for customer profile & statement")
     public ResponseEntity<byte[]> getCustomerPdf(
             @PathVariable Long id,
@@ -83,6 +89,7 @@ public class PdfController {
     }
 
     @GetMapping("/customers")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','CUSTOMER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for full customer directory")
     public ResponseEntity<byte[]> getCustomerListPdf(
             @RequestParam(value = "download", defaultValue = "false") boolean download
@@ -98,6 +105,7 @@ public class PdfController {
     }
 
     @GetMapping("/customer-groups/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','CUSTOMER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for customer group roster")
     public ResponseEntity<byte[]> getCustomerGroupPdf(
             @PathVariable Long id,
@@ -114,6 +122,7 @@ public class PdfController {
     }
 
     @GetMapping("/customers/{id}/history")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','CUSTOMER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for customer ledger history")
     public ResponseEntity<byte[]> getCustomerHistoryPdf(
             @PathVariable Long id,
@@ -130,6 +139,7 @@ public class PdfController {
     }
 
     @GetMapping("/employees")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','USER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for employee directory")
     public ResponseEntity<byte[]> getEmployeeListPdf(
             @RequestParam(value = "download", defaultValue = "false") boolean download
@@ -145,6 +155,7 @@ public class PdfController {
     }
 
     @GetMapping("/employees/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','USER_VIEW')")
     @Operation(summary = "Generate and stream or download PDF for employee profile card")
     public ResponseEntity<byte[]> getEmployeePdf(
             @PathVariable Long id,

@@ -23,6 +23,7 @@ public class CreatePaymentRequest {
 
     @NotNull(message = "Payment amount is required")
     @DecimalMin(value = "0.01", message = "Payment amount must be greater than zero")
+    @jakarta.validation.constraints.Digits(integer=13, fraction=2)
     private BigDecimal amount;
 
     private String paymentMethod; // CASH, CARD, BANK_TRANSFER, CHEQUE, ONLINE

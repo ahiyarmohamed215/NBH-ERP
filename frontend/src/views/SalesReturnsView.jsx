@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { buildSalesReturnPayload } from '../utils/invoiceMapping';
 import { salesReturnApi, salesApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
@@ -83,12 +84,13 @@ export default function SalesReturnsView({ embedded = false }) {
         remarks: '',
         items:
           inv.items?.map((it) => ({
+            invoiceItemId: it.id,
             productId: it.productId,
             productName: it.productName,
             sku: it.productSku,
             maxQty: it.quantity,
             quantityReturned: 0,
-            unitPrice: it.unitPrice,
+            unitPrice: Number(inv.subtotal) > 0 ? Number(it.totalPrice) * Number(inv.netTotal) / (Number(it.quantity) * Number(inv.subtotal)) : 0,
             restockable: true,
             reason: 'Customer return',
           })) || [],
@@ -104,7 +106,7 @@ export default function SalesReturnsView({ embedded = false }) {
   const handleItemQtyChange = (idx, qty) => {
     const updated = [...formData.items];
     const row = { ...updated[idx] };
-    const parsed = parseInt(qty, 10) || 0;
+    const parsed = parseFloat(qty) || 0;
     row.quantityReturned = Math.min(Math.max(0, parsed), row.maxQty);
     updated[idx] = row;
     setFormData({ ...formData, items: updated });
@@ -132,22 +134,11 @@ export default function SalesReturnsView({ embedded = false }) {
 
     try {
       setSaving(true);
-      const payload = {
-        invoiceId: Number(formData.invoiceId),
-        reason: formData.reason,
-        remarks: formData.remarks.trim() || null,
-        items: validItems.map((it) => ({
-          productId: Number(it.productId),
-          quantityReturned: Number(it.quantityReturned),
-          unitPrice: Number(it.unitPrice),
-          restockable: Boolean(it.restockable),
-          reason: it.reason,
-        })),
-      };
+      const payload = buildSalesReturnPayload(formData);
 
       const res = await salesReturnApi.create(payload);
       addToast(
-        `Sales Return ${res.data?.returnNumber || ''} created! Credit Note ${res.data?.creditNoteNumber || ''} issued.`,
+        `Return ${res.data?.returnNumber || ''} recorded. The invoice balance and any remaining customer credit have been updated.`,
         'success'
       );
       resetForm();
@@ -533,7 +524,7 @@ export default function SalesReturnsView({ embedded = false }) {
                       </td>
                       <td style={{ fontWeight: 600, color: '#0f172a' }}>{r.customerName}</td>
                       <td style={{ fontWeight: 700, color: '#dc2626' }}>
-                        ${Number(r.totalRefundAmount || 0).toFixed(2)}
+                        ${Number(r.totalAmount || 0).toFixed(2)}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.reason}
@@ -597,7 +588,7 @@ export default function SalesReturnsView({ embedded = false }) {
               <div>
                 <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>TOTAL REFUND</div>
                 <div style={{ fontWeight: 800, color: '#dc2626', fontSize: '1rem' }}>
-                  ${Number(selectedReturn.totalRefundAmount || 0).toFixed(2)}
+                  ${Number(selectedReturn.totalAmount || 0).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -627,17 +618,17 @@ export default function SalesReturnsView({ embedded = false }) {
                     <tr key={idx}>
                       <td style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
                       <td style={{ fontFamily: 'monospace', color: '#64748b' }}>{it.productSku || '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantityReturned}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
                       <td style={{ textAlign: 'right' }}>${Number(it.unitPrice || 0).toFixed(2)}</td>
                       <td>
-                        {it.restockable ? (
+                        {it.isRestocked ? (
                           <span className="badge badge-success">Restocked</span>
                         ) : (
                           <span className="badge badge-danger">Scrapped</span>
                         )}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
-                        ${((it.quantityReturned || 0) * (it.unitPrice || 0)).toFixed(2)}
+                        ${Number(it.totalAmount || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}

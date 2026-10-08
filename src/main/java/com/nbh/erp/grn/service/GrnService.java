@@ -33,8 +33,12 @@ import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 public class GrnService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final GrnRepository grnRepository;
+    private final com.nbh.erp.purchaseorder.service.PurchaseOrderService purchaseOrders;
+    private final com.nbh.erp.purchasereturn.repository.PurchaseReturnRepository purchaseReturns;
+    private final com.nbh.erp.payment.repository.SupplierPaymentRepository supplierPayments;
     private final SupplierRepository supplierRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
@@ -63,6 +67,9 @@ public class GrnService {
 
     @Transactional
     public GrnDto createGrn(CreateGrnRequest request, boolean autoProcess) {
+        var ticket=idempotency.reserve("createGrn",request.toString()+"|"+autoProcess);
+        if(ticket!=null && ticket.getResourceId()!=null) return getGrnById(ticket.getResourceId());
+
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
@@ -73,6 +80,7 @@ public class GrnService {
 
         Grn grn = Grn.builder()
                 .grnNumber(grnNumber)
+                .purchaseOrderId(request.getPurchaseOrderId())
                 .supplier(supplier)
                 .warehouse(warehouse)
                 .supplierInvoiceNumber(request.getSupplierInvoiceNumber())
@@ -108,15 +116,15 @@ public class GrnService {
         Grn savedGrn = grnRepository.save(grn);
 
         if (autoProcess) {
-            return processGrnInternal(savedGrn);
+            return idempotency.complete(ticket,savedGrn.getId(),processGrnInternal(savedGrn));
         }
 
-        return GrnDto.from(savedGrn);
+        return idempotency.complete(ticket,savedGrn.getId(),GrnDto.from(savedGrn));
     }
 
     @Transactional
     public GrnDto updateGrn(Long id, CreateGrnRequest request, boolean autoProcess) {
-        Grn grn = grnRepository.findById(id)
+        Grn grn = grnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
 
         SecurityUtils.enforceCanEdit("GRN", grn.getGrnNumber());
@@ -131,6 +139,7 @@ public class GrnService {
         Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
 
+        grn.setPurchaseOrderId(request.getPurchaseOrderId());
         grn.setSupplier(supplier);
         grn.setWarehouse(warehouse);
         grn.setSupplierInvoiceNumber(request.getSupplierInvoiceNumber());
@@ -188,14 +197,14 @@ public class GrnService {
 
     @Transactional
     public GrnDto processGrn(Long id) {
-        Grn grn = grnRepository.findById(id)
+        Grn grn = grnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
         return processGrnInternal(grn);
     }
 
     @Transactional
     public GrnDto cancelGrn(Long id, String reason) {
-        Grn grn = grnRepository.findById(id)
+        Grn grn = grnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
 
         if ("CANCELLED".equals(grn.getStatus())) {
@@ -211,6 +220,7 @@ public class GrnService {
 
         // If the GRN was PROCESSED, reverse inventory
         if ("PROCESSED".equals(grn.getStatus())) {
+            if(purchaseReturns.totalReturned(grn.getId()).signum()>0 || supplierPayments.totalPaid(grn.getId()).signum()>0) throw new BusinessException("Reverse dependent supplier payments/returns before cancelling this receipt");
             // First pass: Pre-check that every received product has sufficient available stock in this warehouse
             for (GrnItem item : grn.getItems()) {
                 BigDecimal available = stockService.getAvailableStock(warehouseId, item.getProduct().getId());
@@ -233,6 +243,7 @@ public class GrnService {
                         warehouseId,
                         item.getProduct().getId(),
                         item.getQuantityReceived(),
+                        item.getUnitCost(),
                         "GRN_CANCEL",
                         grn.getGrnNumber(),
                         "Cancellation of GRN " + grn.getGrnNumber() + " - Reason: " + trimmedReason
@@ -242,6 +253,7 @@ public class GrnService {
 
         String currentUsername = SecurityUtils.getCurrentUsername().orElse("SYSTEM");
 
+        if("PROCESSED".equals(grn.getStatus())) updateOrderReceipt(grn,true);
         grn.setStatus("CANCELLED");
         grn.setCancelledAt(LocalDateTime.now());
         grn.setCancelledBy(currentUsername);
@@ -281,6 +293,7 @@ public class GrnService {
             );
         }
 
+        updateOrderReceipt(grn,false);
         grn.setStatus("PROCESSED");
         Grn updated = grnRepository.save(grn);
 
@@ -294,5 +307,11 @@ public class GrnService {
 
         log.info("GRN '{}' processed successfully. Total: {}", grn.getGrnNumber(), grn.getTotalAmount());
         return GrnDto.from(updated);
+    }
+    private void updateOrderReceipt(Grn grn,boolean reverse) {
+        if(grn.getPurchaseOrderId()==null) return;
+        java.util.Map<Long,BigDecimal> qty=new java.util.TreeMap<>();
+        grn.getItems().forEach(i -> qty.merge(i.getProduct().getId(),i.getQuantityReceived(),BigDecimal::add));
+        purchaseOrders.receive(grn.getPurchaseOrderId(),grn.getSupplier().getId(),grn.getWarehouse().getId(),qty,reverse);
     }
 }

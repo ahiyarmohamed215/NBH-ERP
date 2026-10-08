@@ -82,8 +82,44 @@ function ComingSoonModule({ title, description, icon: Icon, color = '#2563eb', b
 export default function App() {
   const { user, loading, logout } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [subTab, setSubTab] = useState('');
+  const [currentView, setCurrentView] = useState(() => {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    return p.get('view') || 'dashboard';
+  });
+  const [subTab, setSubTab] = useState(() => {
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    const initialView = p.get('view') || 'dashboard';
+    return initialView === 'dashboard' ? '' : (p.get('tab') || '');
+  });
+
+  useEffect(() => {
+    if (currentView === 'dashboard') {
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (currentView) params.set('view', currentView);
+    if (subTab) params.set('tab', subTab);
+
+    const hashString = params.toString() ? `#${params.toString()}` : '';
+    if (window.location.hash !== hashString) {
+      history.replaceState(null, '', window.location.pathname + window.location.search + hashString);
+    }
+  }, [currentView, subTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.hash.slice(1));
+      const nextView = p.get('view') || 'dashboard';
+      setCurrentView(nextView);
+      setSubTab(nextView === 'dashboard' ? '' : (p.get('tab') || ''));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Automatic purge of legacy localStorage mock caches
   useEffect(() => {
@@ -114,7 +150,7 @@ export default function App() {
   const isSuperAdmin = Boolean(
     user?.roles?.includes('ROLE_SUPER_ADMIN') ||
     user?.roles?.includes('ROLE_ADMIN') ||
-    (Array.isArray(user?.roles) && user.roles.some((r) => typeof r === 'string' && (r.includes('ADMIN') || r.includes('SUPER'))))
+    (Array.isArray(user?.roles) && user.roles.some((r) => typeof r === 'string' && (r === 'ROLE_ADMIN' || r === 'ROLE_SUPER_ADMIN')))
   );
   const userPermissions = user?.permissions || [];
 
@@ -131,15 +167,15 @@ export default function App() {
         id: 'invoicing',
         label: 'Sales',
         icon: FileText,
-        permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN'],
+        permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN','PAYMENT_VIEW','PAYMENT_CREATE','QUOTATION_VIEW'],
         subItems: [
           { id: 'sales', label: 'Sales Invoices', permission: 'SALES_VIEW' },
           { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
-          { id: 'payments', label: 'Payments', permission: 'SALES_CREATE' },
-          { id: 'advance-payments', label: 'Advance Payments', permission: 'SALES_CREATE' },
+          { id: 'payments', label: 'Payments', permission: 'PAYMENT_VIEW' },
+          { id: 'advance-payments', label: 'Advance Payments', permission: 'PAYMENT_VIEW' },
           { id: 'outstanding-payments', label: 'Outstanding Payments', permission: 'SALES_CREATE' },
-          { id: 'quotations', label: 'Quotations', permission: 'SALES_CREATE' },
+          { id: 'quotations', label: 'Quotations', permission: 'QUOTATION_VIEW' },
         ],
       },
       {
@@ -212,7 +248,7 @@ export default function App() {
         id: 'accounting',
         label: 'Accounting',
         icon: BookOpen,
-        permissions: ['DASHBOARD_VIEW'],
+        permissions: ['ACCOUNTING_VIEW','ACCOUNTING_MANAGE'],
         subItems: [
           { id: 'chart-of-accounts', label: 'Chart of Accounts' },
           { id: 'banking', label: 'Banking' },
@@ -370,7 +406,7 @@ export default function App() {
       setSubTab('day-summary');
     } else {
       setCurrentView(view);
-      if (sub) setSubTab(sub);
+      setSubTab(sub || '');
     }
   }, []);
 
@@ -770,3 +806,5 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() { return <Suspense fallback={<div role="status" style={{padding:32}}>Loading…</div>}><AppContent /></Suspense>; }

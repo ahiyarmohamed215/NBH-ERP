@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 public class GrnDto {
     private Long id;
     private String grnNumber;
+    private Long purchaseOrderId;
     private Long supplierId;
     private String supplierCode;
     private String supplierName;
@@ -42,6 +43,7 @@ public class GrnDto {
         return GrnDto.builder()
                 .id(grn.getId())
                 .grnNumber(grn.getGrnNumber())
+                .purchaseOrderId(grn.getPurchaseOrderId())
                 .supplierId(grn.getSupplier().getId())
                 .supplierCode(grn.getSupplier().getSupplierCode())
                 .supplierName(grn.getSupplier().getName())

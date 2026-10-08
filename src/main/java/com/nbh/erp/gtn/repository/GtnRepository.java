@@ -12,6 +12,10 @@ import java.util.Optional;
 
 @Repository
 public interface GtnRepository extends JpaRepository<Gtn, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Gtn e where e.id = :id")
+    java.util.Optional<Gtn> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     Optional<Gtn> findByGtnNumber(String gtnNumber);
 

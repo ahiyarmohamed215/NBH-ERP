@@ -20,6 +20,8 @@ public class CreateSalesReturnRequest {
     @NotNull(message = "Invoice ID is required")
     private Long invoiceId;
 
+    @NotNull
+    @jakarta.validation.constraints.Pattern(regexp="REFUND|CREDIT_NOTE")
     private String returnType = "REFUND"; // REFUND, CREDIT_NOTE, RESTOCK
 
     private LocalDate returnDate;
@@ -35,6 +37,7 @@ public class CreateSalesReturnRequest {
     @AllArgsConstructor
     public static class CreateSalesReturnItemRequest {
 
+        @NotNull
         private Long invoiceItemId;
 
         @NotNull(message = "Product ID is required")

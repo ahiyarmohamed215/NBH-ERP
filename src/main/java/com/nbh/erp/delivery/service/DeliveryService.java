@@ -36,6 +36,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DeliveryService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryRouteRepository routeRepository;
@@ -44,6 +45,7 @@ public class DeliveryService {
     private final WarehouseRepository warehouseRepository;
     private final InvoiceRepository invoiceRepository;
     private final AuditLogService auditLogService;
+    private final com.nbh.erp.sequence.service.DocumentSequenceService sequences;
 
     @Transactional(readOnly = true)
     public List<DeliveryDto> searchDeliveries(String status, Long routeId, Long vehicleId, LocalDate startDate, LocalDate endDate, String search) {
@@ -63,7 +65,7 @@ public class DeliveryService {
     @Transactional(readOnly = true)
     public List<InvoiceDto> getPendingInvoicesForDelivery() {
         return invoiceRepository.findAll().stream()
-                .filter(inv -> "COMPLETED".equalsIgnoreCase(inv.getStatus()) &&
+                .filter(inv -> com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) &&
                         (inv.getDelivery() == null || "PENDING".equalsIgnoreCase(inv.getDeliveryStatus())))
                 .map(InvoiceDto::from)
                 .toList();
@@ -71,11 +73,18 @@ public class DeliveryService {
 
     @Transactional
     public DeliveryDto createDelivery(CreateDeliveryRequest req) {
+        var ticket=idempotency.reserve("createDelivery",req);
+        if(ticket!=null && ticket.getResourceId()!=null) return getDeliveryById(ticket.getResourceId());
+
         // Validation: Two assigned staff members are required
         if (req.getDriverId().equals(req.getAssistantStaffId())) {
             throw new BusinessException("Primary driver and assistant staff must be two different staff members");
         }
 
+        for (Long staffId : java.util.stream.Stream.of(req.getDriverId(), req.getAssistantStaffId()).sorted().toList()) {
+            userRepository.findByIdForUpdate(staffId).orElseThrow(() -> new BusinessException("Unknown staff member"));
+            if (deliveryRepository.activeTripsForStaff(staffId) > 0) throw new BusinessException("Staff member is already assigned to an active trip");
+        }
         User driver = userRepository.findById(req.getDriverId())
                 .orElseThrow(() -> new ResourceNotFoundException("User (Driver)", "id", req.getDriverId()));
 
@@ -84,7 +93,7 @@ public class DeliveryService {
 
         Vehicle vehicle = null;
         if (req.getVehicleId() != null) {
-            vehicle = vehicleRepository.findById(req.getVehicleId()).orElse(null);
+            vehicle = vehicleRepository.findByIdForUpdate(req.getVehicleId()).orElse(null);
         }
 
         DeliveryRoute route = null;
@@ -98,22 +107,23 @@ public class DeliveryService {
         }
 
         // Validate invoices
-        List<Invoice> selectedInvoices = invoiceRepository.findAllById(req.getInvoiceIds());
+        List<Invoice> selectedInvoices = req.getInvoiceIds().stream().distinct().sorted().map(id -> invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new BusinessException("Unknown invoice: " + id))).toList();
         if (selectedInvoices.isEmpty()) {
             throw new BusinessException("At least one valid invoice must be selected for delivery");
         }
 
         for (Invoice inv : selectedInvoices) {
-            if (inv.getDelivery() != null && "IN_TRANSIT".equalsIgnoreCase(inv.getDelivery().getStatus())) {
+            if (!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) || inv.getDelivery() != null) {
                 throw new BusinessException(String.format("Invoice '%s' is already in transit under delivery trip '%s'",
-                        inv.getInvoiceNumber(), inv.getDelivery().getDeliveryNumber()));
+                        inv.getInvoiceNumber(), inv.getDelivery()!=null ? inv.getDelivery().getDeliveryNumber() : "ineligible"));
             }
         }
 
-        // Auto-generate delivery number DEL-YYYYMMDD-XXX
-        String datePrefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long countToday = deliveryRepository.countByScheduledDate(req.getScheduledDate());
-        String deliveryNumber = String.format("DEL-%s-%03d", datePrefix, countToday + 1);
+        if(!Boolean.TRUE.equals(driver.getIsActive()) || !Boolean.TRUE.equals(assistantStaff.getIsActive())) throw new BusinessException("Assigned staff must be active");
+        if(vehicle!=null && (!Boolean.TRUE.equals(vehicle.getIsActive()) || !"AVAILABLE".equals(vehicle.getStatus()))) throw new BusinessException("Vehicle is not available");
+        if(req.getVehicleId()!=null && vehicle==null || req.getRouteId()!=null && route==null || req.getWarehouseId()!=null && warehouse==null) throw new BusinessException("Unknown vehicle, route, or warehouse");
+        if(warehouse!=null) for(Invoice inv:selectedInvoices) if(!warehouse.getId().equals(inv.getWarehouse().getId())) throw new BusinessException("Invoice warehouse does not match trip");
+        String deliveryNumber=sequences.getNextNumber("DEL");
 
         BigDecimal totalAmount = selectedInvoices.stream()
                 .map(Invoice::getNetTotal)
@@ -162,12 +172,12 @@ public class DeliveryService {
         );
 
         saved.setInvoices(selectedInvoices);
-        return DeliveryDto.from(saved, true);
+        return idempotency.complete(ticket,saved.getId(),DeliveryDto.from(saved,true));
     }
 
     @Transactional
     public DeliveryDto dispatchDelivery(Long id, UpdateDeliveryStatusRequest req) {
-        Delivery delivery = deliveryRepository.findById(id)
+        Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
 
         if ("CANCELLED".equalsIgnoreCase(delivery.getStatus())) {
@@ -177,6 +187,7 @@ public class DeliveryService {
             throw new BusinessException("Delivery trip has already been completed");
         }
 
+        if(!"SCHEDULED".equals(delivery.getStatus())) throw new BusinessException("Only scheduled trips can be dispatched");
         LocalDateTime departTime = (req != null && req.getDepartureTime() != null)
                 ? req.getDepartureTime()
                 : (delivery.getDepartureTime() != null ? delivery.getDepartureTime() : LocalDateTime.now());
@@ -215,17 +226,20 @@ public class DeliveryService {
 
     @Transactional
     public DeliveryDto completeDelivery(Long id, UpdateDeliveryStatusRequest req) {
-        Delivery delivery = deliveryRepository.findById(id)
+        Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
 
         if ("CANCELLED".equalsIgnoreCase(delivery.getStatus())) {
             throw new BusinessException("Cannot complete a cancelled delivery trip");
         }
 
+        if(!"IN_TRANSIT".equals(delivery.getStatus())) throw new BusinessException("Only in-transit trips can be completed");
         LocalDateTime retTime = (req != null && req.getReturnTime() != null)
                 ? req.getReturnTime()
                 : LocalDateTime.now();
 
+        if(retTime.isBefore(delivery.getDepartureTime())) throw new BusinessException("Return time precedes departure");
+        if(req!=null && req.getEndOdometer()!=null && delivery.getStartOdometer()!=null && req.getEndOdometer()<delivery.getStartOdometer()) throw new BusinessException("Odometer cannot decrease");
         delivery.setReturnTime(retTime);
         delivery.setStatus("DELIVERED");
 
@@ -270,13 +284,14 @@ public class DeliveryService {
 
     @Transactional
     public DeliveryDto cancelDelivery(Long id, UpdateDeliveryStatusRequest req) {
-        Delivery delivery = deliveryRepository.findById(id)
+        Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
 
         if ("DELIVERED".equalsIgnoreCase(delivery.getStatus())) {
             throw new BusinessException("Cannot cancel an already completed delivery trip");
         }
 
+        if("CANCELLED".equals(delivery.getStatus())) throw new BusinessException("Trip already cancelled");
         delivery.setStatus("CANCELLED");
         delivery.setCancellationDate(LocalDateTime.now());
         delivery.setCancellationReason(req != null && req.getCancellationReason() != null
@@ -317,7 +332,7 @@ public class DeliveryService {
         long today = deliveryRepository.countByScheduledDate(LocalDate.now());
 
         long pendingInvoices = invoiceRepository.findAll().stream()
-                .filter(inv -> "COMPLETED".equalsIgnoreCase(inv.getStatus()) &&
+                .filter(inv -> com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) &&
                         (inv.getDelivery() == null || "PENDING".equalsIgnoreCase(inv.getDeliveryStatus())))
                 .count();
 

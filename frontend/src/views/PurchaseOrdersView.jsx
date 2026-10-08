@@ -1,5 +1,6 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
-import { supplierApi, warehouseApi, productApi } from '../api/apiClient';
+import { supplierApi, warehouseApi, productApi, purchaseOrderApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
   ShoppingBag,
@@ -45,7 +46,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const [formData, setFormData] = useState({
     supplierId: '',
     warehouseId: '',
-    orderDate: new Date().toISOString().split('T')[0],
+    orderDate: formatBusinessDate(),
     expectedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     terms: 'Net 30 Days',
     notes: '',
@@ -69,15 +70,17 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const loadData = async () => {
     try {
       setLoading(true);
-      const [supRes, whRes, prodRes] = await Promise.all([
+      const [supRes, whRes, prodRes, poRes] = await Promise.all([
         supplierApi.getActive(),
         warehouseApi.getActive(),
         productApi.getProducts({ size: 300, activeOnly: true }),
+        purchaseOrderApi.search(),
       ]);
       const sList = supRes.data || [];
       const wList = whRes.data || [];
       const pList = prodRes.data?.content || prodRes.data || [];
 
+      setPurchaseOrders(poRes.data?.content || []);
       setSuppliers(sList);
       setWarehouses(wList);
       setProducts(pList);
@@ -97,7 +100,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         });
       }
     } catch (err) {
-      console.error('Failed to load master data for POs:', err);
+      addToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -112,7 +115,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     setFormData({
       supplierId: sId,
       warehouseId: wId,
-      orderDate: new Date().toISOString().split('T')[0],
+      orderDate: formatBusinessDate(),
       expectedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       terms: 'Net 30 Days',
       notes: '',
@@ -133,7 +136,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     setFormData({
       supplierId: po.supplierId || '',
       warehouseId: po.warehouseId || '',
-      orderDate: po.orderDate || new Date().toISOString().split('T')[0],
+      orderDate: po.orderDate || formatBusinessDate(),
       expectedDate: po.expectedDate || '',
       terms: po.terms || 'Net 30 Days',
       notes: po.notes || '',
@@ -191,72 +194,15 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     return formData.items.reduce((sum, it) => sum + (it.totalCost || 0), 0);
   };
 
-  const handleSavePurchaseOrder = (status = 'PENDING') => {
-    if (!formData.supplierId) {
-      addToast('Please select a supplier', 'error');
-      return;
-    }
-    if (!formData.warehouseId) {
-      addToast('Please select a destination warehouse', 'error');
-      return;
-    }
-    if (formData.items.length === 0) {
-      addToast('Add at least one product item to the purchase order', 'error');
-      return;
-    }
-
-    if (editingPoId) {
-      const updated = purchaseOrders.map((p) =>
-        p.id === editingPoId
-          ? {
-              ...p,
-              supplierId: formData.supplierId,
-              supplierName: sup ? sup.name : p.supplierName,
-              warehouseId: formData.warehouseId,
-              warehouseName: wh ? wh.name : p.warehouseName,
-              orderDate: formData.orderDate,
-              expectedDate: formData.expectedDate,
-              terms: formData.terms,
-              notes: formData.notes,
-              status: status,
-              totalAmount: calculateGrandTotal(),
-              items: formData.items,
-            }
-          : p
-      );
-      persistOrders(updated);
-      addToast(`Purchase Order updated successfully!`, 'success');
-      setShowCreateModal(false);
-      resetForm();
-      return;
-    }
-
-    const sup = suppliers.find((s) => String(s.id) === String(formData.supplierId));
-    const wh = warehouses.find((w) => String(w.id) === String(formData.warehouseId));
-    const nextNum = `PO-2026-${String(purchaseOrders.length + 1).padStart(3, '0')}`;
-
-    const newOrder = {
-      id: `PO-${Date.now()}`,
-      poNumber: nextNum,
-      supplierId: formData.supplierId,
-      supplierName: sup ? sup.name : 'Vendor',
-      warehouseId: formData.warehouseId,
-      warehouseName: wh ? wh.name : 'Warehouse',
-      orderDate: formData.orderDate,
-      expectedDate: formData.expectedDate,
-      terms: formData.terms,
-      notes: formData.notes,
-      status: status,
-      totalAmount: calculateGrandTotal(),
-      items: formData.items,
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [newOrder, ...purchaseOrders];
-    persistOrders(updated);
-    addToast(`Purchase Order ${nextNum} created successfully!`, 'success');
-    setShowCreateModal(false);
-    resetForm();
+  const handleSavePurchaseOrder = async (status = 'PENDING') => {
+    if(!formData.supplierId || !formData.warehouseId || !formData.items.length) { addToast('Select supplier, warehouse and order lines', 'error'); return; }
+    setLoading(true);
+    try {
+      const payload = { ...formData, status, supplierId: Number(formData.supplierId), warehouseId: Number(formData.warehouseId),
+        items: formData.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) };
+      if(editingPoId) await purchaseOrderApi.update(editingPoId, payload); else await purchaseOrderApi.create(payload);
+      await loadData(); setShowCreateModal(false); resetForm(); addToast('Purchase order saved', 'success');
+    } catch(e) { addToast(e.message, 'error'); } finally { setLoading(false); }
   };
 
   const handleExportCSV = () => {
@@ -275,7 +221,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `purchase_orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `purchase_orders_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

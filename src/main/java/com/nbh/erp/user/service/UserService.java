@@ -58,7 +58,8 @@ public class UserService {
         for (String roleName : request.getRoles()) {
             Role role = roleRepository.findByName(roleName)
                     .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
-            roles.add(role);
+            SecurityUtils.checkRoleGrant(role);
+                    roles.add(role);
         }
 
         User user = User.builder()
@@ -78,10 +79,12 @@ public class UserService {
 
     @Transactional
     public UserDto updateUser(Long id, UpdateUserRequest request) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+        SecurityUtils.protectUser(user);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
@@ -110,6 +113,7 @@ public class UserService {
                     Role role = roleRepository.findByName(cleanName)
                             .or(() -> roleRepository.findByName("ROLE_" + cleanName))
                             .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
+                    SecurityUtils.checkRoleGrant(role);
                     roles.add(role);
                 }
             }
@@ -128,10 +132,12 @@ public class UserService {
 
     @Transactional
     public void toggleUserActive(Long id) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+        SecurityUtils.protectUser(user);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         user.setIsActive(!user.getIsActive());
         userRepository.save(user);
@@ -148,10 +154,12 @@ public class UserService {
 
     @Transactional
     public UserDto approveUser(Long id, com.nbh.erp.user.dto.ApproveUserRequest request) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+        SecurityUtils.protectUser(user);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         if (StringUtils.hasText(request.getFullName())) {
             user.setFullName(request.getFullName().trim());
@@ -181,6 +189,7 @@ public class UserService {
                     Role role = roleRepository.findByName(cleanName)
                             .or(() -> roleRepository.findByName("ROLE_" + cleanName))
                             .orElseThrow(() -> new ResourceNotFoundException("Role", "name", roleName));
+                    SecurityUtils.checkRoleGrant(role);
                     roles.add(role);
                 }
             }
@@ -205,10 +214,12 @@ public class UserService {
 
     @Transactional
     public UserDto rejectUser(Long id) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
+        SecurityUtils.protectUser(user);
+        user.setTokenVersion(user.getTokenVersion() + 1);
 
         user.setApprovalStatus("REJECTED");
         user.setIsActive(false);

@@ -36,7 +36,7 @@ public class ReportService {
         final LocalDate end = endDate != null ? endDate : LocalDate.now();
 
         List<Invoice> invoices = invoiceRepository.findAll().stream()
-                .filter(i -> "COMPLETED".equals(i.getStatus()))
+                .filter(i -> java.util.Set.of("COMPLETED", "PAID", "PARTIAL").contains(i.getStatus()))
                 .filter(i -> !i.getInvoiceDate().isBefore(start) && !i.getInvoiceDate().isAfter(end))
                 .collect(Collectors.toList());
 
@@ -69,8 +69,8 @@ public class ReportService {
         }
 
         return ReportDto.SalesSummaryReport.builder()
-                .startDate(startDate)
-                .endDate(endDate)
+                .startDate(start)
+                .endDate(end)
                 .totalInvoices(invoices.size())
                 .totalRevenue(revenue)
                 .totalDiscount(discount)

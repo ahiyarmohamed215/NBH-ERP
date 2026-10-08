@@ -52,6 +52,10 @@ public class SalesReturn extends BaseEntity {
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private BigDecimal refundAmount = BigDecimal.ZERO;
+
     @Column(name = "return_date", nullable = false)
     private LocalDate returnDate;
 

@@ -12,6 +12,13 @@ import java.util.Optional;
 
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Delivery e where e.id = :id")
+    java.util.Optional<Delivery> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
+
+    @Query("select count(d) from Delivery d where d.status in ('SCHEDULED','IN_TRANSIT') and (d.driver.id = :staffId or d.assistantStaff.id = :staffId)")
+    long activeTripsForStaff(@Param("staffId") Long staffId);
 
     Optional<Delivery> findByDeliveryNumber(String deliveryNumber);
 

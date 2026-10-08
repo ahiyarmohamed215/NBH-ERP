@@ -56,6 +56,7 @@ public class RoleService {
 
     @Transactional
     public RoleDto createRole(CreateRoleRequest request) {
+        com.nbh.erp.security.SecurityUtils.checkPermissionGrant(request.getPermissions());
         String roleName = request.getName().trim().toUpperCase().replace(" ", "_");
         if (!roleName.startsWith("ROLE_")) {
             roleName = "ROLE_" + roleName;
@@ -79,6 +80,7 @@ public class RoleService {
                 .permissions(permissions)
                 .build();
 
+        com.nbh.erp.security.SecurityUtils.checkRoleGrant(role);
         Role saved = roleRepository.save(role);
         log.info("Created new custom role: {}", saved.getName());
         return RoleDto.from(saved);
@@ -91,6 +93,8 @@ public class RoleService {
 
         com.nbh.erp.security.SecurityUtils.enforceCanEdit("ROLE", "Role: " + role.getName());
 
+        com.nbh.erp.security.SecurityUtils.checkRoleGrant(role);
+        com.nbh.erp.security.SecurityUtils.checkPermissionGrant(request.getPermissions());
         role.setDescription(request.getDescription());
 
         if (request.getPermissions() != null) {

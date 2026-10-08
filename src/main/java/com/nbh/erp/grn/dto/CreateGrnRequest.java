@@ -19,6 +19,7 @@ public class CreateGrnRequest {
 
     @NotNull(message = "Supplier ID is required")
     private Long supplierId;
+    private Long purchaseOrderId;
 
     @NotNull(message = "Warehouse ID is required")
     private Long warehouseId;

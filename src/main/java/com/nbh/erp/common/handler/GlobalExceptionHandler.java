@@ -71,6 +71,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("Validation failed", errors));
     }
 
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class, org.springframework.dao.PessimisticLockingFailureException.class, org.springframework.dao.DataIntegrityViolationException.class})
+    public ResponseEntity<ApiResponse<Void>> conflict(Exception ex) {
+        log.warn("Conflicting update", ex);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("Record changed, already exists, or is referenced. Refresh and retry."));
+    }
+    @ExceptionHandler({IllegalArgumentException.class, org.springframework.http.converter.HttpMessageNotReadableException.class, org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class, ArithmeticException.class})
+    public ResponseEntity<ApiResponse<Void>> invalidInput(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error("Invalid request values or monetary precision"));
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unhandled server exception: {}", ex.getMessage(), ex);

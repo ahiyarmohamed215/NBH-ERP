@@ -42,6 +42,7 @@ public class UpdateInvoiceRequest {
     private BigDecimal totalAmount;
 
     @DecimalMin(value = "0.00", message = "Paid amount cannot be negative")
+    @jakarta.validation.constraints.Digits(integer=13, fraction=2)
     private BigDecimal paidAmount;
 
     @DecimalMin(value = "0.00", message = "Balance amount cannot be negative")

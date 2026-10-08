@@ -35,6 +35,7 @@ import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 public class SalesReturnService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final SalesReturnRepository salesReturnRepository;
     private final CreditNoteRepository creditNoteRepository;
@@ -43,6 +44,9 @@ public class SalesReturnService {
     private final CustomerRepository customerRepository;
     private final StockService stockService;
     private final DocumentSequenceService sequenceService;
+    private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
+    private final com.nbh.erp.audit.service.AuditLogService auditLogService;
+    private final com.nbh.erp.accounting.service.AccountingService accounting;
 
     private String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -75,13 +79,19 @@ public class SalesReturnService {
 
     @Transactional
     public SalesReturnDto createSalesReturn(CreateSalesReturnRequest request) {
-        Invoice invoice = invoiceRepository.findById(request.getInvoiceId())
+        var ticket=idempotency.reserve("createSalesReturn",request);
+        if(ticket!=null && ticket.getResourceId()!=null) return getSalesReturnById(ticket.getResourceId());
+
+        Invoice invoice = invoiceRepository.findByIdForUpdate(request.getInvoiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", request.getInvoiceId()));
 
-        if (!"COMPLETED".equals(invoice.getStatus())) {
-            throw new BusinessException("Returns can only be processed against COMPLETED invoices");
+        if (!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(invoice.getStatus())) {
+            throw new BusinessException("Returns require a posted invoice");
         }
 
+        if(!java.util.Set.of("REFUND","CREDIT_NOTE").contains(request.getReturnType().toUpperCase())) throw new BusinessException("Invalid return type");
+        customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
         String returnNumber = sequenceService.generateReturnNumber();
         LocalDate retDate = request.getReturnDate() != null ? request.getReturnDate() : LocalDate.now();
 
@@ -102,10 +112,17 @@ public class SalesReturnService {
         Long warehouseId = invoice.getWarehouse().getId();
 
         for (CreateSalesReturnRequest.CreateSalesReturnItemRequest itemReq : request.getItems()) {
-            Product product = productRepository.findById(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
-
-            BigDecimal lineTotal = itemReq.getQuantity().multiply(itemReq.getUnitPrice());
+            var original=invoice.getItems().stream().filter(x -> java.util.Objects.equals(x.getId(),itemReq.getInvoiceItemId())).findFirst()
+                .orElseThrow(() -> new BusinessException("Select an original invoice line"));
+            if(!seen.add(original.getId())) throw new BusinessException("Duplicate return line");
+            if(!original.getProduct().getId().equals(itemReq.getProductId())) throw new BusinessException("Product does not match original invoice line");
+            BigDecimal returned=salesReturnRepository.returnedQuantity(original.getId());
+            if(itemReq.getQuantity()==null || itemReq.getQuantity().signum()<=0 || returned.add(itemReq.getQuantity()).compareTo(original.getQuantity())>0) throw new BusinessException("Return exceeds unreturned sold quantity");
+            Product product=original.getProduct();
+            BigDecimal lineTotal=invoice.getSubtotal().signum()==0 ? BigDecimal.ZERO : original.getTotalPrice().multiply(itemReq.getQuantity())
+                .multiply(invoice.getNetTotal()).divide(original.getQuantity().multiply(invoice.getSubtotal()),2,java.math.RoundingMode.HALF_UP);
+            lineTotal=lineTotal.min(invoice.getNetTotal().subtract(invoice.getReturnedAmount()).subtract(grandTotal).max(BigDecimal.ZERO));
+            itemReq.setUnitPrice(lineTotal.divide(itemReq.getQuantity(),6,java.math.RoundingMode.HALF_UP));
             grandTotal = grandTotal.add(lineTotal);
 
             boolean isRestockable = !"DAMAGED".equalsIgnoreCase(itemReq.getConditionType());
@@ -129,7 +146,7 @@ public class SalesReturnService {
                         warehouseId,
                         product.getId(),
                         itemReq.getQuantity(),
-                        product.getCostPrice(),
+                        original.getCostPrice(),
                         "SALE_RETURN",
                         returnNumber,
                         "Return against Invoice: " + invoice.getInvoiceNumber()
@@ -140,36 +157,30 @@ public class SalesReturnService {
         salesReturn.setTotalAmount(grandTotal);
         SalesReturn savedReturn = salesReturnRepository.save(salesReturn);
 
-        // If return type is CREDIT_NOTE, generate a credit note for the customer
-        if ("CREDIT_NOTE".equalsIgnoreCase(savedReturn.getReturnType())) {
-            String crnNumber = sequenceService.generateCreditNoteNumber();
-            String currentUser = getCurrentUsername();
-            CreditNote creditNote = CreditNote.builder()
-                    .creditNoteNumber(crnNumber)
-                    .salesReturn(savedReturn)
-                    .customer(savedReturn.getCustomer())
-                    .amount(grandTotal)
-                    .status("ISSUED")
-                    .issueDate(retDate)
-                    .createdBy(currentUser)
-                    .updatedBy(currentUser)
-                    .build();
-            creditNoteRepository.save(creditNote);
-            log.info("Credit Note '{}' issued for customer '{}' amount: {} by {}",
-                    crnNumber, savedReturn.getCustomer().getName(), grandTotal, currentUser);
+        BigDecimal oldPaid=invoice.getPaidAmount();
+        invoice.setReturnedAmount(invoice.getReturnedAmount().add(grandTotal));
+        BigDecimal refund=oldPaid.subtract(com.nbh.erp.sales.service.InvoiceBalances.effectiveTotal(invoice)).max(BigDecimal.ZERO);
+        invoice.setPaidAmount(oldPaid.subtract(refund));
+        com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);
+        invoiceRepository.save(invoice);
+        savedReturn.setRefundAmount("CREDIT_NOTE".equals(savedReturn.getReturnType()) ? BigDecimal.ZERO : refund);
+        if("CREDIT_NOTE".equals(savedReturn.getReturnType()) && refund.signum()>0) {
+            creditNoteRepository.save(CreditNote.builder().creditNoteNumber(sequenceService.generateCreditNoteNumber())
+                .salesReturn(savedReturn).customer(savedReturn.getCustomer()).amount(refund).status("ISSUED").issueDate(retDate)
+                .createdBy(getCurrentUsername()).updatedBy(getCurrentUsername()).build());
         }
-
-        // If customer had an outstanding balance, adjust balance if requested
-        Customer customer = savedReturn.getCustomer();
-        if (customer.getCurrentBalance() != null && customer.getCurrentBalance().compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal newBal = customer.getCurrentBalance().subtract(grandTotal);
-            customer.setCurrentBalance(newBal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newBal);
-            customerRepository.save(customer);
-        }
+        customerBalances.reconcile(invoice.getCustomer().getId());
+        BigDecimal taxReturn=invoice.getNetTotal().signum()==0 ? BigDecimal.ZERO : grandTotal.multiply(invoice.getTaxAmount()).divide(invoice.getNetTotal(),2,java.math.RoundingMode.HALF_UP);
+        if(grandTotal.signum()>0) accounting.post(new com.nbh.erp.accounting.service.AccountingService.Posting("RETURN-"+savedReturn.getId(),retDate,returnNumber,"RETURN",java.util.List.of(
+            new com.nbh.erp.accounting.service.AccountingService.Line("SALES",grandTotal.subtract(taxReturn),BigDecimal.ZERO),
+            new com.nbh.erp.accounting.service.AccountingService.Line("TAX",taxReturn,BigDecimal.ZERO),
+            new com.nbh.erp.accounting.service.AccountingService.Line("AR",BigDecimal.ZERO,grandTotal.subtract(refund)),
+            new com.nbh.erp.accounting.service.AccountingService.Line("CREDIT_NOTE".equals(savedReturn.getReturnType()) ? "DEPOSITS" : "CASH",BigDecimal.ZERO,refund))));
+        auditLogService.log("SALES_RETURN","SalesReturn",returnNumber,"Returned "+grandTotal+", refund/credit "+refund);
 
         log.info("Sales return '{}' completed against invoice '{}'. Total refunded: {}",
                 returnNumber, invoice.getInvoiceNumber(), grandTotal);
 
-        return SalesReturnDto.from(savedReturn);
+        return idempotency.complete(ticket,savedReturn.getId(),SalesReturnDto.from(savedReturn));
     }
 }

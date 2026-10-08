@@ -17,10 +17,10 @@ export function canEditModule(user, module) {
   const isPrivilegedStaff = roles.some((r) => {
     const s = String(r).toUpperCase();
     return (
-      s.includes('ADMIN') ||
-      s.includes('SUPER') ||
-      s.includes('MANAGER') ||
-      s.includes('DIRECTOR')
+      s === 'ROLE_ADMIN' ||
+      s === 'ROLE_SUPER_ADMIN' ||
+      s === 'ROLE_MANAGER' ||
+      s === 'ROLE_DIRECTOR'
     );
   });
   if (isPrivilegedStaff) return true;
@@ -57,10 +57,10 @@ export function canViewCostPrice(user) {
   const isPrivilegedStaff = roles.some((r) => {
     const s = String(r).toUpperCase();
     return (
-      s.includes('ADMIN') ||
-      s.includes('SUPER') ||
-      s.includes('MANAGER') ||
-      s.includes('DIRECTOR')
+      s === 'ROLE_ADMIN' ||
+      s === 'ROLE_SUPER_ADMIN' ||
+      s === 'ROLE_MANAGER' ||
+      s === 'ROLE_DIRECTOR'
     );
   });
   if (isPrivilegedStaff) return true;

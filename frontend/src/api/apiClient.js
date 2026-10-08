@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const API_ORIGIN = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api/v1`,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,6 +12,7 @@ const api = axios.create({
 
 // Attach JWT token automatically
 api.interceptors.request.use((config) => {
+  if (['post','put','patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) config.headers['Idempotency-Key'] = crypto.randomUUID();
   const token = localStorage.getItem('nbh_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -68,32 +70,80 @@ api.interceptors.response.use(
     }
     return response.data;
   },
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      const requestUrl = error.config?.url || '';
-      // If unauthorized and not an explicit login attempt, signal session expiration
-      if (!requestUrl.includes('/auth/login')) {
-        localStorage.removeItem('nbh_token');
-        localStorage.removeItem('nbh_user');
-        sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
-        window.dispatchEvent(new CustomEvent('nbh:session_expired'));
-      }
+  async (error) => {
+    const config = error.config;
+    if (error.response?.status === 401 && config && !config._retried && !config.url?.startsWith('/auth/')) {
+      config._retried = true;
+      try { await refreshSession(); return api(config); }
+      catch (refreshError) { if (refreshError.response?.status === 401 || !localStorage.getItem('nbh_refresh')) expireSession(); throw refreshError; }
     }
-    const message = error.response?.data?.message || error.message || 'An error occurred';
-    return Promise.reject(new Error(message));
+    error.message = error.response?.data?.message || error.message || 'Request failed';
+    error.status = error.response?.status;
+    error.fieldErrors = error.response?.data?.errors || [];
+    if (error.response?.status === 401 && !config?.url?.includes('/auth/login')) expireSession();
+    if (!config?.url?.startsWith('/auth/')) window.dispatchEvent(new CustomEvent('erp:api_error', { detail: error.message }));
+    return Promise.reject(error);
   }
 );
+
+const expireSession = () => {
+  ['nbh_token','nbh_refresh','nbh_user'].forEach(key => localStorage.removeItem(key));
+  sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
+  window.dispatchEvent(new CustomEvent('nbh:session_expired'));
+};
+let refreshPromise;
+export const refreshSession = () => {
+  if (!refreshPromise) {
+    const previous = localStorage.getItem('nbh_token');
+    const perform = async () => {
+      if (localStorage.getItem('nbh_token') !== previous && localStorage.getItem('nbh_token')) return;
+      const refreshToken = localStorage.getItem('nbh_refresh');
+      if (!refreshToken) { expireSession(); throw new Error('Please sign in again'); }
+      const res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, { refreshToken }, { timeout: 30000 });
+      localStorage.setItem('nbh_token', res.data.data.accessToken);
+      localStorage.setItem('nbh_refresh', res.data.data.refreshToken);
+    };
+    refreshPromise = (navigator.locks ? navigator.locks.request('erp-refresh', perform) : perform())
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+};
+// Exhaust pages for existing local-filter tables and complete exports; never silently truncate at page 1.
+export const fetchAllPages = async (url, params = {}) => {
+  let content = [], page = 0, result;
+  do {
+    result = await api.get(url, { params: { ...params, page, size: 200, sort: params.sort || 'id,asc' } });
+    if (!Array.isArray(result.data?.content)) return result;
+    content.push(...result.data.content);
+    page += 1;
+  } while (page < result.data.totalPages);
+  return { ...result, data: { ...result.data, content, totalElements: content.length } };
+};
+export const purchaseOrderApi = {
+  search: (params) => fetchAllPages('/purchase-orders', params),
+  create: (data) => api.post('/purchase-orders', data),
+  update: (id, data) => api.put(`/purchase-orders/${id}`, data),
+  approve: (id) => api.post(`/purchase-orders/${id}/approve`),
+  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
+};
+export const downloadAuthenticated = async (url, filename) => {
+  const res = await api.get(url, { responseType: 'blob' });
+  const blobUrl = URL.createObjectURL(res);
+  const link = document.createElement('a'); link.href = blobUrl; link.download = filename;
+  document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+};
 
 export const authApi = {
   login: (username, password) => api.post('/auth/login', { username, password }),
   signup: (data) => api.post('/auth/signup', data),
   getMe: () => api.get('/auth/me'),
+  logout: () => api.post('/auth/logout'),
   updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 export const userApi = {
-  getAll: (params) => api.get('/users', { params }),
-  getPending: (params) => api.get('/users/pending', { params }),
+  getAll: (params) => fetchAllPages('/users', params),
+  getPending: (params) => fetchAllPages('/users/pending', params),
   getById: (id) => api.get(`/users/${id}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
@@ -150,7 +200,7 @@ export const brandApi = {
 };
 
 export const productApi = {
-  getProducts: (params) => api.get('/products', { params }),
+  getProducts: (params) => fetchAllPages('/products', params),
   searchActive: (query) => api.get('/products/search', { params: { query } }),
   getByBarcode: (barcode) => api.get(`/products/barcode/${barcode}`),
   getById: (id) => api.get(`/products/${id}`),
@@ -188,7 +238,7 @@ export const salesmanApi = {
   getPosStaff: () => api.get('/users/pos-staff'),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
-  toggleActive: (id) => api.delete(`/users/${id}`),
+  toggleActive: (id) => api.patch(`/users/${id}/toggle-active`),
 };
 
 export const inventoryApi = {
@@ -245,7 +295,8 @@ export const adjustmentApi = {
 };
 
 export const salesApi = {
-  search: (params) => api.get('/invoices', { params }),
+  completeHeld: (ids) => api.post('/invoices/complete-held', { ids }),
+  search: (params) => fetchAllPages('/invoices', params),
   getHeld: (cashier) => api.get('/invoices/held', { params: cashier ? { cashier } : {} }),
   getCashierAccounting: (params) => api.get('/invoices/accounting/cashiers', { params }),
   getById: (id) => api.get(`/invoices/${id}`),
@@ -264,21 +315,22 @@ export const salesApi = {
 };
 
 export const salesReturnApi = {
-  search: (params) => api.get('/sales-returns', { params }),
+  search: (params) => fetchAllPages('/sales-returns', params),
   getById: (id) => api.get(`/sales-returns/${id}`),
   create: (data) => api.post('/sales-returns', data),
 };
 
 export const paymentApi = {
-  search: (params) => api.get('/payments', { params }),
+  search: (params) => fetchAllPages('/payments', params),
   getById: (id) => api.get(`/payments/${id}`),
   create: (data) => api.post('/payments', data),
   createAdvance: (data) => api.post('/payments', { ...data, paymentType: 'ADVANCE' }),
+  allocate: (id, data) => api.post(`/payments/${id}/allocations`, data),
   void: (id, reason) => api.post(`/payments/${id}/void`, null, { params: { reason } }),
 };
 
 export const quotationApi = {
-  search: (params) => api.get('/quotations', { params }),
+  search: (params) => fetchAllPages('/quotations', params),
   getById: (id) => api.get(`/quotations/${id}`),
   create: (data) => api.post('/quotations', data),
   update: (id, data) => api.put(`/quotations/${id}`, data),
@@ -315,7 +367,8 @@ export const printPdfDocument = async (pdfUrl) => {
     }
 
     // Fetch PDF blob with Authorization header to prevent 401 Unauthorized
-    const response = await fetch(pdfUrl, { headers });
+    const data = await api.get(pdfUrl, { responseType: 'blob' });
+    const response = { ok: true, blob: async () => data };
     if (!response.ok) {
       const errData = await response.json().catch(() => null);
       throw new Error(errData?.message || `Failed to fetch document (${response.status})`);
@@ -337,6 +390,8 @@ export const printPdfDocument = async (pdfUrl) => {
       document.body.appendChild(iframe);
     }
 
+    if (iframe.dataset.blobUrl) URL.revokeObjectURL(iframe.dataset.blobUrl);
+    iframe.dataset.blobUrl = blobUrl;
     iframe.src = blobUrl;
     iframe.onload = () => {
       setTimeout(() => {
@@ -352,12 +407,8 @@ export const printPdfDocument = async (pdfUrl) => {
       }, 350);
     };
   } catch (err) {
-    console.error('Print PDF error, falling back to direct auth URL:', err);
-    const token = localStorage.getItem('nbh_token');
-    const authUrl = token
-      ? (pdfUrl.includes('?') ? `${pdfUrl}&token=${encodeURIComponent(token)}` : `${pdfUrl}?token=${encodeURIComponent(token)}`)
-      : pdfUrl;
-    window.open(authUrl, '_blank');
+    window.dispatchEvent(new CustomEvent('erp:api_error', { detail: err.message }));
+    throw err;
   }
 };
 
@@ -371,7 +422,8 @@ export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pd
     }
 
     // Fetch PDF blob with Authorization header
-    const response = await fetch(downloadUrl, { headers });
+    const data = await api.get(downloadUrl, { responseType: 'blob' });
+    const response = { ok: true, blob: async () => data };
     if (!response.ok) {
       const errData = await response.json().catch(() => null);
       throw new Error(errData?.message || `Download failed (${response.status})`);
@@ -387,13 +439,8 @@ export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pd
     document.body.removeChild(a);
     window.URL.revokeObjectURL(blobUrl);
   } catch (err) {
-    console.error('Download error, falling back to direct auth link:', err);
-    const token = localStorage.getItem('nbh_token');
-    const baseDownloadUrl = pdfUrl.includes('?') ? `${pdfUrl}&download=true` : `${pdfUrl}?download=true`;
-    const authUrl = token
-      ? `${baseDownloadUrl}&token=${encodeURIComponent(token)}`
-      : baseDownloadUrl;
-    window.open(authUrl, '_blank');
+    window.dispatchEvent(new CustomEvent('erp:api_error', { detail: err.message }));
+    throw err;
   }
 };
 

@@ -30,6 +30,8 @@ public class InvoiceDto {
     private String salesmanName;
     private String status;
     private String paymentType;
+    private String paymentMethod;
+    private BigDecimal returnedAmount;
     private String deliveryStatus;
     private Long deliveryId;
     private String deliveryNumber;
@@ -75,6 +77,8 @@ public class InvoiceDto {
                 .salesmanName(inv.getSalesman() != null ? (inv.getSalesman().getFullName() != null ? inv.getSalesman().getFullName() : inv.getSalesman().getUsername()) : null)
                 .status(inv.getStatus())
                 .paymentType(inv.getPaymentType())
+                .paymentMethod(inv.getPaymentMethod())
+                .returnedAmount(inv.getReturnedAmount())
                 .deliveryStatus(inv.getDeliveryStatus() != null ? inv.getDeliveryStatus() : "PENDING")
                 .deliveryId(delId)
                 .deliveryNumber(delNumber)

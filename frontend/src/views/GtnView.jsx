@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { gtnApi, warehouseApi, productApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -258,7 +259,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `gtn_records_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `gtn_records_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

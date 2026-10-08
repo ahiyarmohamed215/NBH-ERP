@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
 import { prnApi, supplierApi, warehouseApi, productApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -178,6 +179,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     try {
       setSaving(true);
       const payload = {
+        sourceGrnId: Number(formData.sourceGrnId),
         supplierId: Number(formData.supplierId),
         warehouseId: Number(formData.warehouseId),
         originalGrnNumber: formData.originalGrnNumber.trim() || null,
@@ -291,7 +293,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `prn_records_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `prn_records_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -880,6 +882,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                   <div>
+                    <label>Original GRN ID<input type="number" required min="1" value={formData.sourceGrnId || ''} onChange={e=>setFormData({...formData,sourceGrnId:e.target.value})}/></label>
                     <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
                       SUPPLIER / VENDOR *
                     </label>

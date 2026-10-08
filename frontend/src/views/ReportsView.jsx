@@ -1,3 +1,5 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
+import { downloadAuthenticated } from '../api/apiClient';
 import React, { useState, useEffect, useMemo } from 'react';
 import { reportApi, warehouseApi, customerApi, userApi } from '../api/apiClient';
 import { useDataSync } from '../hooks/useDataSync';
@@ -183,7 +185,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Customer_Outstanding_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Customer_Outstanding_Report_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -860,8 +862,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                 type="button"
                 className="btn btn-primary"
                 onClick={() => {
-                  const url = reportApi.getExcelDownloadUrl(null);
-                  window.open(url, '_blank');
+                  downloadAuthenticated('/reports/inventory/excel', 'inventory.xlsx').catch(() => {});
                 }}
                 style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
               >
@@ -870,7 +871,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             </div>
 
             <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-              Stock valuation ledger calculated across Warehouse 1 and Regional Hubs. Total inventory assets: <strong>LKR 902,014.86</strong>
+              Download the current warehouse inventory valuation from the server.
             </div>
           </div>
         </div>

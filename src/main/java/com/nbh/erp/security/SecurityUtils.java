@@ -149,4 +149,24 @@ public final class SecurityUtils {
                 "Please deactivate or change the record status instead."
         );
     }
+
+    public static boolean isAdministrator() { return hasRole("ADMIN") || hasRole("SUPER_ADMIN"); }
+    public static void requirePermission(String permission) {
+        if (!isAdministrator() && !hasAuthority(permission)) throw new AccessDeniedException("Missing permission: " + permission);
+    }
+    public static void checkRoleGrant(com.nbh.erp.role.entity.Role role) {
+        if (hasRole("SUPER_ADMIN")) return;
+        if ("ROLE_SUPER_ADMIN".equals(role.getName())) throw new AccessDeniedException("Only a super administrator can grant this role");
+        if (hasRole("ADMIN")) return;
+        if (java.util.Set.of("ROLE_ADMIN", "ROLE_MANAGER", "ROLE_DIRECTOR").contains(role.getName()) ||
+            !role.getPermissions().stream().allMatch(p -> hasAuthority(p.getName())))
+            throw new AccessDeniedException("Cannot grant privileges beyond your own");
+    }
+    public static void protectUser(com.nbh.erp.user.entity.User user) {
+        user.getRoles().forEach(SecurityUtils::checkRoleGrant);
+    }
+    public static void checkPermissionGrant(java.util.Collection<String> permissions) {
+        if (isAdministrator() || permissions == null) return;
+        if (!permissions.stream().allMatch(SecurityUtils::hasAuthority)) throw new AccessDeniedException("Cannot grant privileges beyond your own");
+    }
 }

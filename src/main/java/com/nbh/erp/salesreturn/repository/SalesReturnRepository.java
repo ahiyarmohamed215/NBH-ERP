@@ -14,6 +14,9 @@ import java.util.Optional;
 public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> {
 
     Optional<SalesReturn> findByReturnNumber(String returnNumber);
+    @Query("select coalesce(sum(i.quantity),0) from SalesReturnItem i where i.invoiceItemId=:lineId and i.salesReturn.status='COMPLETED'")
+    java.math.BigDecimal returnedQuantity(@Param("lineId") Long lineId);
+
 
     @Query("SELECT sr FROM SalesReturn sr WHERE " +
             "(:warehouseId IS NULL OR sr.warehouse.id = :warehouseId) AND " +

@@ -71,7 +71,7 @@ public class QuotationService {
     public QuotationDto createQuotation(CreateQuotationRequest request) {
         Customer customer = null;
         if (request.getCustomerId() != null) {
-            customer = customerRepository.findById(request.getCustomerId())
+            customer = customerRepository.findByIdForUpdate(request.getCustomerId())
                     .orElse(null);
         } else if (request.getCustomerName() != null && !request.getCustomerName().isBlank()) {
             List<Customer> matching = customerRepository.searchCustomers(request.getCustomerName().trim());
@@ -169,7 +169,7 @@ public class QuotationService {
 
     @Transactional
     public QuotationDto updateQuotation(Long id, CreateQuotationRequest request) {
-        Quotation quotation = quotationRepository.findById(id)
+        Quotation quotation = quotationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
 
         SecurityUtils.enforceCanEdit("QUOTATION", quotation.getQuotationNumber());
@@ -179,7 +179,7 @@ public class QuotationService {
         }
 
         if (request.getCustomerId() != null) {
-            Customer customer = customerRepository.findById(request.getCustomerId()).orElse(null);
+            Customer customer = customerRepository.findByIdForUpdate(request.getCustomerId()).orElse(null);
             quotation.setCustomer(customer);
             if (customer != null) {
                 quotation.setCustomerName(customer.getName());
@@ -249,7 +249,7 @@ public class QuotationService {
 
     @Transactional
     public InvoiceDto convertToInvoice(Long id, Long warehouseId) {
-        Quotation quotation = quotationRepository.findById(id)
+        Quotation quotation = quotationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
 
         if ("CONVERTED".equals(quotation.getStatus())) {
@@ -270,13 +270,8 @@ public class QuotationService {
         if (quotation.getItems() != null && !quotation.getItems().isEmpty()) {
             for (QuotationItem qi : quotation.getItems()) {
                 Long pId = qi.getProduct() != null ? qi.getProduct().getId() : null;
-                if (pId == null) {
-                    Product defaultProd = productRepository.findByIsActiveTrue().stream().findFirst()
-                            .orElseGet(() -> productRepository.findAll().stream().findFirst().orElse(null));
-                    if (defaultProd != null) {
-                        pId = defaultProd.getId();
-                    }
-                }
+                if(pId==null) throw new BusinessException("Link every quotation line to a product before conversion");
+                if(qi.getUnitPrice().compareTo(qi.getProduct().getSellingPrice())!=0) throw new BusinessException("Quotation price differs from catalog; update and approve the quotation before conversion");
                 if (pId != null) {
                     invoiceItems.add(CreateInvoiceRequest.CreateInvoiceItemRequest.builder()
                             .productId(pId)
@@ -289,18 +284,7 @@ public class QuotationService {
             }
         }
 
-        if (invoiceItems.isEmpty()) {
-            Product defaultProd = productRepository.findByIsActiveTrue().stream().findFirst()
-                    .orElseGet(() -> productRepository.findAll().stream().findFirst()
-                            .orElseThrow(() -> new BusinessException("No product available to create invoice line item")));
-            invoiceItems.add(CreateInvoiceRequest.CreateInvoiceItemRequest.builder()
-                    .productId(defaultProd.getId())
-                    .quantity(BigDecimal.ONE)
-                    .unitPrice(quotation.getTotalAmount())
-                    .discountRate(BigDecimal.ZERO)
-                    .discountAmount(BigDecimal.ZERO)
-                    .build());
-        }
+        if(invoiceItems.isEmpty()) throw new BusinessException("Quotation has no invoiceable lines");
 
         CreateInvoiceRequest invoiceRequest = CreateInvoiceRequest.builder()
                 .warehouseId(warehouse.getId())

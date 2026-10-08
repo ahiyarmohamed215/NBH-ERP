@@ -31,6 +31,7 @@ public class SalesReturnDto {
     private String status;
     private String returnType;
     private BigDecimal totalAmount;
+    private BigDecimal refundAmount;
     private LocalDate returnDate;
     private String reason;
     private List<SalesReturnItemDto> items;
@@ -52,6 +53,7 @@ public class SalesReturnDto {
                 .status(sr.getStatus())
                 .returnType(sr.getReturnType())
                 .totalAmount(sr.getTotalAmount())
+                .refundAmount(sr.getRefundAmount())
                 .returnDate(sr.getReturnDate())
                 .reason(sr.getReason())
                 .createdBy(sr.getCreatedBy())

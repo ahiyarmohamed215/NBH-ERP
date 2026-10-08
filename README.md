@@ -1,0 +1,71 @@
+# NBH ERP
+
+Spring Boot / Java 21 backend, MySQL database, and React / Vite frontend.
+
+## Local setup
+
+1. Install Java 21, Node.js 22 and MySQL 8. Create a dedicated database and database user.
+2. Set the process environment variables shown in `.env.example`. Spring does not load that file automatically. `DB_PASSWORD` and `JWT_SECRET` are required. The JWT secret must decode from Base64 to at least 32 random bytes. A secure PowerShell generator is `[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`.
+3. For an empty database only, enable `INITIAL_ADMIN_ENABLED=true` and set a unique `INITIAL_ADMIN_PASSWORD` of at least 12 characters. After the first successful start, disable bootstrap and remove the password from the environment. Existing administrator passwords are not reset by startup.
+4. Run `.\mvnw.cmd spring-boot:run` (Linux/macOS: `bash mvnw spring-boot:run`). Flyway creates the schema; Hibernate validates it.
+5. In `frontend`, run `npm ci` then `npm run dev`. Open `http://localhost:5173`. Vite proxies `/api` to port 8080. For separately hosted frontends set `VITE_API_URL` to the backend origin and set `CORS_ALLOWED_ORIGINS` to exact frontend origins.
+
+Readiness: `/health/ready` (checks the database); liveness: `/health/live`. The health endpoints are public and do not disclose credentials. API documentation is available at `/swagger-ui.html`.
+
+## Existing database upgrade
+
+Do not point a development or test run at the live database. Rehearse the migration on a restored copy first.
+
+1. Stop application writes. Take a consistent database backup, including routines/triggers if used, and verify a restore into a separate database. Keep the old application artifact/configuration with the backup.
+2. Set the new JWT secret and database credentials. Rotating the signing key requires users to sign in again; rotate any default bootstrap credentials that were previously used.
+3. For an existing database without Flyway history, explicitly set `DB_BASELINE_ON_MIGRATE=true` for the upgrade start. Baseline version 1 marks the old schema; V2 creates missing module tables and adds version, token, return, purchase-order and source-receipt columns. Existing business rows are retained. Leave `DB_DDL_AUTO=validate`.
+4. After a successful upgrade, remove `DB_BASELINE_ON_MIGRATE` or set it to `false`. Never enable baselining to conceal an unexplained schema mismatch. For an empty database, keep baselining disabled: V1 and V2 run normally.
+5. Reconcile historical invoices, payments, returns, supplier balances and inventory before accepting new transactions. Legacy return amounts and allocations cannot be reliably reconstructed automatically. Link old draft purchase returns to original GRNs before processing. The new accounting ledger starts without historical postings: enter approved opening balances on the chosen cutover date. Do not post invented historical balances.
+6. If migration or business validation fails, stop writes and restore the verified backup plus the old application. MySQL DDL is not generally transactional; do not assume a failed migration automatically rolls back its DDL. Do not delete or repair Flyway history without inspecting the actual schema.
+
+V1 is the complete schema for a fresh installation; V2 is an additive compatibility upgrade. Treat applied migrations as immutable and add a new version for future schema changes.
+
+## Business rules
+
+- A zero customer credit limit means no unpaid sales. Configure credit limits before completing held bills as credit sales.
+- Held / sent-to-warehouse / verified bills do not deduct inventory. Completing them deducts stock and quota once, creates the invoice ledger postings, and reconciles customer debt. Bulk completion is atomic and creates unpaid credit invoices; delivery trips are assigned separately.
+- Posted invoice financial values are immutable. Use receipts, returns or void/reissue. A paid invoice must have its receipts reversed or be returned before it can be voided.
+- Returns require original invoice-line IDs. Quantities cannot exceed the unreturned sale. Prices are derived from original discounts and taxes; customer credit is created only for the portion exceeding remaining invoice debt.
+- Advances do not reduce invoice debt until allocated. Allocations cannot exceed available credit or the target invoice balance. Payment/credit reversals are blocked where dependent refunds must be resolved first.
+- Purchase orders persist with server numbers and track partial receipts. Purchase returns require an original processed GRN and cannot exceed its unreturned quantity or unpaid amount.
+- Quotation conversion rejects unresolved products and stale prices instead of substituting products or silently repricing. Update the quotation to the catalog price before conversion.
+- New journals must balance. Corrections use reversal entries; closed fiscal years reject new postings. The existing latest-receipt costing policy is retained; weighted-average/FIFO valuation needs a separately approved migration and reconciliation policy.
+
+## API additions
+
+- `/api/v1/purchase-orders`: list, detail, create, edit; `/{id}/approve`, `/{id}/cancel`.
+- `/api/v1/invoices/complete-held`: atomically complete a list of held invoice IDs.
+- `/api/v1/payments/{id}/allocations`: apply an advance to an invoice.
+- `/api/v1/credit-notes`: list available credit; `/{id}/apply`, `/{id}/allocations`, `/allocations/{id}/reverse`.
+- `/api/v1/supplier-payments`: supplier receipts and reversals; `/outstanding` lists GRN balances.
+- `/api/v1/accounting`: accounts, journals, journal reversals, reconciliation flags, fiscal-year close, trial balance, income statement and balance sheet.
+- `/api/v1/auth/logout`: revoke the user's active tokens; refresh tokens rotate on every use.
+
+Supply an `Idempotency-Key` header for invoice, payment, return, delivery and inventory-document creation and credit allocations. Reuse the same key and body when retrying an uncertain request. The frontend preserves the header when retrying after refresh. Conflicting concurrent document operations return a conflict or business error; reload the record before retrying. A manually repeated submission with a new key is a new request.
+
+## Verification
+
+Backend tests use an isolated in-memory H2 database in MySQL compatibility mode, not the configured operational database:
+
+```powershell
+.\mvnw.cmd -B -ntp '-Derp.build.directory=.build/verification' test
+```
+
+The custom output directory avoids mixing verification artifacts with an existing `target` directory. Do not use `clean` against a target directory that contains anything other than disposable Maven outputs.
+
+Frontend:
+
+```text
+cd frontend
+npm test
+npm run build
+```
+
+The suite covers security, financial rules, duplicate requests, concurrent GRN processing, purchasing, and fresh/legacy migrations. H2 tests do not replace a migration rehearsal and concurrency checks on the production MySQL version. `.github/workflows/verify.yml` runs backend tests and frontend tests/build.
+
+See `IMPLEMENTATION_NOTES.md` for the audit-to-fix mapping and remaining product work. `PROJECT_REVIEW.md` preserves the original audit and is not a description of the updated implementation.

@@ -28,6 +28,8 @@ public class Grn extends BaseEntity {
     @Column(name = "grn_number", nullable = false, unique = true, length = 50)
     private String grnNumber;
 
+    private Long purchaseOrderId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id", nullable = false)
     private Supplier supplier;

@@ -27,16 +27,17 @@ public class DataInitializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.nbh.erp.accounting.service.AccountingService accounting;
     private final com.nbh.erp.delivery.service.VehicleService vehicleService;
     private final com.nbh.erp.delivery.service.DeliveryRouteService deliveryRouteService;
 
-    @Value("${app.security.initial-admin.enabled:true}")
+    @Value("${app.security.initial-admin.enabled:false}")
     private boolean initialAdminEnabled;
 
     @Value("${app.security.initial-admin.username:admin}")
     private String adminUsername;
 
-    @Value("${app.security.initial-admin.password:admin123}")
+    @Value("${app.security.initial-admin.password:}")
     private String adminPassword;
 
     @Value("${app.security.initial-admin.email:admin@nbh.com}")
@@ -49,6 +50,7 @@ public class DataInitializer implements ApplicationRunner {
 
         // 1. Seed system permissions (required for @PreAuthorize and frontend Role permission builder)
         Map<String, Permission> permissionMap = seedPermissions();
+        accounting.initializeAccounts();
 
         // 2. Seed only Super Admin and Enterprise Admin roles with all permissions
         Set<Permission> allPermissions = new HashSet<>(permissionMap.values());
@@ -57,6 +59,7 @@ public class DataInitializer implements ApplicationRunner {
 
         // 3. Seed Super Admin User if enabled and absent
         if (initialAdminEnabled) {
+            if (adminPassword == null || adminPassword.length() < 12) throw new IllegalStateException("INITIAL_ADMIN_PASSWORD must contain at least 12 characters");
             seedSuperAdminUser(superAdminRole, adminRole);
         } else {
             log.info("Initial super admin user creation is disabled via configuration (initial-admin.enabled=false).");
@@ -80,6 +83,9 @@ public class DataInitializer implements ApplicationRunner {
                 new PermItem("WAREHOUSE", "WAREHOUSE_VIEW", "View warehouse facilities and locations"),
                 new PermItem("WAREHOUSE", "WAREHOUSE_MANAGE", "Create and manage warehouses"),
                 new PermItem("PRODUCT", "PRODUCT_VIEW", "View product catalog, pricing, and specs"),
+                new PermItem("ACCOUNTING", "ACCOUNTING_VIEW", "View accounts and journals"),
+                new PermItem("ACCOUNTING", "ACCOUNTING_MANAGE", "Post and reverse journals and close years"),
+                new PermItem("SALES", "SALES_EDIT", "Edit held invoices and invoice notes"),
                 new PermItem("PRODUCT", "PRODUCT_MANAGE", "Create, edit, and deactivate products"),
                 new PermItem("BRAND", "BRAND_VIEW", "View product brand listings"),
                 new PermItem("BRAND", "BRAND_MANAGE", "Create, edit, and manage product brands"),

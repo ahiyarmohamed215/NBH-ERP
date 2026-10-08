@@ -26,16 +26,22 @@ public class CreateInvoiceRequest {
     private Long warehouseId;
 
     private Long salesmanId;
+    private String paymentMethod;
 
     @Builder.Default
     private String paymentType = "CASH"; // CASH, CARD, CREDIT, BANK_TRANSFER
 
     @Builder.Default
+    @PositiveOrZero
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
     @Builder.Default
+    @PositiveOrZero
+    @jakarta.validation.constraints.DecimalMax("100")
     private BigDecimal taxRate = BigDecimal.ZERO;
 
+    @PositiveOrZero
+    @jakarta.validation.constraints.Digits(integer=13, fraction=2)
     private BigDecimal paidAmount; // If null, defaults to netTotal for cash/card
 
     private LocalDate invoiceDate;
@@ -71,9 +77,12 @@ public class CreateInvoiceRequest {
         private BigDecimal unitPrice;
 
         @Builder.Default
+        @PositiveOrZero
+        @jakarta.validation.constraints.DecimalMax("100")
         private BigDecimal discountRate = BigDecimal.ZERO;
 
         @Builder.Default
+        @PositiveOrZero
         private BigDecimal discountAmount = BigDecimal.ZERO;
     }
 }

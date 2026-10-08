@@ -27,10 +27,18 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Sales & Invoicing", description = "Point of Sale, Billing, and Held Carts APIs")
 public class InvoiceController {
+    public record CompleteHeldRequest(@jakarta.validation.constraints.NotEmpty java.util.List<@jakarta.validation.constraints.NotNull Long> ids) {}
+    @PostMapping("/complete-held")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_EDIT')")
+    public com.nbh.erp.common.dto.ApiResponse<?> completeHeld(@Valid @RequestBody CompleteHeldRequest request) {
+        return com.nbh.erp.common.dto.ApiResponse.ok(invoiceService.completeHeldInvoices(request.ids()));
+    }
+
 
     private final InvoiceService invoiceService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
     @Operation(summary = "Search sales invoices with date, warehouse, customer, and cashier filters")
     public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> searchInvoices(
             @RequestParam(required = false) Long warehouseId,
@@ -50,6 +58,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/held")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
     @Operation(summary = "Get list of held sales invoices (isolated per cashier for regular sales staff)")
     public ResponseEntity<ApiResponse<List<InvoiceDto>>> getHeldInvoices(
             @RequestParam(required = false) String cashier
@@ -69,12 +78,14 @@ public class InvoiceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
     @Operation(summary = "Get invoice by ID")
     public ResponseEntity<ApiResponse<InvoiceDto>> getInvoiceById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoiceById(id)));
     }
 
     @GetMapping("/number/{number}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
     @Operation(summary = "Get invoice by invoice number (e.g. INV-2026-000001)")
     public ResponseEntity<ApiResponse<InvoiceDto>> getInvoiceByNumber(@PathVariable String number) {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoiceByNumber(number)));
@@ -146,7 +157,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/{id}/void")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','SALES_VOID')")
     @Operation(summary = "Void a sales invoice, reverse stock movements and restore customer balance")
     public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoice(
             @PathVariable Long id,
@@ -157,7 +168,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/number/{number}/void")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_DELETE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','SALES_VOID')")
     @Operation(summary = "Void a sales invoice by number, reverse stock movements and restore customer balance")
     public ResponseEntity<ApiResponse<InvoiceDto>> voidInvoiceByNumber(
             @PathVariable String number,

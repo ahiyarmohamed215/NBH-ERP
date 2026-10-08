@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -291,10 +292,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         return (
           roles.some(
             (r) =>
-              r.includes('ADMIN') ||
-              r.includes('SUPER') ||
-              r.includes('MANAGER') ||
-              r.includes('DIRECTOR') ||
+              r === 'ROLE_ADMIN' ||
+              r === 'ROLE_SUPER_ADMIN' ||
+              r === 'ROLE_MANAGER' ||
+              r === 'ROLE_DIRECTOR' ||
               r.includes('CASHIER') ||
               r.includes('POS') ||
               r.includes('SALES')
@@ -782,7 +783,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
       const payload = {
         warehouseId: whId,
-        adjustmentDate: new Date().toISOString().split('T')[0],
+        adjustmentDate: formatBusinessDate(),
         reason: createForm.reason + (createForm.remarks ? `: ${createForm.remarks}` : ''),
         items: [
           {

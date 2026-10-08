@@ -39,6 +39,10 @@ public class CreditNote {
     @Builder.Default
     private String status = "ISSUED"; // ISSUED, APPLIED, VOID
 
+    @Column(nullable = false)
+    @Builder.Default
+    private BigDecimal appliedAmount = BigDecimal.ZERO;
+
     @Column(name = "issue_date", nullable = false)
     private LocalDate issueDate;
 

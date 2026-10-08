@@ -24,28 +24,28 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
     @Operation(summary = "List all categories")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getAllCategories()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
     @Operation(summary = "List active categories for product selection")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getActiveCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getActiveCategories()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
     @Operation(summary = "Get category by ID")
     public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getCategoryById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
     @Operation(summary = "Create a new category")
     public ResponseEntity<ApiResponse<CategoryDto>> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
         CategoryDto created = categoryService.createCategory(request);
@@ -53,7 +53,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
     @Operation(summary = "Update category details")
     public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(
             @PathVariable Long id,
@@ -64,7 +64,7 @@ public class CategoryController {
     }
 
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
     @Operation(summary = "Toggle category active status")
     public ResponseEntity<ApiResponse<Void>> toggleActive(@PathVariable Long id) {
         categoryService.toggleActive(id);
@@ -72,7 +72,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
     @Operation(summary = "Delete category")
     public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         categoryService.deleteCategory(id);

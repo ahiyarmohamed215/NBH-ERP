@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 public class PurchaseReturnDto {
     private Long id;
     private String prnNumber;
+    private Long sourceGrnId;
     private Long supplierId;
     private String supplierCode;
     private String supplierName;
@@ -38,6 +39,7 @@ public class PurchaseReturnDto {
         return PurchaseReturnDto.builder()
                 .id(prn.getId())
                 .prnNumber(prn.getPrnNumber())
+                .sourceGrnId(prn.getSourceGrnId())
                 .supplierId(prn.getSupplier().getId())
                 .supplierCode(prn.getSupplier().getSupplierCode())
                 .supplierName(prn.getSupplier().getName())

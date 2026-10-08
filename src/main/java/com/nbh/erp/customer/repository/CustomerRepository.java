@@ -11,6 +11,10 @@ import java.util.Optional;
 
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select e from Customer e where e.id = :id")
+    java.util.Optional<Customer> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();

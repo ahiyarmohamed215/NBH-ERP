@@ -31,6 +31,7 @@ import java.util.ArrayList;
 @Service
 @RequiredArgsConstructor
 public class StockAdjustmentService {
+    private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
     private final StockAdjustmentRepository adjustmentRepository;
     private final WarehouseRepository warehouseRepository;
@@ -60,6 +61,9 @@ public class StockAdjustmentService {
 
     @Transactional
     public StockAdjustmentDto createAdjustment(CreateStockAdjustmentRequest request, boolean autoProcess) {
+        var ticket=idempotency.reserve("createAdjustment", request.toString()+"|"+autoProcess);
+        if(ticket!=null && ticket.getResourceId()!=null) return getAdjustmentById(ticket.getResourceId());
+
         Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
 
@@ -97,15 +101,15 @@ public class StockAdjustmentService {
         StockAdjustment saved = adjustmentRepository.save(adjustment);
 
         if (autoProcess) {
-            return processAdjustmentInternal(saved);
+            return idempotency.complete(ticket,saved.getId(),processAdjustmentInternal(saved));
         }
 
-        return StockAdjustmentDto.from(saved);
+        return idempotency.complete(ticket,saved.getId(),StockAdjustmentDto.from(saved));
     }
 
     @Transactional
     public StockAdjustmentDto processAdjustment(Long id) {
-        StockAdjustment adjustment = adjustmentRepository.findById(id)
+        StockAdjustment adjustment = adjustmentRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Stock Adjustment", "id", id));
         return processAdjustmentInternal(adjustment);
     }
@@ -151,7 +155,7 @@ public class StockAdjustmentService {
 
     @Transactional
     public void rejectAdjustment(Long id) {
-        StockAdjustment adjustment = adjustmentRepository.findById(id)
+        StockAdjustment adjustment = adjustmentRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Stock Adjustment", "id", id));
 
         if (!"DRAFT".equals(adjustment.getStatus())) {

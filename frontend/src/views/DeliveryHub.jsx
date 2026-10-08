@@ -1,3 +1,4 @@
+import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Truck,
@@ -97,7 +98,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     vehicleId: '',
     driverId: '',
     assistantStaffId: '',
-    scheduledDate: new Date().toISOString().split('T')[0],
+    scheduledDate: formatBusinessDate(),
     departureTime: '',
     selectedInvoiceIds: [],
     startOdometer: '',
@@ -253,7 +254,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       vehicleId: vehicles.find(v => v.status === 'AVAILABLE')?.id || vehicles[0]?.id || '',
       driverId: employees[0]?.id || '',
       assistantStaffId: employees[1]?.id || employees[0]?.id || '',
-      scheduledDate: new Date().toISOString().split('T')[0],
+      scheduledDate: formatBusinessDate(),
       departureTime: '',
       selectedInvoiceIds: [],
       startOdometer: '',

@@ -1,3 +1,6 @@
+import SettlementPanel from '../components/SettlementPanel';
+import { formatBusinessDate } from '../utils/invoiceMapping';
+import { invoiceTotal } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo } from 'react';
 import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi, quotationApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -135,7 +138,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         displayDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
         paymentType: inv.paymentType || (Number(inv.balanceAmount || 0) === 0 ? 'Full Payment' : 'Installment'),
         paymentMethod: inv.paymentMethod || 'Cash',
-        totalAmount: Number(inv.totalAmount || 0),
+        totalAmount: invoiceTotal(inv),
         paidAmount: Number(inv.paidAmount || 0),
         balanceAmount: Number(inv.balanceAmount || 0),
         status: inv.status || (Number(inv.balanceAmount || 0) === 0 ? 'PAID' : 'PARTIAL'),
@@ -240,7 +243,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Invoices_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Invoices_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -274,21 +277,15 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       return;
     }
     try {
-      if (editingInvoice.id && !editingInvoice.id.startsWith('inv-')) {
-        await salesApi.update(editingInvoice.id, {
-          paymentType: editingInvoice.paymentType,
-          paymentMethod: editingInvoice.paymentMethod,
-          paidAmount: Number(editingInvoice.paidAmount || 0),
-          balanceAmount: Number(editingInvoice.balanceAmount || 0),
-          status: editingInvoice.status,
-          notes: editingInvoice.notes,
-        });
+      if (editingInvoice.id && !String(editingInvoice.id).startsWith('inv-')) {
+        await salesApi.update(editingInvoice.id, { notes: editingInvoice.notes });
       }
       addToast(`Invoice ${editingInvoice.invoiceNumber} updated successfully!`, 'success');
       await loadBackendInvoices();
     } catch (err) {
       console.error('Failed to update invoice:', err);
-      addToast(err.response?.data?.message || 'Failed to update invoice', 'error');
+      addToast(err.message || 'Failed to update invoice', 'error');
+      return;
     }
     if (selectedInvoice && (selectedInvoice.id === editingInvoice.id || selectedInvoice.invoiceNumber === editingInvoice.invoiceNumber)) {
       setSelectedInvoice({ ...selectedInvoice, ...editingInvoice });
@@ -619,7 +616,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     invoiceNo: '',
     amount: '',
     paymentMethod: 'Cash',
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: formatBusinessDate(),
     notes: '',
   });
 
@@ -628,14 +625,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     customerName: '',
     amount: '',
     paymentMethod: 'Bank Transfer',
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: formatBusinessDate(),
     notes: '',
   });
 
   const [showCreateQuotationModal, setShowCreateQuotationModal] = useState(false);
   const [quotationForm, setQuotationForm] = useState({
     customerName: '',
-    quotationDate: new Date().toISOString().split('T')[0],
+    quotationDate: formatBusinessDate(),
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     totalAmount: '',
     notes: '',
@@ -666,19 +663,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   // Workflow Action 1: Send bill to warehouse
-  const handleSendToWarehouse = (heldBill) => {
-    const updated = heldBills.map((b) => {
-      if (b.id === heldBill.id) {
-        return {
-          ...b,
-          status: 'SENT_TO_WAREHOUSE',
-          sentToWarehouseAt: new Date().toISOString(),
-        };
-      }
-      return b;
-    });
-    setHeldBills(updated);
-    addToast(`Bill ${heldBill.invoiceNumber} sent to warehouse for stock picking & verification!`, 'success');
+  const handleSendToWarehouse = async (heldBill) => {
+    try { await salesApi.update(heldBill.id, { status: 'SENT_TO_WAREHOUSE' }); await loadHeldBills();
+      addToast(`Bill ${heldBill.invoiceNumber} sent for warehouse verification`, 'success');
+    } catch (err) { addToast(err.message, 'error'); }
   };
 
   // Workflow Action 2: Open warehouse stock adjustment modal
@@ -696,29 +684,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   // Workflow Action 3: Save verified / adjusted stock
-  const handleSaveStockAdjustment = () => {
+  const handleSaveStockAdjustment = async () => {
     if (!adjustingHeldBill) return;
-    const calcNetTotal = adjustingHeldBill.items.reduce(
-      (sum, it) => sum + Number(it.totalPrice || (it.quantity * it.unitPrice) || 0),
-      0
-    );
-    const updated = heldBills.map((b) => {
-      if (b.id === adjustingHeldBill.id) {
-        return {
-          ...b,
-          items: adjustingHeldBill.items,
-          netTotal: calcNetTotal,
-          totalAmount: calcNetTotal,
-          status: 'STOCK_ADJUSTED',
-          stockAdjustedAt: new Date().toISOString(),
-          adjustmentRemarks: adjustingHeldBill.adjustmentRemarks,
-        };
-      }
-      return b;
-    });
-    setHeldBills(updated);
-    addToast(`Stock quantities adjusted & verified for ${adjustingHeldBill.invoiceNumber}. Bill is ready for dispatch!`, 'success');
-    setAdjustingHeldBill(null);
+    try {
+      await salesApi.update(adjustingHeldBill.id, {
+        status: 'STOCK_ADJUSTED', notes: adjustingHeldBill.adjustmentRemarks,
+        items: adjustingHeldBill.items.map(it => ({ productId: it.productId, quantity: Number(it.quantity), unitPrice: Number(it.unitPrice), discountRate: Number(it.discountRate || 0), discountAmount: Number(it.discountAmount || 0) })),
+      });
+      await loadHeldBills(); setAdjustingHeldBill(null);
+      addToast('Verified quantities saved. Inventory will be deducted when the invoice is completed.', 'success');
+    } catch (err) { addToast(err.message, 'error'); }
   };
 
   // Workflow Action 4: Merge multiple bills & open dispatch note
@@ -779,10 +754,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const targetIds = dispatchNoteData.sourceBillIds || [];
 
     try {
-      await Promise.allSettled(
-        targetIds.map((id) => salesApi.cancelHeld(id))
-      );
-      addToast(`Order Dispatch Note ${dispatchNoteData.odnNumber} confirmed for ${dispatchNoteData.customerName}!`, 'success');
+      await salesApi.completeHeld(targetIds);
+      addToast('Invoices completed as unpaid credit sales. Assign the delivery trip in Delivery.', 'success');
       setSelectedHeldIds([]);
       setDispatchNoteData(null);
       await Promise.all([loadHeldBills(), loadBackendInvoices()]);
@@ -828,7 +801,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Held_Bills_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Held_Bills_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -927,6 +900,13 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     loadBackendQuotations();
   }, []);
 
+  const resolveCustomerId = async (name) => {
+    const res = await customerApi.search(name);
+    const matches = (res.data || []).filter(c => c.name.toLowerCase() === name.trim().toLowerCase());
+    if(matches.length !== 1) throw new Error('Enter one exact, unique customer name');
+    return matches[0].id;
+  };
+
   // Form Submissions
   const handleSavePayment = async (e) => {
     e.preventDefault();
@@ -937,11 +917,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const amt = parseFloat(paymentForm.amount) || 0;
     try {
       const payload = {
+        customerId: paymentForm.invoiceNo ? undefined : await resolveCustomerId(paymentForm.customerName),
         customerName: paymentForm.customerName,
         invoiceNumber: paymentForm.invoiceNo || null,
         amount: amt,
         paymentMethod: paymentForm.paymentMethod || 'Cash',
-        paymentDate: paymentForm.paymentDate || new Date().toISOString().split('T')[0],
+        paymentDate: paymentForm.paymentDate || formatBusinessDate(),
         notes: paymentForm.notes || '',
       };
       const res = await paymentApi.create(payload);
@@ -952,7 +933,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         invoiceNo: '',
         amount: '',
         paymentMethod: 'Cash',
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: formatBusinessDate(),
         notes: '',
       });
       await Promise.all([loadBackendPayments(), loadBackendInvoices()]);
@@ -987,10 +968,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const amt = parseFloat(advanceForm.amount) || 0;
     try {
       const payload = {
+        customerId: await resolveCustomerId(advanceForm.customerName),
         customerName: advanceForm.customerName,
         amount: amt,
         paymentMethod: advanceForm.paymentMethod || 'Bank Transfer',
-        paymentDate: advanceForm.paymentDate || new Date().toISOString().split('T')[0],
+        paymentDate: advanceForm.paymentDate || formatBusinessDate(),
         notes: advanceForm.notes || '',
       };
       const res = await paymentApi.createAdvance(payload);
@@ -1001,7 +983,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         customerName: '',
         amount: '',
         paymentMethod: 'Bank Transfer',
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: formatBusinessDate(),
         notes: '',
       });
       await loadBackendAdvances();
@@ -1021,7 +1003,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     try {
       const payload = {
         customerName: quotationForm.customerName,
-        quotationDate: quotationForm.quotationDate || new Date().toISOString().split('T')[0],
+        quotationDate: quotationForm.quotationDate || formatBusinessDate(),
         validUntil: quotationForm.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         totalAmount: amt,
         notes: quotationForm.notes || '',
@@ -1032,7 +1014,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       setShowCreateQuotationModal(false);
       setQuotationForm({
         customerName: '',
-        quotationDate: new Date().toISOString().split('T')[0],
+        quotationDate: formatBusinessDate(),
         validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         totalAmount: '',
         notes: '',
@@ -1095,7 +1077,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Quotations_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Quotations_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1131,7 +1113,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Payments_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Payments_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1163,7 +1145,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Advances_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Advances_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1215,7 +1197,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Outstanding_Invoices_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Outstanding_Invoices_Export_${formatBusinessDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1254,6 +1236,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         overflow: 'hidden',
       }}
     >
+      {currentTab === 'advance-payments' && <SettlementPanel />}
       {/* Page Header (Fixed / Sticky at Top) - Matching InventoryHub / EmployeesHub */}
       <div
         style={{
@@ -1832,7 +1815,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       {/* Total */}
                       {visibleColumns.total && (
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
-                          LKR {Number(inv.totalAmount || 0).toFixed(2)}
+                          LKR {invoiceTotal(inv).toFixed(2)}
                         </td>
                       )}
 
@@ -3182,7 +3165,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           {inv.paymentType}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>
-                          Rs. {Number(inv.totalAmount || 0).toFixed(2)}
+                          Rs. {invoiceTotal(inv).toFixed(2)}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
                           Rs. {Number(inv.paidAmount || 0).toFixed(2)}
@@ -3214,7 +3197,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                   invoiceNo: inv.invoiceNumber,
                                   amount: String(inv.balanceAmount || ''),
                                   paymentMethod: 'Cash',
-                                  paymentDate: new Date().toISOString().split('T')[0],
+                                  paymentDate: formatBusinessDate(),
                                   notes: `Settlement for invoice ${inv.invoiceNumber}`,
                                 });
                                 setShowRecordPaymentModal(true);
@@ -3867,7 +3850,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   CUSTOMER NAME
                 </label>
-                <input
+                <input disabled
                   type="text"
                   className="input-glass"
                   style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
@@ -3882,7 +3865,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAYMENT TYPE
                   </label>
-                  <select
+                  <select disabled
                     className="input-glass"
                     style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
                     value={editingInvoice.paymentType || 'Full Payment'}
@@ -3898,7 +3881,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAYMENT METHOD
                   </label>
-                  <select
+                  <select disabled
                     className="input-glass"
                     style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
                     value={editingInvoice.paymentMethod || 'Cash'}
@@ -3917,7 +3900,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     TOTAL AMOUNT (LKR)
                   </label>
-                  <input
+                  <input disabled
                     type="number"
                     step="0.01"
                     min="0"
@@ -3942,7 +3925,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAID AMOUNT (LKR)
                   </label>
-                  <input
+                  <input disabled
                     type="number"
                     step="0.01"
                     min="0"
@@ -3992,7 +3975,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     STATUS
                   </label>
-                  <select
+                  <select disabled
                     className="input-glass"
                     style={{ width: '100%', height: '36px', fontSize: '0.86rem', fontWeight: 700 }}
                     value={editingInvoice.status || 'PENDING'}
