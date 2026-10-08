@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CashierAccountingDto {
+public class CashierSalesSummaryDto {
     private String username;
     private String fullName;
     private String email;

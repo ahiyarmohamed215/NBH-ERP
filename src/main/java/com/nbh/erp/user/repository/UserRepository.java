@@ -14,8 +14,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
+    Optional<User> findByUsernameIgnoreCase(String username);
+    Optional<User> findByEmailIgnoreCase(String email);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
+    boolean existsByUsernameIgnoreCase(String username);
+    boolean existsByEmailIgnoreCase(String email);
     org.springframework.data.domain.Page<User> findByApprovalStatus(String approvalStatus, org.springframework.data.domain.Pageable pageable);
     long countByApprovalStatus(String approvalStatus);
 }

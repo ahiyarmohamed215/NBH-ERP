@@ -46,7 +46,6 @@ public class SalesReturnService {
     private final DocumentSequenceService sequenceService;
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
     private final com.nbh.erp.audit.service.AuditLogService auditLogService;
-    private final com.nbh.erp.accounting.service.AccountingService accounting;
 
     private String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -170,12 +169,6 @@ public class SalesReturnService {
                 .createdBy(getCurrentUsername()).updatedBy(getCurrentUsername()).build());
         }
         customerBalances.reconcile(invoice.getCustomer().getId());
-        BigDecimal taxReturn=invoice.getNetTotal().signum()==0 ? BigDecimal.ZERO : grandTotal.multiply(invoice.getTaxAmount()).divide(invoice.getNetTotal(),2,java.math.RoundingMode.HALF_UP);
-        if(grandTotal.signum()>0) accounting.post(new com.nbh.erp.accounting.service.AccountingService.Posting("RETURN-"+savedReturn.getId(),retDate,returnNumber,"RETURN",java.util.List.of(
-            new com.nbh.erp.accounting.service.AccountingService.Line("SALES",grandTotal.subtract(taxReturn),BigDecimal.ZERO),
-            new com.nbh.erp.accounting.service.AccountingService.Line("TAX",taxReturn,BigDecimal.ZERO),
-            new com.nbh.erp.accounting.service.AccountingService.Line("AR",BigDecimal.ZERO,grandTotal.subtract(refund)),
-            new com.nbh.erp.accounting.service.AccountingService.Line("CREDIT_NOTE".equals(savedReturn.getReturnType()) ? "DEPOSITS" : "CASH",BigDecimal.ZERO,refund))));
         auditLogService.log("SALES_RETURN","SalesReturn",returnNumber,"Returned "+grandTotal+", refund/credit "+refund);
 
         log.info("Sales return '{}' completed against invoice '{}'. Total refunded: {}",

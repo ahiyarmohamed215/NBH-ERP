@@ -74,7 +74,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class, org.springframework.dao.PessimisticLockingFailureException.class, org.springframework.dao.DataIntegrityViolationException.class})
     public ResponseEntity<ApiResponse<Void>> conflict(Exception ex) {
         log.warn("Conflicting update", ex);
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("Record changed, already exists, or is referenced. Refresh and retry."));
+        String msg = "Record changed, already exists, or is referenced. Refresh and retry.";
+        if (ex instanceof org.springframework.dao.DataIntegrityViolationException dive) {
+            String rootMsg = dive.getMostSpecificCause() != null ? dive.getMostSpecificCause().getMessage() : dive.getMessage();
+            if (rootMsg != null) {
+                String lower = rootMsg.toLowerCase();
+                if (lower.contains("ukr43af9ap4edm43mmtq01oddj6") || lower.contains("users.username") || lower.contains("username")) {
+                    msg = "Username is already registered. Please choose another username or sign in.";
+                } else if (lower.contains("uk6dotkott2kjsp8vw4d0m25fb7") || lower.contains("users.email") || lower.contains("email")) {
+                    msg = "Email address is already registered. Please use another email or sign in.";
+                }
+            }
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(msg));
     }
     @ExceptionHandler({IllegalArgumentException.class, org.springframework.http.converter.HttpMessageNotReadableException.class, org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class, ArithmeticException.class})
     public ResponseEntity<ApiResponse<Void>> invalidInput(Exception ex) {

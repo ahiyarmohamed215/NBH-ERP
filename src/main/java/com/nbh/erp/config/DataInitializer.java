@@ -27,9 +27,9 @@ public class DataInitializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final com.nbh.erp.accounting.service.AccountingService accounting;
     private final com.nbh.erp.delivery.service.VehicleService vehicleService;
     private final com.nbh.erp.delivery.service.DeliveryRouteService deliveryRouteService;
+    private final javax.sql.DataSource dataSource;
 
     @Value("${app.security.initial-admin.enabled:false}")
     private boolean initialAdminEnabled;
@@ -47,10 +47,11 @@ public class DataInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         log.info("Checking system authorization & permissions initialization...");
+        ensureLegacyUserColumnsHaveDefaults();
 
         // 1. Seed system permissions (required for @PreAuthorize and frontend Role permission builder)
         Map<String, Permission> permissionMap = seedPermissions();
-        accounting.initializeAccounts();
+
 
         // 2. Seed only Super Admin and Enterprise Admin roles with all permissions
         Set<Permission> allPermissions = new HashSet<>(permissionMap.values());
@@ -76,6 +77,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private Map<String, Permission> seedPermissions() {
         List<PermItem> defs = List.of(
+                new PermItem("PURCHASING", "SUPPLIER_PAYMENT_MANAGE", "Manage supplier payments and settlements"),
                 new PermItem("USER", "USER_VIEW", "View user accounts and profiles"),
                 new PermItem("USER", "USER_MANAGE", "Create, edit, approve, and deactivate system users"),
                 new PermItem("ROLE", "ROLE_VIEW", "View roles and assigned permissions"),
@@ -83,8 +85,6 @@ public class DataInitializer implements ApplicationRunner {
                 new PermItem("WAREHOUSE", "WAREHOUSE_VIEW", "View warehouse facilities and locations"),
                 new PermItem("WAREHOUSE", "WAREHOUSE_MANAGE", "Create and manage warehouses"),
                 new PermItem("PRODUCT", "PRODUCT_VIEW", "View product catalog, pricing, and specs"),
-                new PermItem("ACCOUNTING", "ACCOUNTING_VIEW", "View accounts and journals"),
-                new PermItem("ACCOUNTING", "ACCOUNTING_MANAGE", "Post and reverse journals and close years"),
                 new PermItem("SALES", "SALES_EDIT", "Edit held invoices and invoice notes"),
                 new PermItem("PRODUCT", "PRODUCT_MANAGE", "Create, edit, and deactivate products"),
                 new PermItem("BRAND", "BRAND_VIEW", "View product brand listings"),
@@ -184,6 +184,29 @@ public class DataInitializer implements ApplicationRunner {
 
             userRepository.save(superAdmin);
             log.info("Initialized default Super Admin user: '{}' with full ERP privileges.", adminUsername);
+        }
+    }
+
+    private void ensureLegacyUserColumnsHaveDefaults() {
+        if (dataSource == null) return;
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            java.sql.DatabaseMetaData meta = conn.getMetaData();
+            try (java.sql.ResultSet rs = meta.getColumns(conn.getCatalog(), null, "users", "failed_login_attempts")) {
+                if (rs.next()) {
+                    try (java.sql.Statement stmt = conn.createStatement()) {
+                        stmt.execute("ALTER TABLE users ALTER COLUMN failed_login_attempts SET DEFAULT 0");
+                    } catch (Exception ignored) {}
+                }
+            }
+            try (java.sql.ResultSet rs = meta.getColumns(conn.getCatalog(), null, "users", "locked")) {
+                if (rs.next()) {
+                    try (java.sql.Statement stmt = conn.createStatement()) {
+                        stmt.execute("ALTER TABLE users ALTER COLUMN locked SET DEFAULT 0");
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Database column check skipped: {}", ex.getMessage());
         }
     }
 }

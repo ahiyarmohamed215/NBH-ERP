@@ -1,3 +1,5 @@
+> Historical document. The accounting module has since been removed; see README.md for the current application.
+
 > Historical audit. Implementation has since changed; see [IMPLEMENTATION_NOTES.md](implementation-notes.md) and [README.md](../README.md).
 
 **ERP project review — 8 October 2026**

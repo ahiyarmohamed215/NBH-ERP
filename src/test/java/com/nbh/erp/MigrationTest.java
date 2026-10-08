@@ -10,7 +10,7 @@ class MigrationTest {
     @Test void freshDatabaseMigratesAndCanRestart() throws Exception {
         String url="jdbc:h2:mem:migration-fresh;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1";
         var flyway=Flyway.configure().dataSource(url,"sa","").load();
-        assertEquals(3,flyway.migrate().migrationsExecuted);
+        assertEquals(4,flyway.migrate().migrationsExecuted);
         assertEquals(0,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
             s.executeQuery("select source_grn_id from prns");
@@ -38,12 +38,30 @@ class MigrationTest {
             s.execute("insert into brands (is_active,created_at,code,name) values (true,current_timestamp,'LEGACY','Preserved brand')");
         }
         var flyway=Flyway.configure().dataSource(url,"sa","").baselineOnMigrate(true).baselineVersion("1").load();
-        assertEquals(2,flyway.migrate().migrationsExecuted);
+        assertEquals(3,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
             try(var rows=s.executeQuery("select name,record_version from brands where code='LEGACY'")) { assertTrue(rows.next());assertEquals("Preserved brand",rows.getString(1));assertEquals(0,rows.getLong(2)); }
             s.executeQuery("select source_grn_id from prns");
             s.executeQuery("select returned_amount,record_version from invoices");
             s.executeQuery("select id from supplier_payment");
+        }
+    }
+    @Test void retiringAccountingPreservesHistoryAndSupplierPaymentAccess() throws Exception {
+        String url="jdbc:h2:mem:retire-accounting;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1";
+        Flyway.configure().dataSource(url,"sa","").target("3").load().migrate();
+        try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
+            s.execute("insert into roles (id,name) values (700,'LEGACY_FINANCE')");
+            s.execute("insert into permissions (id,name,module) values (700,'ACCOUNTING_MANAGE','ACCOUNTING')");
+            s.execute("insert into role_permissions (role_id,permission_id) values (700,700)");
+            s.execute("insert into account (code,name,type,active,created_at,record_version) values ('HISTORY','Historical account','ASSET',true,current_timestamp,0)");
+        }
+        var flyway=Flyway.configure().dataSource(url,"sa","").load();
+        assertEquals(1,flyway.migrate().migrationsExecuted);
+        assertEquals(0,flyway.migrate().migrationsExecuted);
+        try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
+            try(var rows=s.executeQuery("select count(*) from permissions where module='ACCOUNTING'")) { rows.next();assertEquals(0,rows.getInt(1)); }
+            try(var rows=s.executeQuery("select count(*) from role_permissions r join permissions p on p.id=r.permission_id where r.role_id=700 and p.name='SUPPLIER_PAYMENT_MANAGE'")) { rows.next();assertEquals(1,rows.getInt(1)); }
+            try(var rows=s.executeQuery("select name from account where code='HISTORY'")) { assertTrue(rows.next());assertEquals("Historical account",rows.getString(1)); }
         }
     }
 }

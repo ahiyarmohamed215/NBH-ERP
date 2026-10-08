@@ -13,7 +13,6 @@ public class CreditNoteService {
  private final CreditAllocationRepository allocations;
  private final com.nbh.erp.sales.repository.InvoiceRepository invoices;
  private final com.nbh.erp.customer.service.CustomerBalanceService balances;
- private final com.nbh.erp.accounting.service.AccountingService accounting;
  public record Credit(Long id,String number,Long customerId,BigDecimal amount,BigDecimal available,String status) {}
  public record Allocation(Long id,Long invoiceId,BigDecimal amount,boolean reversed) {}
  private Credit dto(com.nbh.erp.salesreturn.entity.CreditNote n) { return new Credit(n.getId(),n.getCreditNoteNumber(),n.getCustomer().getId(),n.getAmount(),n.getAmount().subtract(n.getAppliedAmount()),n.getStatus()); }
@@ -30,7 +29,7 @@ public class CreditNoteService {
   var allocation=new com.nbh.erp.salesreturn.entity.CreditAllocation(); allocation.setCreditNote(note);allocation.setInvoice(invoice);allocation.setAmount(amount);allocations.save(allocation);
   note.setAppliedAmount(note.getAppliedAmount().add(amount));if(note.getAppliedAmount().compareTo(note.getAmount())==0) note.setStatus("APPLIED");notes.save(note);
   invoice.setPaidAmount(invoice.getPaidAmount().add(amount));com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);invoices.save(invoice);balances.reconcile(note.getCustomer().getId());
-  accounting.transfer("CREDIT-"+allocation.getId(),LocalDate.now(),note.getCreditNoteNumber(),"PAYMENT","DEPOSITS","AR",amount);return idempotency.complete(ticket,id,dto(note));
+  return idempotency.complete(ticket,id,dto(note));
  }
  @Transactional public void reverse(Long id,String reason) {
   var allocation=allocations.lockById(id).orElseThrow(() -> new BusinessException("Unknown allocation"));
@@ -38,6 +37,6 @@ public class CreditNoteService {
   if(allocation.isReversed() || invoice.getPaidAmount().compareTo(allocation.getAmount())<0 || !com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(invoice.getStatus())) throw new BusinessException("Allocation is reversed or dependent transactions must be reversed first");
   invoice.setPaidAmount(invoice.getPaidAmount().subtract(allocation.getAmount()));com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);invoices.save(invoice);
   note.setAppliedAmount(note.getAppliedAmount().subtract(allocation.getAmount()));note.setStatus("ISSUED");notes.save(note);allocation.setReversed(true);allocations.save(allocation);
-  balances.reconcile(note.getCustomer().getId());accounting.reverseSource("CREDIT-"+id,reason);
+  balances.reconcile(note.getCustomer().getId());
  }
 }

@@ -1,3 +1,5 @@
+> Historical document. The accounting module has since been removed; see README.md for the current application.
+
 > Historical implementation report. Subsequent cleanup removed unused code and unfinished navigation; see the current [project layout](../README.md#project-layout).
 
 # Implementation status — 8 October 2026

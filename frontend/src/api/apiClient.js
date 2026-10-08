@@ -63,9 +63,6 @@ api.interceptors.response.use(
         if (url.includes('/delivery') || url.includes('/deliveries') || url.includes('/vehicles')) {
           window.dispatchEvent(new CustomEvent('erp:delivery_updated', { detail: payload }));
         }
-        if (url.includes('/accounting') || url.includes('/accounts') || url.includes('/banking') || url.includes('/cheques') || url.includes('/expenses')) {
-          window.dispatchEvent(new CustomEvent('erp:accounting_updated', { detail: payload }));
-        }
       }
     }
     return response.data;
@@ -299,7 +296,7 @@ export const salesApi = {
   completeHeld: (ids) => api.post('/invoices/complete-held', { ids }),
   search: (params) => fetchAllPages('/invoices', params),
   getHeld: (cashier) => api.get('/invoices/held', { params: cashier ? { cashier } : {} }),
-  getCashierAccounting: (params) => api.get('/invoices/accounting/cashiers', { params }),
+  getCashierSalesSummary: (params) => api.get('/invoices/cashiers/summary', { params }),
   getById: (id) => api.get(`/invoices/${id}`),
   getByNumber: (number) => api.get(`/invoices/number/${number}`),
   create: (data) => api.post('/invoices', data),

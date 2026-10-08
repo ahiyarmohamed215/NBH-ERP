@@ -35,7 +35,6 @@ public class StockService {
     private final StockMovementRepository stockMovementRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductRepository productRepository;
-    private final com.nbh.erp.accounting.service.AccountingService accounting;
 
     @Transactional(readOnly = true)
     public BigDecimal getAvailableStock(Long warehouseId, Long productId) {
@@ -306,15 +305,7 @@ public class StockService {
                 .build();
 
         stockMovementRepository.save(movement);
-        BigDecimal value=quantity.abs().multiply(movement.getUnitCost()).setScale(2,java.math.RoundingMode.HALF_UP);
-        String opposite=switch(referenceType) {
-            case "GRN", "GRN_CANCEL", "PRN" -> "AP";
-            case "SALE", "SALE_RETURN", "VOID_SALE" -> "COGS";
-            case "STOCK_ADJUSTMENT" -> "ADJUSTMENTS";
-            default -> null;
-        };
-        if(opposite!=null) accounting.transfer("STOCK-"+movement.getId(),LocalDate.now(),referenceType+" "+referenceNumber,"STOCK",
-            quantity.signum()>0 ? "INVENTORY" : opposite,quantity.signum()>0 ? opposite : "INVENTORY",value);
+
     }
 
     @Transactional(readOnly = true)

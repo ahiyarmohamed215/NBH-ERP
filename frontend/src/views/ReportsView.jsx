@@ -38,7 +38,6 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
     { id: 'sales-reports', label: 'Sales Report', title: 'Sales & Revenue Reports', icon: BarChart3 },
     { id: 'inventory-reports', label: 'Inventory Reports', title: 'Inventory Valuation & Movement Reports', icon: Package },
     { id: 'purchase-reports', label: 'Purchase Reports', title: 'Procurement & Supplier Reports', icon: ShoppingCart },
-    { id: 'accounting-reports', label: 'Accounting Reports', title: 'Financial Accounting Reports', icon: DollarSign },
     { id: 'day-summary', label: 'Day Summary', title: 'Day Summary & Audit Ledger', icon: ShieldCheck },
   ];
 
@@ -891,25 +890,6 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             </p>
             <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
               Total GRN receipts processed this quarter: <strong>14 Receipts</strong> totaling <strong>LKR 458,900.00</strong>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* 6. ACCOUNTING REPORTS TAB */}
-      {/* ------------------------------------------------------------- */}
-      {currentPrimaryTab === 'accounting-reports' && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-              Financial Accounting & Ledger Statements
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
-              Trial Balance, Profit & Loss overview, and Balance Sheet ledger consolidation.
-            </p>
-            <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
-              General ledger audit accounts prepared for upcoming fiscal closing.
             </div>
           </div>
         </div>

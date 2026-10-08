@@ -37,7 +37,6 @@ public class PaymentService {
     private final DocumentSequenceService sequenceService;
     private final AuditLogService auditLogService;
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
-    private final com.nbh.erp.accounting.service.AccountingService accounting;
     private final com.nbh.erp.payment.repository.PaymentAllocationRepository allocations;
 
     @Transactional(readOnly = true)
@@ -117,7 +116,7 @@ public class PaymentService {
                 .build();
 
         Payment saved = paymentRepository.save(payment);
-        accounting.transfer("PAYMENT-"+saved.getId(),saved.getPaymentDate(),saved.getPaymentNumber(),"PAYMENT",com.nbh.erp.accounting.service.AccountingService.cashAccount(saved.getPaymentMethod()),invoice==null?"DEPOSITS":"AR",saved.getAmount());
+
         customerBalances.reconcile(customer.getId());
 
         String username = SecurityUtils.getCurrentUsername().orElse("system");
@@ -154,11 +153,11 @@ public class PaymentService {
         if(payment.getInvoice()!=null) reverseInvoicePayment(payment.getInvoice().getId(),payment.getAmount());
         for(var allocation:allocations.findByPaymentIdAndReversedFalse(payment.getId())) {
             reverseInvoicePayment(allocation.getInvoice().getId(),allocation.getAmount());
-            accounting.reverseSource("ALLOCATION-"+allocation.getId(),reason);
+
             allocation.setReversed(true); allocations.save(allocation);
         }
 
-        accounting.reverseSource("PAYMENT-"+payment.getId(),reason);
+
         payment.setStatus("VOIDED");
         String voidNote = String.format(" [VOIDED on %s: %s]", LocalDate.now(), reason != null ? reason : "Manual void");
         payment.setNotes(payment.getNotes() != null ? payment.getNotes() + voidNote : voidNote);
@@ -200,7 +199,7 @@ public class PaymentService {
         customerRepository.findByIdForUpdate(payment.getCustomer().getId()).orElseThrow();
         var allocation=new com.nbh.erp.payment.entity.PaymentAllocation();
         allocation.setPayment(payment); allocation.setInvoice(invoice); allocation.setAmount(amount); allocations.save(allocation);
-        accounting.transfer("ALLOCATION-"+allocation.getId(),LocalDate.now(),"Advance allocation","PAYMENT","DEPOSITS","AR",amount);
+
         invoice.setPaidAmount(invoice.getPaidAmount().add(amount)); com.nbh.erp.sales.service.InvoiceBalances.recalculate(invoice);
         invoiceRepository.save(invoice); customerBalances.reconcile(payment.getCustomer().getId());
         auditLogService.log("ADVANCE_ALLOCATE","Payment",payment.getPaymentNumber(),"Allocated "+amount+" to "+invoice.getInvoiceNumber());

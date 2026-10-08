@@ -17,7 +17,6 @@ import com.nbh.erp.payment.dto.CreatePaymentRequest;
 import com.nbh.erp.salesreturn.service.SalesReturnService;
 import com.nbh.erp.salesreturn.dto.CreateSalesReturnRequest;
 import com.nbh.erp.inventory.service.StockService;
-import com.nbh.erp.accounting.service.AccountingService;
 import com.nbh.erp.purchaseorder.service.PurchaseOrderService;
 import com.nbh.erp.purchaseorder.dto.PurchaseOrderRequest;
 import com.nbh.erp.security.*;
@@ -47,7 +46,7 @@ class RegressionIntegrationTest {
  @Autowired InvoiceService invoices; @Autowired InvoiceRepository invoiceRepository;
  @Autowired CustomerRepository customers; @Autowired WarehouseRepository warehouses; @Autowired ProductRepository products; @Autowired CategoryRepository categories;
  @Autowired SupplierRepository suppliers; @Autowired PaymentService payments; @Autowired SalesReturnService returns; @Autowired StockService stock;
- @Autowired AccountingService accounting; @Autowired PurchaseOrderService orders; @Autowired UserRepository users; @Autowired RoleRepository roles;
+ @Autowired PurchaseOrderService orders; @Autowired UserRepository users; @Autowired RoleRepository roles;
  @Autowired JwtTokenProvider tokens; @Autowired PasswordEncoder passwords; @Autowired WebApplicationContext context;
  @Autowired com.nbh.erp.auth.service.AuthService auth;
  @Autowired com.nbh.erp.grn.service.GrnService grns;
@@ -71,6 +70,11 @@ class RegressionIntegrationTest {
  void principal(User u) { var p=UserPrincipal.create(u); SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities())); }
  @AfterEach void cleanup() { SecurityContextHolder.clearContext(); org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
  CreateInvoiceRequest sale(boolean held) { return CreateInvoiceRequest.builder().customerId(customer.getId()).warehouseId(warehouse.getId()).paymentType("CREDIT").paidAmount(BigDecimal.ZERO).hold(held).items(List.of(CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(product.getId()).quantity(n("2")).unitPrice(n("10")).build())).build(); }
+ @Test void accountingEndpointsAreRemovedAndCashierSummaryStillWorks() throws Exception {
+  var mapping=context.getBean("requestMappingHandlerMapping",org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+  assertTrue(mapping.getHandlerMethods().keySet().stream().flatMap(info->info.getPatternValues().stream()).noneMatch(path->path.contains("/accounting")));
+  mvc.perform(get("/api/v1/invoices/cashiers/summary")).andExpect(status().isOk());
+ }
  @Test void heldCompletionWithoutLinesDeductsStockAndPostsDebt() {
   var invoice=invoices.createInvoice(sale(true)); assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
   var update=new UpdateInvoiceRequest(); update.setStatus("COMPLETED"); update.setPaidAmount(BigDecimal.ZERO);
@@ -92,9 +96,6 @@ class RegressionIntegrationTest {
  @Test void returnUsesOriginalPriceAndReconcilesDebt() { var invoice=invoices.createInvoice(sale(false));var result=returns.createSalesReturn(returnRequest(invoice,"1"));assertEquals(0,n("10").compareTo(result.getTotalAmount()));assertEquals(0,n("10").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance())); }
  @Test void repeatReturnCannotExceedSale() { var invoice=invoices.createInvoice(sale(false));returns.createSalesReturn(returnRequest(invoice,"2"));assertThrows(RuntimeException.class,()->returns.createSalesReturn(returnRequest(invoice,"1"))); }
  @Test void paidInvoiceAllowsReturn() { var req=sale(false);req.setPaidAmount(n("20"));req.setPaymentType("CASH");var invoice=invoices.createInvoice(req);assertEquals("PAID",invoice.getStatus());assertEquals(0,n("10").compareTo(returns.createSalesReturn(returnRequest(invoice,"1")).getTotalAmount())); }
- @Test void journalMustBalance() { assertThrows(RuntimeException.class,()->accounting.post(new AccountingService.Posting("MANUAL-test",LocalDate.now(),"Test","GENERAL",List.of(new AccountingService.Line("CASH",n("10"),BigDecimal.ZERO),new AccountingService.Line("SALES",BigDecimal.ZERO,n("9")))))); }
- @Test void businessEntriesBalance() { invoices.createInvoice(sale(false));var rows=accounting.trialBalance(null,null);assertEquals(0,rows.stream().map(AccountingService.Balance::balance).reduce(BigDecimal.ZERO,BigDecimal::add).signum()); }
- @Test void closedYearRejectsPosting() { accounting.closeYear(LocalDate.now().getYear());assertThrows(RuntimeException.class,()->accounting.transfer("MANUAL-closed",LocalDate.now(),"Closed","GENERAL","CASH","SALES",n("10"))); }
  @Test void purchaseOrdersPersistAndTrackPartialReceipts() { var req=new PurchaseOrderRequest(supplier.getId(),warehouse.getId(),LocalDate.now(),LocalDate.now().plusDays(1),"Cash","Test","APPROVED",List.of(new PurchaseOrderRequest.Line(product.getId(),n("5"),n("4"))));var po=orders.save(null,req);orders.receive(po.id(),supplier.getId(),warehouse.getId(),Map.of(product.getId(),n("2")),false);assertEquals("PARTIAL",orders.get(po.id()).status());assertEquals(0,n("2").compareTo(orders.get(po.id()).items().get(0).receivedQuantity())); }
  @Test void refreshCannotAuthenticateApi() throws Exception { String token=tokens.generateRefreshToken(admin.getUsername(),0,"session","token");SecurityContextHolder.clearContext();mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized()); }
  @Test void anonymousPdfIsBlocked() throws Exception { SecurityContextHolder.clearContext();mvc.perform(get("/api/v1/pdf/customers")).andExpect(status().isUnauthorized()); }
@@ -102,6 +103,14 @@ class RegressionIntegrationTest {
  @Test void accessTokenCannotRefresh() { var req=new com.nbh.erp.auth.dto.RefreshTokenRequest();req.setRefreshToken(tokens.generateAccessToken(SecurityContextHolder.getContext().getAuthentication()));assertThrows(RuntimeException.class,()->auth.refreshToken(req)); }
  @Test void rotatedRefreshCannotBeReused() { var login=new com.nbh.erp.auth.dto.LoginRequest();login.setUsername(admin.getUsername());login.setPassword("safe-test-password");var response=auth.login(login);var req=new com.nbh.erp.auth.dto.RefreshTokenRequest();req.setRefreshToken(response.getRefreshToken());var rotated=auth.refreshToken(req);assertNotEquals(response.getRefreshToken(),rotated.getRefreshToken());assertThrows(RuntimeException.class,()->auth.refreshToken(req)); }
  @Test void ordinaryUserCannotGrantAdministrator() { var p=UserPrincipal.builder().username("clerk").active(true).authorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_MANAGE"))).build();SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));assertThrows(org.springframework.security.access.AccessDeniedException.class,()->SecurityUtils.checkRoleGrant(roles.findByName("ROLE_ADMIN").orElseThrow())); }
+ @Test void testSignupAndDuplicateHandling() {
+  auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "secret123", "testnewuser@example.com", "New User", "0771234567"));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "secret123", "other@example.com", "Other", "0771234567")));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("differentuser", "secret123", "testnewuser@example.com", "Other", "0771234567")));
+ }
+
 
  @Test void duplicateInvoiceRetryDoesNotPostTwice() {
   var request=new org.springframework.mock.web.MockHttpServletRequest();request.addHeader("Idempotency-Key","same-invoice");
@@ -194,7 +203,6 @@ class RegressionIntegrationTest {
   var result=purchaseReturns.createPurchaseReturn(req,true);assertEquals(0,n("8").compareTo(result.getTotalAmount()));
   assertEquals(0,n("12").compareTo(supplierPayments.outstanding().stream().filter(r->r.id().equals(grn.getId())).findFirst().orElseThrow().balance()));
  }
- @Test void balanceSheetCarriesProfitIntoEquity() { invoices.createInvoice(sale(false));var result=accounting.balanceSheet(null);assertTrue(result.stream().noneMatch(b->Set.of("INCOME","EXPENSE").contains(b.type())));assertEquals(0,result.stream().map(AccountingService.Balance::balance).reduce(BigDecimal.ZERO,BigDecimal::add).signum()); }
 
  @Test void warehouseCheckpointsDoNotPostStockUntilCompletion() {
   var invoice=invoices.createInvoice(sale(true));var update=new UpdateInvoiceRequest();update.setStatus("SENT_TO_WAREHOUSE");invoices.updateInvoice(invoice.getId(),update);
@@ -206,11 +214,8 @@ class RegressionIntegrationTest {
   assertEquals(0,n("20").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance()));
  }
 
- @Test void grnCancellationUsesOriginalCost() {
-  var before=accounting.trialBalance(null,null).stream().filter(b->b.code().equals("AP")).findFirst().orElseThrow().balance();
+ @Test void grnCancellationRestoresOriginalStock() {
   var grn=receipt();product.setCostPrice(n("9"));products.save(product);grns.cancelGrn(grn.getId(),"Incorrect receipt");
-  var after=accounting.trialBalance(null,null).stream().filter(b->b.code().equals("AP")).findFirst().orElseThrow().balance();
-  assertEquals(0,before.compareTo(after));
   assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
 }

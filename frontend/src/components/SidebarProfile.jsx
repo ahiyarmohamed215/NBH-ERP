@@ -706,10 +706,6 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                       <span className="erp-kbd">Alt + 1</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#475569' }}>Accounting Hub</span>
-                      <span className="erp-kbd">Alt + 2</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: '#475569' }}>POS Terminal</span>
                       <span className="erp-kbd">Alt + 3 / F3</span>
                     </div>

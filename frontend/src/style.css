@@ -116,7 +116,7 @@ h4 {
   left: 0;
   background: #ffffff;
   border-right: 1px solid var(--slate-200);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -126,6 +126,7 @@ h4 {
 .glass-header {
   background: #ffffff;
   border-bottom: 1px solid var(--slate-200);
+  box-shadow: none;
 }
 
 .glass-sub-header {
@@ -134,7 +135,7 @@ h4 {
   position: sticky;
   top: 0;
   z-index: 50;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 /* Sidebar Standard Navigation Buttons */
@@ -244,7 +245,7 @@ h4 {
   color: var(--primary-700);
   font-weight: 600;
   border-color: var(--slate-300);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
 }
 
 /* Standard Buttons */
@@ -528,7 +529,7 @@ textarea:disabled {
   border: 1px solid var(--slate-300);
   border-bottom: 2px solid var(--slate-400);
   border-radius: 4px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
   line-height: 1.2;
   min-width: 22px;
 }
@@ -583,6 +584,119 @@ textarea:disabled {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* ==========================================================================
+   Global Button & Navigation Flat Design (No Shadows on Any Buttons or Navs)
+   ========================================================================== */
+button,
+[type="button"],
+[type="reset"],
+[type="submit"],
+.btn,
+.btn-primary,
+.btn-glass,
+.btn-success,
+.btn-danger,
+.btn-sm,
+[role="button"],
+.sidebar-nav-btn,
+.glass-pill-btn,
+.nav-tab,
+nav,
+nav *,
+header,
+header *,
+aside,
+aside *,
+.glass-sidebar,
+.glass-sidebar *,
+.glass-header,
+.glass-header *,
+.glass-sub-header,
+.glass-sub-header *,
+.erp-topbar,
+.erp-topbar *,
+.glass-pill-bar,
+.glass-pill-bar *,
+.nav-tabs,
+[role="navigation"],
+[role="navigation"] *,
+[role="tablist"],
+[role="tablist"] *,
+[role="tab"],
+[role="tab"] * {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+}
+
+button:hover,
+button:focus,
+button:active,
+[type="button"]:hover,
+[type="button"]:focus,
+[type="button"]:active,
+[type="reset"]:hover,
+[type="reset"]:focus,
+[type="reset"]:active,
+[type="submit"]:hover,
+[type="submit"]:focus,
+[type="submit"]:active,
+.btn:hover,
+.btn:focus,
+.btn:active,
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-glass:hover,
+.btn-glass:focus,
+.btn-glass:active,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active,
+.btn-danger:hover,
+.btn-danger:focus,
+.btn-danger:active,
+[role="button"]:hover,
+[role="button"]:focus,
+[role="button"]:active,
+.sidebar-nav-btn:hover,
+.sidebar-nav-btn:focus,
+.sidebar-nav-btn:active,
+.glass-pill-btn:hover,
+.glass-pill-btn:focus,
+.glass-pill-btn:active,
+.glass-pill-btn.active,
+.nav-tab:hover,
+.nav-tab:focus,
+.nav-tab:active,
+.nav-tab.active,
+nav *:hover,
+nav *:focus,
+nav *:active,
+header *:hover,
+header *:focus,
+header *:active,
+aside *:hover,
+aside *:focus,
+aside *:active,
+.glass-sidebar *:hover,
+.glass-sidebar *:focus,
+.glass-sidebar *:active,
+.glass-sub-header *:hover,
+.glass-sub-header *:focus,
+.glass-sub-header *:active,
+.erp-topbar *:hover,
+.erp-topbar *:focus,
+.erp-topbar *:active,
+.glass-pill-bar *:hover,
+.glass-pill-bar *:focus,
+.glass-pill-bar *:active,
+[role="tab"]:hover,
+[role="tab"]:focus,
+[role="tab"]:active {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
 }
 
 /* Print Optimization */

@@ -10,7 +10,7 @@ import com.nbh.erp.customer.repository.CustomerRepository;
 import com.nbh.erp.inventory.service.StockService;
 import com.nbh.erp.product.entity.Product;
 import com.nbh.erp.product.repository.ProductRepository;
-import com.nbh.erp.sales.dto.CashierAccountingDto;
+import com.nbh.erp.sales.dto.CashierSalesSummaryDto;
 import com.nbh.erp.sales.dto.CreateInvoiceRequest;
 import com.nbh.erp.sales.dto.InvoiceDto;
 import com.nbh.erp.sales.dto.UpdateInvoiceRequest;
@@ -56,7 +56,6 @@ public class InvoiceService {
     private final AuditLogService auditLogService;
     private final ProductStaffQuotaService productStaffQuotaService;
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
-    private final com.nbh.erp.accounting.service.AccountingService accounting;
     private final com.nbh.erp.payment.repository.PaymentRepository payments;
 
     public String getCurrentUsername() {
@@ -308,8 +307,8 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
 
-        if (!"HELD".equalsIgnoreCase(invoice.getStatus()) 
-                && !"SENT_TO_WAREHOUSE".equalsIgnoreCase(invoice.getStatus()) 
+        if (!"HELD".equalsIgnoreCase(invoice.getStatus())
+                && !"SENT_TO_WAREHOUSE".equalsIgnoreCase(invoice.getStatus())
                 && !"STOCK_ADJUSTED".equalsIgnoreCase(invoice.getStatus())
                 && !"CANCELLED".equalsIgnoreCase(invoice.getStatus())) {
             throw new BusinessException("Only held or in-progress invoices can be cancelled. Completed invoices require Sales Return.");
@@ -404,8 +403,8 @@ public class InvoiceService {
                 }
             }
 
-            accounting.reverseSource("SALE-"+invoice.getId(),reason);
-        accounting.reverseSource("TAX-"+invoice.getId(),reason);
+
+
         invoice.setStatus("VOIDED");
         } else {
             invoice.setStatus("CANCELLED");
@@ -549,18 +548,18 @@ public class InvoiceService {
         InvoiceBalances.recalculate(invoice);
         invoiceRepository.save(invoice);
         customerBalances.reconcile(customer.getId());
-        accounting.transfer("SALE-"+invoice.getId(),invoice.getInvoiceDate(),"Sale "+invoice.getInvoiceNumber(),"SALES","AR","SALES",invoice.getNetTotal().subtract(invoice.getTaxAmount()));
-        accounting.transfer("TAX-"+invoice.getId(),invoice.getInvoiceDate(),"Tax "+invoice.getInvoiceNumber(),"SALES","AR","TAX",invoice.getTaxAmount());
+
+
         if(invoice.getPaidAmount().signum()>0) {
             var receipt=com.nbh.erp.payment.entity.Payment.builder().paymentNumber(sequenceService.generatePaymentNumber()).invoice(invoice).customer(customer)
                 .amount(invoice.getPaidAmount()).paymentMethod(invoice.getPaymentMethod()).paymentType("INVOICE_PAYMENT").paymentDate(invoice.getInvoiceDate()).status("COMPLETED").notes("Initial invoice payment").build();
             payments.save(receipt);
-            accounting.transfer("PAYMENT-"+receipt.getId(),receipt.getPaymentDate(),receipt.getPaymentNumber(),"PAYMENT",com.nbh.erp.accounting.service.AccountingService.cashAccount(receipt.getPaymentMethod()),"AR",receipt.getAmount());
+
         }
     }
 
     @Transactional(readOnly = true)
-    public List<CashierAccountingDto> getCashierAccounting(LocalDate startDate, LocalDate endDate) {
+    public List<CashierSalesSummaryDto> getCashierSalesSummary(LocalDate startDate, LocalDate endDate) {
         // 1. Get sales aggregations grouped by cashier
         List<InvoiceRepository.CashierSalesProjection> salesSummary = invoiceRepository.getCashierSalesSummary(startDate, endDate);
         Map<String, InvoiceRepository.CashierSalesProjection> salesMap = salesSummary.stream()
@@ -591,13 +590,13 @@ public class InvoiceService {
             }
         }
 
-        List<CashierAccountingDto> result = new ArrayList<>();
+        List<CashierSalesSummaryDto> result = new ArrayList<>();
         for (String username : allCashierUsernames) {
             User u = userMap.get(username);
             InvoiceRepository.CashierSalesProjection sales = salesMap.get(username);
             InvoiceRepository.CashierHeldProjection held = heldMap.get(username);
 
-            result.add(CashierAccountingDto.builder()
+            result.add(CashierSalesSummaryDto.builder()
                     .username(username)
                     .fullName(u != null ? u.getFullName() : username)
                     .email(u != null ? u.getEmail() : null)

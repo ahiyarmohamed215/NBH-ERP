@@ -35,25 +35,63 @@ public class AuthService {
 
     @Transactional
     public void signup(SignupRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new BusinessException("Username '" + request.getUsername() + "' is already registered. Please choose another.");
+        String trimmedUsername = request.getUsername() != null ? request.getUsername().trim() : "";
+        String trimmedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+
+        if (trimmedUsername.isEmpty() || trimmedEmail.isEmpty()) {
+            throw new BusinessException("Username and email are required.");
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException("Email '" + request.getEmail() + "' is already registered. Please use another email.");
+
+        java.util.Optional<User> userByUsername = userRepository.findByUsernameIgnoreCase(trimmedUsername);
+        java.util.Optional<User> userByEmail = userRepository.findByEmailIgnoreCase(trimmedEmail);
+
+        if (userByUsername.isPresent() && userByEmail.isPresent()
+                && !userByUsername.get().getId().equals(userByEmail.get().getId())) {
+            throw new BusinessException("Username '" + trimmedUsername + "' and email '" + trimmedEmail + "' are already registered to different accounts. Please use different credentials or sign in.");
+        }
+
+        User existingUser = userByUsername.orElse(userByEmail.orElse(null));
+
+        if (existingUser != null) {
+            if ("REJECTED".equalsIgnoreCase(existingUser.getApprovalStatus())) {
+                // If the user was rejected earlier, allow them to re-apply with new/updated credentials
+                existingUser.setUsername(trimmedUsername);
+                existingUser.setEmail(trimmedEmail);
+                existingUser.setFullName(request.getFullName().trim());
+                existingUser.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+                existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+                existingUser.setIsActive(false);
+                existingUser.setApprovalStatus("PENDING");
+                existingUser.setUpdatedBy(trimmedUsername);
+                userRepository.save(existingUser);
+                log.info("Previously rejected user re-submitted registration pending approval: '{}'", trimmedUsername);
+                return;
+            } else if ("PENDING".equalsIgnoreCase(existingUser.getApprovalStatus())) {
+                String matchedField = userByUsername.isPresent()
+                        ? "Username '" + trimmedUsername + "'"
+                        : "Email '" + trimmedEmail + "'";
+                throw new BusinessException(matchedField + " is already submitted and pending administrator approval. Please wait for review or contact your administrator.");
+            } else {
+                if (userByUsername.isPresent()) {
+                    throw new BusinessException("Username '" + trimmedUsername + "' is already registered. Please sign in or choose another username.");
+                } else {
+                    throw new BusinessException("Email '" + trimmedEmail + "' is already registered. Please sign in or use another email.");
+                }
+            }
         }
 
         User user = User.builder()
-                .username(request.getUsername().trim())
+                .username(trimmedUsername)
                 .password(passwordEncoder.encode(request.getPassword()))
-                .email(request.getEmail().trim().toLowerCase())
+                .email(trimmedEmail)
                 .fullName(request.getFullName().trim())
                 .phone(request.getPhone() != null ? request.getPhone().trim() : null)
                 .isActive(false) // Inactive until approved by administrator
                 .approvalStatus("PENDING")
                 .roles(new HashSet<>())
                 .build();
-        user.setCreatedBy(request.getUsername().trim());
-        user.setUpdatedBy(request.getUsername().trim());
+        user.setCreatedBy(trimmedUsername);
+        user.setUpdatedBy(trimmedUsername);
 
         userRepository.save(user);
         log.info("New user registered and pending approval: '{}'", user.getUsername());

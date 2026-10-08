@@ -133,12 +133,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   const loadStaffPerformance = async () => {
     try {
-      const [accountingRes, invoicesRes] = await Promise.all([
-        salesApi.getCashierAccounting().catch(() => ({ data: [] })),
+      const [summaryRes, invoicesRes] = await Promise.all([
+        salesApi.getCashierSalesSummary().catch(() => ({ data: [] })),
         salesApi.search({ size: 200 }).catch(() => ({ data: [] })),
       ]);
 
-      const cList = accountingRes.data || [];
+      const cList = summaryRes.data || [];
       setCashierStats(cList);
 
       const invList = invoicesRes.data?.content || invoicesRes.data || [];

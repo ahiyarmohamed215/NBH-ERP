@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 @RestController @RequiredArgsConstructor @RequestMapping("/api/v1/supplier-payments")
-@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ACCOUNTING_MANAGE')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SUPPLIER_PAYMENT_MANAGE')")
 public class SupplierPaymentController {
  private final SupplierPaymentService service;
  @GetMapping public ApiResponse<?> list(){return ApiResponse.ok(service.list());}

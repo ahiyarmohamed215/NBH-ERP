@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api, { paymentApi } from '../api/apiClient';
 export default function SettlementPanel({ supplier = false }) {
  const {user}=useAuth();
- const canManage=user?.roles?.some(r=>['ROLE_ADMIN','ROLE_SUPER_ADMIN'].includes(r)) || user?.permissions?.includes(supplier?'ACCOUNTING_MANAGE':'PAYMENT_CREATE');
+ const canManage=user?.roles?.some(r=>['ROLE_ADMIN','ROLE_SUPER_ADMIN'].includes(r)) || user?.permissions?.includes(supplier?'SUPPLIER_PAYMENT_MANAGE':'PAYMENT_CREATE');
  const [records,setRecords]=useState([]),[credits,setCredits]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [form,setForm]=useState({kind:'advance',source:'',invoice:'',amount:''});
  const load=async()=>{try{if(supplier){const res=await api.get('/supplier-payments/outstanding');setRecords(res.data);const p=await api.get('/supplier-payments');setCredits(p.data);}else{const [p,c]=await Promise.all([paymentApi.search({paymentType:'ADVANCE',status:'COMPLETED'}),api.get('/credit-notes')]);setRecords(p.data.content);setCredits(c.data);}setError('');}catch(e){setError(e.message);}};

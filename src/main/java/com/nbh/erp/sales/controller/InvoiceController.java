@@ -2,7 +2,7 @@ package com.nbh.erp.sales.controller;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.common.dto.PagedResponse;
-import com.nbh.erp.sales.dto.CashierAccountingDto;
+import com.nbh.erp.sales.dto.CashierSalesSummaryDto;
 import com.nbh.erp.sales.dto.CreateInvoiceRequest;
 import com.nbh.erp.sales.dto.InvoiceDto;
 import com.nbh.erp.sales.dto.UpdateInvoiceRequest;
@@ -66,15 +66,15 @@ public class InvoiceController {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getHeldInvoices(cashier)));
     }
 
-    @GetMapping("/accounting/cashiers")
+    @GetMapping("/cashiers/summary")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL')")
-    @Operation(summary = "Get per-cashier sales and held billing accounting breakdown")
-    public ResponseEntity<ApiResponse<List<CashierAccountingDto>>> getCashierAccounting(
+    @Operation(summary = "Get per-cashier sales and held billing summary")
+    public ResponseEntity<ApiResponse<List<CashierSalesSummaryDto>>> getCashierSalesSummary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        List<CashierAccountingDto> accounting = invoiceService.getCashierAccounting(startDate, endDate);
-        return ResponseEntity.ok(ApiResponse.ok(accounting));
+        List<CashierSalesSummaryDto> summary = invoiceService.getCashierSalesSummary(startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.ok(summary));
     }
 
     @GetMapping("/{id}")

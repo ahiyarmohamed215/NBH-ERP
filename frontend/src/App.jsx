@@ -10,14 +10,13 @@ import InvoicingHub from './views/InvoicingHub';
 import EmployeesHub from './views/EmployeesHub';
 
 import ReportsView from './views/ReportsView';
-import AccountingHub from './views/AccountingHub';
 import CustomersHub from './views/CustomersHub';
 import DeliveryHub from './views/DeliveryHub';
 import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
-import { LayoutDashboard, BookOpen, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, ShoppingCart } from 'lucide-react';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -167,14 +166,15 @@ export default function App() {
       {
         id: 'purchasing',
         label: 'Purchasing',
-        icon: Truck,
-        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS'],
+        icon: ShoppingCart,
+        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS', 'SUPPLIER_PAYMENT_MANAGE'],
         subItems: [
           { id: 'suppliers', label: 'Suppliers Directory', permission: 'SUPPLIER_MANAGE' },
           { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
           { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
           { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
           { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_MANAGE' },
+          { id: 'supplier-payments', label: 'Supplier Payments', permission: 'SUPPLIER_PAYMENT_MANAGE' },
         ],
       },
       {
@@ -189,20 +189,6 @@ export default function App() {
         ],
       },
       {
-        id: 'accounting',
-        label: 'Accounting',
-        icon: BookOpen,
-        permissions: ['ACCOUNTING_VIEW','ACCOUNTING_MANAGE'],
-        subItems: [
-          { id: 'chart-of-accounts', label: 'Chart of Accounts' },
-          { id: 'banking', label: 'Banking' },
-          { id: 'cheques', label: 'Cheques' },
-          { id: 'expenses', label: 'Expenses' },
-          { id: 'dividend', label: 'Dividend' },
-          { id: 'journal-entries', label: 'Journal Entries' },
-        ],
-      },
-      {
         id: 'reports',
         label: 'Reports',
         icon: BarChart3,
@@ -212,7 +198,6 @@ export default function App() {
           { id: 'sales-reports', label: 'Sales Report', permission: 'REPORT_VIEW' },
           { id: 'inventory-reports', label: 'Inventory Reports', permission: 'REPORT_VIEW' },
           { id: 'purchase-reports', label: 'Purchase Reports', permission: 'REPORT_VIEW' },
-          { id: 'accounting-reports', label: 'Accounting Reports', permission: 'REPORT_VIEW' },
           { id: 'day-summary', label: 'Day Summary', permission: 'REPORT_VIEW' },
         ],
       },
@@ -276,9 +261,6 @@ export default function App() {
     } else if (view === 'refunds' || view === 'sales-returns') {
       setCurrentView('invoicing');
       setSubTab('refunds');
-    } else if (view === 'accounting') {
-      setCurrentView('accounting');
-      setSubTab(sub || 'chart-of-accounts');
     } else if (view === 'admin' || view === 'users' || view === 'employees') {
       setCurrentView('employees');
       setSubTab(sub || 'list');
@@ -294,7 +276,7 @@ export default function App() {
     } else if (view === 'pending-approvals' || view === 'pending_approvals') {
       setCurrentView('employees');
       setSubTab('pending-approvals');
-    } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
+    } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders' || view === 'supplier-payments') {
       setCurrentView('purchasing');
       setSubTab(view);
     } else if (view === 'delivery' || view === 'deliveries') {
@@ -695,7 +677,6 @@ export default function App() {
                 case 'inventory': return <InventoryHub {...props} onNavigate={navigateTo} />;
                 case 'purchasing': return <PurchasingHub {...props} />;
                 case 'delivery': return <DeliveryHub {...props} />;
-                case 'accounting': return <AccountingHub {...props} />;
                 case 'reports': return <ReportsView {...props} />;
                 default: return null;
               }
