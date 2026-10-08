@@ -1435,9 +1435,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           <Clock size={13} color="#94a3b8" />
                           <span>Joined {formatJoinedDate(pUser.createdAt)}</span>
                         </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
-                          <Shield size={13} color={pUser.roles && pUser.roles.length > 0 ? '#0284c7' : '#94a3b8'} />
-                          {pUser.roles && pUser.roles.length > 0 ? (
+                        {pUser.roles && pUser.roles.length > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
+                            <Shield size={13} color="#0284c7" />
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ color: '#64748b' }}>Assigned:</span>
                               <span
@@ -1454,10 +1454,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                 {pUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')}
                               </span>
                             </span>
-                          ) : (
-                            <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No role assigned</span>
-                          )}
-                        </span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1499,7 +1497,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <Check size={14} />
                       {pUser.roles && pUser.roles.length > 0
                         ? `Approve (${formatRoleName(typeof pUser.roles[0] === 'string' ? pUser.roles[0] : pUser.roles[0].name)})`
-                        : 'Approve (No Role)'}
+                        : 'Quick Approve'}
                     </button>
 
                     {/* Review & Assign Roles (Primary) */}
@@ -2132,7 +2130,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {modalMode === 'approve' && selectedEmployee && (
         <div
           className="modal-backdrop"
-          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto', backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
         >
           <div
             className="glass-modal"
@@ -2381,7 +2379,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {viewingPendingEmployee && (
         <div
           className="modal-backdrop"
-          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
+          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto', backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
         >
           <div
             className="glass-modal"
@@ -2567,7 +2565,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       {confirmAction && (
         <div
           className="modal-backdrop"
-          style={{ padding: '16px', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ padding: '16px', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'rgba(15, 23, 42, 0.45)' }}
         >
           <div
             className="glass-modal"

@@ -456,22 +456,6 @@ export default function RolesView({ onRoleChange }) {
                           {role.name}
                         </span>
                       </div>
-                      {isSystemAdmin && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: '#eff6ff',
-                            color: '#1d4ed8',
-                            border: '1px solid #dbeafe',
-                            flexShrink: 0,
-                          }}
-                        >
-                          System
-                        </span>
-                      )}
                     </div>
 
                     <p
@@ -540,25 +524,7 @@ export default function RolesView({ onRoleChange }) {
                     </span>
 
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      {role.name === 'ROLE_SUPER_ADMIN' || role.name === 'SUPER_ADMIN' ? (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: '#eff6ff',
-                            color: '#1d4ed8',
-                            border: '1px solid #bfdbfe',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                          }}
-                          title="System protected role with permanent full module access"
-                        >
-                          <ShieldCheck size={12} /> System Protected
-                        </span>
-                      ) : canEditRole && (
+                      {canEditRole && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -578,7 +544,6 @@ export default function RolesView({ onRoleChange }) {
                             justifyContent: 'center',
                             cursor: 'pointer',
                             padding: 0,
-                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                             transition: 'all 0.15s ease',
                           }}
                           onMouseEnter={(e) => {

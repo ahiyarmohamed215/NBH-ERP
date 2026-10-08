@@ -7,6 +7,7 @@ import DashboardView from './views/DashboardView';
 import InventoryHub from './views/InventoryHub';
 import PurchasingHub from './views/PurchasingHub';
 import InvoicingHub from './views/InvoicingHub';
+import PaymentsHub from './views/PaymentsHub';
 import EmployeesHub from './views/EmployeesHub';
 
 import ReportsView from './views/ReportsView';
@@ -16,7 +17,7 @@ import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
-import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, ShoppingCart, CreditCard } from 'lucide-react';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -120,14 +121,11 @@ export default function App() {
         id: 'invoicing',
         label: 'Sales',
         icon: FileText,
-        permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN','PAYMENT_VIEW','PAYMENT_CREATE','QUOTATION_VIEW'],
+        permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN', 'QUOTATION_VIEW'],
         subItems: [
           { id: 'sales', label: 'Sales Invoices', permission: 'SALES_VIEW' },
           { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
-          { id: 'payments', label: 'Payments', permission: 'PAYMENT_VIEW' },
-          { id: 'advance-payments', label: 'Advance Payments', permission: 'PAYMENT_VIEW' },
-          { id: 'outstanding-payments', label: 'Outstanding Payments', permission: 'SALES_CREATE' },
           { id: 'quotations', label: 'Quotations', permission: 'QUOTATION_VIEW' },
         ],
       },
@@ -190,6 +188,17 @@ export default function App() {
           { id: 'deliveries', label: 'Delivery Trips', permission: 'DELIVERY_VIEW' },
           { id: 'routes', label: 'Delivery Routes', permission: 'DELIVERY_VIEW' },
           { id: 'vehicles', label: 'Fleet Vehicles', permission: 'DELIVERY_VIEW' },
+        ],
+      },
+      {
+        id: 'payments',
+        label: 'Payment',
+        icon: CreditCard,
+        permissions: ['PAYMENT_VIEW', 'PAYMENT_CREATE', 'SALES_VIEW'],
+        subItems: [
+          { id: 'payments', label: 'Payments', permission: 'PAYMENT_VIEW' },
+          { id: 'advance-payments', label: 'Advance Payment', permission: 'PAYMENT_VIEW' },
+          { id: 'outstanding-payments', label: 'Outstanding Payments', permission: 'PAYMENT_VIEW' },
         ],
       },
       {
@@ -257,12 +266,15 @@ export default function App() {
     } else if (view === 'orders') {
       setCurrentView('invoicing');
       setSubTab('sales');
-    } else if (view === 'payments') {
-      setCurrentView('invoicing');
-      setSubTab('payments');
-    } else if (view === 'advance-payments') {
-      setCurrentView('invoicing');
+    } else if (view === 'payments' || view === 'payment') {
+      setCurrentView('payments');
+      setSubTab(sub || 'payments');
+    } else if (view === 'advance-payments' || view === 'advance-payment') {
+      setCurrentView('payments');
       setSubTab('advance-payments');
+    } else if (view === 'outstanding-payments' || view === 'outstanding-payment') {
+      setCurrentView('payments');
+      setSubTab('outstanding-payments');
     } else if (view === 'refunds' || view === 'sales-returns') {
       setCurrentView('invoicing');
       setSubTab('refunds');
@@ -677,6 +689,7 @@ export default function App() {
               switch (view) {
                 case 'dashboard': return <DashboardView onNavigate={navigateTo} />;
                 case 'invoicing': return <InvoicingHub {...props} />;
+                case 'payments': return <PaymentsHub {...props} />;
                 case 'customers': return <CustomersHub {...props} />;
                 case 'employees': return <EmployeesHub {...props} />;
                 case 'inventory': return <InventoryHub {...props} onNavigate={navigateTo} />;
