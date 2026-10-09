@@ -257,4 +257,12 @@ export function printA4Report({
   printWindow.document.close();
 }
 
+export {
+  printCustomerStatementA4,
+  printCustomerGroupRosterA4,
+  printCustomerDirectoryA4,
+  printCustomerLedgerA4,
+  executeA4Print,
+} from './customerPrintTemplates';
+
 export default printA4Report;

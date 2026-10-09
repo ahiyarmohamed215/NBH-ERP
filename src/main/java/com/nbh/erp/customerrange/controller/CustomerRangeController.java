@@ -131,4 +131,20 @@ public class CustomerRangeController {
         List<StaffPerformanceDto> report = customerRangeService.getStaffPerformanceReport(yearMonth);
         return ResponseEntity.ok(ApiResponse.ok(report));
     }
+
+    @PutMapping("/customer/{customerId}/assign-staff")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE') or hasAuthority('CUSTOMER_TARGET_MANAGE') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerMonthlyProgressDto>> assignStaff(
+            @PathVariable Long customerId,
+            @RequestParam(required = false) Long staffId) {
+        CustomerMonthlyProgressDto dto = customerRangeService.assignStaff(customerId, staffId);
+        return ResponseEntity.ok(ApiResponse.ok("Customer assigned to staff successfully", dto));
+    }
+
+    @PostMapping("/sync-month")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE') or hasAuthority('CUSTOMER_TARGET_MANAGE') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> syncMonth(@RequestParam(required = false) String yearMonth) {
+        customerRangeService.ensureSummariesForMonth(yearMonth);
+        return ResponseEntity.ok(ApiResponse.ok("Monthly customer ranges synchronized", null));
+    }
 }

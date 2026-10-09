@@ -13,7 +13,13 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
 import { useDataSync } from '../hooks/useDataSync';
-import { printA4Report } from '../utils/printReport';
+import {
+  printA4Report,
+  printCustomerStatementA4,
+  printCustomerGroupRosterA4,
+  printCustomerDirectoryA4,
+  printCustomerLedgerA4,
+} from '../utils/printReport';
 import {
   Users,
   UserCheck,
@@ -51,7 +57,7 @@ import {
   Eye,
   Target,
 } from 'lucide-react';
-import CustomerTargetsTab from './CustomerTargetsTab';
+import CustomerMonthlyRangeHub from './CustomerMonthlyRangeHub';
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { user } = useAuth();
@@ -1097,14 +1103,67 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     addToast('Customer groups exported to CSV', 'success');
   };
 
+  const handlePrintSingleCustomer = (c) => {
+    if (!c) return;
+    const r = getCustomerRoute(c.id);
+    const rep = salesmen.find((s) => String(s.id) === String(r?.assignedStaffId || r?.salesmanId));
+    printCustomerStatementA4(c, {
+      groupName: r?.name || r?.groupName,
+      salesRep: rep?.name || r?.assignedStaffName,
+      invoices: String(selectedHistoryCustomerId) === String(c.id) ? historyInvoices : null,
+      payments: String(selectedHistoryCustomerId) === String(c.id) ? historyPayments : null,
+    });
+  };
+
+  const handlePrintCustomerGroup = (routeObj) => {
+    if (!routeObj) return;
+    const assigned = customers.filter((c) => {
+      const cRoutes = getCustomerRoutes(c.id);
+      return cRoutes.some((r) => String(r.id) === String(routeObj.id));
+    });
+    const rep = salesmen.find((s) => String(s.id) === String(routeObj.assignedStaffId || routeObj.salesmanId));
+    printCustomerGroupRosterA4(routeObj, assigned, {
+      salesRepName: rep?.name || routeObj.assignedStaffName || routeObj.salesmanName,
+    });
+  };
+
+  const handlePrintCustomerDirectoryReport = () => {
+    const list = filteredCustomers.length > 0 ? filteredCustomers : customers;
+    if (list.length === 0) {
+      addToast('No customers available to print', 'info');
+      return;
+    }
+    printCustomerDirectoryA4(list);
+  };
+
+  const handlePrintCustomerLedger = (c) => {
+    if (!c) {
+      addToast('Please select a customer first', 'warning');
+      return;
+    }
+    const r = getCustomerRoute(c.id);
+    const rep = salesmen.find((s) => String(s.id) === String(r?.assignedStaffId || r?.salesmanId));
+    printCustomerLedgerA4(c, {
+      invoices: filteredCustomerInvoices,
+      payments: filteredCustomerPayments,
+    }, {
+      groupName: r?.name || r?.groupName,
+      salesRep: rep?.name || r?.assignedStaffName,
+    });
+  };
+
   const handlePrintCustomerGroupsReport = () => {
     const list = filteredRoutes.length > 0 ? filteredRoutes : routes;
     if (list.length === 0) {
       addToast('No customer groups to print', 'error');
       return;
     }
+    if (list.length === 1) {
+      handlePrintCustomerGroup(list[0]);
+      return;
+    }
     printA4Report({
-      title: 'Customer Groups Directory',
+      title: 'Customer Groups Master Directory',
       subtitle: `Total Groups: ${list.length}`,
       metaItems: [
         { label: 'Date', value: new Date().toLocaleDateString() },
@@ -1113,11 +1172,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       columns: [
         { header: 'Group Name', accessor: 'name' },
         { header: 'Group Code', accessor: (r) => r.groupCode || r.routeCode || '—' },
-        { header: 'Assigned Staff', accessor: (r) => {
+        { header: 'Assigned Staff / Rep', accessor: (r) => {
           const assignedStaff = salesmen.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
           return r.assignedStaffName || r.salesmanName || assignedStaff?.name || 'Unassigned';
         }},
-        { header: 'Total Customers', accessor: (r) => String(r.customerIds?.length || 0), align: 'center' },
+        { header: 'Total Customers', accessor: (r) => {
+          const assigned = customers.filter((c) => {
+            const cRoutes = getCustomerRoutes(c.id);
+            return cRoutes.some((rg) => String(rg.id) === String(r.id));
+          });
+          return String(assigned.length);
+        }, align: 'center' },
         { header: 'Status', accessor: (r) => (r.isActive !== false ? 'Active' : 'Inactive'), align: 'center' },
       ],
       data: list,
@@ -1519,7 +1584,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               {/* Print Customer Directory A4 (Icon Only) */}
               <button
                 type="button"
-                onClick={() => pdfApi.printCustomerList()}
+                onClick={handlePrintCustomerDirectoryReport}
                 style={{
                   height: '34px',
                   width: '36px',
@@ -1793,7 +1858,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  pdfApi.printCustomer(c.id);
+                                  handlePrintSingleCustomer(c);
                                 }}
                                 style={{
                                   width: '30px',
@@ -2337,7 +2402,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              pdfApi.printCustomerGroup(route.id);
+                              handlePrintCustomerGroup(route);
                             }}
                             style={{
                               width: '30px',
@@ -2501,7 +2566,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     {/* Print Customer Group A4 */}
                     <button
                       type="button"
-                      onClick={() => pdfApi.printCustomerGroup(selectedRoute?.id)}
+                      onClick={() => handlePrintCustomerGroup(selectedRoute)}
                       style={{
                         width: '34px',
                         height: '34px',
@@ -2837,7 +2902,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
                       type="button"
-                      onClick={() => pdfApi.printCustomerGroup(selectedRoute?.id)}
+                      onClick={() => handlePrintCustomerGroup(selectedRoute)}
                       style={{
                         padding: '8px 18px',
                         borderRadius: '6px',
@@ -4452,7 +4517,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             type="button"
                             onClick={() => {
                               if (selectedHistoryCustomer?.id) {
-                                pdfApi.printCustomerHistory(selectedHistoryCustomer.id);
+                                handlePrintCustomerLedger(selectedHistoryCustomer);
                               } else {
                                 addToast('Please select a customer first', 'warning');
                               }
@@ -5011,7 +5076,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* TAB 4: Customer Range & Targets                               */}
       {/* ------------------------------------------------------------- */}
       {activeTab === 'targets' && (
-        <CustomerTargetsTab
+        <CustomerMonthlyRangeHub
           customers={customers}
           salesmen={salesmen}
           routes={routes}
@@ -5147,6 +5212,26 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   <Edit2 size={13} /> Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintSingleCustomer(viewingCustomer)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#0284c7',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                  }}
+                  title="Print Customer Statement (A4)"
+                >
+                  <Printer size={13} /> Print
                 </button>
                 <button
                   type="button"
@@ -5308,7 +5393,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => pdfApi.printCustomer(viewingCustomer.id)}
+                  onClick={() => handlePrintSingleCustomer(viewingCustomer)}
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#0284c7',

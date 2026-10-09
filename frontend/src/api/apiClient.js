@@ -498,54 +498,58 @@ export const reportApi = {
     `${API_ORIGIN}/api/v1/reports/inventory/excel${warehouseId ? '?warehouseId=' + warehouseId : ''}`,
 };
 
+const normalizePdfUrl = (url = '') => {
+  if (!url) return url;
+  if (API_ORIGIN && url.startsWith(`${API_ORIGIN}/api/v1`)) {
+    return url.substring(`${API_ORIGIN}/api/v1`.length);
+  }
+  if (url.startsWith('/api/v1')) {
+    return url.substring('/api/v1'.length);
+  }
+  return url;
+};
+
 export const printPdfDocument = async (pdfUrl) => {
   try {
-    const token = localStorage.getItem('nbh_token');
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
+    const cleanUrl = normalizePdfUrl(pdfUrl);
     // Fetch PDF blob with Authorization header to prevent 401 Unauthorized
-    const data = await api.get(pdfUrl, { responseType: 'blob' });
-    const response = { ok: true, blob: async () => data };
-    if (!response.ok) {
-      const errData = await response.json().catch(() => null);
-      throw new Error(errData?.message || `Failed to fetch document (${response.status})`);
-    }
-
-    const blob = await response.blob();
+    const data = await api.get(cleanUrl, { responseType: 'blob' });
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
     const blobUrl = window.URL.createObjectURL(blob);
 
-    let iframe = document.getElementById('pdf-silent-printer');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = 'pdf-silent-printer';
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      document.body.appendChild(iframe);
-    }
-
-    if (iframe.dataset.blobUrl) URL.revokeObjectURL(iframe.dataset.blobUrl);
-    iframe.dataset.blobUrl = blobUrl;
-    iframe.src = blobUrl;
-    iframe.onload = () => {
-      setTimeout(() => {
+    const win = window.open(blobUrl, '_blank');
+    if (win) {
+      win.onload = () => {
         try {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        } catch (err) {
-          const win = window.open(blobUrl, '_blank');
-          if (win) {
-            win.onload = () => win.print();
-          }
-        }
-      }, 350);
-    };
+          win.focus();
+          win.print();
+        } catch (_) {}
+      };
+    } else {
+      let iframe = document.getElementById('pdf-silent-printer');
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'pdf-silent-printer';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+      }
+      if (iframe.dataset.blobUrl) URL.revokeObjectURL(iframe.dataset.blobUrl);
+      iframe.dataset.blobUrl = blobUrl;
+      iframe.src = blobUrl;
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          } catch (_) {}
+        }, 350);
+      };
+    }
   } catch (err) {
     window.dispatchEvent(new CustomEvent('erp:api_error', { detail: err.message }));
     throw err;
@@ -554,22 +558,12 @@ export const printPdfDocument = async (pdfUrl) => {
 
 export const downloadPdfDocument = async (pdfUrl, defaultFilename = 'document.pdf') => {
   try {
-    const downloadUrl = pdfUrl.includes('?') ? `${pdfUrl}&download=true` : `${pdfUrl}?download=true`;
-    const token = localStorage.getItem('nbh_token');
-    const headers = {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    const cleanUrl = normalizePdfUrl(pdfUrl);
+    const downloadUrl = cleanUrl.includes('?') ? `${cleanUrl}&download=true` : `${cleanUrl}?download=true`;
 
     // Fetch PDF blob with Authorization header
     const data = await api.get(downloadUrl, { responseType: 'blob' });
-    const response = { ok: true, blob: async () => data };
-    if (!response.ok) {
-      const errData = await response.json().catch(() => null);
-      throw new Error(errData?.message || `Download failed (${response.status})`);
-    }
-
-    const blob = await response.blob();
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
     const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
@@ -667,6 +661,14 @@ export const customerMonthlyRangeApi = {
   getManagerDashboard: (params) => api.get('/customer-ranges/manager-dashboard', { params }),
   getStaffPerformance: (yearMonth) =>
     api.get('/customer-ranges/staff-performance', {
+      params: yearMonth ? { yearMonth } : {},
+    }),
+  assignStaff: (customerId, staffId) =>
+    api.put(`/customer-ranges/customer/${customerId}/assign-staff`, null, {
+      params: staffId ? { staffId } : {},
+    }),
+  syncMonth: (yearMonth) =>
+    api.post('/customer-ranges/sync-month', null, {
       params: yearMonth ? { yearMonth } : {},
     }),
 };

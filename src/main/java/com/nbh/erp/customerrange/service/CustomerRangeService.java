@@ -333,12 +333,13 @@ public class CustomerRangeService {
     // 4. Staff Dashboard: "My Customer Targets"
     // =========================================================================
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<StaffCustomerTargetDto> getMyCustomerTargets(String search, Long rangeId, String sort, Pageable pageable) {
         Long currentUserId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new BusinessException("User must be authenticated"));
 
         String currentMonth = getCurrentYearMonth();
+        ensureSummariesForMonth(currentMonth);
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
 
         // Find summaries for staff member
@@ -371,9 +372,10 @@ public class CustomerRangeService {
     // 5. Manager Dashboard & Staff Performance
     // =========================================================================
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ManagerRangeDashboardDto getManagerDashboard(String yearMonth, Long staffId, Long rangeId, String search, Pageable pageable) {
         String targetMonth = (yearMonth != null && !yearMonth.isBlank()) ? yearMonth.trim() : getCurrentYearMonth();
+        ensureSummariesForMonth(targetMonth);
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
 
         long totalActiveCustomers = customerRepository.count();
@@ -636,6 +638,83 @@ public class CustomerRangeService {
                 .performedAt(LocalDateTime.now(BUSINESS_ZONE))
                 .build();
         auditLogRepository.save(logEntity);
+    }
+
+    @Transactional
+    public void ensureSummariesForMonth(String yearMonth) {
+        String targetMonth = (yearMonth != null && !yearMonth.isBlank()) ? yearMonth.trim() : getCurrentYearMonth();
+        YearMonth ym;
+        try {
+            ym = YearMonth.parse(targetMonth);
+        } catch (Exception e) {
+            ym = YearMonth.now(BUSINESS_ZONE);
+            targetMonth = ym.toString();
+        }
+        LocalDate start = ym.atDay(1);
+        LocalDate end = ym.atEndOfMonth();
+
+        List<Customer> allCustomers = customerRepository.findAll();
+        List<CustomerRangeConfig> activeRanges = getActiveRanges();
+        List<CustomerMonthlySummary> toSave = new ArrayList<>();
+
+        for (Customer c : allCustomers) {
+            Optional<CustomerMonthlySummary> existing = summaryRepository.findByCustomerIdAndYearMonth(c.getId(), targetMonth);
+            if (existing.isEmpty()) {
+                BigDecimal gross = invoiceRepository.getCustomerSalesBetween(c.getId(), start, end);
+                if (gross == null) gross = BigDecimal.ZERO;
+                BigDecimal ret = salesReturnRepository.getCustomerReturnsBetween(c.getId(), start, end);
+                if (ret == null) ret = BigDecimal.ZERO;
+                BigDecimal qualifying = gross.subtract(ret).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+                long invCount = invoiceRepository.countCustomerInvoicesBetween(c.getId(), start, end);
+                CustomerRangeConfig range = determineRangeForAmount(activeRanges, qualifying);
+
+                User staff = c.getEffectiveAssignedStaff();
+                CustomerMonthlySummary s = CustomerMonthlySummary.builder()
+                        .customer(c)
+                        .yearMonth(targetMonth)
+                        .qualifyingPurchases(qualifying)
+                        .invoiceCount((int) invCount)
+                        .currentRange(range)
+                        .highestRangeAchieved(range)
+                        .assignedStaff(staff)
+                        .build();
+                toSave.add(s);
+            } else {
+                CustomerMonthlySummary s = existing.get();
+                User effStaff = c.getEffectiveAssignedStaff();
+                if (s.getAssignedStaff() == null && effStaff != null) {
+                    s.setAssignedStaff(effStaff);
+                    toSave.add(s);
+                }
+            }
+        }
+        if (!toSave.isEmpty()) {
+            summaryRepository.saveAll(toSave);
+        }
+    }
+
+    @Transactional
+    public CustomerMonthlyProgressDto assignStaff(Long customerId, Long staffId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
+        User staff = null;
+        if (staffId != null) {
+            staff = userRepository.findById(staffId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", staffId));
+        }
+        customer.setAssignedStaff(staff);
+        customerRepository.save(customer);
+
+        String currentMonth = getCurrentYearMonth();
+        CustomerMonthlySummary summary = getOrRecalculateSummary(customer, currentMonth);
+        summary.setAssignedStaff(staff);
+        summaryRepository.save(summary);
+
+        recordAuditLog("ASSIGN_STAFF", customer.getId(),
+                String.format("Assigned customer '%s' to staff '%s'",
+                        customer.getName(), staff != null ? (staff.getFullName() != null ? staff.getFullName() : staff.getUsername()) : "Unassigned"));
+
+        return getCustomerProgress(customerId, null);
     }
 
     private void ensureDefaultRanges() {
