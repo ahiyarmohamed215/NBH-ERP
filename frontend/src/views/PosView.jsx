@@ -2742,6 +2742,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             })()}
           </div>
         </div>
+      )}
+
       {/* Target Ranges Breakdown Modal in POS */}
       {showTargetRangesModal && activeTargetForModal && (
         <div

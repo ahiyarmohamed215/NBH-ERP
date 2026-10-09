@@ -1,4 +1,4 @@
--- Flyway migration V6: Performance Indexes
+-- Flyway migration V7: Performance Indexes
 -- Targets verified slow query paths, customer searches, invoice aggregations, and stock queries
 
 -- Invoices: composite indexes for customer billing lookups, cashier reporting, and warehouse views

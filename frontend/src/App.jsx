@@ -151,6 +151,7 @@ export default function App() {
           { id: 'list', label: 'Customer List', permission: 'CUSTOMER_MANAGE' },
           { id: 'groups', label: 'Customer Groups', permission: 'CUSTOMER_MANAGE' },
           { id: 'history', label: 'Customer History', permission: 'CUSTOMER_MANAGE' },
+          { id: 'targets', label: 'Range & Targets', permission: 'CUSTOMER_MANAGE' },
         ],
       },
       {

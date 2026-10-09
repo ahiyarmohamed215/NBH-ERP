@@ -60,8 +60,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   const [activeTab, setActiveTab] = useState(() => {
     if (activeSubTab === 'groups' || activeSubTab === 'routes') return 'groups';
-    if (activeSubTab === 'targets' || activeSubTab === 'ranges') return 'targets';
     if (activeSubTab === 'history') return 'history';
+    if (activeSubTab === 'targets' || activeSubTab === 'ranges') return 'targets';
     return 'list';
   });
 
@@ -156,10 +156,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       setActiveTab(
         activeSubTab === 'groups' || activeSubTab === 'routes'
           ? 'groups'
-          : activeSubTab === 'targets' || activeSubTab === 'ranges'
-            ? 'targets'
-            : activeSubTab === 'history'
-              ? 'history'
+          : activeSubTab === 'history'
+            ? 'history'
+            : activeSubTab === 'targets' || activeSubTab === 'ranges'
+              ? 'targets'
               : 'list'
       );
     }
@@ -1255,27 +1255,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
         <button
           type="button"
-          onClick={() => handleTabChange('targets')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'targets' ? 700 : 500,
-            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
-        >
-          <Target size={16} /> Range & Targets
-        </button>
-
-        <button
-          type="button"
           onClick={() => handleTabChange('history')}
           style={{
             background: 'none',
@@ -1293,6 +1272,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           }}
         >
           <History size={16} /> Customer History
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleTabChange('targets')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'targets' ? 700 : 500,
+            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <Target size={16} /> Range & Targets
         </button>
       </div>
 
@@ -1515,41 +1515,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   <X size={13} /> Reset
                 </button>
               )}
-
-              {/* Export CSV (Icon Only) */}
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Export customers to CSV"
-              >
-                <Download size={14} />
-              </button>
 
               {/* Print Customer Directory A4 (Icon Only) */}
               <button
@@ -2106,42 +2071,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <option value="active">Active Groups</option>
                 <option value="inactive">Inactive Groups</option>
               </select>
-
-              {/* Export CSV (Icon Only) */}
-              <button
-                type="button"
-                onClick={handleExportRoutesCSV}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  minWidth: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Export customer groups to CSV"
-              >
-                <Download size={14} />
-              </button>
 
               {/* Print Groups Directory A4 (Icon Only) */}
               <button
@@ -2905,22 +2834,54 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     flexShrink: 0,
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleCloseRouteView}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '6px',
-                      border: '1px solid #e2e8f0',
-                      backgroundColor: '#ffffff',
-                      color: '#475569',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Close
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => pdfApi.printCustomerGroup(selectedRoute?.id)}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '6px',
+                        border: '1px solid #bae6fd',
+                        backgroundColor: '#ffffff',
+                        color: '#0284c7',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f0f9ff';
+                        e.currentTarget.style.borderColor = '#0284c7';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#bae6fd';
+                      }}
+                      title="Print Customer Group (A4)"
+                    >
+                      <Printer size={14} /> Print
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCloseRouteView}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        backgroundColor: '#ffffff',
+                        color: '#475569',
+                        fontSize: '0.84rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
 
                   {/* Update Group Action in Footer */}
                   {canEditCustomer && (
@@ -3746,19 +3707,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB: Customer Range & Targets                                 */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === 'targets' && (
-        <CustomerTargetsTab
-          customers={customers}
-          salesmen={salesmen}
-          routes={routes}
-          canEdit={canEditCustomer}
-          addToast={addToast}
-        />
-      )}
-
-      {/* ------------------------------------------------------------- */}
       {/* TAB 3: Customer History (Dedicated Multi-Table & Search)      */}
       {/* ------------------------------------------------------------- */}
       {activeTab === 'history' && (
@@ -4499,41 +4447,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </button>
                           )}
 
-                          {/* CSV Export Button (Icon Only) */}
-                          <button
-                            type="button"
-                            onClick={() => handleExportTableCSV(historyTableTab)}
-                            style={{
-                              height: '32px',
-                              width: '32px',
-                              minWidth: '32px',
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              padding: 0,
-                              color: '#334155',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc';
-                              e.currentTarget.style.borderColor = '#94a3b8';
-                              e.currentTarget.style.color = '#0f172a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#ffffff';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.color = '#334155';
-                            }}
-                            title={`Export ${historyTableTab} to CSV`}
-                          >
-                            <Download size={13} />
-                          </button>
-
                           {/* Print Customer Ledger / History A4 (Icon Only) */}
                           <button
                             type="button"
@@ -5095,6 +5008,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       )}
 
       {/* ------------------------------------------------------------- */}
+      {/* TAB 4: Customer Range & Targets                               */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'targets' && (
+        <CustomerTargetsTab
+          customers={customers}
+          salesmen={salesmen}
+          routes={routes}
+          canEdit={canEditCustomer}
+          addToast={addToast}
+        />
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* MODAL: Customer Profile View Popup (When clicking any row)   */}
       {/* ------------------------------------------------------------- */}
       {viewingCustomer && (
@@ -5379,22 +5305,54 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <History size={13} /> View Financial History
               </button>
 
-              <button
-                type="button"
-                onClick={() => setViewingCustomer(null)}
-                style={{
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: '7px 16px',
-                  fontWeight: 600,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => pdfApi.printCustomer(viewingCustomer.id)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '6px',
+                    padding: '7px 16px',
+                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f9ff';
+                    e.currentTarget.style.borderColor = '#0284c7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#ffffff';
+                    e.currentTarget.style.borderColor = '#bae6fd';
+                  }}
+                  title="Print Customer Statement (A4)"
+                >
+                  <Printer size={13} /> Print
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingCustomer(null)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    padding: '7px 16px',
+                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

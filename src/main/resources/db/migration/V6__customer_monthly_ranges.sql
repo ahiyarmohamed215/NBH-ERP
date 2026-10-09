@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS customer_range_configs (
 CREATE TABLE IF NOT EXISTS customer_monthly_summaries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     customer_id BIGINT NOT NULL,
-    year_month VARCHAR(7) NOT NULL,
+    `year_month` VARCHAR(7) NOT NULL,
     qualifying_purchases DECIMAL(38, 2) NOT NULL DEFAULT 0.00,
     invoice_count INT NOT NULL DEFAULT 0,
     current_range_id BIGINT NOT NULL,
@@ -31,13 +31,13 @@ CREATE TABLE IF NOT EXISTS customer_monthly_summaries (
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6),
     record_version BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT uk_cust_month UNIQUE (customer_id, year_month),
+    CONSTRAINT uk_cust_month UNIQUE (customer_id, `year_month`),
     CONSTRAINT fk_cms_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
     CONSTRAINT fk_cms_curr_range FOREIGN KEY (current_range_id) REFERENCES customer_range_configs(id),
     CONSTRAINT fk_cms_high_range FOREIGN KEY (highest_range_achieved_id) REFERENCES customer_range_configs(id),
     CONSTRAINT fk_cms_staff FOREIGN KEY (assigned_staff_id) REFERENCES users(id),
-    INDEX idx_cms_month_range (year_month, current_range_id),
-    INDEX idx_cms_staff_month (assigned_staff_id, year_month)
+    INDEX idx_cms_month_range (`year_month`, current_range_id),
+    INDEX idx_cms_staff_month (assigned_staff_id, `year_month`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS customer_range_audit_logs (
