@@ -30,6 +30,7 @@ import {
   Clock,
   ShieldCheck,
   UserCheck,
+  Printer,
 } from 'lucide-react';
 import CustomerTargetsTab from './CustomerTargetsTab';
 
@@ -450,398 +451,845 @@ export default function CustomerMonthlyRangeHub({
     if (addToast) addToast('Staff performance report exported to CSV', 'success');
   };
 
-  // Tier color styling helper
+  // Tier color styling helper (Matches clean pastel badges in Customer History)
   const getTierBadgeStyle = (tierCode = '', tierName = '') => {
     const code = (tierCode || tierName).toUpperCase();
     if (code.includes('5') || code.includes('DIAMOND')) {
-      return { bg: 'linear-gradient(135deg, #ede9fe 0%, #f5d0fe 100%)', text: '#701a75', border: '#d946ef', badge: '#a21caf' };
+      return { bg: '#fae8ff', text: '#86198f', border: '#f0abfc', badge: '#a21caf' };
     }
     if (code.includes('4') || code.includes('PLATINUM')) {
-      return { bg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', text: '#1e293b', border: '#94a3b8', badge: '#475569' };
+      return { bg: '#f1f5f9', text: '#1e293b', border: '#cbd5e1', badge: '#475569' };
     }
     if (code.includes('3') || code.includes('GOLD')) {
-      return { bg: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', text: '#854d0e', border: '#f59e0b', badge: '#b45309' };
+      return { bg: '#fef3c7', text: '#92400e', border: '#fde68a', badge: '#b45309' };
     }
     if (code.includes('2') || code.includes('SILVER')) {
-      return { bg: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)', text: '#0369a1', border: '#38bdf8', badge: '#0284c7' };
+      return { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd', badge: '#0284c7' };
     }
     if (code.includes('1') || code.includes('BRONZE')) {
-      return { bg: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', text: '#9a3412', border: '#fb923c', badge: '#ea580c' };
+      return { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa', badge: '#ea580c' };
     }
-    return { bg: '#f1f5f9', text: '#64748b', border: '#cbd5e1', badge: '#64748b' };
+    return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0', badge: '#64748b' };
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        paddingBottom: '24px',
+      }}
+    >
       {/* ─────────────────────────────────────────────────────────────
-          TOP HEADER & SUB-TAB NAVIGATION
+          TOP HEADER (2 EQUAL HALVES: Left = Period Selector & Range Info, Right = KPI Metrics Card)
          ───────────────────────────────────────────────────────────── */}
       <div
-        className="glass-card"
         style={{
-          padding: '18px 24px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: 'stretch',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          flexShrink: 0,
           flexWrap: 'wrap',
-          gap: '16px',
         }}
       >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-              }}
-            >
-              <Target size={20} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                Customer Range & Targets Management
-              </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Monthly spend milestones, POS auto-progression, staff tracking, and range tier configuration
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sub-Tab Navigation Pills */}
+        {/* LEFT HALF (50% of window): Period selector on top, Range detail strip on bottom */}
         <div
           style={{
-            display: 'inline-flex',
-            padding: '4px',
-            borderRadius: '10px',
-            background: '#f1f5f9',
-            border: '1px solid #e2e8f0',
-            gap: '4px',
+            flex: '1 1 360px',
+            width: 'calc(50% - 6px)',
+            minWidth: '300px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
           }}
         >
-          <button
-            type="button"
-            onClick={() => setSubTab('dashboard')}
-            style={{
-              padding: '8px 16px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              background: subTab === 'dashboard' ? '#ffffff' : 'transparent',
-              color: subTab === 'dashboard' ? '#2563eb' : '#64748b',
-              boxShadow: subTab === 'dashboard' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <TrendingUp size={15} /> Customer Dashboard
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('setup')}
-            style={{
-              padding: '8px 16px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              background: subTab === 'setup' ? '#ffffff' : 'transparent',
-              color: subTab === 'setup' ? '#2563eb' : '#64748b',
-              boxShadow: subTab === 'setup' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <Sliders size={15} /> Range Setup
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('reports')}
-            style={{
-              padding: '8px 16px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              background: subTab === 'reports' ? '#ffffff' : 'transparent',
-              color: subTab === 'reports' ? '#2563eb' : '#64748b',
-              boxShadow: subTab === 'reports' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <Award size={15} /> Monthly Reports
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('campaigns')}
-            style={{
-              padding: '8px 16px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              background: subTab === 'campaigns' ? '#ffffff' : 'transparent',
-              color: subTab === 'campaigns' ? '#2563eb' : '#64748b',
-              boxShadow: subTab === 'campaigns' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <Sparkles size={15} /> Promotional Campaigns
-          </button>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          TAB 1: SCREEN C — CUSTOMER RANGE DASHBOARD
-         ───────────────────────────────────────────────────────────── */}
-      {subTab === 'dashboard' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Top Month Selector & Quick Actions */}
+          {/* Period Selector Line */}
           <div
-            className="glass-card"
             style={{
-              padding: '14px 20px',
+              width: '100%',
+              height: '35px',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
+              justifyContent: 'space-between',
+              gap: '8px',
+              padding: '0 12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={16} color="#64748b" />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>Calculation Period:</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar size={14} color="#64748b" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
+                Calculation Period:
+              </span>
               <input
                 type="month"
-                className="input-glass"
-                style={{ padding: '6px 12px', fontSize: '0.85rem', fontWeight: 600, width: '170px' }}
                 value={selectedMonth}
                 onChange={(e) => {
                   setSelectedMonth(e.target.value);
                   setDashPage(0);
                 }}
-              />
-              <span style={{ fontSize: '0.78rem', color: '#64748b', background: '#f1f5f9', padding: '4px 10px', borderRadius: '6px' }}>
-                {dashboardData?.monthLabel || selectedMonth}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={handleSyncMonth}
-                className="btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '7px 12px' }}
-                title="Synchronize/Recalculate customer qualifying purchases for this month"
-              >
-                <RefreshCw size={14} className={loadingDashboard ? 'spin' : ''} />
-                Sync Month
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportDashboardCSV}
-                className="btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '7px 12px' }}
-              >
-                <Download size={14} /> Export CSV
-              </button>
-            </div>
-          </div>
-
-          {/* KPI Summary Cards */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '14px',
-            }}
-          >
-            <div className="glass-card" style={{ padding: '14px 18px', borderLeft: '4px solid #2563eb' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>TOTAL ACTIVE CUSTOMERS</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                {dashboardData?.totalActiveCustomers ?? 0}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Registered Customers</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '14px 18px', borderLeft: '4px solid #16a34a' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>ACTIVE PURCHASERS</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#16a34a', marginTop: '4px' }}>
-                {dashboardData?.customersWithPurchases ?? 0}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Bought this month</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '14px 18px', borderLeft: '4px solid #eab308' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>PROMOTED (RANGE 1+)</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ca8a04', marginTop: '4px' }}>
-                {dashboardData?.promotedCustomersCount ?? 0}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Exceeded starting tier</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '14px 18px', borderLeft: '4px solid #06b6d4' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>NEAR NEXT TARGET</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0891b2', marginTop: '4px' }}>
-                {dashboardData?.customersCloseToTargetCount ?? 0}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>≥ 75% to next range</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '14px 18px', borderLeft: '4px solid #8b5cf6' }}>
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>MONTHLY QUALIFYING SALES</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#7c3aed', marginTop: '4px' }}>
-                Rs. {Number(dashboardData?.totalMonthlyQualifyingSales || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Net of returns & refunds</div>
-            </div>
-          </div>
-
-          {/* Search & Filtering Controls */}
-          <div
-            className="glass-card"
-            style={{
-              padding: '16px 20px',
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            {/* Search Bar */}
-            <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
-              <Search size={15} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="input-glass"
-                style={{ paddingLeft: '36px', width: '100%', height: '36px', fontSize: '0.85rem' }}
-                placeholder="Search by customer name, code, phone..."
-                value={dashSearch}
-                onChange={(e) => {
-                  setDashSearch(e.target.value);
-                  setDashPage(0);
+                style={{
+                  height: '26px',
+                  padding: '0 6px',
+                  borderRadius: '4px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  outline: 'none',
+                  backgroundColor: '#f8fafc',
                 }}
               />
             </div>
+            <span
+              style={{
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                color: '#0284c7',
+                backgroundColor: '#e0f2fe',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {dashboardData?.monthLabel || selectedMonth}
+            </span>
+          </div>
 
-            {/* Filter by Range */}
-            <div style={{ minWidth: '160px' }}>
+          {/* Range Info Strip (Same width as Period line = half the window) */}
+          <div
+            style={{
+              width: '100%',
+              height: '35px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              padding: '0 12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.84rem',
+              boxSizing: 'border-box',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+              <span
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#1e293b',
+                  borderRadius: '4px',
+                  border: '1px solid #cbd5e1',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                RANGE & TARGETS
+              </span>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#dcfce7',
+                  color: '#15803d',
+                  border: '1px solid #bbf7d0',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                Active
+              </span>
+              <span
+                style={{
+                  color: '#475569',
+                  fontSize: '0.78rem',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
+                Spend milestones & POS progression
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Sparkles size={12} color="#0284c7" /> Auto-syncs POS
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT HALF (50% of window): Card with 4 equal columns matching left side height */}
+        <div
+          style={{
+            flex: '1 1 360px',
+            width: 'calc(50% - 6px)',
+            minWidth: '300px',
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+            padding: '8px 12px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            alignItems: 'center',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Column 1: Total Active Customers */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '0 6px',
+              borderRight: '1px solid #e2e8f0',
+            }}
+          >
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+              Customers
+            </span>
+            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+              {dashboardData?.totalActiveCustomers ?? 0}
+            </span>
+          </div>
+
+          {/* Column 2: Active Purchasers */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '0 6px',
+              borderRight: '1px solid #e2e8f0',
+            }}
+          >
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+              Purchasers
+            </span>
+            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
+              {dashboardData?.customersWithPurchases ?? 0}
+            </span>
+          </div>
+
+          {/* Column 3: Promoted Customers */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '0 6px',
+              borderRight: '1px solid #e2e8f0',
+            }}
+          >
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+              Promoted (1+)
+            </span>
+            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#d97706', fontFamily: 'monospace' }}>
+              {dashboardData?.promotedCustomersCount ?? 0}
+            </span>
+          </div>
+
+          {/* Column 4: Monthly Qualifying Sales */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: '0 6px',
+            }}
+          >
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+              Qualifying Sales
+            </span>
+            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+              LKR {Number(dashboardData?.totalMonthlyQualifyingSales || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          UNIFIED SUB-NAV TABS & TABLE TOOLBAR (Single-line, matching Customer History)
+         ───────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: '8px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          width: '100%',
+          boxSizing: 'border-box',
+          flexWrap: 'nowrap',
+          flexShrink: 0,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          overflowX: 'auto',
+        }}
+      >
+        {/* Sub-nav tabs */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            flexShrink: 0,
+            padding: '2px',
+            backgroundColor: '#f1f5f9',
+            borderRadius: '6px',
+          }}
+        >
+          {[
+            { id: 'dashboard', label: 'Customer Ranges', count: dashboardData?.totalElements ?? dashboardData?.totalActiveCustomers },
+            { id: 'setup', label: 'Range Tiers Setup', count: ranges.length },
+            { id: 'reports', label: 'Staff Performance', count: staffPerformance.length },
+            { id: 'campaigns', label: 'Promotional Targets' },
+          ].map((tab) => {
+            const isSel = subTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSubTab(tab.id)}
+                style={{
+                  backgroundColor: isSel ? '#ffffff' : 'transparent',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '4px 8px',
+                  fontSize: '0.8rem',
+                  fontWeight: isSel ? 600 : 500,
+                  color: isSel ? '#0284c7' : '#64748b',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: isSel ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span>{tab.label}</span>
+                {tab.count !== undefined && tab.count !== null && (
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      padding: '1px 5px',
+                      borderRadius: '9999px',
+                      backgroundColor: isSel ? '#e0f2fe' : '#e2e8f0',
+                      color: isSel ? '#0284c7' : '#64748b',
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Toolbar Controls per active sub-tab */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexShrink: 0,
+            marginLeft: 'auto',
+          }}
+        >
+          {subTab === 'dashboard' && (
+            <>
+              {/* Search Customer Input */}
+              <div style={{ position: 'relative', width: '200px', minWidth: '150px' }}>
+                <Search
+                  size={13}
+                  style={{
+                    position: 'absolute',
+                    left: '8px',
+                    top: '9px',
+                    color: '#94a3b8',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search customer..."
+                  value={dashSearch}
+                  onChange={(e) => {
+                    setDashSearch(e.target.value);
+                    setDashPage(0);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '0 24px 0 26px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.8rem',
+                    outline: 'none',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s ease',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
+                />
+                {dashSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDashSearch('');
+                      setDashPage(0);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '6px',
+                      top: '8px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      padding: 0,
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Range Filter */}
               <select
-                className="input-glass"
-                style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
                 value={dashRangeFilter}
                 onChange={(e) => {
                   setDashRangeFilter(e.target.value);
                   setDashPage(0);
                 }}
+                style={{
+                  height: '32px',
+                  padding: '0 24px 0 8px',
+                  width: '120px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.8rem',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  color: '#334155',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 6px center',
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
               >
                 <option value="ALL">All Ranges</option>
                 {(dashboardData?.configuredRanges || ranges || []).map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name} (≥ Rs. {Number(r.minSpend).toLocaleString()})
+                    {r.name}
                   </option>
                 ))}
               </select>
-            </div>
 
-            {/* Filter by Staff */}
-            <div style={{ minWidth: '170px' }}>
+              {/* Staff Filter */}
               <select
-                className="input-glass"
-                style={{ width: '100%', height: '36px', fontSize: '0.85rem' }}
                 value={dashStaffFilter}
                 onChange={(e) => {
                   setDashStaffFilter(e.target.value);
                   setDashPage(0);
                 }}
+                style={{
+                  height: '32px',
+                  padding: '0 24px 0 8px',
+                  width: '130px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '0.8rem',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                  color: '#334155',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 6px center',
+                }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
               >
-                <option value="ALL">All Assigned Staff</option>
+                <option value="ALL">All Staff</option>
                 {staffList.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.fullName || s.username}
                   </option>
                 ))}
               </select>
-            </div>
 
-            {/* Near Target Toggle */}
-            <button
-              type="button"
-              onClick={() => setDashNearTargetOnly(!dashNearTargetOnly)}
-              style={{
-                padding: '7px 14px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                borderRadius: '8px',
-                border: dashNearTargetOnly ? '1px solid #0891b2' : '1px solid #cbd5e1',
-                background: dashNearTargetOnly ? '#ecfeff' : '#ffffff',
-                color: dashNearTargetOnly ? '#0e7490' : '#475569',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '36px',
-              }}
-            >
-              <Sparkles size={14} color={dashNearTargetOnly ? '#0891b2' : '#94a3b8'} />
-              Near Next Target ({dashboardData?.customersCloseToTargetCount ?? 0})
-            </button>
-          </div>
+              {/* Near Target Toggle */}
+              <button
+                type="button"
+                onClick={() => setDashNearTargetOnly(!dashNearTargetOnly)}
+                style={{
+                  height: '32px',
+                  padding: '0 8px',
+                  borderRadius: '6px',
+                  border: dashNearTargetOnly ? '1px solid #0284c7' : '1px solid #e2e8f0',
+                  backgroundColor: dashNearTargetOnly ? '#e0f2fe' : '#ffffff',
+                  color: dashNearTargetOnly ? '#0284c7' : '#64748b',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                }}
+                title="Filter customers close to next range threshold"
+              >
+                <Sparkles size={12} color={dashNearTargetOnly ? '#0284c7' : '#94a3b8'} />
+                <span>Near Target ({dashboardData?.customersCloseToTargetCount ?? 0})</span>
+              </button>
 
-          {/* Customer Range Table */}
-          <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.78rem' }}>
-                    <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 14px' }}>ASSIGNED STAFF</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>MONTH PURCHASES</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center' }}>CURRENT RANGE</th>
-                    <th style={{ padding: '12px 14px' }}>PROGRESS TO NEXT TARGET</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>REMAINING</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>
+              {/* Reset Button */}
+              {(dashSearch || dashRangeFilter !== 'ALL' || dashStaffFilter !== 'ALL' || dashNearTargetOnly) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDashSearch('');
+                    setDashRangeFilter('ALL');
+                    setDashStaffFilter('ALL');
+                    setDashNearTargetOnly(false);
+                    setDashPage(0);
+                  }}
+                  style={{
+                    height: '32px',
+                    padding: '0 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#f1f5f9',
+                    color: '#64748b',
+                    fontSize: '0.78rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Reset filters"
+                >
+                  <X size={12} /> Reset
+                </button>
+              )}
+
+              {/* Export CSV (Icon Only) */}
+              <button
+                type="button"
+                onClick={handleExportDashboardCSV}
+                style={{
+                  height: '32px',
+                  width: '32px',
+                  minWidth: '32px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                }}
+                title="Export Range Report to CSV"
+              >
+                <Download size={13} />
+              </button>
+
+              {/* Sync / Refresh Month (Icon Only) */}
+              <button
+                type="button"
+                onClick={handleSyncMonth}
+                disabled={loadingDashboard}
+                style={{
+                  height: '32px',
+                  width: '32px',
+                  minWidth: '32px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                }}
+                title="Synchronize & Recalculate Month"
+              >
+                <RefreshCw size={13} className={loadingDashboard ? 'spin' : ''} />
+              </button>
+            </>
+          )}
+
+          {subTab === 'setup' && (
+            <>
+              {/* Audit Trail Button */}
+              <button
+                type="button"
+                onClick={loadAuditLogs}
+                style={{
+                  height: '32px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <ShieldCheck size={13} color="#0284c7" /> Audit Trail
+              </button>
+
+              {/* Refresh Ranges (Icon Only) */}
+              <button
+                type="button"
+                onClick={loadRanges}
+                disabled={loadingRanges}
+                style={{
+                  height: '32px',
+                  width: '32px',
+                  minWidth: '32px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Refresh Ranges"
+              >
+                <RefreshCw size={13} className={loadingRanges ? 'spin' : ''} />
+              </button>
+
+              {/* New Range Tier Button */}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateRange}
+                  style={{
+                    height: '32px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
+                  }}
+                >
+                  <Plus size={14} /> New Range Tier
+                </button>
+              )}
+            </>
+          )}
+
+          {subTab === 'reports' && (
+            <>
+              {/* Export Staff CSV */}
+              <button
+                type="button"
+                onClick={handleExportStaffCSV}
+                style={{
+                  height: '32px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Download size={13} /> Export CSV
+              </button>
+
+              {/* Print Report */}
+              <button
+                type="button"
+                onClick={() => window.print()}
+                style={{
+                  height: '32px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Printer size={13} /> Print Report
+              </button>
+
+              {/* Refresh Reports (Icon Only) */}
+              <button
+                type="button"
+                onClick={() => {
+                  loadReports();
+                  loadDashboard();
+                }}
+                disabled={loadingReports}
+                style={{
+                  height: '32px',
+                  width: '32px',
+                  minWidth: '32px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#334155',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Refresh Report Data"
+              >
+                <RefreshCw size={13} className={loadingReports ? 'spin' : ''} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          SUB-TAB 1: CUSTOMER RANGES TABLE (SCREEN C)
+         ───────────────────────────────────────────────────────────── */}
+      {subTab === 'dashboard' && (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '860px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CUSTOMER</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>ASSIGNED STAFF</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>MONTH PURCHASES</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CURRENT RANGE</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PROGRESS TO NEXT TARGET</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>REMAINING</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingDashboard ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                        <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
-                        Loading customer ranges...
+                      <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
+                        Loading customer monthly ranges...
                       </td>
                     </tr>
                   ) : displayedCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <Search size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                         No customers found matching the selected filters.
                       </td>
                     </tr>
@@ -856,19 +1304,35 @@ export default function CustomerMonthlyRangeHub({
                       return (
                         <tr
                           key={c.customerId}
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            transition: 'background-color 0.15s',
-                          }}
+                          style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           {/* Customer Name & Code */}
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.customerName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', gap: '6px' }}>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{c.customerCode}</span>
-                              {c.customerPhone && <span>• {c.customerPhone}</span>}
+                          <td style={{ padding: '12px 18px' }}>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                              {c.customerName}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span
+                                style={{
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #e2e8f0',
+                                }}
+                              >
+                                {c.customerCode || 'NO CODE'}
+                              </span>
+                              {c.customerPhone && (
+                                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                  📞 {c.customerPhone}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -877,9 +1341,9 @@ export default function CustomerMonthlyRangeHub({
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span
                                 style={{
-                                  fontSize: '0.8rem',
-                                  fontWeight: 600,
-                                  color: c.assignedStaffName && c.assignedStaffName !== 'Unassigned' ? '#1e293b' : '#94a3b8',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 500,
+                                  color: c.assignedStaffName && c.assignedStaffName !== 'Unassigned' ? '#334155' : '#94a3b8',
                                 }}
                               >
                                 {c.assignedStaffName || 'Unassigned'}
@@ -894,7 +1358,8 @@ export default function CustomerMonthlyRangeHub({
                                     background: 'none',
                                     cursor: 'pointer',
                                     padding: '2px',
-                                    color: '#2563eb',
+                                    color: '#0284c7',
+                                    display: 'inline-flex',
                                   }}
                                 >
                                   <Edit2 size={12} />
@@ -904,10 +1369,8 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Month Net Purchases */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <div style={{ fontWeight: 800, color: purchases > 0 ? '#0f172a' : '#94a3b8', fontSize: '0.9rem' }}>
-                              Rs. {purchases.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
+                          <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: purchases > 0 ? '#0f172a' : '#94a3b8', fontSize: '0.88rem' }}>
+                            LKR {purchases.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* Current Range Badge */}
@@ -917,33 +1380,33 @@ export default function CustomerMonthlyRangeHub({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                padding: '3px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.76rem',
-                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
                                 background: tierStyle.bg,
                                 color: tierStyle.text,
                                 border: `1px solid ${tierStyle.border}`,
                               }}
                             >
-                              <Award size={12} color={tierStyle.badge} />
+                              <Award size={11} color={tierStyle.badge} />
                               {c.currentRangeName}
                             </span>
                           </td>
 
                           {/* Progress to Next Target */}
-                          <td style={{ padding: '12px 14px', minWidth: '180px' }}>
+                          <td style={{ padding: '12px 14px', minWidth: '170px' }}>
                             {c.isHighestRange ? (
-                              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#701a75' }}>
-                                🏆 Highest Range Achieved!
+                              <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#86198f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                🏆 Highest Range Tier
                               </div>
                             ) : (
                               <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '4px' }}>
-                                  <span style={{ color: '#475569', fontWeight: 600 }}>
-                                    Next: <strong>{c.nextRangeName}</strong>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '3px' }}>
+                                  <span style={{ color: '#64748b', fontWeight: 500 }}>
+                                    Next: <strong style={{ color: '#334155' }}>{c.nextRangeName}</strong>
                                   </span>
-                                  <span style={{ fontWeight: 700, color: pct >= 75 ? '#0891b2' : '#2563eb' }}>
+                                  <span style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                                     {pct}%
                                   </span>
                                 </div>
@@ -951,25 +1414,23 @@ export default function CustomerMonthlyRangeHub({
                                   style={{
                                     height: '6px',
                                     width: '100%',
-                                    background: '#e2e8f0',
-                                    borderRadius: '4px',
+                                    background: '#f1f5f9',
+                                    borderRadius: '9999px',
                                     overflow: 'hidden',
+                                    border: '1px solid #e2e8f0',
                                   }}
                                 >
                                   <div
                                     style={{
                                       height: '100%',
                                       width: `${Math.min(100, Math.max(0, pct))}%`,
-                                      background:
-                                        pct >= 75
-                                          ? 'linear-gradient(90deg, #06b6d4 0%, #0891b2 100%)'
-                                          : 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
-                                      borderRadius: '4px',
+                                      background: '#0284c7',
+                                      borderRadius: '9999px',
                                     }}
                                   />
                                 </div>
-                                <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
-                                  Target: Rs. {nextTarget.toLocaleString()}
+                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px', fontFamily: 'monospace' }}>
+                                  Target: LKR {nextTarget.toLocaleString()}
                                 </div>
                               </div>
                             )}
@@ -981,24 +1442,24 @@ export default function CustomerMonthlyRangeHub({
                               <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>—</span>
                             ) : (
                               <div>
-                                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '0.85rem' }}>
-                                  Rs. {remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '0.86rem', fontFamily: 'monospace' }}>
+                                  LKR {remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                                 {c.isCloseToTarget && (
                                   <span
                                     style={{
-                                      fontSize: '0.65rem',
-                                      fontWeight: 800,
+                                      fontSize: '0.68rem',
+                                      fontWeight: 600,
                                       padding: '1px 6px',
-                                      borderRadius: '4px',
-                                      background: '#ecfeff',
-                                      color: '#0891b2',
-                                      border: '1px solid #a5f3fc',
+                                      borderRadius: '9999px',
+                                      background: '#e0f2fe',
+                                      color: '#0284c7',
+                                      border: '1px solid #bae6fd',
                                       display: 'inline-block',
                                       marginTop: '2px',
                                     }}
                                   >
-                                    ⚡ Close to target!
+                                    ⚡ Near Target
                                   </span>
                                 )}
                               </div>
@@ -1006,21 +1467,36 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Actions: View History */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleViewCustomerHistory(c)}
-                              className="btn-secondary"
                               style={{
-                                padding: '4px 10px',
-                                fontSize: '0.74rem',
-                                fontWeight: 600,
+                                height: '28px',
+                                padding: '0 8px',
+                                borderRadius: '5px',
+                                border: '1px solid #e2e8f0',
+                                backgroundColor: '#ffffff',
+                                color: '#334155',
+                                fontSize: '0.76rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                               }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#ffffff';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }}
+                              title="View monthly range progression history"
                             >
-                              <Clock size={12} /> History
+                              <Clock size={12} color="#0284c7" /> History
                             </button>
                           </td>
                         </tr>
@@ -1035,13 +1511,13 @@ export default function CustomerMonthlyRangeHub({
             {dashboardData?.totalPages > 1 && (
               <div
                 style={{
-                  padding: '12px 20px',
+                  padding: '8px 16px',
                   borderTop: '1px solid #e2e8f0',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  background: '#f8fafc',
-                  fontSize: '0.82rem',
+                  background: '#fafbfc',
+                  fontSize: '0.8rem',
                 }}
               >
                 <div style={{ color: '#64748b' }}>
@@ -1050,25 +1526,43 @@ export default function CustomerMonthlyRangeHub({
                   {dashboardData.totalElements} customers
                 </div>
 
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button
                     type="button"
                     disabled={dashPage === 0}
                     onClick={() => setDashPage(dashPage - 1)}
-                    className="btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                    style={{
+                      height: '28px',
+                      padding: '0 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      color: dashPage === 0 ? '#94a3b8' : '#334155',
+                      fontSize: '0.78rem',
+                      fontWeight: 500,
+                      cursor: dashPage === 0 ? 'not-allowed' : 'pointer',
+                    }}
                   >
                     Previous
                   </button>
-                  <span style={{ padding: '4px 8px', fontWeight: 700, color: '#334155' }}>
+                  <span style={{ padding: '0 6px', fontWeight: 600, color: '#334155', fontSize: '0.8rem' }}>
                     {dashPage + 1} / {dashboardData.totalPages}
                   </span>
                   <button
                     type="button"
                     disabled={dashPage >= dashboardData.totalPages - 1}
                     onClick={() => setDashPage(dashPage + 1)}
-                    className="btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                    style={{
+                      height: '28px',
+                      padding: '0 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      color: dashPage >= dashboardData.totalPages - 1 ? '#94a3b8' : '#334155',
+                      fontSize: '0.78rem',
+                      fontWeight: 500,
+                      cursor: dashPage >= dashboardData.totalPages - 1 ? 'not-allowed' : 'pointer',
+                    }}
                   >
                     Next
                   </button>
@@ -1080,81 +1574,51 @@ export default function CustomerMonthlyRangeHub({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 2: SCREEN A — RANGE SETUP & CONFIGURATION (ADMIN)
+          SUB-TAB 2: RANGE SETUP & CONFIGURATION (SCREEN A)
          ───────────────────────────────────────────────────────────── */}
       {subTab === 'setup' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div
-            className="glass-card"
             style={{
-              padding: '18px 24px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 0,
             }}
           >
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-                Customer Purchase Range Tiers Setup
-              </h3>
-              <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Configure monthly qualifying spend thresholds and tier order. Duplicate thresholds are prevented.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={loadAuditLogs}
-                className="btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '8px 14px' }}
-              >
-                <ShieldCheck size={15} /> Audit Trail
-              </button>
-
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={handleOpenCreateRange}
-                  className="btn-primary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', padding: '8px 16px' }}
-                >
-                  <Plus size={16} /> New Range Tier
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Configured Ranges List */}
-          <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.78rem' }}>
-                    <th style={{ padding: '12px 16px', width: '70px', textAlign: 'center' }}>ORDER</th>
-                    <th style={{ padding: '12px 16px' }}>RANGE CODE</th>
-                    <th style={{ padding: '12px 16px' }}>NAME</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>MONTHLY THRESHOLD</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIVE CUSTOMERS (THIS MONTH)</th>
-                    <th style={{ padding: '12px 16px' }}>DESCRIPTION</th>
-                    {canEdit && <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>}
+            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 14px', width: '60px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>ORDER</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>RANGE CODE</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>NAME</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>MONTHLY THRESHOLD</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CUSTOMERS (THIS MONTH)</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DESCRIPTION</th>
+                    {canEdit && <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {loadingRanges ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                        <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
+                      <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
                         Loading range definitions...
                       </td>
                     </tr>
                   ) : ranges.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                        No ranges defined yet. Click "New Range Tier" to create one.
+                      <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <Sliders size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                        No range tiers defined yet. Click "New Range Tier" above to create one.
                       </td>
                     </tr>
                   ) : (
@@ -1168,78 +1632,81 @@ export default function CustomerMonthlyRangeHub({
                           style={{
                             borderBottom: '1px solid #f1f5f9',
                             opacity: r.isActive ? 1 : 0.6,
-                            transition: 'background-color 0.15s',
+                            transition: 'background-color 0.12s ease',
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           {/* Display Order */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: '#64748b', fontSize: '0.84rem' }}>
                             #{r.displayOrder}
                           </td>
 
                           {/* Range Code */}
-                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                          <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', fontSize: '0.85rem' }}>
                             {r.rangeCode}
                           </td>
 
                           {/* Range Name */}
-                          <td style={{ padding: '12px 16px' }}>
+                          <td style={{ padding: '12px 14px' }}>
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '6px',
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.8rem',
-                                fontWeight: 700,
+                                gap: '5px',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
                                 background: tierStyle.bg,
                                 color: tierStyle.text,
                                 border: `1px solid ${tierStyle.border}`,
                               }}
                             >
-                              <Award size={13} color={tierStyle.badge} />
+                              <Award size={12} color={tierStyle.badge} />
                               {r.name}
                             </span>
                           </td>
 
                           {/* Monthly Spend Threshold */}
-                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
-                              Rs. {Number(r.minSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', fontFamily: 'monospace' }}>
+                              LKR {Number(r.minSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                              {isBaseline ? 'Starting base threshold' : 'Qualifying net spend'}
+                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                              {isBaseline ? 'Base threshold' : 'Qualifying spend'}
                             </div>
                           </td>
 
                           {/* Status */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             <span
                               style={{
-                                padding: '3px 8px',
-                                borderRadius: '6px',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
                                 fontSize: '0.72rem',
-                                fontWeight: 700,
+                                fontWeight: 600,
                                 background: r.isActive ? '#dcfce7' : '#fee2e2',
                                 color: r.isActive ? '#15803d' : '#b91c1c',
+                                border: r.isActive ? '1px solid #bbf7d0' : '1px solid #fecaca',
                               }}
                             >
-                              {r.isActive ? 'ACTIVE' : 'INACTIVE'}
+                              {r.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
 
                           {/* Customer Count */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             <span
                               style={{
-                                padding: '3px 10px',
-                                borderRadius: '12px',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
                                 background: '#f1f5f9',
-                                fontWeight: 800,
-                                fontSize: '0.82rem',
-                                color: '#1e293b',
+                                border: '1px solid #e2e8f0',
+                                fontWeight: 600,
+                                fontSize: '0.76rem',
+                                color: '#334155',
+                                fontFamily: 'monospace',
                               }}
                             >
                               {r.currentMonthCustomerCount ?? 0} customers
@@ -1247,22 +1714,34 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Description */}
-                          <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.8rem', maxWidth: '240px' }}>
+                          <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '0.82rem', maxWidth: '240px' }}>
                             {r.description || '—'}
                           </td>
 
                           {/* Action Buttons */}
                           {canEdit && (
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', gap: '4px' }}>
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditRange(r)}
-                                  className="btn-secondary"
-                                  style={{ padding: '4px 8px', fontSize: '0.74rem' }}
+                                  style={{
+                                    height: '28px',
+                                    padding: '0 8px',
+                                    borderRadius: '5px',
+                                    border: '1px solid #e2e8f0',
+                                    backgroundColor: '#ffffff',
+                                    color: '#334155',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
                                   title="Edit range details"
                                 >
-                                  <Edit2 size={12} /> Edit
+                                  <Edit2 size={11} /> Edit
                                 </button>
 
                                 {!isBaseline && (
@@ -1270,13 +1749,15 @@ export default function CustomerMonthlyRangeHub({
                                     type="button"
                                     onClick={() => handleToggleRangeStatus(r)}
                                     style={{
-                                      padding: '4px 8px',
-                                      fontSize: '0.74rem',
+                                      height: '28px',
+                                      padding: '0 8px',
+                                      borderRadius: '5px',
+                                      border: '1px solid',
+                                      borderColor: r.isActive ? '#fecaca' : '#bbf7d0',
+                                      background: r.isActive ? '#fee2e2' : '#dcfce7',
+                                      color: r.isActive ? '#b91c1c' : '#15803d',
+                                      fontSize: '0.76rem',
                                       fontWeight: 600,
-                                      borderRadius: '6px',
-                                      border: '1px solid #cbd5e1',
-                                      background: r.isActive ? '#fff1f2' : '#f0fdf4',
-                                      color: r.isActive ? '#be123c' : '#15803d',
                                       cursor: 'pointer',
                                     }}
                                   >
@@ -1298,68 +1779,29 @@ export default function CustomerMonthlyRangeHub({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 3: SCREEN D — MONTHLY REPORTS & STAFF PERFORMANCE
+          SUB-TAB 3: MONTHLY REPORTS & STAFF PERFORMANCE (SCREEN D)
          ───────────────────────────────────────────────────────────── */}
       {subTab === 'reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Month Selector & Report Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minHeight: 0 }}>
+          {/* Customer Range Distribution Cards Strip */}
           <div
-            className="glass-card"
             style={{
-              padding: '16px 22px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '12px 16px',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={16} color="#64748b" />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>Report Month:</span>
-              </div>
-              <input
-                type="month"
-                className="input-glass"
-                style={{ padding: '6px 12px', fontSize: '0.85rem', fontWeight: 600, width: '170px' }}
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={handleExportStaffCSV}
-                className="btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '7px 14px' }}
-              >
-                <Download size={14} /> Export Staff Report
-              </button>
-
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="btn-secondary"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '7px 14px' }}
-              >
-                <FileText size={14} /> Print Report
-              </button>
-            </div>
-          </div>
-
-          {/* Range Tier Distribution Breakdown */}
-          <div className="glass-card" style={{ padding: '20px' }}>
-            <h4 style={{ margin: '0 0 14px', fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
               Customer Range Distribution ({dashboardData?.monthLabel || selectedMonth})
-            </h4>
+            </div>
 
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                gap: '12px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '8px',
               }}
             >
               {Object.entries(dashboardData?.rangeCustomerCounts || {}).map(([rangeName, count]) => {
@@ -1371,19 +1813,19 @@ export default function CustomerMonthlyRangeHub({
                   <div
                     key={rangeName}
                     style={{
-                      padding: '14px',
-                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
                       background: tierStyle.bg,
                       border: `1px solid ${tierStyle.border}`,
                     }}
                   >
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: tierStyle.text }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 600, color: tierStyle.text }}>
                       {rangeName}
                     </div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: tierStyle.text, marginTop: '4px' }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: tierStyle.text, fontFamily: 'monospace', marginTop: '2px' }}>
                       {count}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: tierStyle.text, opacity: 0.85, marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.68rem', color: tierStyle.text, opacity: 0.85, marginTop: '1px' }}>
                       {percentage}% of customers
                     </div>
                   </div>
@@ -1392,41 +1834,46 @@ export default function CustomerMonthlyRangeHub({
             </div>
           </div>
 
-          {/* Staff Performance & Customer Achievement Breakdown */}
-          <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-              <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
-                Staff Member Target Achievements & Customer Conversions
-              </h4>
-              <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#64748b' }}>
-                Tracks each sales representative's assigned customers, active purchasing customers, and customers reaching Range 1+
-              </p>
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.78rem' }}>
-                    <th style={{ padding: '12px 18px' }}>STAFF MEMBER</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>ASSIGNED CUSTOMERS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>ACTIVE PURCHASERS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>PROMOTED (RANGE 1+)</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>TOTAL QUALIFYING SALES</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>CONVERSION RATE</th>
+          {/* Staff Member Target Achievements Table */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              width: '100%',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>STAFF MEMBER</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ASSIGNED CUSTOMERS</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIVE PURCHASERS</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>PROMOTED (RANGE 1+)</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL QUALIFYING SALES</th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CONVERSION RATE</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingReports ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                        <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
-                        Loading staff performance...
+                      <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
+                        Loading staff performance data...
                       </td>
                     </tr>
                   ) : staffPerformance.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                        No staff assignments found for this month. Assign customers to staff members in the Customer Dashboard.
+                      <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <Users size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                        No staff assignments found for this month. Assign customers to sales representatives in the Customer Ranges tab.
                       </td>
                     </tr>
                   ) : (
@@ -1440,54 +1887,55 @@ export default function CustomerMonthlyRangeHub({
                       return (
                         <tr
                           key={p.staffId}
-                          style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s' }}
+                          style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           <td style={{ padding: '12px 18px' }}>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.staffName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b' }}>@{p.staffUsername}</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{p.staffName}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace' }}>@{p.staffUsername}</div>
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#1e293b' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: '#334155', fontFamily: 'monospace', fontSize: '0.86rem' }}>
                             {totalAssigned}
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{ fontWeight: 700, color: '#16a34a' }}>{active}</span>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <span style={{ fontWeight: 600, color: '#16a34a', fontFamily: 'monospace', fontSize: '0.86rem' }}>{active}</span>
                             <span style={{ fontSize: '0.72rem', color: '#64748b' }}> ({totalAssigned > 0 ? Math.round((active / totalAssigned) * 100) : 0}%)</span>
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             <span
                               style={{
                                 padding: '2px 8px',
-                                borderRadius: '12px',
+                                borderRadius: '9999px',
                                 background: promoted > 0 ? '#fef3c7' : '#f1f5f9',
                                 color: promoted > 0 ? '#b45309' : '#64748b',
-                                fontWeight: 800,
-                                fontSize: '0.8rem',
+                                border: promoted > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                                fontWeight: 600,
+                                fontSize: '0.76rem',
                               }}
                             >
                               {promoted} customers
                             </span>
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
-                            Rs. {totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: '#0284c7', fontFamily: 'monospace', fontSize: '0.88rem' }}>
+                            LKR {totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 700, color: Number(conversion) >= 50 ? '#16a34a' : '#475569' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <div style={{ fontWeight: 600, color: Number(conversion) >= 50 ? '#16a34a' : '#334155', fontFamily: 'monospace', fontSize: '0.85rem' }}>
                               {conversion}%
                             </div>
-                            <div style={{ height: '4px', width: '60px', background: '#e2e8f0', borderRadius: '2px', margin: '3px auto 0' }}>
+                            <div style={{ height: '4px', width: '64px', background: '#e2e8f0', borderRadius: '9999px', margin: '3px auto 0', overflow: 'hidden' }}>
                               <div
                                 style={{
                                   height: '100%',
                                   width: `${Math.min(100, Math.max(0, conversion))}%`,
-                                  background: Number(conversion) >= 50 ? '#16a34a' : '#3b82f6',
-                                  borderRadius: '2px',
+                                  background: Number(conversion) >= 50 ? '#16a34a' : '#0284c7',
+                                  borderRadius: '9999px',
                                 }}
                               />
                             </div>
@@ -1504,7 +1952,7 @@ export default function CustomerMonthlyRangeHub({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 4: PROMOTIONAL CAMPAIGN TARGETS (V5 CAMPAIGNS)
+          SUB-TAB 4: PROMOTIONAL TARGETS (V5 CAMPAIGNS)
          ───────────────────────────────────────────────────────────── */}
       {subTab === 'campaigns' && (
         <CustomerTargetsTab
@@ -1517,14 +1965,14 @@ export default function CustomerMonthlyRangeHub({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL: CREATE / EDIT RANGE (SCREEN A)
+          MODAL: CREATE / EDIT RANGE TIER (SCREEN A)
          ───────────────────────────────────────────────────────────── */}
       {showRangeModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -1537,39 +1985,50 @@ export default function CustomerMonthlyRangeHub({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '520px',
+              borderRadius: '10px',
+              maxWidth: '500px',
               width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              padding: '20px 24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={18} color="#2563eb" />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                <Sliders size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                   {editingRange ? 'Edit Range Tier' : 'New Range Tier'}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRangeModal(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveRange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleSaveRange} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Range Code *
                 </label>
                 <input
                   type="text"
-                  className="input-glass"
-                  style={{ width: '100%', textTransform: 'uppercase', fontFamily: 'monospace' }}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    textTransform: 'uppercase',
+                    fontFamily: 'monospace',
+                    boxSizing: 'border-box',
+                    backgroundColor: editingRange ? '#f8fafc' : '#ffffff',
+                  }}
                   disabled={!!editingRange}
                   value={rangeForm.rangeCode}
                   onChange={(e) => setRangeForm({ ...rangeForm, rangeCode: e.target.value.toUpperCase() })}
@@ -1578,13 +2037,20 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Range Display Name * (e.g. Range 1, Bronze, Silver)
                 </label>
                 <input
                   type="text"
-                  className="input-glass"
-                  style={{ width: '100%' }}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    boxSizing: 'border-box',
+                  }}
                   value={rangeForm.name}
                   onChange={(e) => setRangeForm({ ...rangeForm, name: e.target.value })}
                   placeholder="e.g. Range 1"
@@ -1593,15 +2059,25 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Monthly Purchase Threshold (Rs.) *
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  Monthly Purchase Threshold (LKR) *
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  className="input-glass"
-                  style={{ width: '100%', fontWeight: 700 }}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    boxSizing: 'border-box',
+                    backgroundColor: editingRange && editingRange.rangeCode === 'RANGE_0' ? '#f8fafc' : '#ffffff',
+                  }}
                   value={rangeForm.minSpend}
                   disabled={editingRange && editingRange.rangeCode === 'RANGE_0'}
                   onChange={(e) => setRangeForm({ ...rangeForm, minSpend: e.target.value })}
@@ -1610,33 +2086,48 @@ export default function CustomerMonthlyRangeHub({
                 />
                 {editingRange && editingRange.rangeCode === 'RANGE_0' && (
                   <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                    Range 0 is the starting base tier and must always remain at Rs. 0.00.
+                    Range 0 is the starting base tier and must always remain at LKR 0.00.
                   </span>
                 )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                     Display Order
                   </label>
                   <input
                     type="number"
                     min="0"
-                    className="input-glass"
-                    style={{ width: '100%' }}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box',
+                    }}
                     value={rangeForm.displayOrder}
                     onChange={(e) => setRangeForm({ ...rangeForm, displayOrder: e.target.value })}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                     Active Status
                   </label>
                   <select
-                    className="input-glass"
-                    style={{ width: '100%' }}
+                    style={{
+                      width: '100%',
+                      height: '34px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      boxSizing: 'border-box',
+                      backgroundColor: '#ffffff',
+                    }}
                     value={rangeForm.isActive ? 'true' : 'false'}
                     disabled={editingRange && editingRange.rangeCode === 'RANGE_0'}
                     onChange={(e) => setRangeForm({ ...rangeForm, isActive: e.target.value === 'true' })}
@@ -1648,35 +2139,64 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Description (Optional)
                 </label>
                 <textarea
-                  className="input-glass"
                   rows={2}
-                  style={{ width: '100%', resize: 'none' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.84rem',
+                    boxSizing: 'border-box',
+                    resize: 'none',
+                  }}
                   value={rangeForm.description}
                   onChange={(e) => setRangeForm({ ...rangeForm, description: e.target.value })}
                   placeholder="Notes about this customer range milestone..."
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setShowRangeModal(false)}
-                  className="btn-secondary"
                   disabled={savingRange}
+                  style={{
+                    height: '32px',
+                    padding: '0 14px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary"
                   disabled={savingRange}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  style={{
+                    height: '32px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
                 >
-                  {savingRange ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
+                  {savingRange ? <RefreshCw size={13} className="spin" /> : <Check size={13} />}
                   {editingRange ? 'Update Range' : 'Save Range'}
                 </button>
               </div>
@@ -1693,7 +2213,7 @@ export default function CustomerMonthlyRangeHub({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -1706,39 +2226,40 @@ export default function CustomerMonthlyRangeHub({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '680px',
+              borderRadius: '10px',
+              maxWidth: '640px',
               width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              padding: '20px 24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
               maxHeight: '80vh',
               overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={18} color="#2563eb" />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                <ShieldCheck size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                   Range Configuration Audit Trail
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAuditModal(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
               Maintains an immutable record of changes to ranges, threshold edits, and tier promotions.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {auditLogs.length === 0 ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
                   No audit logs recorded yet.
                 </div>
               ) : (
@@ -1746,8 +2267,8 @@ export default function CustomerMonthlyRangeHub({
                   <div
                     key={log.id}
                     style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
                       fontSize: '0.82rem',
@@ -1756,17 +2277,17 @@ export default function CustomerMonthlyRangeHub({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span
                         style={{
-                          fontWeight: 800,
-                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          fontSize: '0.72rem',
                           padding: '1px 6px',
                           borderRadius: '4px',
                           background: log.actionType?.includes('CREATE') ? '#dcfce7' : '#e0f2fe',
-                          color: log.actionType?.includes('CREATE') ? '#15803d' : '#0369a1',
+                          color: log.actionType?.includes('CREATE') ? '#15803d' : '#0284c7',
                         }}
                       >
                         {log.actionType}
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace' }}>
                         {new Date(log.performedAt).toLocaleString()}
                       </span>
                     </div>
@@ -1790,7 +2311,7 @@ export default function CustomerMonthlyRangeHub({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -1803,24 +2324,25 @@ export default function CustomerMonthlyRangeHub({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '640px',
+              borderRadius: '10px',
+              maxWidth: '600px',
               width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              padding: '20px 24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
               maxHeight: '85vh',
               overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={18} color="#2563eb" />
+                <Clock size={18} color="#0284c7" />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                     Monthly Range History
                   </h3>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
                     {historyCustomer.customerName} ({historyCustomer.customerCode})
                   </div>
                 </div>
@@ -1828,35 +2350,35 @@ export default function CustomerMonthlyRangeHub({
               <button
                 type="button"
                 onClick={() => setHistoryCustomer(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: '#64748b' }}>
-              Historical record of qualifying purchases and achieved ranges preserved across every monthly calculation cycle.
+            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
+              Historical record of qualifying purchases and achieved range milestones across past calculation cycles.
             </p>
 
             {loadingHistory ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
-                <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
+              <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block', color: '#0284c7' }} />
                 Loading history...
               </div>
             ) : customerHistory.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
-                No past monthly history records found for this customer.
+              <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                No past monthly range records found for this customer.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {customerHistory.map((h) => {
                   const tierStyle = getTierBadgeStyle(h.finalRangeCode, h.finalRangeName);
                   return (
                     <div
                       key={h.yearMonth}
                       style={{
-                        padding: '12px 16px',
-                        borderRadius: '10px',
+                        padding: '10px 14px',
+                        borderRadius: '6px',
                         background: '#f8fafc',
                         border: '1px solid #e2e8f0',
                         display: 'flex',
@@ -1867,7 +2389,7 @@ export default function CustomerMonthlyRangeHub({
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#0f172a' }}>
                           {h.monthLabel || h.yearMonth}
                         </div>
                         <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
@@ -1876,25 +2398,25 @@ export default function CustomerMonthlyRangeHub({
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
-                          Rs. {Number(h.qualifyingPurchases || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', fontFamily: 'monospace' }}>
+                          LKR {Number(h.qualifyingPurchases || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                         <span
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            padding: '2px 8px',
-                            borderRadius: '10px',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '9999px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
                             background: tierStyle.bg,
                             color: tierStyle.text,
                             border: `1px solid ${tierStyle.border}`,
                             marginTop: '2px',
                           }}
                         >
-                          <Award size={11} color={tierStyle.badge} />
+                          <Award size={10} color={tierStyle.badge} />
                           {h.finalRangeName}
                         </span>
                       </div>
@@ -1915,7 +2437,7 @@ export default function CustomerMonthlyRangeHub({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
@@ -1928,46 +2450,55 @@ export default function CustomerMonthlyRangeHub({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '440px',
+              borderRadius: '10px',
+              maxWidth: '420px',
               width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              padding: '20px 24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <UserCheck size={18} color="#2563eb" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                <UserCheck size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                   Assign Customer to Staff
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setAssigningCustomer(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ marginBottom: '14px', padding: '10px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
+            <div style={{ marginBottom: '14px', padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
                 {assigningCustomer.customerName}
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                Code: {assigningCustomer.customerCode} • Currently: {assigningCustomer.assignedStaffName || 'Unassigned'}
+              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                Code: <span style={{ fontFamily: 'monospace' }}>{assigningCustomer.customerCode}</span> • Current: {assigningCustomer.assignedStaffName || 'Unassigned'}
               </div>
             </div>
 
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Select Sales Representative / Staff Member:
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Select Sales Representative:
               </label>
               <select
-                className="input-glass"
-                style={{ width: '100%', height: '38px', fontSize: '0.85rem' }}
+                style={{
+                  width: '100%',
+                  height: '35px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.85rem',
+                  backgroundColor: '#ffffff',
+                  boxSizing: 'border-box',
+                }}
                 value={selectedNewStaffId}
                 onChange={(e) => setSelectedNewStaffId(e.target.value)}
               >
@@ -1984,19 +2515,41 @@ export default function CustomerMonthlyRangeHub({
               <button
                 type="button"
                 onClick={() => setAssigningCustomer(null)}
-                className="btn-secondary"
                 disabled={savingAssignStaff}
+                style={{
+                  height: '32px',
+                  padding: '0 14px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '0.8rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveAssignStaff}
-                className="btn-primary"
                 disabled={savingAssignStaff}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                style={{
+                  height: '32px',
+                  padding: '0 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
               >
-                {savingAssignStaff ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
+                {savingAssignStaff ? <RefreshCw size={13} className="spin" /> : <Check size={13} />}
                 Confirm Assignment
               </button>
             </div>

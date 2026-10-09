@@ -408,220 +408,150 @@ export default function CustomerTargetsTab({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '12px',
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
         flex: 1,
         minHeight: 0,
         overflowY: 'auto',
-        paddingBottom: '32px',
+        paddingBottom: '24px',
       }}
     >
       {/* ─────────────────────────────────────────────────────────────
-          1. TOP BANNER / TOOLBAR CARD
+          1. TOOLBAR (Search, Filters, Reset, Refresh & New Target Action)
          ───────────────────────────────────────────────────────────── */}
       <div
-        className="glass-card"
         style={{
-          padding: '16px 20px',
+          backgroundColor: '#ffffff',
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0',
+          padding: '8px 12px',
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          gap: '8px',
+          width: '100%',
+          boxSizing: 'border-box',
           flexWrap: 'wrap',
-          gap: '14px',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
-          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
+          flexShrink: 0,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
-            }}
-          >
-            <Target size={22} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.22rem', fontWeight: 700, color: '#0f172a' }}>
-                Customer Range & Targets
-              </h2>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '20px',
-                  background: '#e0f2fe',
-                  color: '#0369a1',
-                }}
-              >
-                POS & Sales Milestone System
-              </span>
-            </div>
-            <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-              Create customer spending milestones and progressive discount range tiers for salesmen and POS billing
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={loadTargets}
-            disabled={loading}
-            className="secondary-button"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              padding: '8px 14px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#334155',
-              fontWeight: 600,
-            }}
-            title="Refresh targets"
-          >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-            <span>Refresh</span>
-          </button>
-
-          {canEdit && (
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.86rem',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                border: 'none',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                color: '#ffffff',
-                fontWeight: 700,
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
-              }}
-            >
-              <Plus size={16} />
-              <span>New Range & Target</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-
-
-      {/* ─────────────────────────────────────────────────────────────
-          3. FILTER BAR
-         ───────────────────────────────────────────────────────────── */}
-      <div
-        style={{
-          background: '#ffffff',
-          padding: '12px 16px',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        {/* Search */}
-        <div style={{ position: 'relative', flex: '1 1 260px', minWidth: '220px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
-          <input
-            type="text"
-            placeholder="Search targets by name, code, customer or salesman..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px 8px 36px',
-              fontSize: '0.84rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm('')}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: '1 1 auto' }}>
+          {/* Search Box */}
+          <div style={{ position: 'relative', width: '220px', minWidth: '160px' }}>
+            <Search
+              size={13}
               style={{
                 position: 'absolute',
-                right: '10px',
+                left: '8px',
                 top: '9px',
-                background: 'none',
-                border: 'none',
                 color: '#94a3b8',
-                cursor: 'pointer',
+                pointerEvents: 'none',
               }}
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
+            />
+            <input
+              type="text"
+              placeholder="Search targets or customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                height: '32px',
+                padding: '0 24px 0 26px',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.8rem',
+                outline: 'none',
+                backgroundColor: '#ffffff',
+                color: '#0f172a',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s ease',
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+              onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '8px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#94a3b8',
+                  padding: 0,
+                }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
 
-        {/* Status Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Status:</span>
+          {/* Status Select */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{
-              padding: '7px 10px',
-              fontSize: '0.82rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              color: '#334155',
+              height: '32px',
+              padding: '0 24px 0 8px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+              fontFamily: 'inherit',
               fontWeight: 500,
+              color: '#334155',
+              backgroundColor: '#ffffff',
               cursor: 'pointer',
+              outline: 'none',
+              boxSizing: 'border-box',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 6px center',
             }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active Only</option>
             <option value="INACTIVE">Inactive Only</option>
             <option value="ACHIEVED">Achieved Only</option>
           </select>
-        </div>
 
-        {/* Customer Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Customer:</span>
+          {/* Customer Select */}
           <select
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
             style={{
-              padding: '7px 10px',
-              fontSize: '0.82rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              color: '#334155',
+              height: '32px',
+              padding: '0 24px 0 8px',
+              maxWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+              fontFamily: 'inherit',
               fontWeight: 500,
-              maxWidth: '180px',
+              color: '#334155',
+              backgroundColor: '#ffffff',
               cursor: 'pointer',
+              outline: 'none',
+              boxSizing: 'border-box',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 6px center',
             }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
           >
             <option value="ALL">All Customers</option>
             {customers.map((c) => (
@@ -630,25 +560,34 @@ export default function CustomerTargetsTab({
               </option>
             ))}
           </select>
-        </div>
 
-        {/* Salesman Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Sales Rep:</span>
+          {/* Salesman Select */}
           <select
             value={salesmanFilter}
             onChange={(e) => setSalesmanFilter(e.target.value)}
             style={{
-              padding: '7px 10px',
-              fontSize: '0.82rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              color: '#334155',
+              height: '32px',
+              padding: '0 24px 0 8px',
+              maxWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+              fontFamily: 'inherit',
               fontWeight: 500,
-              maxWidth: '180px',
+              color: '#334155',
+              backgroundColor: '#ffffff',
               cursor: 'pointer',
+              outline: 'none',
+              boxSizing: 'border-box',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 6px center',
             }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
           >
             <option value="ALL">All Sales Reps</option>
             {salesmen.map((s) => (
@@ -657,70 +596,153 @@ export default function CustomerTargetsTab({
               </option>
             ))}
           </select>
+
+          {/* Reset Filters Button */}
+          {(searchTerm || statusFilter !== 'ALL' || customerFilter !== 'ALL' || salesmanFilter !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('ALL');
+                setCustomerFilter('ALL');
+                setSalesmanFilter('ALL');
+              }}
+              style={{
+                height: '32px',
+                padding: '0 8px',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                backgroundColor: '#f1f5f9',
+                color: '#64748b',
+                fontSize: '0.78rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                whiteSpace: 'nowrap',
+              }}
+              title="Reset filters"
+            >
+              <X size={12} /> Reset
+            </button>
+          )}
         </div>
 
-        {(searchTerm || statusFilter !== 'ALL' || customerFilter !== 'ALL' || salesmanFilter !== 'ALL') && (
-          <button
-            type="button"
-            onClick={() => {
-              setSearchTerm('');
-              setStatusFilter('ALL');
-              setCustomerFilter('ALL');
-              setSalesmanFilter('ALL');
-            }}
+        {/* Right Action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <span
             style={{
-              background: 'none',
-              border: 'none',
-              color: '#0284c7',
-              fontSize: '0.78rem',
+              fontSize: '0.74rem',
               fontWeight: 600,
-              cursor: 'pointer',
-              textDecoration: 'underline',
+              color: '#64748b',
+              backgroundColor: '#f1f5f9',
+              padding: '4px 8px',
+              borderRadius: '9999px',
+              whiteSpace: 'nowrap',
             }}
           >
-            Reset Filters
+            {filteredTargets.length} {filteredTargets.length === 1 ? 'Target' : 'Targets'}
+          </span>
+
+          <button
+            type="button"
+            onClick={loadTargets}
+            disabled={loading}
+            style={{
+              height: '32px',
+              width: '32px',
+              minWidth: '32px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: 0,
+              color: '#334155',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+            }}
+            title="Refresh targets"
+          >
+            <RefreshCw size={13} className={loading ? 'spin' : ''} />
           </button>
-        )}
+
+          {canEdit && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
+              }}
+            >
+              <Plus size={14} /> New Range & Target
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          4. TARGETS CARDS LIST
+          2. TARGETS CARDS LIST
          ───────────────────────────────────────────────────────────── */}
       {loading ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748b' }}>
-          <RefreshCw size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-          <p style={{ margin: 0, fontSize: '0.92rem', fontWeight: 500 }}>Loading customer range targets...</p>
+        <div
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            padding: '50px 20px',
+            textAlign: 'center',
+            color: '#64748b',
+          }}
+        >
+          <RefreshCw size={24} className="spin" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+          <p style={{ margin: 0, fontSize: '0.86rem', fontWeight: 500 }}>Loading customer range targets...</p>
         </div>
       ) : filteredTargets.length === 0 ? (
         <div
           style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            border: '2px dashed #cbd5e1',
-            padding: '60px 24px',
+            backgroundColor: '#ffffff',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            padding: '50px 24px',
             textAlign: 'center',
           }}
         >
           <div
             style={{
-              width: '56px',
-              height: '56px',
+              width: '44px',
+              height: '44px',
               borderRadius: '50%',
-              background: '#e0f2fe',
+              backgroundColor: '#e0f2fe',
               color: '#0284c7',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '14px',
+              marginBottom: '12px',
             }}
           >
-            <Target size={28} />
+            <Target size={22} />
           </div>
-          <h3 style={{ margin: '0 0 6px', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700 }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
             No Customer Targets Found
           </h3>
-          <p style={{ margin: '0 0 18px', color: '#64748b', fontSize: '0.86rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
-            {searchTerm || statusFilter !== 'ALL'
+          <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.82rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+            {searchTerm || statusFilter !== 'ALL' || customerFilter !== 'ALL' || salesmanFilter !== 'ALL'
               ? 'No targets match your current search and filters. Try clearing filters.'
               : 'Create sales targets with progressive discount range tiers for customers to incentivize bulk purchases in POS mode.'}
           </p>
@@ -729,25 +751,26 @@ export default function CustomerTargetsTab({
               type="button"
               onClick={handleOpenCreateModal}
               style={{
+                height: '32px',
+                padding: '0 14px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
+                gap: '5px',
               }}
             >
-              <Plus size={16} /> Create First Range Target
+              <Plus size={14} /> Create First Range Target
             </button>
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredTargets.map((target) => {
             const achieved = Number(target.currentAchievedAmount || 0);
             const goal = Number(target.targetAmount || 0);
@@ -761,130 +784,117 @@ export default function CustomerTargetsTab({
               <div
                 key={target.id}
                 style={{
-                  background: '#ffffff',
-                  border: isCompleted ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '16px 20px',
-                  boxShadow: '0 2px 6px -1px rgba(0,0,0,0.04)',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '14px',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  gap: '12px',
                 }}
               >
-                {/* Top Achieved Ribbon */}
-                {isCompleted && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '0',
-                      right: '0',
-                      background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                      color: '#ffffff',
-                      fontSize: '0.65rem',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      padding: '3px 18px',
-                      borderBottomLeftRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
-                    }}
-                  >
-                    <Award size={11} /> Target Goal Achieved!
-                  </div>
-                )}
-
                 {/* Header Row: Title, Badges & Actions */}
                 <div
                   style={{
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
                     flexWrap: 'wrap',
-                    gap: '10px',
-                    paddingRight: isCompleted ? '110px' : '0',
+                    gap: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: '#f1f5f9',
+                        color: '#1e293b',
+                        border: '1px solid #cbd5e1',
+                      }}
+                    >
+                      {target.targetCode}
+                    </span>
+                    <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                      {target.name}
+                    </h3>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        padding: '1px 7px',
+                        borderRadius: '9999px',
+                        backgroundColor: target.isActive ? '#dcfce7' : '#f1f5f9',
+                        color: target.isActive ? '#15803d' : '#64748b',
+                        border: `1px solid ${target.isActive ? '#bbf7d0' : '#e2e8f0'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
                       <span
                         style={{
-                          fontSize: '0.74rem',
-                          fontFamily: 'monospace',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background: '#f1f5f9',
-                          color: '#334155',
-                          border: '1px solid #e2e8f0',
+                          width: '5px',
+                          height: '5px',
+                          borderRadius: '50%',
+                          backgroundColor: target.isActive ? '#16a34a' : '#94a3b8',
                         }}
-                      >
-                        {target.targetCode}
-                      </span>
-                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                        {target.name}
-                      </h3>
+                      />
+                      {target.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    {isCompleted && (
                       <span
                         style={{
-                          fontSize: '0.68rem',
+                          fontSize: '0.7rem',
                           fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          background: target.isActive ? '#dcfce7' : '#f1f5f9',
-                          color: target.isActive ? '#15803d' : '#64748b',
+                          padding: '1px 8px',
+                          borderRadius: '9999px',
+                          backgroundColor: '#dcfce7',
+                          color: '#15803d',
+                          border: '1px solid #bbf7d0',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          gap: '3px',
                         }}
                       >
-                        <span
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: target.isActive ? '#16a34a' : '#94a3b8',
-                          }}
-                        />
-                        {target.isActive ? 'Active' : 'Inactive'}
+                        <CheckCircle2 size={11} /> Goal Achieved
                       </span>
-                      {target.daysRemaining !== undefined && (
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            padding: '2px 8px',
-                            borderRadius: '12px',
-                            background: target.daysRemaining > 0 ? '#eff6ff' : '#fee2e2',
-                            color: target.daysRemaining > 0 ? '#1d4ed8' : '#b91c1c',
-                          }}
-                        >
-                          {target.daysRemaining > 0 ? `${target.daysRemaining} days left` : 'Expired'}
-                        </span>
-                      )}
-                    </div>
-                    {target.description && (
-                      <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                        {target.description}
-                      </p>
+                    )}
+                    {target.daysRemaining !== undefined && (
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          padding: '1px 7px',
+                          borderRadius: '9999px',
+                          backgroundColor: target.daysRemaining > 0 ? '#e0f2fe' : '#fee2e2',
+                          color: target.daysRemaining > 0 ? '#0369a1' : '#b91c1c',
+                          border: `1px solid ${target.daysRemaining > 0 ? '#bae6fd' : '#fecaca'}`,
+                        }}
+                      >
+                        {target.daysRemaining > 0 ? `${target.daysRemaining} days left` : 'Expired'}
+                      </span>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <button
                       type="button"
                       onClick={() => setSelectedTargetDetail(target)}
                       style={{
-                        padding: '6px 10px',
-                        fontSize: '0.78rem',
+                        height: '28px',
+                        padding: '0 8px',
+                        fontSize: '0.76rem',
                         fontWeight: 600,
                         color: '#0284c7',
-                        background: '#f0f9ff',
+                        backgroundColor: '#f0f9ff',
                         border: '1px solid #bae6fd',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -892,7 +902,7 @@ export default function CustomerTargetsTab({
                       }}
                       title="View full progress breakdown"
                     >
-                      <Info size={13} /> View Progress
+                      <Info size={12} /> Progress
                     </button>
 
                     {canEdit && (
@@ -901,13 +911,14 @@ export default function CustomerTargetsTab({
                           type="button"
                           onClick={() => handleOpenEditModal(target)}
                           style={{
-                            padding: '6px 10px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
+                            height: '28px',
+                            padding: '0 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 500,
                             color: '#334155',
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '6px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -915,21 +926,21 @@ export default function CustomerTargetsTab({
                           }}
                           title="Edit target configuration"
                         >
-                          <Edit2 size={13} /> Edit
+                          <Edit2 size={12} /> Edit
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleToggleActive(target)}
                           style={{
-                            padding: '6px 10px',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
+                            height: '28px',
+                            padding: '0 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 500,
                             color: target.isActive ? '#d97706' : '#16a34a',
-                            background: target.isActive ? '#fffbeb' : '#f0fdf4',
-                            border: '1px solid',
-                            borderColor: target.isActive ? '#fde68a' : '#bbf7d0',
-                            borderRadius: '6px',
+                            backgroundColor: target.isActive ? '#fffbeb' : '#f0fdf4',
+                            border: `1px solid ${target.isActive ? '#fde68a' : '#bbf7d0'}`,
+                            borderRadius: '4px',
                             cursor: 'pointer',
                           }}
                           title={target.isActive ? 'Deactivate target' : 'Activate target'}
@@ -941,16 +952,21 @@ export default function CustomerTargetsTab({
                           type="button"
                           onClick={() => handleDelete(target)}
                           style={{
-                            padding: '6px 8px',
+                            height: '28px',
+                            width: '28px',
                             color: '#ef4444',
-                            background: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            borderRadius: '6px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #fee2e2',
+                            borderRadius: '4px',
                             cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
                           }}
                           title="Deactivate target"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={12} />
                         </button>
                       </>
                     )}
@@ -962,17 +978,18 @@ export default function CustomerTargetsTab({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '16px',
+                    gap: '14px',
                     flexWrap: 'wrap',
-                    padding: '8px 12px',
-                    background: '#f8fafc',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px',
+                    border: '1px solid #f1f5f9',
                     fontSize: '0.78rem',
                     color: '#475569',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Users size={14} style={{ color: '#0284c7' }} />
+                    <Users size={13} style={{ color: '#0284c7' }} />
                     <span style={{ fontWeight: 600, color: '#64748b' }}>Scope:</span>
                     <strong style={{ color: '#0f172a' }}>
                       {target.customerName ? (
@@ -980,7 +997,7 @@ export default function CustomerTargetsTab({
                       ) : target.customerGroupName ? (
                         `Group: ${target.customerGroupName}`
                       ) : (
-                        <span style={{ color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
+                        <span style={{ color: '#0369a1', backgroundColor: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
                           Store-wide (All Customers)
                         </span>
                       )}
@@ -989,40 +1006,48 @@ export default function CustomerTargetsTab({
 
                   {target.salesmanName && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <User size={14} style={{ color: '#059669' }} />
-                      <span style={{ fontWeight: 600, color: '#64748b' }}>Assigned Rep:</span>
+                      <User size={13} style={{ color: '#059669' }} />
+                      <span style={{ fontWeight: 600, color: '#64748b' }}>Sales Rep:</span>
                       <strong style={{ color: '#0f172a' }}>{target.salesmanName}</strong>
                     </div>
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Calendar size={14} style={{ color: '#d97706' }} />
+                    <Calendar size={13} style={{ color: '#d97706' }} />
                     <span style={{ fontWeight: 600, color: '#64748b' }}>Period:</span>
-                    <strong style={{ color: '#334155' }}>
+                    <strong style={{ color: '#334155', fontFamily: 'monospace' }}>
                       {target.startDate} to {target.endDate}
                     </strong>
                   </div>
+
+                  {target.description && (
+                    <div style={{ color: '#64748b', fontSize: '0.76rem', marginLeft: 'auto' }}>
+                      {target.description}
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress Bar & Numeric Metrics */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <div>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Achieved Sales:</span>{' '}
-                      <strong style={{ fontSize: '1.08rem', color: '#0f172a', fontWeight: 800 }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      <span>Achieved: </span>
+                      <strong style={{ fontSize: '0.96rem', color: '#0f172a', fontFamily: 'monospace', fontWeight: 700 }}>
                         Rs. {achieved.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </strong>{' '}
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        / Goal: Rs. {goal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </strong>
+                      <span> / Goal: </span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
+                        Rs. {goal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </div>
 
                     <div style={{ textAlign: 'right' }}>
                       <span
                         style={{
-                          fontSize: '0.95rem',
-                          fontWeight: 800,
-                          color: percentage >= 100 ? '#16a34a' : percentage >= 50 ? '#0284c7' : '#d97706',
+                          fontSize: '0.86rem',
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          color: percentage >= 100 ? '#16a34a' : '#0284c7',
                         }}
                       >
                         {percentage}% Achieved
@@ -1030,12 +1055,12 @@ export default function CustomerTargetsTab({
                     </div>
                   </div>
 
-                  {/* Gradient Progress Bar */}
+                  {/* Clean Progress Bar (Customer History theme) */}
                   <div
                     style={{
-                      height: '9px',
-                      background: '#e2e8f0',
-                      borderRadius: '5px',
+                      height: '6px',
+                      backgroundColor: '#f1f5f9',
+                      borderRadius: '9999px',
                       overflow: 'hidden',
                       position: 'relative',
                     }}
@@ -1044,11 +1069,8 @@ export default function CustomerTargetsTab({
                       style={{
                         height: '100%',
                         width: `${Math.min(100, Math.max(0, percentage))}%`,
-                        background:
-                          percentage >= 100
-                            ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)'
-                            : 'linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)',
-                        borderRadius: '5px',
+                        backgroundColor: percentage >= 100 ? '#16a34a' : '#0284c7',
+                        borderRadius: '9999px',
                         transition: 'width 0.4s ease',
                       }}
                     />
@@ -1056,31 +1078,32 @@ export default function CustomerTargetsTab({
                 </div>
 
                 {/* Progressive Slabs / Ranges Track */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Target Range Tiers & Progressive Rewards
-                    </div>
+                    </span>
                     {currentTier && (
                       <span
                         style={{
-                          fontSize: '0.74rem',
+                          fontSize: '0.7rem',
                           fontWeight: 700,
                           color: '#15803d',
-                          background: '#dcfce7',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
+                          backgroundColor: '#dcfce7',
+                          border: '1px solid #bbf7d0',
+                          padding: '1px 7px',
+                          borderRadius: '9999px',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          gap: '3px',
                         }}
                       >
-                        <Check size={12} /> {currentTier.tierName} Unlocked ({currentTier.discountPercentage}% Discount)!
+                        <Check size={11} /> {currentTier.tierName} Unlocked ({currentTier.discountPercentage}% Discount)
                       </span>
                     )}
                   </div>
 
-                  {/* Tiers Horizontal Strip */}
+                  {/* Tiers Grid */}
                   <div
                     style={{
                       display: 'grid',
@@ -1096,30 +1119,29 @@ export default function CustomerTargetsTab({
                         <div
                           key={tier.id || tIdx}
                           style={{
-                            padding: '10px 12px',
-                            borderRadius: '8px',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
                             border: isAchievedTier
-                              ? '1.5px solid #86efac'
+                              ? '1px solid #bbf7d0'
                               : isNext
-                              ? '1.5px dashed #0284c7'
+                              ? '1px dashed #0284c7'
                               : '1px solid #e2e8f0',
-                            background: isAchievedTier
-                              ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)'
+                            backgroundColor: isAchievedTier
+                              ? '#f0fdf4'
                               : isNext
-                              ? 'linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%)'
-                              : '#fafafa',
+                              ? '#f0f9ff'
+                              : '#f8fafc',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '4px',
-                            position: 'relative',
+                            gap: '3px',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span
                               style={{
-                                fontSize: '0.75rem',
+                                fontSize: '0.76rem',
                                 fontWeight: 700,
-                                color: isAchievedTier ? '#15803d' : isNext ? '#0369a1' : '#475569',
+                                color: isAchievedTier ? '#15803d' : isNext ? '#0369a1' : '#334155',
                               }}
                             >
                               {tier.tierName}
@@ -1127,19 +1149,20 @@ export default function CustomerTargetsTab({
                             <span
                               style={{
                                 fontSize: '0.72rem',
-                                fontWeight: 800,
-                                padding: '1px 6px',
+                                fontWeight: 700,
+                                fontFamily: 'monospace',
+                                padding: '1px 5px',
                                 borderRadius: '4px',
-                                background: isAchievedTier ? '#22c55e' : isNext ? '#0284c7' : '#94a3b8',
-                                color: '#ffffff',
+                                backgroundColor: isAchievedTier ? '#dcfce7' : isNext ? '#e0f2fe' : '#e2e8f0',
+                                color: isAchievedTier ? '#15803d' : isNext ? '#0284c7' : '#475569',
                               }}
                             >
                               {tier.discountPercentage > 0 ? `${tier.discountPercentage}%` : `Rs. ${tier.discountAmount}`}
                             </span>
                           </div>
 
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                            Range: Rs. {Number(tier.minAmount).toLocaleString()}
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            Rs. {Number(tier.minAmount).toLocaleString()}
                             {tier.maxAmount ? ` - ${Number(tier.maxAmount).toLocaleString()}` : '+'}
                           </div>
 
@@ -1169,15 +1192,15 @@ export default function CustomerTargetsTab({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          5. ADD / EDIT TARGET MODAL
+          3. ADD / EDIT TARGET MODAL
          ───────────────────────────────────────────────────────────── */}
       {showModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(3px)',
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1191,49 +1214,50 @@ export default function CustomerTargetsTab({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: '10px',
               maxWidth: '820px',
               width: '100%',
               maxHeight: '92vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
               display: 'flex',
               flexDirection: 'column',
+              border: '1px solid #cbd5e1',
             }}
           >
             {/* Modal Header */}
             <div
               style={{
-                padding: '18px 24px',
+                padding: '14px 20px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: '#f8fafc',
-                borderTopLeftRadius: '16px',
-                borderTopRightRadius: '16px',
+                backgroundColor: '#ffffff',
+                borderTopLeftRadius: '10px',
+                borderTopRightRadius: '10px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: '#0284c7',
-                    color: '#ffffff',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Target size={20} />
+                  <Target size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
                     {editingTarget ? 'Edit Customer Target & Ranges' : 'New Customer Target & Ranges'}
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b' }}>
                     Configure sales target milestones and tiered discount rewards
                   </p>
                 </div>
@@ -1249,16 +1273,16 @@ export default function CustomerTargetsTab({
                   padding: '4px',
                 }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveTarget} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={handleSaveTarget} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Row 1: Target Name & Code */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Name / Promotion Title *
                   </label>
                   <input
@@ -1269,17 +1293,20 @@ export default function CustomerTargetsTab({
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
-                      fontSize: '0.86rem',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Code (Auto if blank)
                   </label>
                   <input
@@ -1289,25 +1316,28 @@ export default function CustomerTargetsTab({
                     onChange={(e) => setFormData({ ...formData, targetCode: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
-                      fontSize: '0.86rem',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontFamily: 'monospace',
                     }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
                   />
                 </div>
               </div>
 
               {/* Row 2: Target Scope Selection */}
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   Target Scope (Who does this target apply to?)
                 </label>
-                <div style={{ display: 'flex', gap: '18px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', cursor: 'pointer', color: '#0f172a' }}>
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1316,7 +1346,7 @@ export default function CustomerTargetsTab({
                     />
                     Specific Customer
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', cursor: 'pointer', color: '#0f172a' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1325,7 +1355,7 @@ export default function CustomerTargetsTab({
                     />
                     Customer Group
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', cursor: 'pointer', color: '#0f172a' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1338,7 +1368,7 @@ export default function CustomerTargetsTab({
 
                 {formData.scopeType === 'CUSTOMER' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
                       Select Customer *
                     </label>
                     <select
@@ -1347,11 +1377,12 @@ export default function CustomerTargetsTab({
                       required={formData.scopeType === 'CUSTOMER'}
                       style={{
                         width: '100%',
-                        padding: '9px 12px',
-                        fontSize: '0.85rem',
-                        borderRadius: '8px',
+                        height: '34px',
+                        padding: '0 10px',
+                        fontSize: '0.82rem',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        background: '#ffffff',
+                        backgroundColor: '#ffffff',
                       }}
                     >
                       <option value="">-- Choose Customer --</option>
@@ -1366,7 +1397,7 @@ export default function CustomerTargetsTab({
 
                 {formData.scopeType === 'GROUP' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
                       Select Customer Group *
                     </label>
                     <select
@@ -1375,11 +1406,12 @@ export default function CustomerTargetsTab({
                       required={formData.scopeType === 'GROUP'}
                       style={{
                         width: '100%',
-                        padding: '9px 12px',
-                        fontSize: '0.85rem',
-                        borderRadius: '8px',
+                        height: '34px',
+                        padding: '0 10px',
+                        fontSize: '0.82rem',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        background: '#ffffff',
+                        backgroundColor: '#ffffff',
                       }}
                     >
                       <option value="">-- Choose Customer Group --</option>
@@ -1394,9 +1426,9 @@ export default function CustomerTargetsTab({
               </div>
 
               {/* Row 3: Assigned Salesman & Target Goal */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Assigned Sales Rep / Salesman (Optional)
                   </label>
                   <select
@@ -1404,11 +1436,12 @@ export default function CustomerTargetsTab({
                     onChange={(e) => setFormData({ ...formData, salesmanId: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
-                      fontSize: '0.85rem',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
-                      background: '#ffffff',
+                      backgroundColor: '#ffffff',
                     }}
                   >
                     <option value="">-- No Specific Sales Rep --</option>
@@ -1421,7 +1454,7 @@ export default function CustomerTargetsTab({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Overall Target Amount (Rs.) *
                   </label>
                   <input
@@ -1434,14 +1467,18 @@ export default function CustomerTargetsTab({
                     onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '9px 12px',
-                      fontSize: '0.86rem',
-                      borderRadius: '8px',
+                      height: '34px',
+                      padding: '0 10px',
+                      fontSize: '0.82rem',
+                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: 700,
+                      fontFamily: 'monospace',
                     }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
                   />
                 </div>
               </div>
@@ -1449,21 +1486,22 @@ export default function CustomerTargetsTab({
               {/* Row 4: Date Range & Quick Presets */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Period Dates *
                   </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     <button
                       type="button"
                       onClick={() => setDatePreset('thisMonth')}
                       style={{
-                        background: '#f1f5f9',
+                        backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
                         padding: '2px 8px',
                         fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
+                        fontWeight: 500,
                       }}
                     >
                       This Month
@@ -1472,13 +1510,14 @@ export default function CustomerTargetsTab({
                       type="button"
                       onClick={() => setDatePreset('nextQuarter')}
                       style={{
-                        background: '#f1f5f9',
+                        backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
                         padding: '2px 8px',
                         fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
+                        fontWeight: 500,
                       }}
                     >
                       Quarterly (90 Days)
@@ -1487,13 +1526,14 @@ export default function CustomerTargetsTab({
                       type="button"
                       onClick={() => setDatePreset('thisYear')}
                       style={{
-                        background: '#f1f5f9',
+                        backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
                         padding: '2px 8px',
                         fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
+                        fontWeight: 500,
                       }}
                     >
                       Full Year
@@ -1501,9 +1541,9 @@ export default function CustomerTargetsTab({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Start Date:</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Start Date:</span>
                     <input
                       type="date"
                       required
@@ -1511,16 +1551,18 @@ export default function CustomerTargetsTab({
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                       style={{
                         width: '100%',
-                        padding: '8px 12px',
-                        fontSize: '0.85rem',
-                        borderRadius: '8px',
+                        height: '34px',
+                        padding: '0 10px',
+                        fontSize: '0.82rem',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         marginTop: '3px',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>End Date:</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>End Date:</span>
                     <input
                       type="date"
                       required
@@ -1528,11 +1570,13 @@ export default function CustomerTargetsTab({
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                       style={{
                         width: '100%',
-                        padding: '8px 12px',
-                        fontSize: '0.85rem',
-                        borderRadius: '8px',
+                        height: '34px',
+                        padding: '0 10px',
+                        fontSize: '0.82rem',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         marginTop: '3px',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
@@ -1544,96 +1588,96 @@ export default function CustomerTargetsTab({
                  ───────────────────────────────────────────────────────── */}
               <div
                 style={{
-                  background: '#f8fafc',
-                  padding: '16px',
-                  borderRadius: '12px',
+                  backgroundColor: '#f8fafc',
+                  padding: '14px',
+                  borderRadius: '8px',
                   border: '1px solid #e2e8f0',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: '10px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
                       Range Slabs & Progressive Discount Tiers
                     </h4>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#64748b' }}>
                       When customer purchases reach each range, the unlocked discount applies automatically
                     </p>
                   </div>
 
                   {/* Preset Buttons */}
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset('standard3')}
                       style={{
-                        padding: '3px 8px',
+                        padding: '2px 8px',
                         fontSize: '0.72rem',
                         fontWeight: 600,
-                        background: '#e0f2fe',
+                        backgroundColor: '#e0f2fe',
                         color: '#0369a1',
                         border: '1px solid #bae6fd',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
-                      ⚡ 3-Tier (3%, 5%, 8%)
+                      3-Tier (3%, 5%, 8%)
                     </button>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset('executive4')}
                       style={{
-                        padding: '3px 8px',
+                        padding: '2px 8px',
                         fontSize: '0.72rem',
                         fontWeight: 600,
-                        background: '#fef3c7',
+                        backgroundColor: '#fef3c7',
                         color: '#b45309',
                         border: '1px solid #fde68a',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
-                      👑 4-Tier (2%, 5%, 8%, 12%)
+                      4-Tier (2%, 5%, 8%, 12%)
                     </button>
                     <button
                       type="button"
                       onClick={() => handleApplyPreset('booster')}
                       style={{
-                        padding: '3px 8px',
+                        padding: '2px 8px',
                         fontSize: '0.72rem',
                         fontWeight: 600,
-                        background: '#f3e8ff',
+                        backgroundColor: '#f3e8ff',
                         color: '#7e22ce',
                         border: '1px solid #e9d5ff',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
-                      🚀 Volume (5%, 10%)
+                      Volume (5%, 10%)
                     </button>
                   </div>
                 </div>
 
                 {/* Tiers List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {formData.tiers.map((tier, idx) => (
                     <div
                       key={idx}
                       style={{
-                        background: '#ffffff',
-                        padding: '10px 12px',
-                        borderRadius: '8px',
+                        backgroundColor: '#ffffff',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         display: 'grid',
                         gridTemplateColumns: '1.2fr 1fr 1fr 1fr 1.5fr auto',
-                        gap: '8px',
+                        gap: '6px',
                         alignItems: 'center',
                       }}
                     >
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Tier Name:</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Tier Name:</span>
                         <input
                           type="text"
                           value={tier.tierName}
@@ -1641,16 +1685,18 @@ export default function CustomerTargetsTab({
                           placeholder="e.g. Silver Tier"
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '0.8rem',
-                            borderRadius: '6px',
+                            height: '30px',
+                            padding: '0 6px',
+                            fontSize: '0.78rem',
+                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
+                            boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Min Spend (Rs.):</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Min Spend (Rs.):</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1660,17 +1706,20 @@ export default function CustomerTargetsTab({
                           placeholder="0"
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '0.8rem',
-                            borderRadius: '6px',
+                            height: '30px',
+                            padding: '0 6px',
+                            fontSize: '0.78rem',
+                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             fontWeight: 600,
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Max Spend (Rs.):</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Max Spend (Rs.):</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1680,16 +1729,19 @@ export default function CustomerTargetsTab({
                           placeholder="Unlimited"
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '0.8rem',
-                            borderRadius: '6px',
+                            height: '30px',
+                            padding: '0 6px',
+                            fontSize: '0.78rem',
+                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Discount (%):</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Discount (%):</span>
                         <input
                           type="number"
                           step="0.1"
@@ -1700,18 +1752,21 @@ export default function CustomerTargetsTab({
                           placeholder="0"
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '0.8rem',
-                            borderRadius: '6px',
+                            height: '30px',
+                            padding: '0 6px',
+                            fontSize: '0.78rem',
+                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             fontWeight: 700,
                             color: '#0284c7',
+                            fontFamily: 'monospace',
+                            boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>Reward Note:</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Reward Note:</span>
                         <input
                           type="text"
                           value={tier.rewardDescription}
@@ -1719,15 +1774,17 @@ export default function CustomerTargetsTab({
                           placeholder="e.g. 5% off POS orders"
                           style={{
                             width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '0.8rem',
-                            borderRadius: '6px',
+                            height: '30px',
+                            padding: '0 6px',
+                            fontSize: '0.78rem',
+                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
+                            boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
-                      <div style={{ paddingTop: '14px' }}>
+                      <div style={{ paddingTop: '12px' }}>
                         <button
                           type="button"
                           onClick={() => handleRemoveTier(idx)}
@@ -1740,7 +1797,7 @@ export default function CustomerTargetsTab({
                           }}
                           title="Remove tier"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -1754,32 +1811,32 @@ export default function CustomerTargetsTab({
                     alignSelf: 'flex-start',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    fontSize: '0.78rem',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    fontSize: '0.76rem',
                     fontWeight: 600,
                     color: '#0284c7',
-                    background: '#ffffff',
+                    backgroundColor: '#ffffff',
                     border: '1px dashed #0284c7',
-                    borderRadius: '6px',
+                    borderRadius: '4px',
                     cursor: 'pointer',
-                    marginTop: '4px',
+                    marginTop: '2px',
                   }}
                 >
-                  <Plus size={14} /> Add Another Range Tier
+                  <Plus size={13} /> Add Another Range Tier
                 </button>
               </div>
 
-              {/* Status toggle & Notes */}
+              {/* Status toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
                   type="checkbox"
                   id="isActiveTarget"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  style={{ width: '15px', height: '15px', cursor: 'pointer' }}
                 />
-                <label htmlFor="isActiveTarget" style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                <label htmlFor="isActiveTarget" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
                   Target is Active and available in POS
                 </label>
               </div>
@@ -1789,7 +1846,7 @@ export default function CustomerTargetsTab({
                 style={{
                   display: 'flex',
                   justifyContent: 'flex-end',
-                  gap: '10px',
+                  gap: '8px',
                   paddingTop: '12px',
                   borderTop: '1px solid #e2e8f0',
                 }}
@@ -1798,12 +1855,13 @@ export default function CustomerTargetsTab({
                   type="button"
                   onClick={() => setShowModal(false)}
                   style={{
-                    padding: '9px 18px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    borderRadius: '8px',
+                    height: '34px',
+                    padding: '0 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    background: '#ffffff',
+                    backgroundColor: '#ffffff',
                     color: '#475569',
                     cursor: 'pointer',
                   }}
@@ -1814,21 +1872,22 @@ export default function CustomerTargetsTab({
                   type="submit"
                   disabled={saving}
                   style={{
-                    padding: '9px 22px',
-                    fontSize: '0.86rem',
-                    fontWeight: 700,
-                    borderRadius: '8px',
+                    height: '34px',
+                    padding: '0 18px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    borderRadius: '6px',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    backgroundColor: '#0284c7',
                     color: '#ffffff',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+                    gap: '5px',
+                    boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
                   }}
                 >
-                  {saving ? <RefreshCw size={15} className="animate-spin" /> : <Check size={16} />}
+                  {saving ? <RefreshCw size={13} className="spin" /> : <Check size={14} />}
                   <span>{editingTarget ? 'Update Target & Ranges' : 'Save Range Target'}</span>
                 </button>
               </div>
@@ -1838,15 +1897,15 @@ export default function CustomerTargetsTab({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          6. VIEW DETAIL MODAL
+          4. VIEW DETAIL MODAL
          ───────────────────────────────────────────────────────────── */}
       {selectedTargetDetail && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(3px)',
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(2px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1860,29 +1919,32 @@ export default function CustomerTargetsTab({
           <div
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: '16px',
-              maxWidth: '680px',
+              borderRadius: '10px',
+              maxWidth: '640px',
               width: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
               display: 'flex',
               flexDirection: 'column',
+              border: '1px solid #cbd5e1',
             }}
           >
             <div
               style={{
-                padding: '16px 20px',
+                padding: '14px 18px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: '#f8fafc',
+                backgroundColor: '#f8fafc',
+                borderTopLeftRadius: '10px',
+                borderTopRightRadius: '10px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Target size={20} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+                <Target size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
                   Target Progress: {selectedTargetDetail.name}
                 </h3>
               </div>
@@ -1891,49 +1953,61 @@ export default function CustomerTargetsTab({
                 onClick={() => setSelectedTargetDetail(null)}
                 style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Achievement Summary Card */}
+            <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Achievement Summary Card (Matches Customer History KPI card) */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  color: '#ffffff',
-                  padding: '18px 20px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '12px',
                   alignItems: 'center',
                 }}
               >
-                <div>
-                  <div style={{ fontSize: '0.78rem', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Sales Achieved in Period
+                <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Sales Achieved
                   </div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', marginTop: '3px' }}>
                     Rs. {Number(selectedTargetDetail.currentAchievedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '4px' }}>
-                    Target Goal: Rs. {Number(selectedTargetDetail.targetAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} ({selectedTargetDetail.achievementPercentage}%)
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.78rem', opacity: 0.9 }}>Unlocked Discount</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fef08a' }}>
+                <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Target Goal
+                  </div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: '#0284c7', marginTop: '3px' }}>
+                    Rs. {Number(selectedTargetDetail.targetAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', fontFamily: 'monospace' }}>
+                    {selectedTargetDetail.achievementPercentage}% of goal
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Unlocked Discount
+                  </div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace', color: '#16a34a', marginTop: '3px' }}>
                     {selectedTargetDetail.currentDiscountPercentage > 0 ? `${selectedTargetDetail.currentDiscountPercentage}%` : '0%'}
                   </div>
-                  <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>
-                    {selectedTargetDetail.currentAchievedTier ? selectedTargetDetail.currentAchievedTier.tierName : 'Base (No discount)'}
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                    {selectedTargetDetail.currentAchievedTier ? selectedTargetDetail.currentAchievedTier.tierName : 'Base tier'}
                   </div>
                 </div>
               </div>
 
               {/* Slabs Breakdown */}
               <div>
-                <h4 style={{ margin: '0 0 8px', fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '0.76rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Range Slabs & Unlocking Status
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1941,25 +2015,25 @@ export default function CustomerTargetsTab({
                     <div
                       key={tr.id}
                       style={{
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        border: tr.isAchieved ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                        background: tr.isAchieved ? '#f0fdf4' : '#fafafa',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: tr.isAchieved ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                        backgroundColor: tr.isAchieved ? '#f0fdf4' : '#f8fafc',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.84rem', color: tr.isAchieved ? '#15803d' : '#334155' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.82rem', color: tr.isAchieved ? '#15803d' : '#0f172a' }}>
                           {tr.tierName}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
                           Range: Rs. {Number(tr.minAmount).toLocaleString()} - {tr.maxAmount ? `Rs. ${Number(tr.maxAmount).toLocaleString()}` : 'Unlimited'}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: tr.isAchieved ? '#16a34a' : '#64748b' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.84rem', fontFamily: 'monospace', color: tr.isAchieved ? '#16a34a' : '#475569' }}>
                           {tr.discountPercentage}% Discount
                         </div>
                         <span
@@ -1977,18 +2051,20 @@ export default function CustomerTargetsTab({
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', paddingTop: '6px' }}>
                 <button
                   type="button"
                   onClick={() => setSelectedTargetDetail(null)}
                   style={{
-                    padding: '8px 16px',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    borderRadius: '8px',
+                    height: '32px',
+                    padding: '0 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    background: '#ffffff',
+                    backgroundColor: '#ffffff',
                     cursor: 'pointer',
+                    color: '#334155',
                   }}
                 >
                   Close

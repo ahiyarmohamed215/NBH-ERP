@@ -701,6 +701,7 @@ aside *:active,
 
 /* Print Optimization */
 @media print {
+
   .glass-sidebar,
   .erp-topbar,
   .btn,
@@ -711,7 +712,8 @@ aside *:active,
     display: none !important;
   }
 
-  body, html {
+  body,
+  html {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 11pt !important;
