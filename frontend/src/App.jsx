@@ -17,7 +17,7 @@ import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
-import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, ShoppingCart, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, ShoppingCart, CreditCard } from 'lucide-react';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -442,8 +442,8 @@ export default function App() {
         <aside
           className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
           style={{
-            width: isSidebarCollapsed ? '64px' : '235px',
-            minWidth: isSidebarCollapsed ? '64px' : '235px',
+            width: isSidebarCollapsed ? '56px' : '205px',
+            minWidth: isSidebarCollapsed ? '56px' : '205px',
             height: '100vh',
             maxHeight: '100vh',
             position: 'sticky',
@@ -456,15 +456,15 @@ export default function App() {
             borderRight: '1px solid #e2e8f0',
           }}
         >
-          <div style={{ padding: isSidebarCollapsed ? '16px 8px' : '16px 14px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: isSidebarCollapsed ? '14px 6px' : '14px 10px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {/* Logo & Brand Header */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                padding: isSidebarCollapsed ? '0' : '4px 6px',
-                marginBottom: '20px',
+                padding: isSidebarCollapsed ? '0' : '2px 4px',
+                marginBottom: isSidebarCollapsed ? '12px' : '16px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -480,14 +480,15 @@ export default function App() {
                     justifyContent: 'center',
                     flexShrink: 0,
                     cursor: isSidebarCollapsed ? 'pointer' : 'default',
+                    transition: 'transform 0.15s ease',
                   }}
                   onClick={isSidebarCollapsed ? toggleSidebar : undefined}
-                  title="NBH ERP"
+                  title={isSidebarCollapsed ? 'Click to expand sidebar (Ctrl+B)' : 'NBH ERP'}
                 >
                   <Package size={17} />
                 </div>
                 {!isSidebarCollapsed && (
-                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
                     NBH ERP
                   </div>
                 )}
@@ -518,32 +519,6 @@ export default function App() {
               )}
             </div>
 
-            {/* When collapsed, show small expand button right below logo */}
-            {isSidebarCollapsed && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-                <button
-                  type="button"
-                  onClick={toggleSidebar}
-                  title="Expand Sidebar (Ctrl+B)"
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    padding: '5px',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0284c7')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
-                >
-                  <PanelLeftOpen size={14} />
-                </button>
-              </div>
-            )}
-
             {/* Standard Navigation Buttons */}
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {accessibleModules.map((mod) => {
@@ -563,13 +538,13 @@ export default function App() {
                       alignItems: 'center',
                       justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
                       width: '100%',
-                      padding: isSidebarCollapsed ? '10px 0' : '9px 12px',
+                      padding: isSidebarCollapsed ? '8px 0' : '8px 10px',
                       borderRadius: '8px',
                       border: 'none',
                       backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
                       color: isCurrentModule ? '#0284c7' : '#475569',
                       fontWeight: isCurrentModule ? 600 : 500,
-                      fontSize: '0.9rem',
+                      fontSize: '0.86rem',
                       cursor: 'pointer',
                       position: 'relative',
                       textAlign: 'left',
@@ -581,9 +556,9 @@ export default function App() {
                       if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
                       <Icon
-                        size={18}
+                        size={17}
                         color={isCurrentModule ? '#0284c7' : '#64748b'}
                         style={{ flexShrink: 0 }}
                       />

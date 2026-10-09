@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Printer, FileDown, RefreshCw, Eye, Edit2, History } from 'lucide-react';
+import { Download, Printer, RefreshCw, Eye, Edit2, History } from 'lucide-react';
 
 /**
  * Reusable Global Toolbar Action Buttons (Export CSV, Print A4, Download PDF, Refresh)
@@ -80,20 +80,6 @@ export function ToolbarActions({
         </button>
       )}
 
-      {onDownloadPdf && (
-        <button
-          type="button"
-          onClick={onDownloadPdf}
-          disabled={loading}
-          style={buttonStyle}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          title={pdfTitle}
-        >
-          <FileDown size={14} />
-        </button>
-      )}
-
       {onRefresh && (
         <button
           type="button"
@@ -167,28 +153,6 @@ export function TableRowActions({
           title={printTitle}
         >
           <Printer size={13} />
-        </button>
-      )}
-
-      {onDownloadPdf && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDownloadPdf();
-          }}
-          style={baseButtonStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f1f5f9';
-            e.currentTarget.style.color = '#0f172a';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.color = '#334155';
-          }}
-          title={pdfTitle}
-        >
-          <FileDown size={13} />
         </button>
       )}
 

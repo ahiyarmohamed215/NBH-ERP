@@ -90,5 +90,10 @@ public class DocumentSequenceService {
     public String generateAdvanceVoucherNumber() {
         return getNextNumber("ADV");
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String generateTargetNumber() {
+        return getNextNumber("TGT");
+    }
 }
 

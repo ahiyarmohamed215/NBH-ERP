@@ -38,7 +38,6 @@ import {
   ListFilter,
   Upload,
   Download,
-  FileDown,
   ArrowLeft,
   History,
   Clock,
@@ -50,7 +49,9 @@ import {
   CreditCard,
   ChevronRight,
   Eye,
+  Target,
 } from 'lucide-react';
+import CustomerTargetsTab from './CustomerTargetsTab';
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { user } = useAuth();
@@ -59,6 +60,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   const [activeTab, setActiveTab] = useState(() => {
     if (activeSubTab === 'groups' || activeSubTab === 'routes') return 'groups';
+    if (activeSubTab === 'targets' || activeSubTab === 'ranges') return 'targets';
     if (activeSubTab === 'history') return 'history';
     return 'list';
   });
@@ -154,9 +156,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       setActiveTab(
         activeSubTab === 'groups' || activeSubTab === 'routes'
           ? 'groups'
-          : activeSubTab === 'history'
-            ? 'history'
-            : 'list'
+          : activeSubTab === 'targets' || activeSubTab === 'ranges'
+            ? 'targets'
+            : activeSubTab === 'history'
+              ? 'history'
+              : 'list'
       );
     }
   }, [activeSubTab]);
@@ -1251,6 +1255,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
         <button
           type="button"
+          onClick={() => handleTabChange('targets')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
+            padding: '10px 4px',
+            fontSize: '0.92rem',
+            fontWeight: activeTab === 'targets' ? 700 : 500,
+            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '-1px',
+          }}
+        >
+          <Target size={16} /> Range & Targets
+        </button>
+
+        <button
+          type="button"
           onClick={() => handleTabChange('history')}
           style={{
             background: 'none',
@@ -1561,41 +1586,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <Printer size={14} />
               </button>
 
-              {/* Download Customer Directory PDF A4 (Icon Only) */}
-              <button
-                type="button"
-                onClick={() => pdfApi.downloadCustomerList()}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Download Customer Directory PDF (A4)"
-              >
-                <FileDown size={14} />
-              </button>
-
               {/* Refresh Customer Records (Icon Only) */}
               <button
                 type="button"
@@ -1864,39 +1854,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 title="Print Customer Statement (A4)"
                               >
                                 <Printer size={13} />
-                              </button>
-
-                              {/* Download Customer PDF A4 */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  pdfApi.downloadCustomer(c.id, c.name);
-                                }}
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  background: '#ffffff',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  color: '#334155',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#f1f5f9';
-                                  e.currentTarget.style.color = '#0f172a';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#ffffff';
-                                  e.currentTarget.style.color = '#334155';
-                                }}
-                                title="Download Customer PDF (A4)"
-                              >
-                                <FileDown size={13} />
                               </button>
 
                               {/* History */}
@@ -2222,42 +2179,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <Printer size={14} />
               </button>
 
-              {/* Download Groups Directory PDF A4 (Icon Only) */}
-              <button
-                type="button"
-                onClick={handlePrintCustomerGroupsReport}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  minWidth: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Download Customer Groups PDF (A4)"
-              >
-                <FileDown size={14} />
-              </button>
-
               {/* Refresh Groups (Icon Only) */}
               <button
                 type="button"
@@ -2519,42 +2440,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           >
                             <Printer size={13} />
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              pdfApi.downloadCustomerGroup(route.id, route.name);
-                            }}
-                            style={{
-                              width: '30px',
-                              height: '30px',
-                              minWidth: '30px',
-                              borderRadius: '6px',
-                              border: '1px solid #e2e8f0',
-                              backgroundColor: '#ffffff',
-                              color: '#334155',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              padding: 0,
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc';
-                              e.currentTarget.style.borderColor = '#94a3b8';
-                              e.currentTarget.style.color = '#0f172a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#ffffff';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.color = '#334155';
-                            }}
-                            title="Download Customer Group PDF (A4)"
-                          >
-                            <FileDown size={13} />
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -2717,41 +2602,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       title="Print Customer Group (A4)"
                     >
                       <Printer size={14} />
-                    </button>
-
-                    {/* Download Customer Group PDF A4 */}
-                    <button
-                      type="button"
-                      onClick={() => pdfApi.downloadCustomerGroup(selectedRoute?.id, selectedRoute?.name)}
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        minWidth: '34px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        color: '#334155',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        padding: 0,
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#94a3b8';
-                        e.currentTarget.style.color = '#0f172a';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.color = '#334155';
-                      }}
-                      title="Download Customer Group PDF (A4)"
-                    >
-                      <FileDown size={14} />
                     </button>
 
                     <button
@@ -3885,7 +3735,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                   >
-                    <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Update Customer Group'}
+                    <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Save Changes'}
                   </button>
                 </div>
               </>
@@ -3894,6 +3744,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         </div>
       )}
 
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB: Customer Range & Targets                                 */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'targets' && (
+        <CustomerTargetsTab
+          customers={customers}
+          salesmen={salesmen}
+          routes={routes}
+          canEdit={canEditCustomer}
+          addToast={addToast}
+        />
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 3: Customer History (Dedicated Multi-Table & Search)      */}
@@ -4710,47 +4573,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             title="Print Customer Ledger History (A4)"
                           >
                             <Printer size={13} />
-                          </button>
-
-                          {/* Download Customer Ledger History PDF A4 (Icon Only) */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (selectedHistoryCustomer?.id) {
-                                pdfApi.downloadCustomerHistory(selectedHistoryCustomer.id);
-                              } else {
-                                addToast('Please select a customer first', 'warning');
-                              }
-                            }}
-                            style={{
-                              height: '32px',
-                              width: '32px',
-                              minWidth: '32px',
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              padding: 0,
-                              color: '#334155',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc';
-                              e.currentTarget.style.borderColor = '#94a3b8';
-                              e.currentTarget.style.color = '#0f172a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#ffffff';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.color = '#334155';
-                            }}
-                            title="Download Customer Ledger PDF (A4)"
-                          >
-                            <FileDown size={13} />
                           </button>
 
                           {/* Refresh Customer History (Icon Only) */}

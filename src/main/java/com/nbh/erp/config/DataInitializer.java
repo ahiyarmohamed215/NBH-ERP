@@ -118,6 +118,8 @@ public class DataInitializer implements ApplicationRunner {
                 new PermItem("SUPPLIER", "SUPPLIER_MANAGE", "Create and manage suppliers"),
                 new PermItem("CUSTOMER", "CUSTOMER_VIEW", "View customer master and credit limits"),
                 new PermItem("CUSTOMER", "CUSTOMER_MANAGE", "Create, edit, and manage customers"),
+                new PermItem("CUSTOMER", "CUSTOMER_TARGET_VIEW", "View customer sales targets and discount ranges"),
+                new PermItem("CUSTOMER", "CUSTOMER_TARGET_MANAGE", "Create and configure customer sales targets and discount ranges"),
                 new PermItem("INVENTORY", "INVENTORY_VIEW", "View stock balances across warehouses"),
                 new PermItem("INVENTORY", "INVENTORY_MANAGE", "Manage inventory movements and stocks"),
                 new PermItem("INVENTORY", "INVENTORY_ADJUST", "Perform and approve stock count adjustments"),

@@ -69,6 +69,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate BETWEEN :startDate AND :endDate")
     BigDecimal getTotalSalesBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
+    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.customer.id = :customerId AND i.status IN ('COMPLETED','PAID','PARTIAL') AND (:startDate IS NULL OR i.invoiceDate >= :startDate) AND (:endDate IS NULL OR i.invoiceDate <= :endDate)")
+    BigDecimal getCustomerSalesBetween(@Param("customerId") Long customerId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COUNT(i) FROM Invoice i WHERE i.customer.id = :customerId AND i.status IN ('COMPLETED','PAID','PARTIAL') AND (:startDate IS NULL OR i.invoiceDate >= :startDate) AND (:endDate IS NULL OR i.invoiceDate <= :endDate)")
+    long countCustomerInvoicesBetween(@Param("customerId") Long customerId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COALESCE(SUM(i.netTotal), 0) FROM Invoice i WHERE i.salesRep.id = :salesmanId AND i.status IN ('COMPLETED','PAID','PARTIAL') AND (:startDate IS NULL OR i.invoiceDate >= :startDate) AND (:endDate IS NULL OR i.invoiceDate <= :endDate)")
+    BigDecimal getSalesmanSalesBetween(@Param("salesmanId") Long salesmanId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     @Query("SELECT COUNT(i) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate = :date")
     long countCompletedInvoicesForDate(@Param("date") LocalDate date);
 

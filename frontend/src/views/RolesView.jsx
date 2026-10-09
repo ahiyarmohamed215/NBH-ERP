@@ -1,3 +1,4 @@
+import './EmployeeDialogs.css';
 import React, { useState, useEffect } from 'react';
 import { roleApi, broadcastDataChange } from '../api/apiClient';
 import { useDataSync } from '../hooks/useDataSync';
@@ -649,16 +650,14 @@ export default function RolesView({ onRoleChange }) {
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
-            className="glass-modal"
+            className="glass-modal role-view-dialog" role="dialog" aria-modal="true" aria-label="Role details"
             style={{
               width: '100%',
-              maxWidth: '720px',
-              padding: '24px 28px',
+              padding: '18px 22px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
-              maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -796,6 +795,7 @@ export default function RolesView({ onRoleChange }) {
 
             {/* Scrollable Permissions List */}
             <div
+              className="role-permissions-grid"
               style={{
                 flex: 1,
                 minHeight: 0,
@@ -811,7 +811,7 @@ export default function RolesView({ onRoleChange }) {
                   <div
                     key={mod}
                     style={{
-                      marginBottom: '16px',
+                      marginBottom: 0,
                       backgroundColor: '#ffffff',
                       border: '1px solid #e2e8f0',
                       borderRadius: '8px',
@@ -836,7 +836,7 @@ export default function RolesView({ onRoleChange }) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '8px' }}>
                       {assignedInMod.map((p) => (
                         <div
                           key={p.name}
@@ -909,11 +909,9 @@ export default function RolesView({ onRoleChange }) {
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
-            className="glass-modal"
+            className="glass-modal role-edit-dialog" role="dialog" aria-modal="true" aria-label={editingRole ? 'Edit role' : 'Create role'}
             style={{
               width: '100%',
-              maxWidth: '920px',
-              maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
               backgroundColor: '#ffffff',
@@ -941,8 +939,8 @@ export default function RolesView({ onRoleChange }) {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ padding: '20px 24px', overflowY: 'auto', maxHeight: 'calc(90vh - 140px)' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="role-edit-body" style={{ padding: '18px 22px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                     ROLE NAME {!editingRole && '*'}
@@ -1006,7 +1004,7 @@ export default function RolesView({ onRoleChange }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="role-permissions-grid">
                     {Object.entries(permissionsByModule).map(([moduleName, perms]) => {
                       const modulePermNames = perms.map((p) => p.name);
                       const allSelected = modulePermNames.every((name) => formData.permissions.includes(name));
@@ -1072,7 +1070,7 @@ export default function RolesView({ onRoleChange }) {
                             </button>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '8px' }}>
                             {perms.map((perm) => {
                               const isChecked = formData.permissions.includes(perm.name);
                               return (
@@ -1121,7 +1119,8 @@ export default function RolesView({ onRoleChange }) {
                 alignItems: 'center',
                 justifyContent: 'flex-end',
                 gap: '10px',
-                padding: '14px 24px',
+                padding: '12px 22px',
+                flexShrink: 0,
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#f8fafc',
               }}>

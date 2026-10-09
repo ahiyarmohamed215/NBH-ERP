@@ -8,6 +8,7 @@ import { printA4Report } from '../utils/printReport';
 import { ToolbarActions, TableRowActions } from '../components/ToolbarActions';
 import RoleSearchSelector from '../components/RoleSearchSelector';
 import RolesView from './RolesView';
+import './EmployeeDialogs.css';
 import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
@@ -1601,12 +1602,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
-            className="glass-modal"
+            className="glass-modal employee-dialog" role="dialog" aria-modal="true" aria-label={modalMode === 'add' ? 'Add New Employee' : 'Edit Employee'}
             style={{
               width: '100%',
-              maxWidth: '1080px',
-              height: 'min(760px, 92vh)',
-              maxHeight: 'min(760px, 92vh)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -1619,7 +1617,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Header */}
             <div
               style={{
-                padding: '16px 24px',
+                padding: '14px 22px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1667,11 +1665,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Split Form: Left side details, Right side role assignment */}
             <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div
+                className="employee-dialog-layout"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(330px, 0.85fr) minmax(490px, 1.4fr)',
                   gap: '20px',
-                  padding: '20px 24px',
+                  padding: '18px 22px',
                   overflowY: 'auto',
                   flex: 1,
                   minHeight: 0,
@@ -1679,15 +1676,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               >
                 {/* Left Side: Employee Information Card */}
                 <div
+                  className="employee-details-panel"
                   style={{
                     backgroundColor: '#f8fafc',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '18px',
+                    borderRadius: '8px',
+                    padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '14px',
-                    overflowY: 'auto',
                     minHeight: 0,
                   }}
                 >
@@ -1774,16 +1771,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
                 {/* Right Side: Role Assignment Card */}
                 <div
+                  className="employee-roles-panel"
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '18px',
+                    borderRadius: '8px',
+                    padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
                     minHeight: 0,
-                    overflow: 'hidden',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
@@ -1860,12 +1857,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
-            className="glass-modal"
+            className="glass-modal employee-dialog" role="dialog" aria-modal="true" aria-label={modalMode === 'add' ? 'Add New Employee' : 'Edit Employee'}
             style={{
               width: '100%',
-              maxWidth: '1080px',
-              height: 'min(760px, 92vh)',
-              maxHeight: 'min(760px, 92vh)',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e2e8f0',
@@ -1878,7 +1872,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Header */}
             <div
               style={{
-                padding: '16px 24px',
+                padding: '14px 22px',
                 borderBottom: '1px solid #e2e8f0',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1926,11 +1920,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Split Form: Left side details, Right side role assignment */}
             <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div
+                className="employee-dialog-layout"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(330px, 0.85fr) minmax(490px, 1.4fr)',
                   gap: '20px',
-                  padding: '20px 24px',
+                  padding: '18px 22px',
                   overflowY: 'auto',
                   flex: 1,
                   minHeight: 0,
@@ -1938,15 +1931,15 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               >
                 {/* Left Side: Employee Information Card */}
                 <div
+                  className="employee-details-panel"
                   style={{
                     backgroundColor: '#f8fafc',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '18px',
+                    borderRadius: '8px',
+                    padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '14px',
-                    overflowY: 'auto',
                     minHeight: 0,
                   }}
                 >
@@ -2040,16 +2033,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
                 {/* Right Side: Role Assignment Card (Splitted side-by-side like Customer Groups) */}
                 <div
+                  className="employee-roles-panel"
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '18px',
+                    borderRadius: '8px',
+                    padding: '16px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px',
                     minHeight: 0,
-                    overflow: 'hidden',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>

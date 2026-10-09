@@ -2548,7 +2548,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           <div
             style={{
               width: '100%',
-              maxWidth: '720px',
+              maxWidth: '1000px',
               backgroundColor: '#ffffff',
               borderRadius: '14px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05)',
@@ -2615,627 +2615,655 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveQuota} style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              {/* Product Selection with Search Bar */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                    Product <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  {quotaForm.productId && !editingQuota && (
-                    <button
-                      type="button"
-                      onClick={() => setQuotaForm((prev) => ({ ...prev, productId: '', allocatedQuantity: '' }))}
+            {/* Modal Form - Split Two Columns: Product Left, Assign Staff Right */}
+            <form
+              onSubmit={handleSaveQuota}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                minHeight: 0,
+                overflow: 'hidden',
+              }}
+            >
+              {(() => {
+                const selectedProd = productsList.find((p) => String(p.id) === String(quotaForm.productId));
+                const selectedUser = salesStaff.find((s) => String(s.id) === String(quotaForm.userId));
+                const avail = quotaForm.productId
+                  ? (selectedProductStock != null
+                      ? Number(selectedProductStock.availableStock ?? 0)
+                      : Number(getProductStockInfo(quotaForm.productId).available ?? 0))
+                  : 0;
+                const isOos = quotaForm.productId
+                  ? (selectedProductStock != null
+                      ? Boolean(selectedProductStock.outOfStock || avail <= 0)
+                      : avail <= 0)
+                  : false;
+                const unit = selectedProductStock?.unit || (quotaForm.productId ? getProductStockInfo(quotaForm.productId).unit : 'Units');
+                const allocVal = parseFloat(quotaForm.allocatedQuantity);
+                const isExceeding = !isNaN(allocVal) && allocVal > avail && !isOos;
+                const canSubmit = !savingQuota && quotaForm.productId && quotaForm.userId && !isOos && !isExceeding && allocVal > 0;
+                const staffInitials = ((selectedUser?.fullName || selectedUser?.username || 'U')[0] || 'U').toUpperCase();
+
+                return (
+                  <>
+                    {/* Split Two-Column Body */}
+                    <div
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0284c7',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: 0,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
+                        padding: '20px 24px',
+                        overflowY: 'auto',
+                        flex: 1,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                        gap: '20px',
+                        alignItems: 'start',
                       }}
                     >
-                      <ArrowRightLeft size={12} /> Change Product
-                    </button>
-                  )}
-                </div>
-
-                {quotaForm.productId ? (
-                  (() => {
-                    const selectedProd = productsList.find((p) => String(p.id) === String(quotaForm.productId));
-                    const avail = selectedProductStock != null
-                      ? Number(selectedProductStock.availableStock ?? 0)
-                      : Number(getProductStockInfo(quotaForm.productId).available ?? 0);
-                    const isOos = selectedProductStock != null
-                      ? Boolean(selectedProductStock.outOfStock || avail <= 0)
-                      : avail <= 0;
-                    const unit = selectedProductStock?.unit || getProductStockInfo(quotaForm.productId).unit || 'Units';
-
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {/* Selected Product Card */}
+                      {/* ======================================================== */}
+                      {/* COLUMN 1: PRODUCT SELECTION & QUANTITY ALLOCATION */}
+                      {/* ======================================================== */}
+                      <div
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                        }}
+                      >
+                        {/* Column Header */}
                         <div
                           style={{
-                            padding: '10px 14px',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '12px',
+                            paddingBottom: '10px',
+                            borderBottom: '1px solid #e2e8f0',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div
                               style={{
-                                width: '34px',
-                                height: '34px',
-                                borderRadius: '8px',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '7px',
                                 backgroundColor: '#e0f2fe',
                                 color: '#0284c7',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                flexShrink: 0,
                               }}
                             >
-                              <Package size={18} />
+                              <Package size={16} />
                             </div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
-                                  {selectedProd?.name || quotaForm.productId}
-                                </strong>
-                                <span
-                                  style={{
-                                    fontSize: '0.74rem',
-                                    padding: '1px 6px',
-                                    borderRadius: '4px',
-                                    backgroundColor: '#f1f5f9',
-                                    color: '#475569',
-                                    fontWeight: 600,
-                                    fontFamily: 'monospace',
-                                  }}
-                                >
-                                  {selectedProd?.sku || 'SKU'}
-                                </span>
-                                {selectedProd?.brandName && (
-                                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                                    • {selectedProd.brandName}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {!editingQuota && (
-                            <button
-                              type="button"
-                              onClick={() => setQuotaForm((prev) => ({ ...prev, productId: '', allocatedQuantity: '' }))}
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '0.76rem',
-                                fontWeight: 600,
-                                color: '#0284c7',
-                                backgroundColor: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                flexShrink: 0,
-                              }}
-                            >
-                              <ArrowRightLeft size={12} /> Change
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Stock Availability Banner */}
-                        {isOos ? (
-                          <div
-                            style={{
-                              padding: '10px 14px',
-                              backgroundColor: '#fef2f2',
-                              border: '1px solid #fecaca',
-                              borderRadius: '8px',
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: '10px',
-                            }}
-                          >
-                            <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#dc2626' }}>
-                                  Out of Stock
-                                </span>
-                                <span style={{ fontSize: '0.72rem', backgroundColor: '#fee2e2', color: '#991b1b', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                                  0 Available
-                                </span>
-                              </div>
-                              <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.4 }}>
-                                There is currently 0 available inventory stock for this product. You cannot allocate inventory until stock is received.
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+                                Product & Stock
+                              </h4>
+                              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                                Select product and set quantity limit
                               </p>
                             </div>
                           </div>
-                        ) : (
-                          <div
+                          <span
                             style={{
-                              padding: '8px 14px',
-                              backgroundColor: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
-                              borderRadius: '8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: '10px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              backgroundColor: quotaForm.productId ? '#dcfce7' : '#e0f2fe',
+                              color: quotaForm.productId ? '#15803d' : '#0369a1',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <CheckCircle size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
-                              <div>
-                                <span style={{ fontSize: '0.82rem', color: '#166534' }}>Available Stock: </span>
-                                <strong style={{ fontSize: '0.9rem', color: '#15803d', fontWeight: 700 }}>
-                                  {avail.toLocaleString()} {unit}
-                                </strong>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setQuotaForm((prev) => ({ ...prev, allocatedQuantity: String(avail) }))}
-                              title="Allocate all available inventory"
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                backgroundColor: '#dcfce7',
-                                color: '#15803d',
-                                border: '1px solid #86efac',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              Allocate Max ({avail})
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div>
-                    {/* Interactive Product Search Input */}
-                    <div style={{ position: 'relative' }}>
-                      <Search
-                        size={15}
-                        style={{
-                          position: 'absolute',
-                          left: '12px',
-                          top: '10px',
-                          color: '#94a3b8',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Search product by name, SKU, brand, category..."
-                        value={modalProductSearch}
-                        onChange={(e) => setModalProductSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: '36px',
-                          padding: '0 32px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          backgroundColor: '#ffffff',
-                          color: '#0f172a',
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#0284c7';
-                          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                      {modalProductSearch && (
-                        <button
-                          type="button"
-                          onClick={() => setModalProductSearch('')}
-                          style={{
-                            position: 'absolute',
-                            right: '10px',
-                            top: '9px',
-                            background: 'none',
-                            border: 'none',
-                            color: '#94a3b8',
-                            cursor: 'pointer',
-                            padding: '2px',
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Search Results List */}
-                    <div
-                      style={{
-                        marginTop: '6px',
-                        maxHeight: '190px',
-                        overflowY: 'auto',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        backgroundColor: '#ffffff',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
-                      }}
-                    >
-                      {filteredProductsForModal.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-                          No products found matching &quot;{modalProductSearch}&quot;
+                            {quotaForm.productId ? 'Selected' : 'Required *'}
+                          </span>
                         </div>
-                      ) : (
-                        filteredProductsForModal.map((p) => {
-                          const stock = getProductStockInfo(p.id);
-                          const isOos = stock.isOutOfStock;
-                          return (
-                            <div
-                              key={p.id}
-                              onClick={() => {
-                                setQuotaForm((prev) => ({ ...prev, productId: String(p.id), allocatedQuantity: '' }));
-                                setModalProductSearch('');
-                              }}
-                              style={{
-                                padding: '8px 12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                borderBottom: '1px solid #f1f5f9',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.1s ease',
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                            >
-                              <div style={{ minWidth: 0, paddingRight: '8px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a' }}>
-                                    {p.name}
-                                  </span>
-                                  <span
+
+                        {/* Product Selection */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                              Product <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            {quotaForm.productId && !editingQuota && (
+                              <button
+                                type="button"
+                                onClick={() => setQuotaForm((prev) => ({ ...prev, productId: '', allocatedQuantity: '' }))}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#0284c7',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <ArrowRightLeft size={12} /> Change Product
+                              </button>
+                            )}
+                          </div>
+
+                          {quotaForm.productId ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {/* Selected Product Card */}
+                              <div
+                                style={{
+                                  padding: '10px 12px',
+                                  backgroundColor: '#ffffff',
+                                  borderRadius: '8px',
+                                  border: '1px solid #cbd5e1',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '10px',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                  <div
                                     style={{
-                                      fontSize: '0.72rem',
-                                      padding: '1px 5px',
-                                      borderRadius: '4px',
-                                      backgroundColor: '#f1f5f9',
-                                      color: '#475569',
-                                      fontFamily: 'monospace',
+                                      width: '34px',
+                                      height: '34px',
+                                      borderRadius: '8px',
+                                      backgroundColor: '#e0f2fe',
+                                      color: '#0284c7',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
                                     }}
                                   >
-                                    {p.sku}
-                                  </span>
-                                  {p.brandName && (
-                                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>• {p.brandName}</span>
-                                  )}
+                                    <Package size={18} />
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                      <strong style={{ fontSize: '0.86rem', color: '#0f172a' }}>
+                                        {selectedProd?.name || quotaForm.productId}
+                                      </strong>
+                                      <span
+                                        style={{
+                                          fontSize: '0.72rem',
+                                          padding: '1px 6px',
+                                          borderRadius: '4px',
+                                          backgroundColor: '#f1f5f9',
+                                          color: '#475569',
+                                          fontWeight: 600,
+                                          fontFamily: 'monospace',
+                                        }}
+                                      >
+                                        {selectedProd?.sku || 'SKU'}
+                                      </span>
+                                      {selectedProd?.brandName && (
+                                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                          • {selectedProd.brandName}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
+                                {!editingQuota && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setQuotaForm((prev) => ({ ...prev, productId: '', allocatedQuantity: '' }))}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 600,
+                                      color: '#0284c7',
+                                      backgroundColor: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '5px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <ArrowRightLeft size={11} /> Change
+                                  </button>
+                                )}
                               </div>
-                              <div style={{ flexShrink: 0 }}>
-                                {isOos ? (
-                                  <span
+
+                              {/* Stock Availability Alert / Banner */}
+                              {isOos ? (
+                                <div
+                                  style={{
+                                    padding: '9px 12px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: '8px',
+                                  }}
+                                >
+                                  <AlertCircle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#dc2626' }}>
+                                        Out of Stock
+                                      </span>
+                                      <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#991b1b', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                        0 Available
+                                      </span>
+                                    </div>
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#991b1b', lineHeight: 1.4 }}>
+                                      No inventory available for allocation. Receive stock in Inventory first.
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    padding: '8px 12px',
+                                    backgroundColor: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '8px',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <CheckCircle size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                    <div>
+                                      <span style={{ fontSize: '0.78rem', color: '#166534' }}>Stock: </span>
+                                      <strong style={{ fontSize: '0.86rem', color: '#15803d', fontWeight: 700 }}>
+                                        {avail.toLocaleString()} {unit}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setQuotaForm((prev) => ({ ...prev, allocatedQuantity: String(avail) }))}
+                                    title="Allocate all available inventory"
                                     style={{
-                                      padding: '2px 8px',
-                                      borderRadius: '5px',
+                                      padding: '3px 8px',
                                       fontSize: '0.72rem',
                                       fontWeight: 700,
-                                      backgroundColor: '#fef2f2',
-                                      color: '#dc2626',
-                                      border: '1px solid #fecaca',
+                                      backgroundColor: '#dcfce7',
+                                      color: '#15803d',
+                                      border: '1px solid #86efac',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
                                     }}
                                   >
-                                    Out of Stock (0)
-                                  </span>
+                                    Allocate Max ({avail})
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              {/* Search Input */}
+                              <div style={{ position: 'relative' }}>
+                                <Search
+                                  size={14}
+                                  style={{
+                                    position: 'absolute',
+                                    left: '11px',
+                                    top: '11px',
+                                    color: '#94a3b8',
+                                    pointerEvents: 'none',
+                                  }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search by name, SKU, category..."
+                                  value={modalProductSearch}
+                                  onChange={(e) => setModalProductSearch(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    height: '36px',
+                                    padding: '0 30px 0 34px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.84rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0f172a',
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#0284c7';
+                                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                />
+                                {modalProductSearch && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setModalProductSearch('')}
+                                    style={{
+                                      position: 'absolute',
+                                      right: '8px',
+                                      top: '9px',
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#94a3b8',
+                                      cursor: 'pointer',
+                                      padding: '2px',
+                                    }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Search Results List */}
+                              <div
+                                style={{
+                                  marginTop: '6px',
+                                  maxHeight: '210px',
+                                  overflowY: 'auto',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#ffffff',
+                                }}
+                              >
+                                {filteredProductsForModal.length === 0 ? (
+                                  <div style={{ padding: '14px', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
+                                    No products found matching &quot;{modalProductSearch}&quot;
+                                  </div>
                                 ) : (
-                                  <span
-                                    style={{
-                                      padding: '2px 8px',
-                                      borderRadius: '5px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 700,
-                                      backgroundColor: '#f0fdf4',
-                                      color: '#16a34a',
-                                      border: '1px solid #bbf7d0',
-                                    }}
-                                  >
-                                    In Stock: {stock.available} {stock.unit}
-                                  </span>
+                                  filteredProductsForModal.map((p) => {
+                                    const stock = getProductStockInfo(p.id);
+                                    const isItemOos = stock.isOutOfStock;
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        onClick={() => {
+                                          setQuotaForm((prev) => ({ ...prev, productId: String(p.id), allocatedQuantity: '' }));
+                                          setModalProductSearch('');
+                                        }}
+                                        style={{
+                                          padding: '7px 10px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          borderBottom: '1px solid #f1f5f9',
+                                          cursor: 'pointer',
+                                          transition: 'background-color 0.1s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                      >
+                                        <div style={{ minWidth: 0, paddingRight: '8px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
+                                              {p.name}
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: '0.7rem',
+                                                padding: '1px 4px',
+                                                borderRadius: '3px',
+                                                backgroundColor: '#f1f5f9',
+                                                color: '#475569',
+                                                fontFamily: 'monospace',
+                                              }}
+                                            >
+                                              {p.sku}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div style={{ flexShrink: 0 }}>
+                                          {isItemOos ? (
+                                            <span
+                                              style={{
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                backgroundColor: '#fef2f2',
+                                                color: '#dc2626',
+                                                border: '1px solid #fecaca',
+                                              }}
+                                            >
+                                              0 Stock
+                                            </span>
+                                          ) : (
+                                            <span
+                                              style={{
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                backgroundColor: '#f0fdf4',
+                                                color: '#16a34a',
+                                                border: '1px solid #bbf7d0',
+                                              }}
+                                            >
+                                              {stock.available} {stock.unit}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })
                                 )}
                               </div>
                             </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                          )}
+                        </div>
 
-              {/* Staff Member Selection with Search Bar (POS-Only Staff) */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                      Staff Member <span style={{ color: '#ef4444' }}>*</span>
-                    </label>
-                    <span style={{ marginLeft: '8px', fontSize: '0.72rem', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                      POS Access Only
-                    </span>
-                  </div>
-                  {quotaForm.userId && !editingQuota && (
-                    <button
-                      type="button"
-                      onClick={() => setQuotaForm((prev) => ({ ...prev, userId: '' }))}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0284c7',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: 0,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <ArrowRightLeft size={12} /> Change Staff
-                    </button>
-                  )}
-                </div>
+                        {/* Allocated Quantity Input */}
+                        <div style={{ marginTop: 'auto', paddingTop: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                              Allocated Quantity <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            {quotaForm.productId && !isOos && avail > 0 && (
+                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                Max: <strong style={{ color: '#0f172a' }}>{avail.toLocaleString()}</strong> {unit}
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="1"
+                            min="1"
+                            max={isOos ? 0 : avail}
+                            disabled={isOos || !quotaForm.productId}
+                            placeholder={
+                              !quotaForm.productId
+                                ? 'Select product first...'
+                                : isOos
+                                ? '0 (Out of Stock)'
+                                : `Enter quantity (1 to ${avail})`
+                            }
+                            value={quotaForm.allocatedQuantity}
+                            onChange={(e) => setQuotaForm({ ...quotaForm, allocatedQuantity: e.target.value })}
+                            style={{
+                              width: '100%',
+                              height: '38px',
+                              padding: '0 12px',
+                              borderRadius: '7px',
+                              border: `1px solid ${
+                                isOos
+                                  ? '#fca5a5'
+                                  : isExceeding
+                                  ? '#ef4444'
+                                  : '#cbd5e1'
+                              }`,
+                              fontSize: '0.92rem',
+                              fontWeight: 700,
+                              color: isOos ? '#dc2626' : '#0f172a',
+                              backgroundColor: isOos || !quotaForm.productId ? '#ffffff' : '#ffffff',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                            onFocus={(e) => {
+                              if (!isOos && quotaForm.productId) {
+                                e.currentTarget.style.borderColor = '#0284c7';
+                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                              }
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = isOos ? '#fca5a5' : isExceeding ? '#ef4444' : '#cbd5e1';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            required
+                          />
+                          {isOos ? (
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
+                              ⚠️ Product is out of stock. Cannot allocate stock.
+                            </p>
+                          ) : isExceeding ? (
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>
+                              ⚠️ Cannot allocate {allocVal} units. Only {avail} {unit} available in warehouse.
+                            </p>
+                          ) : (
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                              Salesperson will be restricted to sell up to this allocation limit in the POS.
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
-                {quotaForm.userId ? (
-                  (() => {
-                    const selectedUser = salesStaff.find((s) => String(s.id) === String(quotaForm.userId));
-                    const initials = ((selectedUser?.fullName || selectedUser?.username || 'U')[0] || 'U').toUpperCase();
-
-                    return (
+                      {/* ======================================================== */}
+                      {/* COLUMN 2: ASSIGN STAFF & ALLOCATION DETAILS */}
+                      {/* ======================================================== */}
                       <div
                         style={{
-                          padding: '10px 14px',
                           backgroundColor: '#f8fafc',
-                          borderRadius: '8px',
                           border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '16px',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
+                          flexDirection: 'column',
+                          gap: '14px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div
-                            style={{
-                              width: '34px',
-                              height: '34px',
-                              borderRadius: '50%',
-                              backgroundColor: '#e0f2fe',
-                              color: '#0284c7',
-                              fontWeight: 700,
-                              fontSize: '0.88rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {initials}
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
-                                {selectedUser?.fullName || selectedUser?.username || quotaForm.userId}
-                              </strong>
-                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                (@{selectedUser?.username})
-                              </span>
-                              {selectedUser?.employeeCode && (
-                                <span
-                                  style={{
-                                    fontSize: '0.72rem',
-                                    padding: '1px 5px',
-                                    borderRadius: '4px',
-                                    backgroundColor: '#f1f5f9',
-                                    color: '#475569',
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  {selectedUser.employeeCode}
-                                </span>
-                              )}
-                              <span
-                                style={{
-                                  fontSize: '0.72rem',
-                                  padding: '1px 6px',
-                                  borderRadius: '4px',
-                                  backgroundColor: '#ecfdf5',
-                                  color: '#059669',
-                                  border: '1px solid #a7f3d0',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                POS Authorized
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        {!editingQuota && (
-                          <button
-                            type="button"
-                            onClick={() => setQuotaForm((prev) => ({ ...prev, userId: '' }))}
-                            style={{
-                              padding: '4px 10px',
-                              fontSize: '0.76rem',
-                              fontWeight: 600,
-                              color: '#0284c7',
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <ArrowRightLeft size={12} /> Change
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div>
-                    {/* Interactive Staff Search Input */}
-                    <div style={{ position: 'relative' }}>
-                      <Search
-                        size={15}
-                        style={{
-                          position: 'absolute',
-                          left: '12px',
-                          top: '10px',
-                          color: '#94a3b8',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Search POS staff by name, username, employee code..."
-                        value={modalStaffSearch}
-                        onChange={(e) => setModalStaffSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: '36px',
-                          padding: '0 32px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.86rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                          backgroundColor: '#ffffff',
-                          color: '#0f172a',
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#0284c7';
-                          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      />
-                      {modalStaffSearch && (
-                        <button
-                          type="button"
-                          onClick={() => setModalStaffSearch('')}
+                        {/* Section Header */}
+                        <div
                           style={{
-                            position: 'absolute',
-                            right: '10px',
-                            top: '9px',
-                            background: 'none',
-                            border: 'none',
-                            color: '#94a3b8',
-                            cursor: 'pointer',
-                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingBottom: '10px',
+                            borderBottom: '1px solid #e2e8f0',
                           }}
                         >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Staff Results List */}
-                    <div
-                      style={{
-                        marginTop: '6px',
-                        maxHeight: '170px',
-                        overflowY: 'auto',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        backgroundColor: '#ffffff',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
-                      }}
-                    >
-                      {salesStaff.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-                          No staff members found with POS module access.
-                        </div>
-                      ) : filteredStaffForModal.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-                          No POS staff found matching &quot;{modalStaffSearch}&quot;
-                        </div>
-                      ) : (
-                        filteredStaffForModal.map((s) => {
-                          const initials = ((s.fullName || s.username || 'U')[0] || 'U').toUpperCase();
-                          return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div
-                              key={s.id}
-                              onClick={() => {
-                                setQuotaForm((prev) => ({ ...prev, userId: String(s.id) }));
-                                setModalStaffSearch('');
-                              }}
                               style={{
-                                padding: '8px 12px',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '7px',
+                                backgroundColor: '#ede9fe',
+                                color: '#7c3aed',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Users size={16} />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+                                Assign Staff Member
+                              </h4>
+                              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                                POS-authorized salesperson
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              backgroundColor: quotaForm.userId ? '#dcfce7' : '#ede9fe',
+                              color: quotaForm.userId ? '#15803d' : '#6d28d9',
+                            }}
+                          >
+                            {quotaForm.userId ? 'Assigned' : 'POS Access Only'}
+                          </span>
+                        </div>
+
+                        {/* Staff Selection */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                              Staff Member <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            {quotaForm.userId && !editingQuota && (
+                              <button
+                                type="button"
+                                onClick={() => setQuotaForm((prev) => ({ ...prev, userId: '' }))}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#0284c7',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <ArrowRightLeft size={12} /> Change Staff
+                              </button>
+                            )}
+                          </div>
+
+                          {quotaForm.userId ? (
+                            <div
+                              style={{
+                                padding: '10px 12px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                borderBottom: '1px solid #f1f5f9',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.1s ease',
+                                gap: '10px',
                               }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div
                                   style={{
-                                    width: '28px',
-                                    height: '28px',
+                                    width: '34px',
+                                    height: '34px',
                                     borderRadius: '50%',
                                     backgroundColor: '#e0f2fe',
                                     color: '#0284c7',
-                                    fontSize: '0.78rem',
                                     fontWeight: 700,
+                                    fontSize: '0.86rem',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexShrink: 0,
                                   }}
                                 >
-                                  {initials}
+                                  {staffInitials}
                                 </div>
-                                <div style={{ minWidth: 0 }}>
+                                <div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a' }}>
-                                      {s.fullName || s.username}
-                                    </span>
+                                    <strong style={{ fontSize: '0.86rem', color: '#0f172a' }}>
+                                      {selectedUser?.fullName || selectedUser?.username || quotaForm.userId}
+                                    </strong>
                                     <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                                      @{s.username}
+                                      (@{selectedUser?.username})
                                     </span>
-                                    {s.employeeCode && (
+                                    {selectedUser?.employeeCode && (
                                       <span
                                         style={{
                                           fontSize: '0.7rem',
@@ -3246,231 +3274,376 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                           fontWeight: 600,
                                         }}
                                       >
-                                        {s.employeeCode}
+                                        {selectedUser.employeeCode}
                                       </span>
                                     )}
+                                    <span
+                                      style={{
+                                        fontSize: '0.7rem',
+                                        padding: '1px 6px',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#ecfdf5',
+                                        color: '#059669',
+                                        border: '1px solid #a7f3d0',
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      POS Authorized
+                                    </span>
                                   </div>
                                 </div>
                               </div>
-                              <span
+                              {!editingQuota && (
+                                <button
+                                  type="button"
+                                  onClick={() => setQuotaForm((prev) => ({ ...prev, userId: '' }))}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    color: '#0284c7',
+                                    backgroundColor: '#f8fafc',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <ArrowRightLeft size={11} /> Change
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              {/* Staff Search Input */}
+                              <div style={{ position: 'relative' }}>
+                                <Search
+                                  size={14}
+                                  style={{
+                                    position: 'absolute',
+                                    left: '11px',
+                                    top: '11px',
+                                    color: '#94a3b8',
+                                    pointerEvents: 'none',
+                                  }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search staff by name, code..."
+                                  value={modalStaffSearch}
+                                  onChange={(e) => setModalStaffSearch(e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    height: '36px',
+                                    padding: '0 30px 0 34px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.84rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    backgroundColor: '#ffffff',
+                                    color: '#0f172a',
+                                  }}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#0284c7';
+                                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                                  }}
+                                  onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                />
+                                {modalStaffSearch && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setModalStaffSearch('')}
+                                    style={{
+                                      position: 'absolute',
+                                      right: '8px',
+                                      top: '9px',
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#94a3b8',
+                                      cursor: 'pointer',
+                                      padding: '2px',
+                                    }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Staff Search Results List */}
+                              <div
                                 style={{
-                                  fontSize: '0.7rem',
-                                  padding: '2px 7px',
-                                  borderRadius: '999px',
-                                  backgroundColor: '#e0f2fe',
-                                  color: '#0284c7',
-                                  fontWeight: 600,
-                                  flexShrink: 0,
+                                  marginTop: '6px',
+                                  maxHeight: '210px',
+                                  overflowY: 'auto',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  backgroundColor: '#ffffff',
                                 }}
                               >
-                                POS Authorized
-                              </span>
+                                {salesStaff.length === 0 ? (
+                                  <div style={{ padding: '14px', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
+                                    No staff members found with POS module access.
+                                  </div>
+                                ) : filteredStaffForModal.length === 0 ? (
+                                  <div style={{ padding: '14px', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
+                                    No POS staff found matching &quot;{modalStaffSearch}&quot;
+                                  </div>
+                                ) : (
+                                  filteredStaffForModal.map((s) => {
+                                    const init = ((s.fullName || s.username || 'U')[0] || 'U').toUpperCase();
+                                    return (
+                                      <div
+                                        key={s.id}
+                                        onClick={() => {
+                                          setQuotaForm((prev) => ({ ...prev, userId: String(s.id) }));
+                                          setModalStaffSearch('');
+                                        }}
+                                        style={{
+                                          padding: '7px 10px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          borderBottom: '1px solid #f1f5f9',
+                                          cursor: 'pointer',
+                                          transition: 'background-color 0.1s ease',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                                          <div
+                                            style={{
+                                              width: '26px',
+                                              height: '26px',
+                                              borderRadius: '50%',
+                                              backgroundColor: '#e0f2fe',
+                                              color: '#0284c7',
+                                              fontSize: '0.74rem',
+                                              fontWeight: 700,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              flexShrink: 0,
+                                            }}
+                                          >
+                                            {init}
+                                          </div>
+                                          <div style={{ minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
+                                                {s.fullName || s.username}
+                                              </span>
+                                              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                                @{s.username}
+                                              </span>
+                                              {s.employeeCode && (
+                                                <span
+                                                  style={{
+                                                    fontSize: '0.68rem',
+                                                    padding: '1px 4px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: '#f1f5f9',
+                                                    color: '#475569',
+                                                    fontWeight: 600,
+                                                  }}
+                                                >
+                                                  {s.employeeCode}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <span
+                                          style={{
+                                            fontSize: '0.68rem',
+                                            padding: '2px 6px',
+                                            borderRadius: '999px',
+                                            backgroundColor: '#e0f2fe',
+                                            color: '#0284c7',
+                                            fontWeight: 600,
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          POS Auth
+                                        </span>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
                             </div>
-                          );
-                        })
-                      )}
+                          )}
+                        </div>
+
+                        {/* Notes / Remarks */}
+                        <div style={{ marginTop: 'auto', paddingTop: '6px' }}>
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                            Notes / Remarks
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Optional notes regarding this inventory allocation..."
+                            value={quotaForm.notes}
+                            onChange={(e) => setQuotaForm({ ...quotaForm, notes: e.target.value })}
+                            style={{
+                              width: '100%',
+                              height: '38px',
+                              padding: '0 12px',
+                              borderRadius: '7px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.84rem',
+                              color: '#0f172a',
+                              backgroundColor: '#ffffff',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = '#0284c7';
+                              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          />
+                        </div>
+
+                        {/* Live Allocation Summary Box */}
+                        <div
+                          style={{
+                            padding: '10px 12px',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '0.78rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em', fontSize: '0.72rem' }}>
+                              Allocation Preview
+                            </span>
+                            {canSubmit ? (
+                              <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <CheckCircle size={12} /> Ready
+                              </span>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#64748b' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Staff:</span>
+                              <strong style={{ color: selectedUser ? '#0f172a' : '#94a3b8' }}>
+                                {selectedUser?.fullName || selectedUser?.username || 'Not selected'}
+                              </strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Product:</span>
+                              <strong style={{ color: selectedProd ? '#0f172a' : '#94a3b8', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {selectedProd?.name || 'Not selected'}
+                              </strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Limit:</span>
+                              <strong style={{ color: allocVal > 0 ? '#0284c7' : '#94a3b8' }}>
+                                {allocVal > 0 ? `${allocVal.toLocaleString()} ${unit}` : 'Not set'}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* Allocated Quantity Input */}
-              <div>
-                {(() => {
-                  const avail = quotaForm.productId
-                    ? (selectedProductStock != null
-                        ? Number(selectedProductStock.availableStock ?? 0)
-                        : Number(getProductStockInfo(quotaForm.productId).available ?? 0))
-                    : 0;
-                  const isOos = quotaForm.productId
-                    ? (selectedProductStock != null
-                        ? Boolean(selectedProductStock.outOfStock || avail <= 0)
-                        : avail <= 0)
-                    : false;
-                  const unit = selectedProductStock?.unit || (quotaForm.productId ? getProductStockInfo(quotaForm.productId).unit : 'Units');
-                  const allocVal = parseFloat(quotaForm.allocatedQuantity);
-                  const isExceeding = !isNaN(allocVal) && allocVal > avail && !isOos;
-
-                  return (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-                        <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                          Allocated Quantity <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        {quotaForm.productId && !isOos && avail > 0 && (
-                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Max allocatable: <strong style={{ color: '#0f172a' }}>{avail.toLocaleString()}</strong> {unit}
+                    {/* Modal Actions Footer */}
+                    <div
+                      style={{
+                        padding: '14px 24px',
+                        borderTop: '1px solid #e2e8f0',
+                        backgroundColor: '#f8fafc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div style={{ fontSize: '0.8rem' }}>
+                        {!quotaForm.productId || !quotaForm.userId || !quotaForm.allocatedQuantity ? (
+                          <span style={{ color: '#64748b' }}>
+                            * Select product, staff member, and quantity to save
+                          </span>
+                        ) : isOos ? (
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                            ⚠️ Product is out of stock
+                          </span>
+                        ) : isExceeding ? (
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                            ⚠️ Quantity exceeds available stock ({avail} max)
+                          </span>
+                        ) : (
+                          <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle size={14} /> Ready to save allocation
                           </span>
                         )}
                       </div>
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        max={isOos ? 0 : avail}
-                        disabled={isOos || !quotaForm.productId}
-                        placeholder={
-                          !quotaForm.productId
-                            ? 'Select product first...'
-                            : isOos
-                            ? '0 (Out of Stock)'
-                            : `Enter quantity (1 to ${avail})`
-                        }
-                        value={quotaForm.allocatedQuantity}
-                        onChange={(e) => setQuotaForm({ ...quotaForm, allocatedQuantity: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px',
-                          borderRadius: '7px',
-                          border: `1px solid ${
-                            isOos
-                              ? '#fca5a5'
-                              : isExceeding
-                              ? '#ef4444'
-                              : '#cbd5e1'
-                          }`,
-                          fontSize: '0.95rem',
-                          fontWeight: 700,
-                          color: isOos ? '#dc2626' : '#0f172a',
-                          backgroundColor: isOos || !quotaForm.productId ? '#f8fafc' : '#ffffff',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                        onFocus={(e) => {
-                          if (!isOos && quotaForm.productId) {
-                            e.currentTarget.style.borderColor = '#0284c7';
-                            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                          }
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = isOos ? '#fca5a5' : isExceeding ? '#ef4444' : '#cbd5e1';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                        required
-                      />
-                      {isOos ? (
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#dc2626', fontWeight: 600 }}>
-                          ⚠️ Product is out of stock. Cannot allocate stock.
-                        </p>
-                      ) : isExceeding ? (
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#dc2626', fontWeight: 600 }}>
-                          ⚠️ Cannot allocate {allocVal} units. Only {avail} {unit} available in inventory stock.
-                        </p>
-                      ) : (
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#64748b' }}>
-                          Staff member will be authorized to sell up to this allocated amount in the POS module.
-                        </p>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
 
-              {/* Notes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                  Notes / Remarks
-                </label>
-                <input
-                  type="text"
-                  placeholder="Optional notes regarding this inventory allocation..."
-                  value={quotaForm.notes}
-                  onChange={(e) => setQuotaForm({ ...quotaForm, notes: e.target.value })}
-                  style={{
-                    width: '100%',
-                    height: '36px',
-                    padding: '0 12px',
-                    borderRadius: '7px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
-                    color: '#0f172a',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#0284c7';
-                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              {/* Modal Actions */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
-                  marginTop: '8px',
-                  paddingTop: '16px',
-                  borderTop: '1px solid #f1f5f9',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowQuotaModal(false)}
-                  style={{
-                    padding: '8px 18px',
-                    borderRadius: '7px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#475569',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                >
-                  Cancel
-                </button>
-                {(() => {
-                  const avail = quotaForm.productId
-                    ? (selectedProductStock != null
-                        ? Number(selectedProductStock.availableStock ?? 0)
-                        : Number(getProductStockInfo(quotaForm.productId).available ?? 0))
-                    : 0;
-                  const isOos = quotaForm.productId
-                    ? (selectedProductStock != null
-                        ? Boolean(selectedProductStock.outOfStock || avail <= 0)
-                        : avail <= 0)
-                    : false;
-                  const allocVal = parseFloat(quotaForm.allocatedQuantity);
-                  const isExceeding = !isNaN(allocVal) && allocVal > avail;
-                  const canSubmit = !savingQuota && quotaForm.productId && quotaForm.userId && !isOos && !isExceeding && allocVal > 0;
-
-                  return (
-                    <button
-                      type="submit"
-                      disabled={!canSubmit}
-                      style={{
-                        padding: '8px 22px',
-                        borderRadius: '7px',
-                        border: 'none',
-                        backgroundColor: !canSubmit ? '#94a3b8' : '#0284c7',
-                        color: '#ffffff',
-                        fontSize: '0.86rem',
-                        fontWeight: 600,
-                        cursor: !canSubmit ? 'not-allowed' : 'pointer',
-                        boxShadow: !canSubmit ? 'none' : '0 2px 4px rgba(2, 132, 199, 0.25)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {savingQuota ? 'Saving...' : editingQuota ? 'Save Changes' : 'Save Allocation'}
-                    </button>
-                  );
-                })()}
-              </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuotaModal(false)}
+                          style={{
+                            padding: '8px 18px',
+                            borderRadius: '7px',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#ffffff',
+                            color: '#475569',
+                            fontSize: '0.86rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!canSubmit}
+                          style={{
+                            padding: '8px 22px',
+                            borderRadius: '7px',
+                            border: 'none',
+                            backgroundColor: !canSubmit ? '#94a3b8' : '#0284c7',
+                            color: '#ffffff',
+                            fontSize: '0.86rem',
+                            fontWeight: 600,
+                            cursor: !canSubmit ? 'not-allowed' : 'pointer',
+                            boxShadow: !canSubmit ? 'none' : '0 2px 4px rgba(2, 132, 199, 0.25)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {savingQuota ? 'Saving...' : editingQuota ? 'Save Changes' : 'Save Allocation'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </form>
+
           </div>
         </div>
       )}

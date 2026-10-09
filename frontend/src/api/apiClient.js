@@ -48,8 +48,9 @@ api.interceptors.response.use(
         if (url.includes('/users')) {
           window.dispatchEvent(new CustomEvent('erp:users_updated', { detail: payload }));
         }
-        if (url.includes('/customers') || url.includes('/customer-groups') || url.includes('/routes')) {
+        if (url.includes('/customers') || url.includes('/customer-groups') || url.includes('/routes') || url.includes('/customer-targets')) {
           window.dispatchEvent(new CustomEvent('erp:customers_updated', { detail: payload }));
+          window.dispatchEvent(new CustomEvent('erp:targets_updated', { detail: payload }));
         }
         if (url.includes('/products') || url.includes('/inventory') || url.includes('/warehouses') || url.includes('/stock') || url.includes('/categories') || url.includes('/brands') || url.includes('/adjustments')) {
           window.dispatchEvent(new CustomEvent('erp:inventory_updated', { detail: payload }));
@@ -217,6 +218,16 @@ export const customerApi = {
   update: (id, data) => api.put(`/customers/${id}`, data),
   toggleActive: (id) => api.patch(`/customers/${id}/toggle-active`),
   delete: (id) => api.delete(`/customers/${id}`),
+};
+
+export const customerTargetApi = {
+  getAll: (activeOnly = false) => api.get('/customer-targets', { params: { activeOnly } }),
+  getById: (id) => api.get(`/customer-targets/${id}`),
+  getCustomerProgress: (customerId) => api.get(`/customer-targets/customer/${customerId}/progress`),
+  create: (data) => api.post('/customer-targets', data),
+  update: (id, data) => api.put(`/customer-targets/${id}`, data),
+  toggleActive: (id) => api.patch(`/customer-targets/${id}/toggle-active`),
+  delete: (id) => api.delete(`/customer-targets/${id}`),
 };
 
 export const supplierApi = {

@@ -1,6 +1,6 @@
 import { useWorkspaceActive } from '../components/RetainedWorkspaces';
 import React, { useState, useEffect, useRef } from 'react';
-import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi, staffQuotaApi } from '../api/apiClient';
+import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi, staffQuotaApi, customerTargetApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import confetti from 'canvas-confetti';
@@ -42,6 +42,9 @@ import {
   BarChart2,
   Eye,
   ChevronRight,
+  Target,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 
 export default function PosView({ onExitPos, initialHeldInvoice }) {
@@ -82,6 +85,59 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
   const [heldInvoices, setHeldInvoices] = useState([]);
   const [showHeldModal, setShowHeldModal] = useState(false);
   const [heldTab, setHeldTab] = useState('mine');
+
+  // Customer Range & Targets State in POS
+  const [customerTargets, setCustomerTargets] = useState([]);
+  const [loadingTargets, setLoadingTargets] = useState(false);
+  const [showTargetRangesModal, setShowTargetRangesModal] = useState(false);
+  const [activeTargetForModal, setActiveTargetForModal] = useState(null);
+
+  // Fetch Customer Range & Targets whenever selected customer changes
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setCustomerTargets([]);
+      return;
+    }
+    let isCurrent = true;
+    setLoadingTargets(true);
+    customerTargetApi
+      .getCustomerProgress(selectedCustomerId)
+      .then((res) => {
+        if (!isCurrent) return;
+        const list = res?.data?.data || res?.data || [];
+        setCustomerTargets(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        console.error('Error loading customer targets in POS:', err);
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingTargets(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedCustomerId]);
+
+  // Sync targets on event bus updates
+  useEffect(() => {
+    const handleTargetSync = () => {
+      if (selectedCustomerId) {
+        customerTargetApi
+          .getCustomerProgress(selectedCustomerId)
+          .then((res) => {
+            const list = res?.data?.data || res?.data || [];
+            setCustomerTargets(Array.isArray(list) ? list : []);
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('erp:targets_updated', handleTargetSync);
+    window.addEventListener('erp:sales_updated', handleTargetSync);
+    return () => {
+      window.removeEventListener('erp:targets_updated', handleTargetSync);
+      window.removeEventListener('erp:sales_updated', handleTargetSync);
+    };
+  }, [selectedCustomerId]);
 
   useEffect(() => {
     loadInitialData();
@@ -1127,6 +1183,222 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             </span>
           </div>
         )}
+
+        {/* Row 3 (BELOW): Customer Range & Targets Milestone Card in POS */}
+        {selectedCustomer && customerTargets.length > 0 && (() => {
+          const primaryTarget = customerTargets[0];
+          const achieved = Number(primaryTarget.currentAchievedAmount || 0);
+          const goal = Number(primaryTarget.targetAmount || 0);
+          const pct = Number(primaryTarget.achievementPercentage || 0);
+          const currentTier = primaryTarget.currentTier;
+          const nextTier = primaryTarget.nextTier;
+          const neededForNext = Number(primaryTarget.amountNeededForNextTier || 0);
+          const discPct = Number(primaryTarget.currentDiscountPercentage || 0);
+
+          // Cart projection
+          const cartSubtotal = subtotal || 0;
+          const unlocksNextWithCart = nextTier && cartSubtotal >= neededForNext;
+
+          return (
+            <div
+              style={{
+                marginTop: '4px',
+                padding: '10px 14px',
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%)',
+                border: '1px solid #bae6fd',
+                borderRadius: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                boxShadow: '0 2px 5px rgba(2, 132, 199, 0.05)',
+              }}
+            >
+              {/* Target Title & Quick Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '6px',
+                      background: '#0284c7',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                    }}
+                  >
+                    <Target size={15} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                        {primaryTarget.targetName}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontFamily: 'monospace',
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          background: '#e0f2fe',
+                          color: '#0369a1',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {primaryTarget.targetCode}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Period: {primaryTarget.startDate} to {primaryTarget.endDate} • {primaryTarget.daysRemaining} days remaining
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTargetForModal(primaryTarget);
+                      setShowTargetRangesModal(true);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      color: '#334155',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View Slabs
+                  </button>
+
+                  {discPct > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (cartSubtotal <= 0) {
+                          addToast('Cart is empty. Add products to apply discount.', 'warning');
+                          return;
+                        }
+                        const discVal = parseFloat(((cartSubtotal * discPct) / 100).toFixed(2));
+                        setDiscountAmount(discVal);
+                        addToast(`🎯 Applied ${discPct}% Target Range Discount (-Rs. ${discVal.toLocaleString()})!`, 'success');
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        border: 'none',
+                        borderRadius: '6px',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
+                      }}
+                      title="Click to apply earned target discount to this bill"
+                    >
+                      <Zap size={12} /> Apply {discPct}% Target Discount
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress & Milestone Row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.76rem', color: '#334155' }}>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>Achieved: </span>
+                  <strong style={{ fontWeight: 800, color: '#0f172a' }}>
+                    Rs. {achieved.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>{' '}
+                  <span style={{ color: '#64748b' }}>/ Rs. {goal.toLocaleString()}</span>{' '}
+                  <span style={{ fontWeight: 700, color: pct >= 100 ? '#16a34a' : '#0284c7' }}>({pct}%)</span>
+                </div>
+
+                {/* Unlocked Tier Badge */}
+                {currentTier ? (
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      background: '#dcfce7',
+                      color: '#15803d',
+                      border: '1px solid #86efac',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Award size={12} /> Unlocked: {currentTier.tierName} ({discPct}% Off)
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Base Level (No discount unlocked yet)
+                  </div>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              <div
+                style={{
+                  height: '6px',
+                  background: '#e2e8f0',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  width: '100%',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.min(100, Math.max(0, pct))}%`,
+                    background: pct >= 100 ? '#16a34a' : 'linear-gradient(90deg, #38bdf8 0%, #0284c7 100%)',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+
+              {/* Next Milestone Incentive Note */}
+              {nextTier && (
+                <div
+                  style={{
+                    fontSize: '0.72rem',
+                    color: unlocksNextWithCart ? '#15803d' : '#0369a1',
+                    background: unlocksNextWithCart ? '#dcfce7' : '#f0f9ff',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: unlocksNextWithCart ? '1px solid #86efac' : '1px solid #e0f2fe',
+                  }}
+                >
+                  <span>
+                    {unlocksNextWithCart ? (
+                      <strong>🎉 Current cart (+Rs. {cartSubtotal.toLocaleString()}) unlocks {nextTier.tierName} ({nextTier.discountPercentage}% Discount)!</strong>
+                    ) : (
+                      <span>
+                        Next Target: <strong>{nextTier.tierName}</strong> ({nextTier.discountPercentage}% Disc) — needs <strong>Rs. {neededForNext.toLocaleString()}</strong> more
+                        {cartSubtotal > 0 && ` (this order adds Rs. ${cartSubtotal.toLocaleString()})`}
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontWeight: 700 }}>Tier {nextTier.tierLevel}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
@@ -2459,6 +2731,106 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      {/* Target Ranges Breakdown Modal in POS */}
+      {showTargetRangesModal && activeTargetForModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '16px',
+          }}
+          onClick={() => setShowTargetRangesModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '14px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '20px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Target size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  {activeTargetForModal.targetName} Slabs
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTargetRangesModal(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
+              Purchasing within each slab unlocks the reward discount for this customer during the promotion period.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              {(activeTargetForModal.tiers || []).map((tier) => (
+                <div
+                  key={tier.id}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: tier.isAchieved ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                    background: tier.isAchieved ? '#f0fdf4' : '#f8fafc',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.84rem', color: tier.isAchieved ? '#15803d' : '#1e293b' }}>
+                      {tier.tierName}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Spend: Rs. {Number(tier.minAmount).toLocaleString()} - {tier.maxAmount ? `Rs. ${Number(tier.maxAmount).toLocaleString()}` : 'Unlimited'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: tier.isAchieved ? '#16a34a' : '#0284c7' }}>
+                      {tier.discountPercentage}% Discount
+                    </div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: tier.isAchieved ? '#16a34a' : '#94a3b8' }}>
+                      {tier.isAchieved ? '✓ REACHED' : 'NOT REACHED'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={() => setShowTargetRangesModal(false)}
+                style={{
+                  padding: '7px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

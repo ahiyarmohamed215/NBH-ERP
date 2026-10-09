@@ -107,8 +107,8 @@ h4 {
 
 /* Standard Surfaces (No blurry glass, clean solid borders) */
 .glass-sidebar {
-  width: 260px;
-  min-width: 260px;
+  width: 205px;
+  min-width: 205px;
   height: 100vh;
   max-height: 100vh;
   position: sticky;
@@ -549,8 +549,8 @@ textarea:disabled {
 
 /* Collapsed Sidebar in Distraction-Free / Full Screen Mode */
 .glass-sidebar.collapsed {
-  width: 62px !important;
-  min-width: 62px !important;
+  width: 56px !important;
+  min-width: 56px !important;
 }
 
 .glass-sidebar.collapsed .sidebar-brand-text,
@@ -563,7 +563,7 @@ textarea:disabled {
 
 .glass-sidebar.collapsed .sidebar-nav-btn {
   justify-content: center !important;
-  padding: 10px 0 !important;
+  padding: 8px 0 !important;
 }
 
 .glass-sidebar.collapsed .nav-icon-wrap {

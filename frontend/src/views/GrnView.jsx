@@ -1,4 +1,4 @@
-import { mergeGrnItems } from '../utils/grnItems';
+import { mergeGrnItems, calculateGrnStaging, buildGrnItemsPayload } from '../utils/grnItems';
 import './GrnView.css';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useRef } from 'react';
@@ -48,7 +48,10 @@ const INITIAL_STAGING_ITEM = {
   unitOfMeasure: 'PCS',
   quantity: 1,
   freeQuantity: 0,
-  currentQuantity: 0,
+  currentQuantity: null,
+  stockLoading: false,
+  lastCostPrice: null,
+  currentSellingPrice: null,
   packQty: 1,
   packSize: 1,
   purchaseValue: 0,
@@ -159,12 +162,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       const res = await inventoryApi.getWarehouseStock(whId);
       const stockMap = {};
       (res.data || []).forEach((b) => {
-        stockMap[b.productId] = b.quantity || 0;
+        stockMap[b.productId] = Number(b.availableQuantity ?? (Number(b.quantity || 0) - Number(b.reservedQuantity || 0)));
       });
       return stockMap;
     } catch (err) {
       console.error('Failed to load warehouse stock:', err);
-      return {};
+      return null;
     }
   };
 
@@ -253,7 +256,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       addToast('Use a separate GRN for products in a different warehouse.', 'error');
       return;
     }
-    const currentStock = 0;
+    const currentStock = null;
     const cost = Number(prod.costPrice) || 0;
     const sale = Number(prod.sellingPrice) || 0;
     const wholesale = Number(prod.wholesalePrice) || (sale ? sale * 0.9 : cost * 1.15);
@@ -281,6 +284,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       quantity: qty,
       freeQuantity: free,
       currentQuantity: currentStock,
+      stockLoading: true,
+      lastCostPrice: prod.costPrice ?? null,
+      currentSellingPrice: prod.sellingPrice ?? null,
       packQty: 1,
       packSize: 1,
       purchaseValue: purchaseVal,
@@ -302,64 +308,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     setShowProductDropdown(false);
     const stockMap = await loadStockForWarehouse(warehouseId);
     setStagingItem(prev => String(prev.productId) === String(prod.id)
-      ? { ...prev, currentQuantity: stockMap[prod.id] || 0 } : prev);
+      ? { ...prev, stockLoading: false, currentQuantity: stockMap ? (stockMap[prod.id] ?? 0) : null } : prev);
   };
 
   // Recalculate staging calculations whenever quantities, prices, or discounts change
   const handleStagingChange = (field, value) => {
-    setStagingItem((prev) => {
-      const updated = { ...prev, [field]: value };
-
-      let qty = field === 'quantity' ? Math.max(0, parseInt(value, 10) || 0) : prev.quantity;
-      let free = field === 'freeQuantity' ? Math.max(0, parseInt(value, 10) || 0) : prev.freeQuantity;
-      let cost = field === 'costPrice' ? Math.max(0, parseFloat(value) || 0) : prev.costPrice;
-      let sale = field === 'salePrice' ? Math.max(0, parseFloat(value) || 0) : prev.salePrice;
-      let packQ = field === 'packQty' ? Math.max(1, parseInt(value, 10) || 1) : prev.packQty;
-      let packS = field === 'packSize' ? Math.max(1, parseInt(value, 10) || 1) : prev.packSize;
-
-      // If user altered packQty or packSize, auto update quantity
-      if (field === 'packQty' || field === 'packSize') {
-        qty = packQ * packS;
-        updated.quantity = qty;
-      }
-
-      const grossValue = qty * cost;
-      updated.purchaseValue = grossValue;
-
-      let discPct = prev.discountPercent;
-      let discAmt = prev.discountAmount;
-
-      if (field === 'discountPercent') {
-        discPct = Math.max(0, Math.min(100, parseFloat(value) || 0));
-        discAmt = (grossValue * discPct) / 100;
-        updated.discountPercent = discPct;
-        updated.discountAmount = discAmt;
-      } else if (field === 'discountAmount') {
-        discAmt = Math.max(0, parseFloat(value) || 0);
-        discPct = grossValue > 0 ? (discAmt / grossValue) * 100 : 0;
-        updated.discountAmount = discAmt;
-        updated.discountPercent = Number(discPct.toFixed(2));
-      } else {
-        discAmt = (grossValue * discPct) / 100;
-        updated.discountAmount = discAmt;
-      }
-
-      const netAmount = Math.max(0, grossValue - discAmt);
-      updated.amount = netAmount;
-
-      // Price and GP metrics
-      const markup = sale > cost ? sale - cost : 0;
-      updated.markupPrice = Number(markup.toFixed(2));
-
-      const gp = sale > 0 ? ((sale - cost) / sale) * 100 : 0;
-      updated.gpPercent = Number(gp.toFixed(1));
-
-      const totalEffectiveUnits = qty + free;
-      const freeCost = totalEffectiveUnits > 0 ? netAmount / totalEffectiveUnits : cost;
-      updated.freeCostPrice = Number(freeCost.toFixed(2));
-
-      return updated;
-    });
+    setStagingItem(prev => calculateGrnStaging(prev, field, value));
   };
 
   // Add staging item to the GRN items list
@@ -473,12 +427,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
         supplierInvoiceNumber: formData.supplierInvoiceNumber.trim() || null,
         receivedDate: formData.grnDate || formatBusinessDate(),
         notes: formData.remarks.trim() || null,
-        items: formData.items.map((it) => ({
-          productId: Number(it.productId),
-          quantityReceived: Number(it.quantityReceived) + (Number(it.freeQuantity) || 0), // Include free issue into received inventory count
-          unitCost: Number((Number(it.amount) / (Number(it.quantityReceived) + (Number(it.freeQuantity) || 0))).toFixed(8)),
-          notes: it.notes,
-        })),
+        items: buildGrnItemsPayload(formData.items),
       };
 
       let res;
@@ -1505,7 +1454,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                           — <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</span>
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '12px' }}>
-                          <span>Cost: <strong style={{ color: '#0f172a' }}>${Number(p.costPrice || 0).toFixed(2)}</strong></span>
+                          <span>Last cost: <strong style={{ color: '#0f172a' }}>${Number(p.costPrice || 0).toFixed(2)}</strong></span>
+                          <span>Selling: <strong>${Number(p.sellingPrice || 0).toFixed(2)}</strong></span>
                           <span>{p.defaultWarehouseName || 'No default warehouse'}</span>
                         </div>
                       </div>
@@ -1517,8 +1467,16 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
             <div className="grn-selected-product">
               <span title={stagingItem.tradeName}>{stagingItem.productId ? `${stagingItem.productCode} — ${stagingItem.tradeName}` : 'Select a product to add a receipt line'}</span>
-              {stagingItem.productId && <small>In stock: {stagingItem.currentQuantity} {stagingItem.unitOfMeasure}</small>}
+
             </div>
+
+            {stagingItem.productId && (
+              <div className="grn-product-summary" aria-live="polite">
+                <div><span>Last cost price</span><strong>{stagingItem.lastCostPrice == null ? 'Unavailable' : '$' + Number(stagingItem.lastCostPrice).toFixed(2)}</strong></div>
+                <div><span>Available qty</span><strong>{stagingItem.stockLoading ? 'Loading…' : stagingItem.currentQuantity == null ? 'Unavailable' : stagingItem.currentQuantity + ' ' + stagingItem.unitOfMeasure}</strong></div>
+                <div><span>Current selling price</span><strong>{stagingItem.currentSellingPrice == null ? 'Unavailable' : '$' + Number(stagingItem.currentSellingPrice).toFixed(2)}</strong></div>
+              </div>
+            )}
 
             <div className="grn-line-fields">
               {[
@@ -1526,7 +1484,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 ['freeQuantity', 'FREE (FOC)', 0, '1'],
                 ['costPrice', 'UNIT COST ($) *', 0, '0.01'],
                 ['discountPercent', 'DISCOUNT %', 0, '0.1'],
-                ['salePrice', 'SALE PRICE ($)', 0, '0.01'],
+                ['salePrice', 'SELLING PRICE ($)', 0, '0.01'],
               ].map(([field, label, min, step]) => (
                 <label key={field}>{label}
                   <input className="input-glass" type="number" min={min} step={step}
@@ -1718,7 +1676,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   }}
                 >
                   <CheckCircle size={16} />
-                  {saving ? 'Processing...' : (editingGrnId ? 'Update & Post Inventory' : 'Save & post inventory')}
+                  {saving ? 'Saving Inventory...' : 'Save Inventory'}
                 </button>
               </div>
             </div>

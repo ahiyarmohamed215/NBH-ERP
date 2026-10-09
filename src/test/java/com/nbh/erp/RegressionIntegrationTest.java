@@ -160,6 +160,26 @@ class RegressionIntegrationTest {
   assertEquals("Direct Purchase",grns.getGrnById(posted.getId()).getGrnType());assertEquals("Updated note",posted.getNotes());
   assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
+ @Test void grnHttpCreatePostsInventory() throws Exception {
+  String body="""
+    {"supplierId":%d,"grnType":"Standard Inward","receivedDate":"2026-10-09",
+     "items":[{"productId":%d,"quantityReceived":3,"unitCost":6.66666667}]}
+    """.formatted(supplier.getId(),product.getId());
+  mvc.perform(post("/api/v1/grns?process=true").contentType("application/json").content(body))
+    .andExpect(status().isCreated()).andExpect(jsonPath("$.data.status").value("PROCESSED"));
+  assertEquals(0,n("103").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void grnHttpAllowsFreeReceiptsAndRejectsNegativeCost() throws Exception {
+  String body="""
+    {"supplierId":%d,"receivedDate":"2026-10-09",
+     "items":[{"productId":%d,"quantityReceived":2,"unitCost":0}]}
+    """.formatted(supplier.getId(),product.getId());
+  mvc.perform(post("/api/v1/grns?process=true").contentType("application/json").content(body))
+    .andExpect(status().isCreated()).andExpect(jsonPath("$.data.totalAmount").value(0));
+  assertEquals(0,n("102").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  mvc.perform(post("/api/v1/grns?process=true").contentType("application/json").content(body.replace("\"unitCost\":0", "\"unitCost\":-1")))
+    .andExpect(status().isBadRequest());
+ }
  @Test void automaticGrnRejectsMissingProductWarehouse() {
   product.setDefaultWarehouse(null);products.save(product);
   assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(automaticReceiptRequest(),true));

@@ -141,7 +141,7 @@ export default function RoleSearchSelector({
   const unassignedCount = Math.max(0, combinedRoles.length - selectedCount);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: '14px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: '10px' }}>
       {/* Top Label and Count */}
       {label && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -322,10 +322,10 @@ export default function RoleSearchSelector({
         {/* Search Bar */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search
-            size={18}
+            size={14}
             style={{
               position: 'absolute',
-              left: '12px',
+              left: '10px',
               top: '50%',
               transform: 'translateY(-50%)',
               color: '#0284c7',
@@ -334,16 +334,17 @@ export default function RoleSearchSelector({
           />
           <input
             ref={inputRef}
+            aria-label="Search roles"
             type="text"
             placeholder={placeholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              height: '42px',
-              padding: '0 38px 0 40px',
-              borderRadius: '8px',
-              border: '1.5px solid #cbd5e1',
+              height: '34px',
+              padding: '0 30px 0 32px',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
               fontSize: '0.88rem',
               backgroundColor: '#ffffff',
               boxSizing: 'border-box',
@@ -353,7 +354,7 @@ export default function RoleSearchSelector({
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = '#0284c7';
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(2, 132, 199, 0.15)';
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#cbd5e1';
@@ -467,7 +468,7 @@ export default function RoleSearchSelector({
       <div
         style={{
           flex: 1,
-          minHeight: '220px',
+          minHeight: '120px',
           overflowY: 'auto',
           border: '1px solid #e2e8f0',
           borderRadius: '10px',
@@ -545,7 +546,7 @@ export default function RoleSearchSelector({
                 key={r.id || r.name || idx}
                 onClick={() => !isLocked && handleToggleRole(roleKey)}
                 style={{
-                  padding: '11px 14px',
+                  padding: '8px 12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
