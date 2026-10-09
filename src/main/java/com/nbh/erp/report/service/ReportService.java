@@ -35,10 +35,8 @@ public class ReportService {
         final LocalDate start = startDate != null ? startDate : LocalDate.now().minusDays(30);
         final LocalDate end = endDate != null ? endDate : LocalDate.now();
 
-        List<Invoice> invoices = invoiceRepository.findAll().stream()
-                .filter(i -> java.util.Set.of("COMPLETED", "PAID", "PARTIAL").contains(i.getStatus()))
-                .filter(i -> !i.getInvoiceDate().isBefore(start) && !i.getInvoiceDate().isAfter(end))
-                .collect(Collectors.toList());
+        List<Invoice> invoices = invoiceRepository.findByStatusInAndDateBetween(
+                java.util.Set.of("COMPLETED", "PAID", "PARTIAL"), start, end);
 
         BigDecimal revenue = BigDecimal.ZERO;
         BigDecimal discount = BigDecimal.ZERO;
@@ -83,9 +81,7 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public ReportDto.InventoryValuationReport getInventoryValuation(Long warehouseId) {
-        List<StockBalance> balances = warehouseId != null
-                ? stockBalanceRepository.findByWarehouseId(warehouseId)
-                : stockBalanceRepository.findAll();
+        List<StockBalance> balances = stockBalanceRepository.findAllWithProductAndWarehouse(warehouseId);
 
         String whName = "All Warehouses Enterprise";
         if (warehouseId != null) {
