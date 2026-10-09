@@ -57,6 +57,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
   const [warehouses, setWarehouses] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [stockBalances, setStockBalances] = useState([]);
+  const [isHoldingCart, setIsHoldingCart] = useState(false);
 
   // Staff Motivation / KPI Data
   const [cashierStats, setCashierStats] = useState([]);
@@ -620,10 +621,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   // Hold Bill Only (Single Action Button)
   const handleHoldCart = async () => {
+    if (isHoldingCart) return;
     if (cart.length === 0) {
       addToast('Cart is empty. Add products first.', 'error');
       return;
     }
+    setIsHoldingCart(true);
     try {
       const headerWhId = cart[0]?.warehouseId || warehouses[0]?.id;
       const payload = {
@@ -648,7 +651,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       await loadHeldInvoices();
       loadStaffPerformance();
     } catch (err) {
-      addToast('Failed to hold bill: ' + (err.response?.data?.message || err.message), 'error');
+      if (err.isUnknownStatus) {
+        addToast("We couldn't confirm whether the invoice was saved. Please check the invoice list before trying again.", 'warning');
+      } else {
+        addToast('Unable to save the invoice. Please try again.', 'error');
+      }
+    } finally {
+      setIsHoldingCart(false);
     }
   };
 

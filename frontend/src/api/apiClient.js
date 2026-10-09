@@ -1,4 +1,10 @@
 import axios from 'axios';
+import {
+  getUserFriendlyErrorMessage,
+  isNetworkError,
+  isTimeoutError,
+  isCriticalMutation,
+} from '../utils/errorHandler.js';
 
 const API_ORIGIN = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 
@@ -10,9 +16,88 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token automatically
+// Deduplication & In-Memory TTL Cache for GET requests
+const inFlightRequests = new Map();
+const apiCache = new Map();
+
+export const clearApiCache = (pattern) => {
+  if (!pattern) {
+    apiCache.clear();
+    return;
+  }
+  for (const key of apiCache.keys()) {
+    if (key.includes(pattern)) {
+      apiCache.delete(key);
+    }
+  }
+};
+
+const getDefaultTtlForUrl = (url = '') => {
+  const u = (url || '').toLowerCase();
+  // Static / master data cached for 5 minutes
+  if (u.includes('/warehouses') || u.includes('/categories') || u.includes('/brands') || u.includes('/roles/permissions')) {
+    return 300000;
+  }
+  return 0;
+};
+
+// Wrap api.request to provide in-flight deduplication & master-data caching
+const originalRequest = api.request.bind(api);
+api.request = function (configOrUrl, maybeConfig) {
+  let config;
+  if (typeof configOrUrl === 'string') {
+    config = maybeConfig ? { ...maybeConfig, url: configOrUrl } : { url: configOrUrl };
+  } else {
+    config = configOrUrl ? { ...configOrUrl } : {};
+  }
+  const method = (config.method || 'get').toLowerCase();
+
+  // Deduplicate and cache safe GET requests
+  if (method === 'get' && !config.skipDedupe) {
+    const serializedParams = config.params ? JSON.stringify(config.params) : '';
+    const dedupeKey = `GET:${config.url || ''}:${serializedParams}`;
+
+    // 1. Check TTL cache if not bypassed
+    if (!config.skipCache && apiCache.has(dedupeKey)) {
+      const entry = apiCache.get(dedupeKey);
+      if (entry.expiresAt > Date.now()) {
+        return Promise.resolve(entry.data);
+      }
+      apiCache.delete(dedupeKey);
+    }
+
+    // 2. Check in-flight promise to coalesce simultaneous requests
+    if (inFlightRequests.has(dedupeKey)) {
+      return inFlightRequests.get(dedupeKey);
+    }
+
+    const requestPromise = originalRequest(config)
+      .then((data) => {
+        const ttl = config.cacheTtl !== undefined ? config.cacheTtl : getDefaultTtlForUrl(config.url);
+        if (ttl > 0 && !config.skipCache && data) {
+          apiCache.set(dedupeKey, { data, expiresAt: Date.now() + ttl });
+        }
+        return data;
+      })
+      .finally(() => {
+        inFlightRequests.delete(dedupeKey);
+      });
+
+    inFlightRequests.set(dedupeKey, requestPromise);
+    return requestPromise;
+  }
+
+  return originalRequest(config);
+};
+
+// Attach JWT token, correlation ID, and idempotency key automatically
 api.interceptors.request.use((config) => {
-  if (['post','put','patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) config.headers['Idempotency-Key'] = crypto.randomUUID();
+  if (['post', 'put', 'patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = crypto.randomUUID();
+  }
+  if (!config.headers['X-Request-Id']) {
+    config.headers['X-Request-Id'] = crypto.randomUUID();
+  }
   const token = localStorage.getItem('nbh_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -34,10 +119,23 @@ export const broadcastDataChange = (entityType, detail = {}) => {
 // Intercept responses for global error handling, session expiration & data synchronization
 api.interceptors.response.use(
   (response) => {
-    // If request was a mutation (POST, PUT, PATCH, DELETE), broadcast real-time update
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp:api_healthy', { detail: { timestamp: Date.now() } }));
+    }
+
+    // If request was a mutation (POST, PUT, PATCH, DELETE), broadcast real-time update & invalidate cache
     const method = response.config?.method?.toLowerCase();
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
       const url = response.config?.url || '';
+
+      // Invalidate relevant caches
+      if (url.includes('/warehouses')) clearApiCache('/warehouses');
+      if (url.includes('/categories')) clearApiCache('/categories');
+      if (url.includes('/brands')) clearApiCache('/brands');
+      if (url.includes('/roles')) clearApiCache('/roles');
+      if (url.includes('/products')) clearApiCache('/products');
+      if (url.includes('/customers')) clearApiCache('/customers');
+
       if (typeof window !== 'undefined') {
         const payload = { url, method, timestamp: Date.now() };
         window.dispatchEvent(new CustomEvent('erp:data_changed', { detail: payload }));
@@ -69,17 +167,45 @@ api.interceptors.response.use(
     return response.data;
   },
   async (error) => {
-    const config = error.config;
+    const config = error.config || {};
     if (error.response?.status === 401 && config && !config._retried && !config.url?.startsWith('/auth/')) {
       config._retried = true;
-      try { await refreshSession(); return api(config); }
-      catch (refreshError) { if (refreshError.response?.status === 401 || !localStorage.getItem('nbh_refresh')) expireSession(); throw refreshError; }
+      try {
+        await refreshSession();
+        return api(config);
+      } catch (refreshError) {
+        if (refreshError.response?.status === 401 || !localStorage.getItem('nbh_refresh')) expireSession();
+        throw refreshError;
+      }
     }
-    error.message = error.response?.data?.message || error.message || 'Request failed';
+
+    const friendlyMessage = getUserFriendlyErrorMessage(error, config.errorContext);
+    error.friendlyMessage = friendlyMessage;
+    error.message = friendlyMessage;
     error.status = error.response?.status;
     error.fieldErrors = error.response?.data?.errors || [];
-    if (error.response?.status === 401 && !config?.url?.includes('/auth/login')) expireSession();
-    if (!config?.url?.startsWith('/auth/')) window.dispatchEvent(new CustomEvent('erp:api_error', { detail: error.message }));
+    error.requestId = error.response?.data?.requestId || error.response?.headers?.['x-request-id'] || config.headers?.['X-Request-Id'];
+    error.isNetworkError = isNetworkError(error);
+    error.isTimeout = isTimeoutError(error);
+    error.isUnknownStatus = isCriticalMutation(config.url, config.method) && (error.isNetworkError || error.isTimeout || !error.status);
+    error.isOutage = [502, 503, 504].includes(error.status) || error.isNetworkError || error.isTimeout;
+
+    if (error.response?.status === 401 && !config?.url?.includes('/auth/login')) {
+      expireSession();
+    }
+
+    if (!config?.url?.startsWith('/auth/') && !config.skipGlobalErrorToast) {
+      window.dispatchEvent(new CustomEvent('erp:api_error', {
+        detail: {
+          message: friendlyMessage,
+          type: error.isUnknownStatus ? 'warning' : 'error',
+          status: error.status,
+          requestId: error.requestId,
+          isOutage: error.isOutage,
+        }
+      }));
+    }
+
     return Promise.reject(error);
   }
 );
@@ -518,6 +644,26 @@ export const deliveryApi = {
   dispatch: (id, data) => api.post(`/deliveries/${id}/dispatch`, data || {}),
   complete: (id, data) => api.post(`/deliveries/${id}/complete`, data || {}),
   cancel: (id, data) => api.post(`/deliveries/${id}/cancel`, data || {}),
+};
+
+export const customerMonthlyRangeApi = {
+  getAllRanges: () => api.get('/customer-ranges'),
+  createRange: (data) => api.post('/customer-ranges', data),
+  updateRange: (id, data) => api.put(`/customer-ranges/${id}`, data),
+  toggleStatus: (id, active) => api.patch(`/customer-ranges/${id}/status`, null, { params: { active } }),
+  getAuditTrail: () => api.get('/customer-ranges/audit-trail'),
+  getCustomerProgress: (customerId, cartTotal) =>
+    api.get(`/customer-ranges/customer/${customerId}/progress`, {
+      params: cartTotal ? { cartTotal } : {},
+    }),
+  getCustomerHistory: (customerId) => api.get(`/customer-ranges/customer/${customerId}/history`),
+  getMyTargets: (params) => api.get('/customer-ranges/my-targets', { params }),
+  getNearTargets: () => api.get('/customer-ranges/near-target'),
+  getManagerDashboard: (params) => api.get('/customer-ranges/manager-dashboard', { params }),
+  getStaffPerformance: (yearMonth) =>
+    api.get('/customer-ranges/staff-performance', {
+      params: yearMonth ? { yearMonth } : {},
+    }),
 };
 
 export default api;

@@ -28,7 +28,7 @@ export default function DashboardView({ onNavigate }) {
       const res = await dashboardApi.getSummary();
       setData(res.data);
     } catch (err) {
-      addToast('Failed to load dashboard metrics: ' + err.message, 'error');
+      addToast('Unable to load dashboard metrics. Please try again.', 'error');
     } finally {
       setLoading(false);
     }

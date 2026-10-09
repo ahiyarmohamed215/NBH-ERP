@@ -58,6 +58,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   // -------------------------------------------------------------
   const [payments, setPayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('ALL');
 
@@ -205,11 +206,13 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   // -------------------------------------------------------------
   const handleSavePayment = async (e) => {
     e.preventDefault();
+    if (isSavingPayment) return;
     if (!paymentForm.customerName || !paymentForm.amount) {
       addToast('Please provide customer name and payment amount', 'error');
       return;
     }
     const amt = parseFloat(paymentForm.amount) || 0;
+    setIsSavingPayment(true);
     try {
       const payload = {
         customerId: paymentForm.invoiceNo ? undefined : await resolveCustomerId(paymentForm.customerName),
@@ -234,7 +237,13 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
       await Promise.all([loadBackendPayments(), loadBackendInvoices()]);
     } catch (err) {
       console.error('Failed to record payment:', err);
-      addToast(err.response?.data?.message || 'Failed to record payment', 'error');
+      if (err.isUnknownStatus) {
+        addToast("We couldn't confirm the payment status. Please check the payment record before trying again.", 'warning');
+      } else {
+        addToast('Unable to process payment. Please try again.', 'error');
+      }
+    } finally {
+      setIsSavingPayment(false);
     }
   };
 
@@ -295,11 +304,13 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   // -------------------------------------------------------------
   const handleSaveAdvance = async (e) => {
     e.preventDefault();
+    if (isSavingPayment) return;
     if (!advanceForm.customerName || !advanceForm.amount) {
       addToast('Please provide customer name and advance amount', 'error');
       return;
     }
     const amt = parseFloat(advanceForm.amount) || 0;
+    setIsSavingPayment(true);
     try {
       const payload = {
         customerId: await resolveCustomerId(advanceForm.customerName),
@@ -323,7 +334,13 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
       await loadBackendAdvances();
     } catch (err) {
       console.error('Failed to record advance:', err);
-      addToast(err.response?.data?.message || 'Failed to record advance', 'error');
+      if (err.isUnknownStatus) {
+        addToast("We couldn't confirm the payment status. Please check the payment record before trying again.", 'warning');
+      } else {
+        addToast('Unable to process payment. Please try again.', 'error');
+      }
+    } finally {
+      setIsSavingPayment(false);
     }
   };
 

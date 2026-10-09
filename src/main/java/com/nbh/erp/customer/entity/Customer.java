@@ -68,6 +68,23 @@ public class Customer extends BaseEntity {
     @JoinColumn(name = "delivery_route_id")
     private com.nbh.erp.delivery.entity.DeliveryRoute deliveryRoute;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private com.nbh.erp.user.entity.User assignedStaff;
+
+    public com.nbh.erp.user.entity.User getEffectiveAssignedStaff() {
+        if (this.assignedStaff != null) {
+            return this.assignedStaff;
+        }
+        if (this.customerGroup != null && this.customerGroup.getAssignedStaff() != null) {
+            return this.customerGroup.getAssignedStaff();
+        }
+        if (this.deliveryRoute != null && this.deliveryRoute.getAssignedStaff() != null) {
+            return this.deliveryRoute.getAssignedStaff();
+        }
+        return null;
+    }
+
     public Set<com.nbh.erp.customergroup.entity.CustomerGroup> getCustomerGroups() {
         if (this.customerGroups == null) {
             this.customerGroups = new HashSet<>();

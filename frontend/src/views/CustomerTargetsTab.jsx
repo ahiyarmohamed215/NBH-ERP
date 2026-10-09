@@ -110,7 +110,7 @@ export default function CustomerTargetsTab({
       const data = res?.data?.data || res?.data || [];
       setTargets(Array.isArray(data) ? data : []);
     } catch (err) {
-      if (addToast) addToast('Error loading customer targets: ' + (err.message || 'Unknown error'), 'error');
+      if (addToast) addToast('Unable to load customer range information. Please try again.', 'error');
     } finally {
       setLoading(false);
     }

@@ -17,6 +17,9 @@ public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> 
     @Query("select coalesce(sum(i.quantity),0) from SalesReturnItem i where i.invoiceItemId=:lineId and i.salesReturn.status='COMPLETED'")
     java.math.BigDecimal returnedQuantity(@Param("lineId") Long lineId);
 
+    @Query("SELECT COALESCE(SUM(sr.totalAmount), 0) FROM SalesReturn sr WHERE sr.customer.id = :customerId AND sr.status = 'COMPLETED' AND (:startDate IS NULL OR sr.returnDate >= :startDate) AND (:endDate IS NULL OR sr.returnDate <= :endDate)")
+    java.math.BigDecimal getCustomerReturnsBetween(@Param("customerId") Long customerId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
 
     @Query("SELECT sr FROM SalesReturn sr WHERE " +
             "(:warehouseId IS NULL OR sr.warehouse.id = :warehouseId) AND " +

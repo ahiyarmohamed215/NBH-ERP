@@ -46,6 +46,7 @@ public class SalesReturnService {
     private final DocumentSequenceService sequenceService;
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
     private final com.nbh.erp.audit.service.AuditLogService auditLogService;
+    private final com.nbh.erp.customerrange.service.CustomerRangeService customerRangeService;
 
     private String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -170,6 +171,12 @@ public class SalesReturnService {
         }
         customerBalances.reconcile(invoice.getCustomer().getId());
         auditLogService.log("SALES_RETURN","SalesReturn",returnNumber,"Returned "+grandTotal+", refund/credit "+refund);
+
+        try {
+            customerRangeService.onSalesReturnCompleted(savedReturn);
+        } catch (Exception e) {
+            log.error("Failed to sync customer range on sales return {}: {}", returnNumber, e.getMessage());
+        }
 
         log.info("Sales return '{}' completed against invoice '{}'. Total refunded: {}",
                 returnNumber, invoice.getInvoiceNumber(), grandTotal);

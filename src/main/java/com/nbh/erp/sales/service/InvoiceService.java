@@ -57,6 +57,7 @@ public class InvoiceService {
     private final ProductStaffQuotaService productStaffQuotaService;
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
     private final com.nbh.erp.payment.repository.PaymentRepository payments;
+    private final com.nbh.erp.customerrange.service.CustomerRangeService customerRangeService;
 
     public String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -428,6 +429,12 @@ public class InvoiceService {
                         saved.getInvoiceNumber(), getCurrentUsername(), reason != null ? reason : "Manual void")
         );
 
+        try {
+            customerRangeService.onInvoiceVoided(saved);
+        } catch (Exception e) {
+            log.error("Failed to sync customer range on invoice void for {}: {}", saved.getInvoiceNumber(), e.getMessage());
+        }
+
         return InvoiceDto.from(saved);
     }
 
@@ -555,6 +562,12 @@ public class InvoiceService {
                 .amount(invoice.getPaidAmount()).paymentMethod(invoice.getPaymentMethod()).paymentType("INVOICE_PAYMENT").paymentDate(invoice.getInvoiceDate()).status("COMPLETED").notes("Initial invoice payment").build();
             payments.save(receipt);
 
+        }
+
+        try {
+            customerRangeService.onInvoiceFinalized(invoice);
+        } catch (Exception e) {
+            log.error("Failed to sync customer monthly range on invoice finalization for {}: {}", invoice.getInvoiceNumber(), e.getMessage());
         }
     }
 

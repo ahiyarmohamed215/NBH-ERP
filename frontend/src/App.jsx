@@ -17,11 +17,13 @@ import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 
-import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, ShoppingCart, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, ShoppingCart, CreditCard, WifiOff } from 'lucide-react';
+import ErrorState from './components/ErrorState';
 
 export default function App() {
   const { user, loading, logout } = useAuth();
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [currentView, setCurrentView] = useState(() => {
     const p = new URLSearchParams(window.location.hash.slice(1));
     return p.get('view') || 'dashboard';
@@ -68,6 +70,17 @@ export default function App() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   // Automatic purge of legacy localStorage mock caches
@@ -239,6 +252,11 @@ export default function App() {
   const allowedModuleIds = useMemo(
     () => accessibleModules.map((m) => m.id),
     [accessibleModules]
+  );
+
+  const allModuleIds = useMemo(
+    () => moduleDefinitions.map((m) => m.id),
+    [moduleDefinitions]
   );
 
   // Seamless navigation helper supporting legacy and restructured routes
@@ -605,53 +623,53 @@ export default function App() {
 
       {/* Main Workspace Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
+        {/* Offline Warning Banner */}
+        {!isOnline && (
+          <div
+            role="status"
+            style={{
+              backgroundColor: '#fffbeb',
+              color: '#b45309',
+              borderBottom: '1px solid #fde68a',
+              padding: '8px 16px',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              zIndex: 70,
+            }}
+          >
+            <WifiOff size={16} />
+            Unable to connect. You are currently offline. Changes will not be saved until connection is restored.
+          </div>
+        )}
+
         {/* Dynamic Workspace Rendering */}
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
           {accessibleModules.length === 0 ? (
-            <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '0 auto' }}>
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fef3c7',
-                  color: '#d97706',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px',
-                }}
-              >
-                <ShieldAlert size={28} />
-              </div>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', marginBottom: '8px' }}>No Modules Assigned</h2>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                Your account is active, but no system modules or permissions have been assigned to your role yet.
-                Please contact an administrator to configure role permissions for your account.
-              </p>
-            </div>
+            <ErrorState
+              type="access-denied"
+              title="No Modules Assigned"
+              message="Your account is active, but no system modules or permissions have been assigned to your role yet. Please contact an administrator to configure role permissions for your account."
+              onAction={logout}
+              actionText="Sign Out"
+            />
+          ) : !allModuleIds.includes(currentView) ? (
+            <ErrorState
+              type="not-found"
+              title="Page Not Found"
+              message="The requested page or module could not be found."
+              onNavigateHome={() => navigateTo('dashboard')}
+            />
           ) : !allowedModuleIds.includes(currentView) ? (
-            <div style={{ padding: '60px 24px', textAlign: 'center', maxWidth: '480px', margin: '0 auto' }}>
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fee2e2',
-                  color: '#ef4444',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px',
-                }}
-              >
-                <Lock size={28} />
-              </div>
-              <h2 style={{ fontSize: '1.3rem', color: '#0f172a', marginBottom: '8px' }}>Access Restricted</h2>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: '1.6' }}>
-                You do not have permission to view this module.
-              </p>
-            </div>
+            <ErrorState
+              type="access-denied"
+              title="Access Restricted"
+              message="You do not have permission to view this module."
+              onNavigateHome={() => navigateTo('dashboard')}
+            />
           ) : (
             <RetainedWorkspaces key={identity} current={currentView} allowed={allowedModuleIds} render={view => {
               const props = {
@@ -671,7 +689,7 @@ export default function App() {
                 case 'purchasing': return <PurchasingHub {...props} />;
                 case 'delivery': return <DeliveryHub {...props} />;
                 case 'reports': return <ReportsView {...props} />;
-                default: return null;
+                default: return <ErrorState type="not-found" onNavigateHome={() => navigateTo('dashboard')} />;
               }
             }} />
           )}
