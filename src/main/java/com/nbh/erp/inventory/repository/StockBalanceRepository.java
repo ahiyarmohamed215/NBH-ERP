@@ -54,4 +54,13 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
             @Param("query") String query,
             Pageable pageable
     );
+
+    @Query("SELECT COALESCE(SUM(sb.quantity * sb.product.costPrice), 0) FROM StockBalance sb WHERE (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
+    BigDecimal getTotalCostValuation(@Param("warehouseId") Long warehouseId);
+
+    @Query("SELECT COUNT(sb) FROM StockBalance sb WHERE sb.quantity <= sb.product.minStockLevel AND (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
+    long countLowStockAlerts(@Param("warehouseId") Long warehouseId);
+
+    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.product p JOIN FETCH sb.warehouse w WHERE (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
+    List<StockBalance> findAllWithProductAndWarehouse(@Param("warehouseId") Long warehouseId);
 }

@@ -90,6 +90,11 @@ api.request = function (configOrUrl, maybeConfig) {
   return originalRequest(config);
 };
 
+// Explicitly route api.get through wrapped api.request
+api.get = function (url, config = {}) {
+  return api.request({ ...config, method: 'get', url });
+};
+
 // Attach JWT token, correlation ID, and idempotency key automatically
 api.interceptors.request.use((config) => {
   if (['post', 'put', 'patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) {
@@ -98,7 +103,7 @@ api.interceptors.request.use((config) => {
   if (!config.headers['X-Request-Id']) {
     config.headers['X-Request-Id'] = crypto.randomUUID();
   }
-  const token = localStorage.getItem('nbh_token');
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_token') : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -194,7 +199,7 @@ api.interceptors.response.use(
       expireSession();
     }
 
-    if (!config?.url?.startsWith('/auth/') && !config.skipGlobalErrorToast) {
+    if (typeof window !== 'undefined' && !config?.url?.startsWith('/auth/') && !config.skipGlobalErrorToast) {
       window.dispatchEvent(new CustomEvent('erp:api_error', {
         detail: {
           message: friendlyMessage,

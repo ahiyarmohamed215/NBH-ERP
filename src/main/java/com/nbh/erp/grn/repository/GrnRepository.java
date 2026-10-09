@@ -36,4 +36,10 @@ public interface GrnRepository extends JpaRepository<Grn, Long> {
             @Param("query") String query,
             Pageable pageable
     );
+
+    @Query("SELECT DISTINCT g FROM Grn g " +
+           "LEFT JOIN FETCH g.supplier " +
+           "LEFT JOIN FETCH g.warehouse " +
+           "ORDER BY g.createdAt DESC")
+    java.util.List<Grn> findRecentGrns(Pageable pageable);
 }

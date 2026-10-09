@@ -33,6 +33,27 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     BigDecimal outstandingForCustomer(@Param("customerId") Long customerId);
     List<Invoice> findByStatus(String status);
 
+    long countByStatus(String status);
+
+    long countByStatusIn(java.util.Collection<String> statuses);
+
+    @Query("SELECT DISTINCT i FROM Invoice i " +
+           "LEFT JOIN FETCH i.customer " +
+           "LEFT JOIN FETCH i.warehouse " +
+           "LEFT JOIN FETCH i.salesRep " +
+           "ORDER BY i.createdAt DESC")
+    List<Invoice> findRecentInvoices(Pageable pageable);
+
+    @Query("SELECT DISTINCT i FROM Invoice i " +
+           "LEFT JOIN FETCH i.customer " +
+           "WHERE i.status IN :statuses AND i.invoiceDate BETWEEN :startDate AND :endDate " +
+           "ORDER BY i.invoiceDate ASC")
+    List<Invoice> findByStatusInAndDateBetween(
+            @Param("statuses") java.util.Collection<String> statuses,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     List<Invoice> findByStatusAndCreatedBy(String status, String createdBy);
 
     boolean existsByWarehouseId(Long warehouseId);

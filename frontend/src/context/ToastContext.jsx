@@ -6,7 +6,9 @@ const ToastContext = createContext(null);
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const [isServerOutage, setIsServerOutage] = useState(false);
   const recentToastsRef = useRef(new Map()); // Map<string, number> for deduplication
+  const outageIncidentRef = useRef({ active: false, lastNotifiedAt: 0, count: 0 });
 
   const addToast = useCallback((rawMessage, type = 'success') => {
     if (!rawMessage) return;
@@ -14,15 +16,41 @@ export const ToastProvider = ({ children }) => {
     // Sanitize message to strip any technical codes, HTTP statuses, or exception text
     const cleanMessage = sanitizeErrorMessage(rawMessage);
     const toastType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+    const now = Date.now();
+
+    // Check if this error represents an outage / connectivity failure
+    const isOutageMessage =
+      cleanMessage.includes('temporarily unavailable') ||
+      cleanMessage.includes('Unable to connect') ||
+      cleanMessage.includes('taking too long') ||
+      cleanMessage.includes('502') ||
+      cleanMessage.includes('503') ||
+      cleanMessage.includes('504');
+
+    if (isOutageMessage && (toastType === 'error' || toastType === 'warning')) {
+      setIsServerOutage(true);
+      outageIncidentRef.current.active = true;
+      outageIncidentRef.current.count += 1;
+
+      // Group 30+ simultaneous outage failures into EXACTLY ONE user-facing notification with 8-second cooldown
+      if (now - outageIncidentRef.current.lastNotifiedAt < 8000) {
+        return; // Suppress duplicate notification during ongoing outage
+      }
+      outageIncidentRef.current.lastNotifiedAt = now;
+    } else if (outageIncidentRef.current.active && (toastType === 'error' || toastType === 'warning')) {
+      // While a server outage is active, suppress secondary downstream errors (e.g. cascaded fetch failures)
+      // unless it is an explicit form validation error
+      if (!cleanMessage.includes('highlighted fields') && !cleanMessage.includes('validation')) {
+        return;
+      }
+    }
 
     // Deduplication check: prevent multiple identical notifications appearing simultaneously
-    const now = Date.now();
     const dedupKey = `${toastType}:::${cleanMessage}`;
     const lastShown = recentToastsRef.current.get(dedupKey) || 0;
 
-    if (now - lastShown < 3000) {
-      // Skipped duplicate toast within 3 second window
-      return;
+    if (now - lastShown < 3500) {
+      return; // Skipped duplicate toast within cooldown window
     }
 
     recentToastsRef.current.set(dedupKey, now);
@@ -43,8 +71,8 @@ export const ToastProvider = ({ children }) => {
       if (prev.some((t) => t.message === cleanMessage && t.type === toastType)) {
         return prev;
       }
-      // Maximum 4 toasts visible at a time to prevent screen clutter
-      const trimmed = prev.length >= 4 ? prev.slice(prev.length - 3) : prev;
+      // Maximum 3 toasts visible at a time to prevent screen clutter
+      const trimmed = prev.length >= 3 ? prev.slice(prev.length - 2) : prev;
       return [...trimmed, { id, message: cleanMessage, type: toastType }];
     });
 
@@ -68,8 +96,21 @@ export const ToastProvider = ({ children }) => {
       }
     };
 
+    const handleApiHealthy = () => {
+      // Confirmed recovery: clear outage indicator
+      if (outageIncidentRef.current.active) {
+        outageIncidentRef.current.active = false;
+        outageIncidentRef.current.count = 0;
+        setIsServerOutage(false);
+      }
+    };
+
     window.addEventListener('erp:api_error', handleApiError);
-    return () => window.removeEventListener('erp:api_error', handleApiError);
+    window.addEventListener('erp:api_healthy', handleApiHealthy);
+    return () => {
+      window.removeEventListener('erp:api_error', handleApiError);
+      window.removeEventListener('erp:api_healthy', handleApiHealthy);
+    };
   }, [addToast]);
 
   const removeToast = useCallback((id) => {
@@ -79,11 +120,51 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
+
+      {/* Persistent Connection Status Indicator during active server outages */}
+      {isServerOutage && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            top: '14px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000000,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 16px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fca5a5',
+            color: '#991b1b',
+            borderRadius: '20px',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
+            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.16)',
+            pointerEvents: 'auto',
+            animation: 'fadeIn 0.25s ease-out',
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#ef4444',
+              display: 'inline-block',
+            }}
+          />
+          System temporarily unavailable — reconnecting automatically...
+        </div>
+      )}
+
       <div
         aria-live="polite"
         style={{
           position: 'fixed',
-          top: '20px',
+          top: isServerOutage ? '56px' : '20px',
           left: 0,
           right: 0,
           margin: '0 auto',
@@ -95,6 +176,7 @@ export const ToastProvider = ({ children }) => {
           maxWidth: '540px',
           width: 'max-content',
           pointerEvents: 'none',
+          transition: 'top 0.2s ease',
         }}
       >
         {toasts.map((toast) => {
