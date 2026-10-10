@@ -65,6 +65,7 @@ public class DeliveryService {
     @Transactional(readOnly = true)
     public List<InvoiceDto> getPendingInvoicesForDelivery() {
         return invoiceRepository.findAll().stream()
+                .filter(inv -> Boolean.TRUE.equals(inv.getCustomer().getIsActive()))
                 .filter(inv -> com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) &&
                         (inv.getDelivery() == null || "PENDING".equalsIgnoreCase(inv.getDeliveryStatus())))
                 .map(InvoiceDto::from)
@@ -113,6 +114,7 @@ public class DeliveryService {
         }
 
         for (Invoice inv : selectedInvoices) {
+            com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
             if (!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) || inv.getDelivery() != null) {
                 throw new BusinessException(String.format("Invoice '%s' is already in transit under delivery trip '%s'",
                         inv.getInvoiceNumber(), inv.getDelivery()!=null ? inv.getDelivery().getDeliveryNumber() : "ineligible"));
@@ -153,6 +155,7 @@ public class DeliveryService {
 
         // Update assigned invoices
         for (Invoice inv : selectedInvoices) {
+            com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
             inv.setDelivery(saved);
             inv.setDeliveryStatus("OUT_FOR_DELIVERY");
             invoiceRepository.save(inv);
@@ -179,6 +182,7 @@ public class DeliveryService {
     public DeliveryDto dispatchDelivery(Long id, UpdateDeliveryStatusRequest req) {
         Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
+        delivery.getInvoices().forEach(inv -> com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer()));
 
         if ("CANCELLED".equalsIgnoreCase(delivery.getStatus())) {
             throw new BusinessException("Cannot dispatch a cancelled delivery trip");
@@ -228,6 +232,7 @@ public class DeliveryService {
     public DeliveryDto completeDelivery(Long id, UpdateDeliveryStatusRequest req) {
         Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
+        delivery.getInvoices().forEach(inv -> com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer()));
 
         if ("CANCELLED".equalsIgnoreCase(delivery.getStatus())) {
             throw new BusinessException("Cannot complete a cancelled delivery trip");
@@ -286,6 +291,7 @@ public class DeliveryService {
     public DeliveryDto cancelDelivery(Long id, UpdateDeliveryStatusRequest req) {
         Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
+        delivery.getInvoices().forEach(inv -> com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer()));
 
         if ("DELIVERED".equalsIgnoreCase(delivery.getStatus())) {
             throw new BusinessException("Cannot cancel an already completed delivery trip");

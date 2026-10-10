@@ -11,6 +11,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule } from '../utils/permissionUtils';
+import { printA4Report } from '../utils/printReport';
 import {
   Database,
   Building2,
@@ -27,6 +28,7 @@ import {
   Eye,
   Package,
   Download,
+  Printer,
   Award,
 } from 'lucide-react';
 
@@ -203,7 +205,7 @@ const MastersView = React.forwardRef(function MastersView({
         description: '',
       });
     } else if (activeTab === 'brands') {
-      setModalForm({ code: '', name: '', description: '' });
+      setModalForm({ code: '', name: '', description: '', markupPercent: 0 });
     } else if (activeTab === 'warehouses') {
       setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '' });
     } else if (activeTab === 'categories') {
@@ -235,6 +237,7 @@ const MastersView = React.forwardRef(function MastersView({
         code: item.code || '',
         name: item.name || '',
         description: item.description || '',
+        markupPercent: item.markupPercent ?? 0,
       });
     } else {
       setModalForm({
@@ -286,10 +289,17 @@ const MastersView = React.forwardRef(function MastersView({
           return;
         }
         const bCode = modalForm.code?.trim().toUpperCase() || modalForm.name.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 10);
+        const markupPercent = Number(modalForm.markupPercent);
+        if (!Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 99999) {
+          addToast('Enter a valid MP% between 0 and 99999', 'error');
+          setSaving(false);
+          return;
+        }
         const payload = {
           code: bCode,
           name: modalForm.name.trim(),
           description: modalForm.description?.trim() || '',
+          markupPercent,
         };
         if (editingItem) {
           await brandApi.update(editingItem.id, payload);
@@ -409,6 +419,59 @@ const MastersView = React.forwardRef(function MastersView({
   const filteredCategories = filterList(categories, ['code', 'name', 'description']);
   const filteredCustomers = filterList(customers, ['name', 'code', 'customerCode', 'phone', 'contactPerson', 'email']);
   const filteredSuppliers = filterList(suppliers, ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email']);
+
+  const handlePrintSuppliers = (supplier = null) => {
+    const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[character]));
+    const supplierDetails = (item) => ({
+      code: escapeText(item.code || item.supplierCode),
+      name: escapeText(item.name),
+      contactPerson: escapeText(item.contactPerson),
+      phone: escapeText(item.phone),
+      email: escapeText(item.email),
+      address: escapeText(item.address),
+      status: isItemActive(item) ? 'Active' : 'Inactive',
+    });
+    if (supplier) {
+      const details = supplierDetails(supplier);
+      printA4Report({
+        title: 'Supplier Details',
+        columns: [
+          { header: 'Field', accessor: 'field', width: '30%' },
+          { header: 'Details', accessor: 'value' },
+        ],
+        data: [
+          { field: 'Supplier Code', value: details.code },
+          { field: 'Supplier Name', value: details.name },
+          { field: 'Contact Person', value: details.contactPerson },
+          { field: 'Phone', value: details.phone },
+          { field: 'Email', value: details.email },
+          { field: 'Address', value: details.address },
+          { field: 'Status', value: details.status },
+        ],
+      });
+      return;
+    }
+    printA4Report({
+      title: 'Supplier Directory',
+      metaItems: [
+        { label: 'Search', value: escapeText(searchTerm) || 'All suppliers' },
+        { label: 'Status', value: statusFilter === 'ALL' ? 'All' : statusFilter === 'ACTIVE' ? 'Active' : 'Inactive' },
+      ],
+      columns: [
+        { header: 'Code', accessor: 'code' },
+        { header: 'Supplier Name', accessor: 'name' },
+        { header: 'Contact Person', accessor: 'contactPerson' },
+        { header: 'Phone', accessor: 'phone' },
+        { header: 'Email', accessor: 'email' },
+        { header: 'Address', accessor: 'address' },
+        { header: 'Status', accessor: 'status' },
+      ],
+      data: filteredSuppliers.map(supplierDetails),
+      summaryItems: [{ label: 'Total Suppliers', value: String(filteredSuppliers.length) }],
+    });
+  };
 
   const activeCount = currentItems.filter(isItemActive).length;
   const inactiveCount = currentItems.length - activeCount;
@@ -810,10 +873,10 @@ const MastersView = React.forwardRef(function MastersView({
             </button>
           )}
 
-          {/* Export CSV - Icon only */}
+          {/* Supplier print / other master-data CSV export */}
           <button
             type="button"
-            onClick={handleExportCSV}
+            onClick={activeTab === 'suppliers' ? () => handlePrintSuppliers() : handleExportCSV}
             style={{
               height: '38px',
               width: '38px',
@@ -840,9 +903,10 @@ const MastersView = React.forwardRef(function MastersView({
               e.currentTarget.style.borderColor = '#cbd5e1';
               e.currentTarget.style.color = '#64748b';
             }}
-            title={`Export ${activeTab} to CSV`}
+            title={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : `Export ${activeTab} to CSV`}
+            aria-label={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : `Export ${activeTab} to CSV`}
           >
-            <Download size={15} />
+            {activeTab === 'suppliers' ? <Printer size={15} /> : <Download size={15} />}
           </button>
 
           {/* Refresh Records - Icon only */}
@@ -1097,6 +1161,7 @@ const MastersView = React.forwardRef(function MastersView({
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND CODE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND NAME</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', backgroundColor: '#fafbfc' }}>MP%</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTES</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
@@ -1105,7 +1170,7 @@ const MastersView = React.forwardRef(function MastersView({
               <tbody>
                 {filteredBrands.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                       No brands found matching current criteria.
                     </td>
                   </tr>
@@ -1127,6 +1192,7 @@ const MastersView = React.forwardRef(function MastersView({
                       >
                         <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{b.code}</td>
                         <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{b.name}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>{Number(b.markupPercent || 0).toFixed(2)}%</td>
                         <td style={{ padding: '12px 18px', color: '#64748b' }}>{b.description || '—'}</td>
                         <td style={{ padding: '12px 18px' }}>
                           <button
@@ -1636,6 +1702,18 @@ const MastersView = React.forwardRef(function MastersView({
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
                               type="button"
+                              title="Print Supplier Details (A4)"
+                              aria-label="Print Supplier Details (A4)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintSuppliers(s);
+                              }}
+                              style={{ width: '30px', height: '30px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <Printer size={13} />
+                            </button>
+                            <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenEdit({ ...s, code });
@@ -1699,12 +1777,27 @@ const MastersView = React.forwardRef(function MastersView({
                   {viewingItem.name || viewingItem.code}
                 </h2>
               </div>
-              <button
-                onClick={() => setViewingItem(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={22} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {viewingItem.type === 'suppliers' && (
+                  <button
+                    type="button"
+                    className="btn btn-glass"
+                    title="Print Supplier Details (A4)"
+                    onClick={() => handlePrintSuppliers(viewingItem)}
+                  >
+                    <Printer size={15} /> Print
+                  </button>
+                )}
+                <button
+                  type="button"
+                  title="Close"
+                  aria-label="Close"
+                  onClick={() => setViewingItem(null)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                >
+                  <X size={22} />
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '24px' }}>
@@ -1790,6 +1883,13 @@ const MastersView = React.forwardRef(function MastersView({
                     <span>{viewingItem.address || '—'}</span>
                   </div>
                 </>
+              )}
+
+              {viewingItem.type === 'brands' && (
+                <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>MP% (Markup on cost)</span>
+                  <div style={{ marginTop: '6px', fontWeight: 700 }}>{Number(viewingItem.markupPercent || 0).toFixed(2)}%</div>
+                </div>
               )}
 
               {viewingItem.type === 'categories' && (
@@ -2030,6 +2130,12 @@ const MastersView = React.forwardRef(function MastersView({
 
               {activeTab === 'brands' && (
                 <>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px', fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
+                    MP% (Markup on cost)
+                    <input type="number" className="input-glass" min="0" max="99999" step="0.01"
+                      value={modalForm.markupPercent ?? 0}
+                      onChange={(e) => setModalForm({ ...modalForm, markupPercent: e.target.value })} />
+                  </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>

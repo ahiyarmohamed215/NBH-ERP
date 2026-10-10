@@ -13,16 +13,45 @@ import java.util.Optional;
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select e from Customer e where e.id = :id")
-    java.util.Optional<Customer> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+    java.util.Optional<Customer> findAnyByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
+    default Optional<Customer> findByIdForUpdate(Long id) {
+        return findAnyByIdForUpdate(id).map(customer -> {
+            requireActive(customer);
+            return customer;
+        });
+    }
+
+    Optional<Customer> findByIdAndIsActiveTrue(Long id);
+
+    default List<Customer> requireActiveCustomers(List<Long> ids) {
+        List<Customer> customers = findAllById(ids);
+        if (customers.size() != new java.util.HashSet<>(ids).size()) {
+            throw new com.nbh.erp.common.exception.BusinessException("Unknown customer in assignment");
+        }
+        customers.forEach(CustomerRepository::requireActive);
+        return customers;
+    }
+
+    static void requireActive(Customer customer) {
+        if (customer != null && !Boolean.TRUE.equals(customer.getIsActive())) {
+            throw new com.nbh.erp.common.exception.BusinessException("Customer is inactive");
+        }
+    }
 
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();
+    long countByIsActiveTrue();
 
-    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g WHERE g.id = :customerGroupId OR c.customerGroup.id = :customerGroupId")
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g WHERE c.isActive = true AND (g.id = :customerGroupId OR c.customerGroup.id = :customerGroupId)")
     List<Customer> findByCustomerGroupId(@Param("customerGroupId") Long customerGroupId);
 
-    List<Customer> findByDeliveryRouteId(Long deliveryRouteId);
+    List<Customer> findByDeliveryRouteIdAndIsActiveTrue(Long deliveryRouteId);
+
+    default List<Customer> findByDeliveryRouteId(Long deliveryRouteId) {
+        return findByDeliveryRouteIdAndIsActiveTrue(deliveryRouteId);
+    }
 
     default List<Customer> findByRouteId(Long routeId) {
         return findByCustomerGroupId(routeId);

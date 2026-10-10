@@ -28,7 +28,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p " +
            "LEFT JOIN p.customer c " +
            "LEFT JOIN p.invoice i " +
-           "WHERE (:customerId IS NULL OR c.id = :customerId) " +
+           "WHERE c.isActive = true AND (:customerId IS NULL OR c.id = :customerId) " +
            "AND (:invoiceId IS NULL OR i.id = :invoiceId) " +
            "AND (:paymentType IS NULL OR p.paymentType = :paymentType) " +
            "AND (:paymentMethod IS NULL OR p.paymentMethod = :paymentMethod) " +

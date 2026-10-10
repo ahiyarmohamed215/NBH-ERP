@@ -41,6 +41,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
            "LEFT JOIN FETCH i.customer " +
            "LEFT JOIN FETCH i.warehouse " +
            "LEFT JOIN FETCH i.salesRep " +
+           "WHERE i.customer.isActive = true " +
            "ORDER BY i.createdAt DESC")
     List<Invoice> findRecentInvoices(Pageable pageable);
 
@@ -62,7 +63,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByCustomerId(Long customerId);
 
-    @Query("SELECT i FROM Invoice i WHERE " +
+    @Query("SELECT i FROM Invoice i WHERE i.customer.isActive = true AND " +
             "(:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR i.customer.id = :customerId) AND " +
             "(:status IS NULL OR i.status = :status) AND " +

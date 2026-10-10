@@ -1,0 +1,103 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import React, { act } from 'react';
+import { createServer } from 'vite';
+import { Window } from 'happy-dom';
+
+test('GRN directory prints and intake accepts products with different destinations', async () => {
+  const window = new Window();
+  Object.assign(globalThis, { window, document: window.document, localStorage: window.localStorage, IS_REACT_ACT_ENVIRONMENT: true });
+  const { createRoot } = await import('react-dom/client');
+  const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } });
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  try {
+    const apis = await server.ssrLoadModule('/src/api/apiClient.js');
+    for (const [name, api] of Object.entries(apis)) {
+      if (!name.endsWith('Api') || !api || typeof api !== 'object') continue;
+      for (const method of Object.keys(api)) if (typeof api[method] === 'function') api[method] = async () => ({ data: [] });
+    }
+    const products = [
+      { id: 1, sku: 'P-1', name: 'First product', defaultWarehouseId: 10, defaultWarehouseName: 'Hidden North Warehouse', categoryName: 'Rice', brandName: 'First brand', brandMarkupPercent: 25, costPrice: 4 },
+      { id: 2, sku: 'P-2', name: 'Second product', defaultWarehouseId: 20, defaultWarehouseName: 'Hidden South Warehouse', categoryName: 'Flour', brandName: 'Second brand', costPrice: 6 },
+    ];
+    const grn = { id: 5, grnNumber: 'GRN-5', supplierName: 'Test supplier', warehouseName: 'Hidden North Warehouse', receivedDate: '2026-10-10', status: 'PROCESSED', items: [{ productId: 1 }, { productId: 1 }, { productId: 2 }] };
+    apis.grnApi.search = async () => ({ data: { content: [grn] } });
+    apis.grnApi.getById = async () => ({ data: grn });
+    apis.supplierApi.getActive = async () => ({ data: [{ id: 3, name: 'Test supplier' }] });
+    apis.productApi.getProducts = async () => ({ data: { content: products } });
+    const stockRequests = [];
+    apis.inventoryApi.getWarehouseStock = async (id) => { stockRequests.push(id); return { data: [] }; };
+    let saved;
+    apis.grnApi.create = async (payload) => { saved = payload; return { data: { grnNumber: 'GRN-6' } }; };
+    let printed;
+    window.open = () => ({ document: { open() {}, write(html) { printed = html; }, close() {} } });
+    const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
+    const { ToastProvider } = await server.ssrLoadModule('/src/context/ToastContext.jsx');
+    const { default: GrnView } = await server.ssrLoadModule('/src/views/GrnView.jsx');
+    const ref = React.createRef();
+    await act(async () => root.render(React.createElement(AuthProvider, null, React.createElement(ToastProvider, null, React.createElement(GrnView, { ref })))));
+    assert.deepEqual([...host.querySelectorAll('thead th')].map((cell) => cell.textContent.trim()), ['GRN NUMBER', 'SUPPLIER', 'TOTAL PRODUCTS', 'DATE', 'STATUS', 'ACTIONS']);
+    assert.equal(host.querySelector('tbody tr td:nth-child(3)').textContent.trim(), '2');
+    assert.ok(!host.textContent.includes('Hidden North Warehouse'));
+    assert.ok(!host.textContent.includes('Create GRN'));
+    assert.equal(host.querySelector('[aria-label="Refresh records"]').textContent.trim(), '');
+    await act(async () => host.querySelector('[aria-label="Print GRN Directory (A4)"]').click());
+    assert.ok(printed.includes('GRN-5') && printed.includes('Total Products'));
+    assert.ok(!printed.includes('Hidden North Warehouse'));
+    await act(async () => host.querySelector('tbody tr').click());
+    const popup = host.querySelector('[role="dialog"]');
+    assert.equal(popup.querySelector('.grn-inspection-details'), null);
+    assert.ok(popup.querySelector('.purchase-inspection-items table'));
+    assert.ok(popup.querySelector('.purchase-inspection-actions'));
+    assert.equal(popup.querySelectorAll('[title="Print GRN"]').length, 1);
+    assert.equal(popup.querySelector('footer'), null);
+    assert.ok(!popup.textContent.includes('TOTAL INWARD VALUE'));
+    assert.ok(!popup.textContent.includes('PDF'));
+    await act(async () => popup.querySelector('[aria-label="Close GRN details"]').click());
+    await act(async () => ref.current.openCreate());
+    assert.deepEqual([...host.querySelectorAll('thead th')].map((cell) => cell.textContent.trim()), ['Product code', 'Product name', 'Qty', 'Unit cost', 'MP%', 'Selling price', 'Actions']);
+    assert.ok(!host.textContent.includes('Supplier invoice') && !host.textContent.includes('GRN type'));
+    assert.ok(!host.querySelector('input[name="freeQuantity"]') && !host.querySelector('input[name="discountPercent"]'));
+    for (const product of products) {
+      const input = host.querySelector('input[placeholder^="Search product"]');
+      await act(async () => { input.blur(); input.focus(); });
+      const label = [...host.querySelectorAll('span')].find((span) => span.textContent === product.sku);
+      assert.ok(label, `Product ${product.sku} is available`);
+      assert.ok(!host.textContent.includes(product.defaultWarehouseName));
+      await act(async () => label.parentElement.parentElement.click());
+      if (product.id === 1) assert.equal(host.querySelector('input[name="salePrice"]').value, '5');
+      await act(async () => host.querySelector('.grn-add-item').click());
+    }
+    assert.equal(host.querySelectorAll('tbody tr').length, 2);
+    assert.deepEqual(stockRequests, [10, 20]);
+    await act(async () => host.querySelector('[aria-label="Edit item 1"]').click());
+    assert.equal(host.querySelector('input[name="salePrice"]').readOnly, true);
+    const changeNumber = async (name, value) => act(async () => {
+      const input = host.querySelector(`input[name="${name}"]`);
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    await changeNumber('costPrice', '8');
+    assert.equal(host.querySelector('input[name="salePrice"]').value, '10');
+    await act(async () => host.querySelector('[aria-label="Use brand MP%"]').click());
+    assert.equal(host.querySelector('input[name="salePrice"]').readOnly, false);
+    await changeNumber('salePrice', '11.25');
+    await act(async () => host.querySelector('.grn-add-item').click());
+    assert.equal(host.querySelectorAll('tbody tr').length, 2, 'Editing replaces a line without duplicating its quantity');
+    assert.ok(host.querySelector('tbody tr').textContent.includes('11.25'));
+    await act(async () => host.querySelector('[aria-label="Remove item 2"]').click());
+    assert.equal(host.querySelectorAll('tbody tr').length, 1);
+    const save = [...host.querySelectorAll('button')].find((button) => /Save (as )?Draft/.test(button.textContent));
+    await act(async () => save.click());
+    assert.deepEqual(saved.items.map((item) => item.productId), [1]);
+    assert.equal(saved.items[0].sellingPrice, 11.25);
+    assert.equal(saved.items[0].useBrandMarkup, false);
+    assert.equal(saved.warehouseId, undefined);
+  } finally {
+    // Allow native toast expiry timers to complete before removing the browser globals.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5500)); });
+    await act(async () => { await window.happyDOM.waitUntilComplete(); root.unmount(); });
+    await server.close(); await window.happyDOM.close();
+    for (const key of ['window', 'document', 'localStorage', 'IS_REACT_ACT_ENVIRONMENT']) delete globalThis[key];
+  }
+});

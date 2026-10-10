@@ -19,12 +19,15 @@ public interface GrnRepository extends JpaRepository<Grn, Long> {
 
     Optional<Grn> findByGrnNumber(String grnNumber);
 
-    boolean existsByWarehouseId(Long warehouseId);
+    @Query("SELECT COUNT(g) > 0 FROM Grn g WHERE g.warehouse.id = :warehouseId OR EXISTS " +
+            "(SELECT i.id FROM GrnItem i WHERE i.grn = g AND i.warehouse.id = :warehouseId)")
+    boolean existsByWarehouseId(@Param("warehouseId") Long warehouseId);
 
     boolean existsBySupplierId(Long supplierId);
 
     @Query("SELECT g FROM Grn g WHERE " +
-            "(:warehouseId IS NULL OR g.warehouse.id = :warehouseId) AND " +
+            "(:warehouseId IS NULL OR EXISTS (SELECT i.id FROM GrnItem i WHERE i.grn = g " +
+            "AND COALESCE(i.warehouse.id, g.warehouse.id) = :warehouseId)) AND " +
             "(:supplierId IS NULL OR g.supplier.id = :supplierId) AND " +
             "(:status IS NULL OR g.status = :status) AND " +
             "(:query IS NULL OR :query = '' OR LOWER(g.grnNumber) LIKE LOWER(CONCAT('%', :query, '%')) " +

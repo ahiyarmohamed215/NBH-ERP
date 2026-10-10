@@ -1,3 +1,4 @@
+import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
@@ -144,12 +145,17 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   };
 
   const handleExecuteTransfer = async (id, gtnNumber) => {
+    if (saving) return;
+    setSaving(true);
     try {
-      await gtnApi.transfer(id);
+      const res = await gtnApi.transfer(id);
+      setSelectedGtn((current) => current?.id === id ? res.data : current);
       addToast(`GTN ${gtnNumber} transferred! Stocks updated in both warehouses.`, 'success');
       loadData();
     } catch (err) {
-      addToast('Transfer failed: ' + err.message, 'error');
+      addToast(err.response?.data?.message || 'Transfer failed: ' + err.message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -776,27 +782,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             </div>
 
             <div className="purchase-body">
-              <div className="purchase-fields"><label>Source warehouse *<select value={formData.sourceWarehouseId} onChange={e=>setFormData({...formData, sourceWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Destination warehouse *<select value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Remarks / transfer reason<input type="text" value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>
               <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false}
-                onChange={items=>setFormData(previous=>({...previous,items}))} />
-            </div>
-
-            {/* Modal Footer */}
-            <div
-              style={{
-                padding: '12px 20px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
-                Total Transfer Quantity: <strong style={{ color: '#0284c7', fontSize: '1.25rem', fontWeight: 900 }}>{calculateTotalUnits()} units</strong>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label>Source warehouse *<select value={formData.sourceWarehouseId} onChange={e=>setFormData({...formData, sourceWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Destination warehouse *<select value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label className="purchase-remarks">Remarks / transfer reason<textarea rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+                actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
@@ -849,145 +837,22 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
                   {saving ? 'Processing...' : 'Direct Transfer & Dispatch'}
                 </button>
-              </div>
+              </div>} />
             </div>
           </div>
         </div>
       )}
 
       {/* GTN Inspection Drawer / Modal */}
-      {selectedGtn && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: 'min(1020px, 96vw)',
-              maxWidth: '1020px',
-              maxHeight: 'calc(100vh - 24px)',
-              overflowY: 'auto',
-              padding: '24px',
-              background: '#ffffff',
-              borderRadius: '14px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Goods Transfer Note Details
-                </span>
-                <h2 style={{ fontSize: '1.45rem', color: '#0f172a', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Package size={24} color="#2563eb" /> {selectedGtn.gtnNumber}
-                </h2>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass btn-sm"
-                  onClick={() => pdfApi.downloadGtn(selectedGtn.id, selectedGtn.gtnNumber)}
-                  style={{ fontWeight: 700, color: '#15803d', borderColor: '#86efac', padding: '7px 12px' }}
-                >
-                  <Download size={15} color="#15803d" /> Download PDF
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => pdfApi.printGtn(selectedGtn.id)}
-                  style={{ fontWeight: 700, padding: '7px 14px' }}
-                >
-                  <Printer size={15} /> Print Direct
-                </button>
-                <button
-                  onClick={() => setSelectedGtn(null)}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
-                >
-                  <X size={22} />
-                </button>
-              </div>
-            </div>
+      {selectedGtn && <PurchaseInspectionModal type="GTN" number={selectedGtn.gtnNumber} status={selectedGtn.status} rows={selectedGtn.items || []}
+        onClose={() => setSelectedGtn(null)} onPrint={() => pdfApi.printGtn(selectedGtn.id)}
+        actions={['DRAFT', 'PENDING'].includes(selectedGtn.status) ? [{ label: 'Transfer GTN', icon: CheckCircle, disabled: saving, onClick: () => handleExecuteTransfer(selectedGtn.id, selectedGtn.gtnNumber) }] : []}
+        columns={[
+          { label: 'Product code', value: item => item.productSku || '—' },
+          { label: 'Product', value: item => item.productName },
+          { label: 'Qty transferred', numeric: true, value: item => item.quantityTransferred ?? item.quantity },
+        ]} />}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '18px', fontSize: '0.9rem' }}>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>SOURCE WAREHOUSE</div>
-                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{selectedGtn.sourceWarehouseName}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>DESTINATION WAREHOUSE</div>
-                <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '1.05rem' }}>{selectedGtn.destinationWarehouseName}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>STATUS</div>
-                <div>
-                  <span className={`badge ${selectedGtn.status === 'TRANSFERRED' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.85rem' }}>
-                    {selectedGtn.status}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700 }}>DATE & TIME</div>
-                <div style={{ color: '#334155', fontWeight: 600 }}>
-                  {selectedGtn.transferredAt ? new Date(selectedGtn.transferredAt).toLocaleString() : '—'}
-                </div>
-              </div>
-            </div>
-
-            {selectedGtn.remarks && (
-              <div style={{ padding: '10px 14px', background: '#f1f5f9', borderRadius: '6px', marginBottom: '16px', fontSize: '0.86rem', color: '#475569' }}>
-                <span style={{ fontWeight: 700 }}>Remarks:</span> {selectedGtn.remarks}
-              </div>
-            )}
-
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Transferred Item Lines</h3>
-            <div style={{ border: '2px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <table className="glass-table" style={{ margin: 0 }}>
-                <thead style={{ background: '#f1f5f9' }}>
-                  <tr>
-                    <th style={{ padding: '10px 14px' }}>Product</th>
-                    <th style={{ padding: '10px 14px' }}>SKU</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Qty Transferred</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedGtn.items?.map((it, idx) => (
-                    <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                      <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0f172a' }}>{it.productName}</td>
-                      <td style={{ padding: '10px 14px', fontFamily: 'monospace', color: '#64748b' }}>{it.productSku || '—'}</td>
-                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#1d4ed8', fontSize: '0.95rem' }}>
-                        {it.quantityTransferred}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                className="btn btn-glass"
-                onClick={() => pdfApi.downloadGtn(selectedGtn.id, selectedGtn.gtnNumber)}
-                style={{ fontWeight: 700, color: '#15803d', borderColor: '#86efac' }}
-              >
-                <Download size={15} color="#15803d" /> Download PDF
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => pdfApi.printGtn(selectedGtn.id)}
-                style={{ fontWeight: 700 }}
-              >
-                <Printer size={15} /> Print Direct
-              </button>
-              <button className="btn btn-glass" onClick={() => setSelectedGtn(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 });

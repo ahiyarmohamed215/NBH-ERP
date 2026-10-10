@@ -103,7 +103,7 @@ public class CustomerGroupService {
         CustomerGroup saved = customerGroupRepository.save(group);
 
         if (request.getCustomerIds() != null && !request.getCustomerIds().isEmpty()) {
-            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> {
+            customerRepository.requireActiveCustomers(request.getCustomerIds()).forEach(c -> {
                 c.getCustomerGroups().add(saved);
                 if (c.getCustomerGroup() == null) {
                     c.setCustomerGroup(saved);
@@ -170,7 +170,7 @@ public class CustomerGroupService {
                     }
                 }
             });
-            customerRepository.findAllById(request.getCustomerIds()).forEach(c -> {
+            customerRepository.requireActiveCustomers(request.getCustomerIds()).forEach(c -> {
                 c.getCustomerGroups().add(saved);
                 if (c.getCustomerGroup() == null) {
                     c.setCustomerGroup(saved);

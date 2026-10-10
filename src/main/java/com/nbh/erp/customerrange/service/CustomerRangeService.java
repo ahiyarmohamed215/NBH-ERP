@@ -187,7 +187,7 @@ public class CustomerRangeService {
 
     @Transactional
     public CustomerMonthlyProgressDto getCustomerProgress(Long customerId, BigDecimal hypotheticalCartTotal) {
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
         String currentMonth = getCurrentYearMonth();
@@ -378,7 +378,7 @@ public class CustomerRangeService {
         ensureSummariesForMonth(targetMonth);
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
 
-        long totalActiveCustomers = customerRepository.count();
+        long totalActiveCustomers = customerRepository.countByIsActiveTrue();
         long activePurchasers = summaryRepository.countActivePurchasersByYearMonth(targetMonth);
         long zeroPurchasers = Math.max(0, totalActiveCustomers - activePurchasers);
         BigDecimal totalSales = summaryRepository.getTotalQualifyingSalesByYearMonth(targetMonth);
@@ -446,6 +446,8 @@ public class CustomerRangeService {
 
     @Transactional(readOnly = true)
     public List<CustomerRangeHistoryDto> getCustomerRangeHistory(Long customerId) {
+        customerRepository.findByIdAndIsActiveTrue(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
         List<CustomerMonthlySummary> summaries = summaryRepository.findByCustomerIdOrderByYearMonthDesc(customerId);
 
         return summaries.stream().map(s -> CustomerRangeHistoryDto.builder()
@@ -653,7 +655,7 @@ public class CustomerRangeService {
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.atEndOfMonth();
 
-        List<Customer> allCustomers = customerRepository.findAll();
+        List<Customer> allCustomers = customerRepository.findByIsActiveTrue();
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
         List<CustomerMonthlySummary> toSave = new ArrayList<>();
 
@@ -695,7 +697,7 @@ public class CustomerRangeService {
 
     @Transactional
     public CustomerMonthlyProgressDto assignStaff(Long customerId, Long staffId) {
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
         User staff = null;
         if (staffId != null) {

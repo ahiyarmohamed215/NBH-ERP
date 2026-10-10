@@ -94,7 +94,7 @@ public class DeliveryRouteService {
         DeliveryRoute saved = routeRepository.save(route);
 
         if (req.getCustomerIds() != null && !req.getCustomerIds().isEmpty()) {
-            customerRepository.findAllById(req.getCustomerIds()).forEach(c -> c.setDeliveryRoute(saved));
+            customerRepository.requireActiveCustomers(req.getCustomerIds()).forEach(c -> c.setDeliveryRoute(saved));
         }
 
         auditLogService.log(
@@ -150,7 +150,7 @@ public class DeliveryRouteService {
                     c.setDeliveryRoute(null);
                 }
             });
-            customerRepository.findAllById(req.getCustomerIds()).forEach(c -> c.setDeliveryRoute(saved));
+            customerRepository.requireActiveCustomers(req.getCustomerIds()).forEach(c -> c.setDeliveryRoute(saved));
         }
 
         auditLogService.log(

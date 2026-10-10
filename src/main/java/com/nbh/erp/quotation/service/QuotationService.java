@@ -64,6 +64,7 @@ public class QuotationService {
     public QuotationDto getQuotationById(Long id) {
         Quotation quotation = quotationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
+        CustomerRepository.requireActive(quotation.getCustomer());
         return QuotationDto.from(quotation);
     }
 
@@ -171,6 +172,7 @@ public class QuotationService {
     public QuotationDto updateQuotation(Long id, CreateQuotationRequest request) {
         Quotation quotation = quotationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
+        CustomerRepository.requireActive(quotation.getCustomer());
 
         SecurityUtils.enforceCanEdit("QUOTATION", quotation.getQuotationNumber());
 
@@ -179,7 +181,7 @@ public class QuotationService {
         }
 
         if (request.getCustomerId() != null) {
-            Customer customer = customerRepository.findByIdForUpdate(request.getCustomerId()).orElse(null);
+            Customer customer = customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow(() -> new BusinessException("Unknown customer"));
             quotation.setCustomer(customer);
             if (customer != null) {
                 quotation.setCustomerName(customer.getName());
@@ -251,6 +253,7 @@ public class QuotationService {
     public InvoiceDto convertToInvoice(Long id, Long warehouseId) {
         Quotation quotation = quotationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
+        CustomerRepository.requireActive(quotation.getCustomer());
 
         if ("CONVERTED".equals(quotation.getStatus())) {
             throw new BusinessException("Quotation " + quotation.getQuotationNumber() + " has already been converted to invoice " + quotation.getConvertedInvoiceNumber());

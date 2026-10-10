@@ -53,6 +53,15 @@ public class CreateGrnRequest {
         @PositiveOrZero(message = "Unit cost cannot be negative")
         private BigDecimal unitCost;
 
+        @PositiveOrZero(message = "Selling price cannot be negative")
+        private BigDecimal sellingPrice;
+
+        @PositiveOrZero(message = "MP% cannot be negative")
+        @jakarta.validation.constraints.DecimalMax("99999")
+        private BigDecimal markupPercent;
+
+        private Boolean useBrandMarkup;
+
         private String notes;
     }
 }

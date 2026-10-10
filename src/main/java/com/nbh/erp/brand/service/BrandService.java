@@ -76,6 +76,7 @@ public class BrandService {
                 .code(cleanCode)
                 .name(request.getName().trim())
                 .description(request.getDescription())
+                .markupPercent(request.getMarkupPercent() != null ? request.getMarkupPercent() : java.math.BigDecimal.ZERO)
                 .isActive(true)
                 .build();
 
@@ -96,6 +97,7 @@ public class BrandService {
 
         brand.setName(request.getName().trim());
         brand.setDescription(request.getDescription());
+        if (request.getMarkupPercent() != null) brand.setMarkupPercent(request.getMarkupPercent());
 
         Brand saved = brandRepository.save(brand);
         log.info("Brand ID {} updated: {} by {}", id, saved.getName(), getCurrentUsername());

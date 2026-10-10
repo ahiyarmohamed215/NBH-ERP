@@ -50,6 +50,8 @@ class RegressionIntegrationTest {
  @Autowired JwtTokenProvider tokens; @Autowired PasswordEncoder passwords; @Autowired WebApplicationContext context;
  @Autowired com.nbh.erp.auth.service.AuthService auth;
  @Autowired com.nbh.erp.grn.service.GrnService grns;
+ @Autowired com.nbh.erp.brand.service.BrandService brandService;
+ @Autowired com.nbh.erp.brand.repository.BrandRepository brands;
  @Autowired com.nbh.erp.payment.service.SupplierPaymentService supplierPayments;
  @Autowired com.nbh.erp.purchasereturn.service.PurchaseReturnService purchaseReturns;
  @Autowired com.nbh.erp.inventory.repository.ProductStaffQuotaRepository quotas;
@@ -70,6 +72,27 @@ class RegressionIntegrationTest {
  void principal(User u) { var p=UserPrincipal.create(u); SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities())); }
  @AfterEach void cleanup() { SecurityContextHolder.clearContext(); org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
  CreateInvoiceRequest sale(boolean held) { return CreateInvoiceRequest.builder().customerId(customer.getId()).warehouseId(warehouse.getId()).paymentType("CREDIT").paidAmount(BigDecimal.ZERO).hold(held).items(List.of(CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(product.getId()).quantity(n("2")).unitPrice(n("10")).build())).build(); }
+ @Test void inactiveCustomerIsHiddenAndExistingDocumentsCannotBeUsed() {
+  var invoice = invoices.createInvoice(sale(false));
+  var held = invoices.createInvoice(sale(true));
+  var advance = payments.processPayment(CreatePaymentRequest.builder().customerId(customer.getId()).amount(n("50")).build());
+  customer.setIsActive(false); customers.saveAndFlush(customer);
+  var customerService = context.getBean(com.nbh.erp.customer.service.CustomerService.class);
+  assertTrue(customerService.getAllCustomers().stream().noneMatch(c -> c.getId().equals(customer.getId())));
+  assertTrue(customerService.searchCustomers("Regression customer").isEmpty());
+  assertThrows(RuntimeException.class, () -> customerService.getCustomerById(customer.getId()));
+  assertThrows(RuntimeException.class, () -> customers.requireActiveCustomers(List.of(customer.getId())));
+  assertThrows(RuntimeException.class, () -> invoices.createInvoice(sale(false)));
+  assertThrows(RuntimeException.class, () -> invoices.getInvoiceById(invoice.getId()));
+  assertThrows(RuntimeException.class, () -> invoices.cancelHeldInvoice(held.getId()));
+  assertThrows(RuntimeException.class, () -> payments.processPayment(CreatePaymentRequest.builder().invoiceId(invoice.getId()).amount(n("5")).build()));
+  assertThrows(RuntimeException.class, () -> payments.allocateAdvance(advance.getId(), invoice.getId(), n("5")));
+  assertThrows(RuntimeException.class, () -> payments.voidPayment(advance.getId(), "Reversal"));
+  assertThrows(RuntimeException.class, () -> returns.createSalesReturn(returnRequest(invoice, "1")));
+  assertTrue(invoices.searchInvoices(null, customer.getId(), null, null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 20)).getContent().isEmpty());
+  assertTrue(payments.searchPayments(customer.getId(), null, null, null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 20)).getContent().isEmpty());
+  assertTrue(customers.findById(customer.getId()).isPresent(), "Historical records remain stored");
+ }
  @Test void accountingEndpointsAreRemovedAndCashierSummaryStillWorks() throws Exception {
   var mapping=context.getBean("requestMappingHandlerMapping",org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
   assertTrue(mapping.getHandlerMethods().keySet().stream().flatMap(info->info.getPatternValues().stream()).noneMatch(path->path.contains("/accounting")));
@@ -188,12 +211,44 @@ class RegressionIntegrationTest {
   warehouse.setIsActive(false);warehouses.save(warehouse);
   assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(automaticReceiptRequest(),true));
  }
- @Test void automaticGrnRejectsMixedWarehouses() {
+ @Test void automaticGrnPostsAndCancelsMixedWarehousesUsingOriginalDestinations() {
   var otherWarehouse=warehouses.save(Warehouse.builder().code("OTHER-W").name("Other warehouse").build());
   var other=products.save(Product.builder().sku("OTHER-P").name("Other product").category(product.getCategory()).defaultWarehouse(otherWarehouse).sellingPrice(n("10")).costPrice(n("4")).build());
   var req=automaticReceiptRequest();var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(other.getId());line.setQuantityReceived(n("1"));line.setUnitCost(n("4"));req.setItems(List.of(req.getItems().getFirst(),line));
-  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,true));
+  var receipt=grns.createGrn(req,true);
+  assertEquals(2,receipt.getItems().size());
+  assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals(0,n("1").compareTo(stock.getAvailableStock(otherWarehouse.getId(),other.getId())));
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getAvailableStock(warehouse.getId(),other.getId())));
+  assertTrue(grns.searchGrns(otherWarehouse.getId(),null,null,null,org.springframework.data.domain.Pageable.ofSize(20)).getContent().stream().anyMatch(g -> g.getId().equals(receipt.getId())));
+  other.setDefaultWarehouse(warehouse);products.save(other);
+  grns.cancelGrn(receipt.getId(),"Reverse mixed receipt");
   assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getAvailableStock(otherWarehouse.getId(),other.getId())));
+ }
+ @Test void draftGrnUpdateAllowsMixedDestinationsAndProcessingUsesSavedDestinations() {
+  var otherWarehouse=warehouses.save(Warehouse.builder().code("DRAFT-W").name("Draft destination").build());
+  var other=products.save(Product.builder().sku("DRAFT-P").name("Draft product").category(product.getCategory()).defaultWarehouse(otherWarehouse).sellingPrice(n("10")).costPrice(n("4")).build());
+  var req=automaticReceiptRequest();var draft=grns.createGrn(req,false);
+  var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(other.getId());line.setQuantityReceived(n("3"));line.setUnitCost(n("4"));
+  req.setItems(List.of(req.getItems().getFirst(),line));
+  var updated=grns.updateGrn(draft.getId(),req,false);
+  assertEquals(2,updated.getItems().size());
+  other.setDefaultWarehouse(warehouse);products.save(other);
+  grns.processGrn(draft.getId());
+  assertEquals(0,n("3").compareTo(stock.getAvailableStock(otherWarehouse.getId(),other.getId())));
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getAvailableStock(warehouse.getId(),other.getId())));
+ }
+ @Test void purchaseReturnUsesMatchingLineDestinationFromMixedReceipt() {
+  var otherWarehouse=warehouses.save(Warehouse.builder().code("RETURN-W").name("Return destination").build());
+  var other=products.save(Product.builder().sku("RETURN-P").name("Return product").category(product.getCategory()).defaultWarehouse(otherWarehouse).sellingPrice(n("10")).costPrice(n("4")).build());
+  var req=automaticReceiptRequest();var received=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();received.setProductId(other.getId());received.setQuantityReceived(n("3"));received.setUnitCost(n("4"));
+  req.setItems(List.of(req.getItems().getFirst(),received));var receipt=grns.createGrn(req,true);
+  var returnReq=new com.nbh.erp.purchasereturn.dto.CreatePurchaseReturnRequest();returnReq.setSupplierId(supplier.getId());returnReq.setWarehouseId(otherWarehouse.getId());returnReq.setSourceGrnId(receipt.getId());returnReq.setReturnDate(LocalDate.now());
+  var line=new com.nbh.erp.purchasereturn.dto.CreatePurchaseReturnRequest.CreatePurchaseReturnItemRequest();line.setProductId(other.getId());line.setQuantityReturned(n("2"));line.setUnitCost(n("99"));returnReq.setItems(List.of(line));
+  purchaseReturns.createPurchaseReturn(returnReq,true);
+  assertEquals(0,n("1").compareTo(stock.getAvailableStock(otherWarehouse.getId(),other.getId())));
+  assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
  @Test void automaticGrnRejectsWarehouseOverride() {
   var req=automaticReceiptRequest();req.setWarehouseId(-1L);
@@ -202,6 +257,21 @@ class RegressionIntegrationTest {
  @Test void automaticGrnRejectsInvalidType() {
   var req=automaticReceiptRequest();req.setGrnType("Unknown type");
   assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,false));
+ }
+ @Test void brandMarkupCalculatesReceiptSellingPriceAndManualDraftEditPersists() {
+  var brandReq=new com.nbh.erp.brand.dto.CreateBrandRequest();brandReq.setCode("MP-BRAND");brandReq.setName("Markup brand");brandReq.setMarkupPercent(n("25"));
+  var brand=brandService.createBrand(brandReq);
+  product.setBrand(brands.findById(brand.getId()).orElseThrow());products.save(product);
+  assertEquals(0,n("25").compareTo(com.nbh.erp.product.dto.ProductDto.from(product,true).getBrandMarkupPercent()));
+  var req=automaticReceiptRequest();var line=req.getItems().getFirst();line.setUseBrandMarkup(true);line.setSellingPrice(n("999"));
+  var draft=grns.createGrn(req,false);var saved=draft.getItems().getFirst();
+  assertEquals(0,n("5.00").compareTo(saved.getSellingPrice()));assertEquals(0,n("25").compareTo(saved.getMarkupPercent()));assertTrue(saved.getUseBrandMarkup());
+  line.setUseBrandMarkup(false);line.setSellingPrice(n("7.25"));line.setMarkupPercent(n("25"));
+  var edited=grns.updateGrn(draft.getId(),req,false);
+  assertEquals(0,n("7.25").compareTo(edited.getItems().getFirst().getSellingPrice()));assertFalse(edited.getItems().getFirst().getUseBrandMarkup());
+  assertEquals(0,n("7.25").compareTo(grns.getGrnById(draft.getId()).getItems().getFirst().getSellingPrice()));
+  var update=new com.nbh.erp.brand.dto.UpdateBrandRequest();update.setName("Markup brand");update.setMarkupPercent(n("30"));brandService.updateBrand(brand.getId(),update);
+  assertEquals(0,n("30").compareTo(brandService.getBrandById(brand.getId()).getMarkupPercent()));
  }
  com.nbh.erp.grn.dto.GrnDto receipt() {
   var req=new com.nbh.erp.grn.dto.CreateGrnRequest();req.setSupplierId(supplier.getId());req.setWarehouseId(warehouse.getId());req.setReceivedDate(LocalDate.now());
@@ -237,5 +307,69 @@ class RegressionIntegrationTest {
  @Test void grnCancellationRestoresOriginalStock() {
   var grn=receipt();product.setCostPrice(n("9"));products.save(product);grns.cancelGrn(grn.getId(),"Incorrect receipt");
   assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void processedGrnEditsPostOnlyQuantityDifferencesAndCanBeCancelledAgain() {
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);
+  req.getItems().getFirst().setQuantityReceived(n("8"));
+  assertEquals("PROCESSED",grns.updateGrn(grn.getId(),req,true).getStatus());
+  assertEquals(0,n("108").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  req.getItems().getFirst().setQuantityReceived(n("6"));
+  assertEquals("PROCESSED",grns.updateGrn(grn.getId(),req,false).getStatus());
+  assertEquals(0,n("106").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  grns.updateGrn(grn.getId(),req,true);
+  assertEquals(0,n("106").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  grns.cancelGrn(grn.getId(),"Correct receipt");
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  var restored=grns.processGrn(grn.getId());assertEquals("PROCESSED",restored.getStatus());assertNull(restored.getCancelReason());
+  assertEquals(0,n("106").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.processGrn(grn.getId()));
+  grns.cancelGrn(grn.getId(),"Cancel restored receipt");
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void processedGrnReductionRequiresOnlyTheDifferenceInAvailableStock() {
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);
+  stock.decreaseStock(warehouse.getId(),product.getId(),n("102"),"TEST","USED","Used stock");
+  req.getItems().getFirst().setQuantityReceived(n("3"));
+  grns.updateGrn(grn.getId(),req,true);
+  assertEquals(0,n("1").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void processedGrnEditAndCancellationRejectInsufficientInventoryWithoutChangingReceipt() {
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);
+  stock.decreaseStock(warehouse.getId(),product.getId(),n("104"),"TEST","USED","Used stock");
+  req.getItems().getFirst().setQuantityReceived(n("2"));
+  var failure=assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.updateGrn(grn.getId(),req,true));
+  assertTrue(failure.getMessage().contains("insufficient inventory"));
+  var cancelFailure=assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.cancelGrn(grn.getId(),"Insufficient stock"));
+  assertTrue(cancelFailure.getMessage().contains("available stock is 1"));
+  assertEquals(0,n("1").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals("PROCESSED",grns.getGrnById(grn.getId()).getStatus());
+  assertEquals(0,n("5").compareTo(grns.getGrnById(grn.getId()).getItems().getFirst().getQuantityReceived()));
+ }
+ @Test void processedGrnRemovalChecksOriginalWarehouseAndNewProductsIncreaseTheirOwnStock() {
+  var otherWarehouse=warehouses.save(Warehouse.builder().code("EDIT-W").name("Edit destination").build());
+  var other=products.save(Product.builder().sku("EDIT-P").name("Edit product").category(product.getCategory()).defaultWarehouse(otherWarehouse).sellingPrice(n("10")).costPrice(n("4")).build());
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);
+  product.setDefaultWarehouse(otherWarehouse);products.save(product);
+  var added=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();added.setProductId(other.getId());added.setQuantityReceived(n("2"));added.setUnitCost(n("4"));
+  req.setItems(List.of(req.getItems().getFirst(),added));grns.updateGrn(grn.getId(),req,true);
+  assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getAvailableStock(otherWarehouse.getId(),product.getId())));
+  assertEquals(0,n("2").compareTo(stock.getAvailableStock(otherWarehouse.getId(),other.getId())));
+  req.setItems(List.of(added));grns.updateGrn(grn.getId(),req,true);
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void cancelledGrnEditDoesNotPostStockUntilReprocessed() {
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);grns.cancelGrn(grn.getId(),"Correction");
+  req.getItems().getFirst().setQuantityReceived(n("9"));
+  assertEquals("CANCELLED",grns.updateGrn(grn.getId(),req,false).getStatus());
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals("PROCESSED",grns.processGrn(grn.getId()).getStatus());
+  assertEquals(0,n("109").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void processedGrnEditPreservesPaymentAndReturnSafeguards() {
+  var req=automaticReceiptRequest();var grn=grns.createGrn(req,true);supplierPayments.pay(grn.getId(),n("5"),"BANK_TRANSFER");
+  req.getItems().getFirst().setQuantityReceived(n("3"));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.updateGrn(grn.getId(),req,true));
+  assertEquals(0,n("105").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
 }

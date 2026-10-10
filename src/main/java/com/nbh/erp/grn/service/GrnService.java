@@ -45,6 +45,11 @@ public class GrnService {
     private final AuditLogService auditLogService;
 
     private void replaceItems(Grn grn, CreateGrnRequest request) {
+        setItems(grn, buildItems(grn, request));
+    }
+
+    private java.util.List<GrnItem> buildItems(Grn grn, CreateGrnRequest request) {
+        var destinations = savedDestinations(grn);
         var merged = new java.util.LinkedHashMap<Long, GrnItem>();
         for (var incoming : request.getItems()) {
             Product product = productRepository.findById(incoming.getProductId())
@@ -52,7 +57,7 @@ public class GrnService {
             BigDecimal value = incoming.getQuantityReceived().multiply(incoming.getUnitCost());
             GrnItem line = merged.get(product.getId());
             if (line == null) {
-                line = GrnItem.builder().grn(grn).product(product)
+                line = GrnItem.builder().grn(grn).product(product).warehouse(destinations.getOrDefault(product.getId(), product.getDefaultWarehouse()))
                         .quantityReceived(incoming.getQuantityReceived()).unitCost(incoming.getUnitCost())
                         .totalCost(value).notes(incoming.getNotes()).build();
                 merged.put(product.getId(), line);
@@ -62,10 +67,30 @@ public class GrnService {
                 line.setUnitCost(line.getTotalCost().divide(line.getQuantityReceived(), 8, java.math.RoundingMode.HALF_UP));
                 if (incoming.getNotes() != null) line.setNotes(incoming.getNotes());
             }
+            line.setUseBrandMarkup(incoming.getUseBrandMarkup());
+            if (Boolean.TRUE.equals(incoming.getUseBrandMarkup())) {
+                BigDecimal markup = product.getBrand() != null ? product.getBrand().getMarkupPercent() : BigDecimal.ZERO;
+                line.setMarkupPercent(markup);
+                line.setSellingPrice(line.getUnitCost().multiply(BigDecimal.ONE.add(markup.movePointLeft(2)))
+                        .setScale(2, java.math.RoundingMode.HALF_UP));
+            } else {
+                line.setMarkupPercent(incoming.getMarkupPercent());
+                line.setSellingPrice(incoming.getSellingPrice());
+            }
         }
+        return new ArrayList<>(merged.values());
+    }
+
+    private void setItems(Grn grn, java.util.List<GrnItem> items) {
         grn.getItems().clear();
-        grn.getItems().addAll(merged.values());
-        grn.setTotalAmount(merged.values().stream().map(GrnItem::getTotalCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+        grn.getItems().addAll(items);
+        grn.setTotalAmount(items.stream().map(GrnItem::getTotalCost).reduce(BigDecimal.ZERO, BigDecimal::add));
+    }
+
+    private java.util.Map<Long, Warehouse> savedDestinations(Grn grn) {
+        var destinations = new java.util.HashMap<Long, Warehouse>();
+        grn.getItems().forEach(item -> destinations.put(item.getProduct().getId(), item.getReceivingWarehouse()));
+        return destinations;
     }
 
     private String resolveGrnType(String type) {
@@ -78,6 +103,10 @@ public class GrnService {
     }
 
     private Warehouse resolveWarehouse(CreateGrnRequest request) {
+        return resolveWarehouse(request, java.util.Map.of());
+    }
+
+    private Warehouse resolveWarehouse(CreateGrnRequest request, java.util.Map<Long, Warehouse> destinations) {
         Warehouse warehouse = null;
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new BusinessException("GRN must have at least one line item");
@@ -85,18 +114,16 @@ public class GrnService {
         for (var item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product", "id", item.getProductId()));
-            Warehouse destination = product.getDefaultWarehouse();
+            Warehouse destination = destinations.getOrDefault(product.getId(), product.getDefaultWarehouse());
             if (!Boolean.TRUE.equals(product.getIsActive())) throw new BusinessException("Product is inactive: " + product.getSku());
             if (destination == null || !Boolean.TRUE.equals(destination.getIsActive())) {
                 throw new BusinessException("Set an active default warehouse on product " + product.getSku() + " before receiving goods");
             }
-            if (warehouse != null && !warehouse.getId().equals(destination.getId())) {
-                throw new BusinessException("Products belong to different warehouses. Create a separate GRN for each warehouse");
+            if (request.getWarehouseId() != null && !request.getWarehouseId().equals(destination.getId())) {
+                throw new BusinessException("Warehouse must match the selected products' default warehouse");
             }
-            warehouse = destination;
-        }
-        if (request.getWarehouseId() != null && !request.getWarehouseId().equals(warehouse.getId())) {
-            throw new BusinessException("Warehouse must match the selected products' default warehouse");
+            // Retain the header destination for compatibility; inventory uses each line's destination.
+            if (warehouse == null) warehouse = destination;
         }
         return warehouse;
     }
@@ -163,14 +190,21 @@ public class GrnService {
 
         SecurityUtils.enforceCanEdit("GRN", grn.getGrnNumber());
 
-        if (!"DRAFT".equals(grn.getStatus())) {
-            throw new BusinessException("Only DRAFT GRNs can be edited. GRN " + grn.getGrnNumber() + " is " + grn.getStatus());
+        if (!java.util.Set.of("DRAFT", "PROCESSED", "CANCELLED").contains(grn.getStatus())) {
+            throw new BusinessException("Cannot edit GRN " + grn.getGrnNumber() + " with status " + grn.getStatus());
         }
 
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
-        Warehouse warehouse = resolveWarehouse(request);
+        Warehouse warehouse = resolveWarehouse(request, savedDestinations(grn));
+        var updatedItems = buildItems(grn, request);
+        boolean wasProcessed = "PROCESSED".equals(grn.getStatus());
+        if (wasProcessed) {
+            ensureNoDependentTransactions(grn, "editing");
+            applyProcessedEdit(grn, updatedItems);
+            updateOrderReceipt(grn, true);
+        }
 
         grn.setPurchaseOrderId(request.getPurchaseOrderId());
         grn.setGrnType(resolveGrnType(request.getGrnType()));
@@ -180,7 +214,8 @@ public class GrnService {
         grn.setReceivedDate(request.getReceivedDate());
         grn.setNotes(request.getNotes());
 
-        replaceItems(grn, request);
+        setItems(grn, updatedItems);
+        if (wasProcessed) updateOrderReceipt(grn, false);
         Grn savedGrn = grnRepository.save(grn);
 
         auditLogService.log(
@@ -194,7 +229,7 @@ public class GrnService {
                         savedGrn.getTotalAmount())
         );
 
-        if (autoProcess) {
+        if (autoProcess && !wasProcessed) {
             return processGrnInternal(savedGrn);
         }
 
@@ -227,34 +262,37 @@ public class GrnService {
         }
 
         String trimmedReason = reason.trim();
-        Long warehouseId = grn.getWarehouse().getId();
 
         // If the GRN was PROCESSED, reverse inventory
         if ("PROCESSED".equals(grn.getStatus())) {
-            if(purchaseReturns.totalReturned(grn.getId()).signum()>0 || supplierPayments.totalPaid(grn.getId()).signum()>0) throw new BusinessException("Reverse dependent supplier payments/returns before cancelling this receipt");
-            // First pass: Pre-check that every received product has sufficient available stock in this warehouse
-            for (GrnItem item : grn.getItems()) {
-                BigDecimal available = stockService.getAvailableStock(warehouseId, item.getProduct().getId());
-                if (available.compareTo(item.getQuantityReceived()) < 0) {
+            ensureNoDependentTransactions(grn, "cancelling");
+            var receivedStock = receiptStock(grn.getItems());
+            // Lock and validate every original destination before any stock is reversed.
+            for (var entry : receivedStock.entrySet()) {
+                var key = entry.getKey();
+                var item = entry.getValue();
+                BigDecimal available = stockService.getAvailableStockForUpdate(key.warehouseId(), key.productId());
+                if (available.compareTo(item.quantity()) < 0) {
                     throw new BusinessException(String.format(
-                            "Cannot cancel GRN %s: Insufficient stock for product '%s' (%s) in warehouse '%s'. Required to reverse: %s, Currently available in stock: %s",
+                            "Cannot cancel GRN %s: insufficient inventory for '%s' (%s). Need to deduct %s; available stock is %s.",
                             grn.getGrnNumber(),
-                            item.getProduct().getName(),
-                            item.getProduct().getSku(),
-                            grn.getWarehouse().getName(),
-                            item.getQuantityReceived(),
+                            item.product().getName(),
+                            item.product().getSku(),
+                            item.quantity(),
                             available
                     ));
                 }
             }
 
             // Second pass: Reverse stock for all line items
-            for (GrnItem item : grn.getItems()) {
+            for (var entry : receivedStock.entrySet()) {
+                var key = entry.getKey();
+                var item = entry.getValue();
                 stockService.decreaseStock(
-                        warehouseId,
-                        item.getProduct().getId(),
-                        item.getQuantityReceived(),
-                        item.getUnitCost(),
+                        key.warehouseId(),
+                        key.productId(),
+                        item.quantity(),
+                        item.unitCost(),
                         "GRN_CANCEL",
                         grn.getGrnNumber(),
                         "Cancellation of GRN " + grn.getGrnNumber() + " - Reason: " + trimmedReason
@@ -286,15 +324,17 @@ public class GrnService {
     }
 
     private GrnDto processGrnInternal(Grn grn) {
-        if (!"DRAFT".equals(grn.getStatus())) {
-            throw new BusinessException("Only DRAFT GRNs can be processed. GRN " + grn.getGrnNumber() + " is " + grn.getStatus());
+        boolean restoring = "CANCELLED".equals(grn.getStatus());
+        if (!"DRAFT".equals(grn.getStatus()) && !restoring) {
+            throw new BusinessException("Only draft or cancelled GRNs can be processed. GRN " + grn.getGrnNumber() + " is " + grn.getStatus());
         }
 
-        Long warehouseId = grn.getWarehouse().getId();
-
         for (GrnItem item : grn.getItems()) {
+            if (!Boolean.TRUE.equals(item.getReceivingWarehouse().getIsActive())) {
+                throw new BusinessException("Receiving destination is inactive for product " + item.getProduct().getSku());
+            }
             stockService.increaseStock(
-                    warehouseId,
+                    item.getReceivingWarehouse().getId(),
                     item.getProduct().getId(),
                     item.getQuantityReceived(),
                     item.getUnitCost(),
@@ -306,10 +346,15 @@ public class GrnService {
 
         updateOrderReceipt(grn,false);
         grn.setStatus("PROCESSED");
+        if (restoring) {
+            grn.setCancelledAt(null);
+            grn.setCancelledBy(null);
+            grn.setCancelReason(null);
+        }
         Grn updated = grnRepository.save(grn);
 
         auditLogService.log(
-                "GRN_PROCESS",
+                restoring ? "GRN_RESTORE" : "GRN_PROCESS",
                 "Grn",
                 grn.getGrnNumber(),
                 String.format("GRN %s processed for supplier '%s'. Total: %s",
@@ -319,8 +364,74 @@ public class GrnService {
         log.info("GRN '{}' processed successfully. Total: {}", grn.getGrnNumber(), grn.getTotalAmount());
         return GrnDto.from(updated);
     }
+    private record StockKey(Long warehouseId, Long productId) implements Comparable<StockKey> {
+        public int compareTo(StockKey other) {
+            int destination = warehouseId.compareTo(other.warehouseId);
+            return destination != 0 ? destination : productId.compareTo(other.productId);
+        }
+    }
+
+    private record ReceiptStock(Product product, Warehouse warehouse, BigDecimal quantity, BigDecimal value) {
+        BigDecimal unitCost() { return value.divide(quantity, 8, java.math.RoundingMode.HALF_UP); }
+    }
+
+    private java.util.SortedMap<StockKey, ReceiptStock> receiptStock(java.util.List<GrnItem> items) {
+        var stock = new java.util.TreeMap<StockKey, ReceiptStock>();
+        for (var item : items) {
+            var destination = item.getReceivingWarehouse();
+            var key = new StockKey(destination.getId(), item.getProduct().getId());
+            var entry = new ReceiptStock(item.getProduct(), destination, item.getQuantityReceived(), item.getTotalCost());
+            stock.merge(key, entry, (old, added) -> new ReceiptStock(old.product(), old.warehouse(),
+                    old.quantity().add(added.quantity()), old.value().add(added.value())));
+        }
+        return stock;
+    }
+
+    private void ensureNoDependentTransactions(Grn grn, String action) {
+        if (purchaseReturns.totalReturned(grn.getId()).signum() > 0 || supplierPayments.totalPaid(grn.getId()).signum() > 0) {
+            throw new BusinessException("Reverse dependent supplier payments/returns before " + action + " this receipt");
+        }
+    }
+
+    private void applyProcessedEdit(Grn grn, java.util.List<GrnItem> updatedItems) {
+        var original = receiptStock(grn.getItems());
+        var updated = receiptStock(updatedItems);
+        var keys = new java.util.TreeSet<StockKey>(original.keySet());
+        keys.addAll(updated.keySet());
+        // Lock in destination/product order and check all reductions before changing stock.
+        for (var key : keys) {
+            BigDecimal before = original.containsKey(key) ? original.get(key).quantity() : BigDecimal.ZERO;
+            BigDecimal after = updated.containsKey(key) ? updated.get(key).quantity() : BigDecimal.ZERO;
+            BigDecimal available = stockService.getAvailableStockForUpdate(key.warehouseId(), key.productId());
+            BigDecimal reduction = before.subtract(after);
+            if (reduction.signum() > 0 && available.compareTo(reduction) < 0) {
+                throw new BusinessException(String.format("Cannot edit GRN %s: insufficient inventory for '%s' (%s). Need to deduct %s; available stock is %s.",
+                        grn.getGrnNumber(), original.get(key).product().getName(), original.get(key).product().getSku(), reduction, available));
+            }
+        }
+        for (var key : keys) {
+            BigDecimal before = original.containsKey(key) ? original.get(key).quantity() : BigDecimal.ZERO;
+            BigDecimal after = updated.containsKey(key) ? updated.get(key).quantity() : BigDecimal.ZERO;
+            BigDecimal change = after.subtract(before);
+            if (change.signum() < 0) {
+                stockService.decreaseStock(key.warehouseId(), key.productId(), change.negate(), original.get(key).unitCost(),
+                        "GRN_EDIT", grn.getGrnNumber(), "Quantity reduced by GRN edit");
+            } else if (change.signum() > 0) {
+                stockService.increaseStock(key.warehouseId(), key.productId(), change, updated.get(key).unitCost(),
+                        "GRN", grn.getGrnNumber(), "Quantity added by GRN edit");
+            }
+            if (updated.containsKey(key) && updated.get(key).unitCost().signum() > 0) {
+                updated.get(key).product().setCostPrice(updated.get(key).unitCost());
+                productRepository.save(updated.get(key).product());
+            }
+        }
+    }
+
     private void updateOrderReceipt(Grn grn,boolean reverse) {
         if(grn.getPurchaseOrderId()==null) return;
+        if (grn.getItems().stream().anyMatch(i -> !i.getReceivingWarehouse().getId().equals(grn.getWarehouse().getId()))) {
+            throw new BusinessException("Products on a linked purchase order must use the order's destination");
+        }
         java.util.Map<Long,BigDecimal> qty=new java.util.TreeMap<>();
         grn.getItems().forEach(i -> qty.merge(i.getProduct().getId(),i.getQuantityReceived(),BigDecimal::add));
         purchaseOrders.receive(grn.getPurchaseOrderId(),grn.getSupplier().getId(),grn.getWarehouse().getId(),qty,reverse);

@@ -24,7 +24,7 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
 
     @Query("SELECT q FROM Quotation q " +
            "LEFT JOIN q.customer c " +
-           "WHERE (:customerId IS NULL OR c.id = :customerId) " +
+           "WHERE (c IS NULL OR c.isActive = true) AND (:customerId IS NULL OR c.id = :customerId) " +
            "AND (:status IS NULL OR q.status = :status) " +
            "AND (:startDate IS NULL OR q.quotationDate >= :startDate) " +
            "AND (:endDate IS NULL OR q.quotationDate <= :endDate) " +

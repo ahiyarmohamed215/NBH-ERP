@@ -190,7 +190,7 @@ public class ReportService {
                 .collect(Collectors.toList());
 
         Map<Long, List<Invoice>> byCustomer = unpaidInvoices.stream()
-                .filter(i -> i.getCustomer() != null)
+                .filter(i -> i.getCustomer() != null && Boolean.TRUE.equals(i.getCustomer().getIsActive()))
                 .collect(Collectors.groupingBy(i -> i.getCustomer().getId()));
 
         List<ReportDto.OutstandingCustomerReport> result = new ArrayList<>();

@@ -135,11 +135,14 @@ public class PurchaseReturnService {
 
         if(prn.getSourceGrnId()==null) throw new BusinessException("Link an original GRN before processing");
         var grn=receipts.findByIdForUpdate(prn.getSourceGrnId()).orElseThrow(() -> new BusinessException("Unknown GRN"));
-        if(!"PROCESSED".equals(grn.getStatus()) || !grn.getSupplier().getId().equals(prn.getSupplier().getId()) || !grn.getWarehouse().getId().equals(prn.getWarehouse().getId())) throw new BusinessException("Return must match processed GRN supplier and warehouse");
+        if(!"PROCESSED".equals(grn.getStatus()) || !grn.getSupplier().getId().equals(prn.getSupplier().getId())) throw new BusinessException("Return must match processed GRN supplier");
         var seen=new java.util.HashSet<Long>(); BigDecimal total=BigDecimal.ZERO;
         for(var item:prn.getItems()) {
             if(!seen.add(item.getProduct().getId())) throw new BusinessException("Duplicate return product");
             var originals=grn.getItems().stream().filter(i -> i.getProduct().getId().equals(item.getProduct().getId())).toList();
+            if (originals.isEmpty() || originals.stream().anyMatch(i -> !i.getReceivingWarehouse().getId().equals(prn.getWarehouse().getId()))) {
+                throw new BusinessException("Return destination must match the product's original receipt");
+            }
             BigDecimal originalQty=originals.stream().map(com.nbh.erp.grn.entity.GrnItem::getQuantityReceived).reduce(BigDecimal.ZERO,BigDecimal::add);
             BigDecimal returned=purchaseReturnRepository.returnedQuantity(grn.getId(),item.getProduct().getId());
             if(returned.add(item.getQuantityReturned()).compareTo(originalQty)>0) throw new BusinessException("Return exceeds original unreturned receipt");

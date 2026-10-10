@@ -1,6 +1,7 @@
 package com.nbh.erp.grn.entity;
 
 import com.nbh.erp.product.entity.Product;
+import com.nbh.erp.warehouse.entity.Warehouse;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,6 +28,14 @@ public class GrnItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse warehouse;
+
+    public Warehouse getReceivingWarehouse() {
+        return warehouse != null ? warehouse : grn.getWarehouse();
+    }
+
     @Column(name = "quantity_received", nullable = false)
     private BigDecimal quantityReceived;
 
@@ -35,6 +44,15 @@ public class GrnItem {
 
     @Column(name = "total_cost", nullable = false)
     private BigDecimal totalCost;
+
+    @Column(name = "selling_price")
+    private BigDecimal sellingPrice;
+
+    @Column(name = "markup_percent", precision = 9, scale = 4)
+    private BigDecimal markupPercent;
+
+    @Column(name = "use_brand_markup")
+    private Boolean useBrandMarkup;
 
     @Column(length = 255)
     private String notes;

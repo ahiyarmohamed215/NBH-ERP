@@ -21,7 +21,7 @@ public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> 
     java.math.BigDecimal getCustomerReturnsBetween(@Param("customerId") Long customerId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 
 
-    @Query("SELECT sr FROM SalesReturn sr WHERE " +
+    @Query("SELECT sr FROM SalesReturn sr WHERE sr.customer.isActive = true AND " +
             "(:warehouseId IS NULL OR sr.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR sr.customer.id = :customerId) AND " +
             "(:status IS NULL OR sr.status = :status) AND " +

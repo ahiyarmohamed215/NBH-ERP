@@ -5,6 +5,10 @@ export function calculateGrnStaging(previous, field, value) {
     updated[key] = Math.max(key === 'packQty' || key === 'packSize' ? 1 : 0, Number(updated[key]) || 0);
   }
   if (field === 'packQty' || field === 'packSize') updated.quantity = updated.packQty * updated.packSize;
+  updated.markupPercent = Math.max(0, Number(updated.markupPercent) || 0);
+  if (updated.useBrandMarkup) {
+    updated.salePrice = Number((updated.costPrice * (1 + updated.markupPercent / 100)).toFixed(2));
+  }
   updated.purchaseValue = updated.quantity * updated.costPrice;
   if (field === 'discountAmount') {
     updated.discountAmount = Math.min(updated.purchaseValue, Math.max(0, Number(value) || 0));
@@ -25,13 +29,21 @@ export function buildGrnItemsPayload(items) {
   return items.map((item, index) => {
     const quantityReceived = Number(item.quantityReceived) + Number(item.freeQuantity || 0);
     const amount = Number(item.amount);
+    const sellingPrice = Number(item.salePrice || 0);
+    const markupPercent = Number(item.markupPercent || 0);
     if (!Number.isFinite(quantityReceived) || quantityReceived <= 0 || !Number.isFinite(amount) || amount < 0) {
       throw new Error(`Line ${index + 1}: enter a positive received quantity and a valid non-negative cost.`);
+    }
+    if (!Number.isFinite(sellingPrice) || sellingPrice < 0 || !Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 99999) {
+      throw new Error(`Line ${index + 1}: enter a valid selling price and MP%.`);
     }
     return {
       productId: Number(item.productId),
       quantityReceived,
       unitCost: Number((amount / quantityReceived).toFixed(8)),
+      sellingPrice,
+      markupPercent,
+      useBrandMarkup: Boolean(item.useBrandMarkup),
       notes: item.notes,
     };
   });
@@ -53,10 +65,13 @@ export function mergeGrnItems(items) {
       + Number(item.amount ?? item.quantityReceived * item.unitCost);
     const unitCost = quantityReceived ? purchaseValue / quantityReceived : 0;
     const discountPercent = purchaseValue ? discountAmount / purchaseValue * 100 : 0;
-    const salePrice = Number(item.salePrice || previous.salePrice || 0);
+    const markupPercent = Number(item.markupPercent || 0);
+    const salePrice = item.useBrandMarkup
+      ? Number((unitCost * (1 + markupPercent / 100)).toFixed(2))
+      : Number(item.salePrice ?? previous.salePrice ?? 0);
     const gpPercent = salePrice ? (salePrice - unitCost) / salePrice * 100 : 0;
     lines.set(key, { ...previous, ...item, quantityReceived, freeQuantity, purchaseValue,
-      discountAmount, amount, unitCost, discountPercent, salePrice, gpPercent,
+      discountAmount, amount, unitCost, discountPercent, salePrice, markupPercent, gpPercent,
       freeCostPrice: amount / (quantityReceived + freeQuantity),
       notes: `Free: ${freeQuantity} | Disc: ${discountPercent.toFixed(2)}% | Sale: $${salePrice.toFixed(2)}` });
   }

@@ -73,15 +73,15 @@ public class DeliveryDto {
 
     public static DeliveryDto from(Delivery d, boolean includeInvoices) {
         List<Long> invIds = d.getInvoices() != null
-                ? d.getInvoices().stream().map(com.nbh.erp.sales.entity.Invoice::getId).toList()
+                ? d.getInvoices().stream().filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive())).map(com.nbh.erp.sales.entity.Invoice::getId).toList()
                 : List.of();
 
         List<String> invNums = d.getInvoices() != null
-                ? d.getInvoices().stream().map(com.nbh.erp.sales.entity.Invoice::getInvoiceNumber).toList()
+                ? d.getInvoices().stream().filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive())).map(com.nbh.erp.sales.entity.Invoice::getInvoiceNumber).toList()
                 : List.of();
 
         List<InvoiceDto> invDtos = (includeInvoices && d.getInvoices() != null)
-                ? d.getInvoices().stream().map(InvoiceDto::from).toList()
+                ? d.getInvoices().stream().filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive())).map(InvoiceDto::from).toList()
                 : List.of();
 
         String driverName = d.getDriver() != null

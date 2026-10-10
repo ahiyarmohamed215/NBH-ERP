@@ -51,6 +51,7 @@ public class CustomerTargetService {
         }
 
         return targets.stream()
+                .filter(t -> t.getCustomer() == null || Boolean.TRUE.equals(t.getCustomer().getIsActive()))
                 .map(t -> mapToDtoWithProgress(t, t.getCustomer() != null ? t.getCustomer().getId() : null))
                 .collect(Collectors.toList());
     }
@@ -59,12 +60,13 @@ public class CustomerTargetService {
     public CustomerTargetDto getTargetById(Long id) {
         CustomerTarget target = targetRepository.findByIdWithTiers(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
+        CustomerRepository.requireActive(target.getCustomer());
         return mapToDtoWithProgress(target, target.getCustomer() != null ? target.getCustomer().getId() : null);
     }
 
     @Transactional(readOnly = true)
     public List<CustomerTargetProgressDto> getCustomerTargetProgress(Long customerId) {
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
         LocalDate today = LocalDate.now();
@@ -104,7 +106,7 @@ public class CustomerTargetService {
 
         Customer customer = null;
         if (request.getCustomerId() != null) {
-            customer = customerRepository.findById(request.getCustomerId())
+            customer = customerRepository.findByIdAndIsActiveTrue(request.getCustomerId())
                     .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", request.getCustomerId()));
         }
 
@@ -171,6 +173,7 @@ public class CustomerTargetService {
 
         CustomerTarget target = targetRepository.findByIdWithTiers(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
+        CustomerRepository.requireActive(target.getCustomer());
 
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new BusinessException("Start date cannot be after end date");
@@ -189,7 +192,7 @@ public class CustomerTargetService {
         }
 
         if (request.getCustomerId() != null) {
-            Customer customer = customerRepository.findById(request.getCustomerId())
+            Customer customer = customerRepository.findByIdAndIsActiveTrue(request.getCustomerId())
                     .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", request.getCustomerId()));
             target.setCustomer(customer);
         } else {
@@ -248,6 +251,7 @@ public class CustomerTargetService {
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
         CustomerTarget target = targetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
+        CustomerRepository.requireActive(target.getCustomer());
         target.setIsActive(!Boolean.TRUE.equals(target.getIsActive()));
         targetRepository.save(target);
 
@@ -265,6 +269,7 @@ public class CustomerTargetService {
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
         CustomerTarget target = targetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
+        CustomerRepository.requireActive(target.getCustomer());
         // Soft deactivate to maintain audit compliance
         target.setIsActive(false);
         targetRepository.save(target);

@@ -1,3 +1,4 @@
+import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
@@ -162,12 +163,17 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
   };
 
   const handleProcessPrn = async (id, prnNumber) => {
+    if (saving) return;
+    setSaving(true);
     try {
-      await prnApi.process(id);
+      const res = await prnApi.process(id);
+      setSelectedPrn((current) => current?.id === id ? res.data : current);
       addToast(`Purchase Return ${prnNumber} processed! Inventory updated.`, 'success');
       loadData();
     } catch (err) {
-      addToast('Processing failed: ' + err.message, 'error');
+      addToast(err.response?.data?.message || 'Processing failed: ' + err.message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -801,27 +807,9 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             </div>
 
             <div className="purchase-body">
-              <div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Dispatch warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Original GRN ID *<input type="number" value={formData.sourceGrnId || ''} onChange={e=>setFormData({...formData, sourceGrnId:e.target.value})}/></label><label>GRN / invoice reference<input type="text" value={formData.originalGrnNumber || ''} onChange={e=>setFormData({...formData, originalGrnNumber:e.target.value})}/></label><label>Return reason *<select value={formData.reason} onChange={e=>setFormData({...formData, reason:e.target.value})}>{COMMON_REASONS.map(r=><option key={r} value={r}>{r}</option>)}</select></label><label>Remarks / notes<input type="text" value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>
               <PurchaseLines products={products} items={formData.items} quantityField="quantityReturned" withCost={true}
-                onChange={items=>setFormData(previous=>({...previous,items}))} />
-            </div>
-
-            {/* Modal Footer */}
-            <div
-              style={{
-                padding: '12px 20px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
-                Total Return Debit Value: <strong style={{ color: '#dc2626', fontSize: '1.25rem', fontWeight: 900 }}>${totalReturnVal.toFixed(2)}</strong>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Dispatch warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Original GRN ID *<input type="number" value={formData.sourceGrnId || ''} onChange={e=>setFormData({...formData, sourceGrnId:e.target.value})}/></label><label>GRN / invoice reference<input type="text" value={formData.originalGrnNumber || ''} onChange={e=>setFormData({...formData, originalGrnNumber:e.target.value})}/></label><label>Return reason *<select value={formData.reason} onChange={e=>setFormData({...formData, reason:e.target.value})}>{COMMON_REASONS.map(r=><option key={r} value={r}>{r}</option>)}</select></label><label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+                actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
@@ -874,122 +862,24 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                   <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
                   {saving ? 'Processing...' : 'Process Return & Debit Stock'}
                 </button>
-              </div>
+              </div>} />
             </div>
           </div>
         </div>
       )}
 
       {/* PRN Inspection Drawer / Modal */}
-      {selectedPrn && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: 'min(1020px, 96vw)',
-              maxWidth: '1020px',
-              maxHeight: 'calc(100vh - 24px)',
-              overflowY: 'auto',
-              padding: '24px',
-              background: '#ffffff',
-              borderRadius: '14px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                  Purchase Return Details
-                </span>
-                <h2 style={{ fontSize: '1.3rem', color: '#0f172a', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Package size={20} color="#2563eb" /> {selectedPrn.prnNumber}
-                </h2>
-              </div>
-              <button
-                onClick={() => setSelectedPrn(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {selectedPrn && <PurchaseInspectionModal type="PRN" number={selectedPrn.prnNumber} status={selectedPrn.status} rows={selectedPrn.items || []}
+        onClose={() => setSelectedPrn(null)}
+        actions={['DRAFT', 'PENDING'].includes(selectedPrn.status) ? [{ label: 'Process PRN', icon: CheckCircle, disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []}
+        columns={[
+          { label: 'Product code', value: item => item.productSku || '—' },
+          { label: 'Product', value: item => item.productName },
+          { label: 'Qty returned', numeric: true, value: item => item.quantityReturned },
+          { label: 'Unit cost', numeric: true, value: item => '$' + Number(item.unitCost || 0).toFixed(2) },
+          { label: 'Subtotal', numeric: true, value: item => '$' + Number(item.totalCost || 0).toFixed(2) },
+        ]} />}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>SUPPLIER</div>
-                <div style={{ fontWeight: 600, color: '#0f172a' }}>{selectedPrn.supplierName}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>WAREHOUSE</div>
-                <div style={{ fontWeight: 600, color: '#2563eb' }}>{selectedPrn.warehouseName}</div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>STATUS & DATE</div>
-                <div>
-                  <span className={`badge ${selectedPrn.status === 'PROCESSED' ? 'badge-success' : 'badge-warning'}`}>
-                    {selectedPrn.status}
-                  </span>{' '}
-                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>
-                    {selectedPrn.createdAt ? new Date(selectedPrn.createdAt).toLocaleDateString() : ''}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>TOTAL VALUE</div>
-                <div style={{ fontWeight: 800, color: '#dc2626', fontSize: '1rem' }}>
-                  ${Number(selectedPrn.totalAmount || 0).toFixed(2)}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '16px', fontSize: '0.85rem', color: '#475569' }}>
-              <div><span style={{ fontWeight: 600 }}>Return Reason:</span> {selectedPrn.reason}</div>
-              {selectedPrn.originalGrnNumber && (
-                <div><span style={{ fontWeight: 600 }}>Original GRN #:</span> {selectedPrn.originalGrnNumber}</div>
-              )}
-              {selectedPrn.remarks && (
-                <div><span style={{ fontWeight: 600 }}>Remarks:</span> {selectedPrn.remarks}</div>
-              )}
-            </div>
-
-            <h3 style={{ fontSize: '0.95rem', color: '#0f172a', marginBottom: '8px' }}>Returned Item Lines</h3>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <table className="glass-table" style={{ margin: 0 }}>
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th style={{ textAlign: 'right' }}>Qty</th>
-                    <th style={{ textAlign: 'right' }}>Unit Cost</th>
-                    <th style={{ textAlign: 'right' }}>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedPrn.items?.map((it, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
-                      <td style={{ fontFamily: 'monospace', color: '#64748b' }}>{it.productSku || '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantityReturned}</td>
-                      <td style={{ textAlign: 'right' }}>${Number(it.unitCost || 0).toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        ${((it.quantityReturned || 0) * (it.unitCost || 0)).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button className="btn btn-glass" onClick={() => setSelectedPrn(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 });

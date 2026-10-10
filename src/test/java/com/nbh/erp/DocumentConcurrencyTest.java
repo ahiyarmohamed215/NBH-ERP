@@ -34,5 +34,12 @@ class DocumentConcurrencyTest {
    assertNotEquals(first.get(30,TimeUnit.SECONDS),second.get(30,TimeUnit.SECONDS));
   }
   assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  grns.cancelGrn(receipt.getId(), "Restore concurrently");
+  assertEquals(0,stock.getAvailableStock(warehouse.getId(),product.getId()).signum());
+  try(var executor=Executors.newFixedThreadPool(2)) {
+   var first=executor.submit(action);var second=executor.submit(action);
+   assertNotEquals(first.get(30,TimeUnit.SECONDS),second.get(30,TimeUnit.SECONDS));
+  }
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
 }

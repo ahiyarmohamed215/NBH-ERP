@@ -43,6 +43,13 @@ public class StockService {
                 .orElse(BigDecimal.ZERO);
     }
 
+    @Transactional
+    public BigDecimal getAvailableStockForUpdate(Long warehouseId, Long productId) {
+        return stockBalanceRepository.findByWarehouseIdAndProductIdForUpdate(warehouseId, productId)
+                .map(StockBalance::getAvailableQuantity)
+                .orElse(BigDecimal.ZERO);
+    }
+
     @Transactional(readOnly = true)
     public StockDto getStockBalance(Long warehouseId, Long productId) {
         StockBalance balance = stockBalanceRepository.findByWarehouseIdAndProductId(warehouseId, productId)

@@ -18,4 +18,8 @@ public class UpdateBrandRequest {
     private String name;
 
     private String description;
+
+    @jakarta.validation.constraints.DecimalMin(value = "0", message = "MP% cannot be negative")
+    @jakarta.validation.constraints.DecimalMax(value = "99999", message = "MP% must not exceed 99999")
+    private java.math.BigDecimal markupPercent;
 }

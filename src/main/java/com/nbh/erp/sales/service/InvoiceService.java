@@ -110,6 +110,7 @@ public class InvoiceService {
         if (!canViewAllSales()) {
             // Non-supervisor cashiers can ONLY see their own held bills
             return invoiceRepository.findByStatusInAndCreatedBy(UNPOSTED, getCurrentUsername()).stream()
+                    .filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive()))
                     .map(InvoiceDto::from)
                     .collect(Collectors.toList());
         }
@@ -117,11 +118,13 @@ public class InvoiceService {
         // Supervisor / Admin with SALES_VIEW_ALL
         if (cashier != null && !cashier.isBlank()) {
             return invoiceRepository.findByStatusInAndCreatedBy(UNPOSTED, cashier.trim()).stream()
+                    .filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive()))
                     .map(InvoiceDto::from)
                     .collect(Collectors.toList());
         }
 
         return invoiceRepository.findByStatusIn(UNPOSTED).stream()
+                .filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive()))
                 .map(InvoiceDto::from)
                 .collect(Collectors.toList());
     }
@@ -308,6 +311,8 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", id));
 
+        customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
+
         if (!"HELD".equalsIgnoreCase(invoice.getStatus())
                 && !"SENT_TO_WAREHOUSE".equalsIgnoreCase(invoice.getStatus())
                 && !"STOCK_ADJUSTED".equalsIgnoreCase(invoice.getStatus())
@@ -359,6 +364,7 @@ public class InvoiceService {
     }
 
     public void enforceAccess(Invoice invoice) {
+        CustomerRepository.requireActive(invoice.getCustomer());
         if (!canViewAllSales() && !Objects.equals(invoice.getCreatedBy(), getCurrentUsername()))
             throw new org.springframework.security.access.AccessDeniedException("Invoice belongs to another cashier");
     }

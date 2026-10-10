@@ -57,7 +57,7 @@ public class GrnController {
 
     @PostMapping("/{id}/process")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
-    @Operation(summary = "Process draft GRN and increment warehouse stock balances")
+    @Operation(summary = "Process a draft or restore a cancelled GRN and increment stock balances")
     public ResponseEntity<ApiResponse<GrnDto>> processGrn(@PathVariable Long id) {
         GrnDto processed = grnService.processGrn(id);
         return ResponseEntity.ok(ApiResponse.ok("GRN processed and inventory updated", processed));
@@ -65,7 +65,7 @@ public class GrnController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
-    @Operation(summary = "Update an existing draft Goods Received Note (pass ?process=true to auto-process)")
+    @Operation(summary = "Update a GRN; processed receipts adjust stock by the quantity difference (pass ?process=true to process drafts or cancelled receipts)")
     public ResponseEntity<ApiResponse<GrnDto>> updateGrn(
             @PathVariable Long id,
             @Valid @RequestBody CreateGrnRequest request,

@@ -54,6 +54,7 @@ public class PdfGenerationService {
         Invoice invoice = invoiceRepository.findById(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", invoiceId));
 
+        com.nbh.erp.customer.repository.CustomerRepository.requireActive(invoice.getCustomer());
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 36, 36, 36, 36);
 
@@ -195,7 +196,6 @@ public class PdfGenerationService {
 
             PdfPCell c2 = new PdfPCell();
             c2.setBorder(Rectangle.NO_BORDER);
-            c2.addElement(new Paragraph("Warehouse: " + grn.getWarehouse().getName(), bodyFont));
             c2.addElement(new Paragraph("Received Date: " + DateUtils.formatDate(grn.getReceivedDate()), bodyFont));
             c2.addElement(new Paragraph("Status: " + grn.getStatus(), boldBody));
 
@@ -326,7 +326,7 @@ public class PdfGenerationService {
 
     @Transactional(readOnly = true)
     public byte[] generateCustomerPdf(Long customerId) {
-        var customer = customerRepository.findById(customerId)
+        var customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -429,7 +429,7 @@ public class PdfGenerationService {
 
     @Transactional(readOnly = true)
     public byte[] generateCustomerListPdf() {
-        var customers = customerRepository.findAll();
+        var customers = customerRepository.findByIsActiveTrue();
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4.rotate(), 28, 28, 28, 28);
@@ -580,7 +580,7 @@ public class PdfGenerationService {
 
     @Transactional(readOnly = true)
     public byte[] generateCustomerHistoryPdf(Long customerId) {
-        var customer = customerRepository.findById(customerId)
+        var customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();

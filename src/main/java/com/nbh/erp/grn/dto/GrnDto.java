@@ -75,6 +75,7 @@ public class GrnDto {
     public static class GrnItemDto {
         private Long id;
         private Long productId;
+        private Long warehouseId;
         private String productSku;
         private String productBarcode;
         private String productName;
@@ -82,12 +83,16 @@ public class GrnDto {
         private BigDecimal quantityReceived;
         private BigDecimal unitCost;
         private BigDecimal totalCost;
+        private BigDecimal sellingPrice;
+        private BigDecimal markupPercent;
+        private Boolean useBrandMarkup;
         private String notes;
 
         public static GrnItemDto from(GrnItem item) {
             return GrnItemDto.builder()
                     .id(item.getId())
                     .productId(item.getProduct().getId())
+                    .warehouseId(item.getReceivingWarehouse().getId())
                     .productSku(item.getProduct().getSku())
                     .productBarcode(item.getProduct().getBarcode())
                     .productName(item.getProduct().getName())
@@ -95,6 +100,9 @@ public class GrnDto {
                     .quantityReceived(item.getQuantityReceived())
                     .unitCost(item.getUnitCost())
                     .totalCost(item.getTotalCost())
+                    .sellingPrice(item.getSellingPrice())
+                    .markupPercent(item.getMarkupPercent())
+                    .useBrandMarkup(item.getUseBrandMarkup())
                     .notes(item.getNotes())
                     .build();
         }

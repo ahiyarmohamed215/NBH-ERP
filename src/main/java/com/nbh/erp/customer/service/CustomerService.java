@@ -32,7 +32,7 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
-        return customerRepository.findAll().stream()
+        return customerRepository.findByIsActiveTrue().stream()
                 .map(CustomerDto::from)
                 .collect(Collectors.toList());
     }
@@ -56,7 +56,7 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public CustomerDto getCustomerById(Long id) {
-        Customer customer = customerRepository.findById(id)
+        Customer customer = customerRepository.findByIdAndIsActiveTrue(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
         return CustomerDto.from(customer);
     }
@@ -106,7 +106,7 @@ public class CustomerService {
 
     @Transactional
     public CustomerDto updateCustomer(Long id, CreateCustomerRequest request) {
-        Customer customer = customerRepository.findById(id)
+        Customer customer = customerRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
 
         // Enforce that only authorized staff can edit
@@ -141,7 +141,7 @@ public class CustomerService {
 
     @Transactional
     public void toggleActive(Long id) {
-        Customer customer = customerRepository.findById(id)
+        Customer customer = customerRepository.findAnyByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
 
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer: " + customer.getName());

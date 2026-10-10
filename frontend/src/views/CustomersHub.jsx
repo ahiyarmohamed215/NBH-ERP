@@ -58,6 +58,7 @@ import {
   Target,
 } from 'lucide-react';
 import CustomerMonthlyRangeHub from './CustomerMonthlyRangeHub';
+import { historyDocumentReference, historyDetailRows } from '../utils/customerHistoryDetails';
 
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { user } = useAuth();
@@ -126,6 +127,40 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const [outstandingStatusFilter, setOutstandingStatusFilter] = useState('ALL');
 
   const [previewModalDoc, setPreviewModalDoc] = useState(null);
+
+  const historyPreviewRequest = useRef(0);
+  const escapePrintText = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fetchHistoryDocument = async (docType, data) => {
+    const response = await (docType.includes('Invoice') ? salesApi : paymentApi).getById(data.id);
+    return { ...response.data, customerName: response.data.customerName || selectedHistoryCustomer?.name };
+  };
+  const openHistoryDocument = async (docType, data) => {
+    const request = ++historyPreviewRequest.current;
+    setPreviewModalDoc({ docType, data, loading: true });
+    try {
+      const details = await fetchHistoryDocument(docType, data);
+      setPreviewModalDoc((current) => current && request === historyPreviewRequest.current ? { docType, data: details } : current);
+    } catch (err) {
+      setPreviewModalDoc((current) => current && request === historyPreviewRequest.current ? { ...current, loading: false, error: 'Could not load full details. Close and try again.' } : current);
+    }
+  };
+  const printHistoryDocument = async (docType, data) => {
+    try {
+      if (docType.includes('Invoice')) {
+        await pdfApi.printInvoice(data.id);
+      } else {
+        const details = data;
+        printA4Report({
+          title: docType,
+          subtitle: `Reference: ${escapePrintText(historyDocumentReference(details))}`,
+          columns: [{ header: 'Detail', accessor: 'label' }, { header: 'Value', accessor: 'value' }],
+          data: historyDetailRows(details).map((field) => ({ label: escapePrintText(field.label), value: escapePrintText(field.value) })),
+        });
+      }
+    } catch (err) {
+      addToast('Failed to print document: ' + err.message, 'error');
+    }
+  };
 
   // Routes / Groups State
   const [routes, setRoutes] = useState([]);
@@ -202,7 +237,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       let loadedCustomers = [];
       if (cRes.status === 'fulfilled') {
         loadedCustomers = cRes.value.data || cRes.value || [];
+        loadedCustomers = loadedCustomers.filter((c) => Boolean(c.isActive ?? c.active));
         setCustomers(loadedCustomers);
+        const activeIds = new Set(loadedCustomers.map((c) => String(c.id)));
+        setViewingCustomer((c) => c && activeIds.has(String(c.id)) ? c : null);
+        setSelectedHistoryCustomerId((id) => activeIds.has(String(id)) ? id : '');
+        setPreviewModalDoc((doc) => doc && activeIds.has(String(doc.data.customerId)) ? doc : null);
       }
 
       const rawSalesmen = sRes.status === 'fulfilled' ? (sRes.value.data || sRes.value || []) : [];
@@ -411,7 +451,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         ]);
         const invList = invRes.data?.content || invRes.data || [];
         const pmtList = pmtRes.data?.content || pmtRes.data || [];
-        setHistoryInvoices(invList);
+        setHistoryInvoices(invList.map((inv) => ({ ...inv, totalAmount: inv.netTotal ?? inv.totalAmount })));
         setHistoryPayments(pmtList);
       } catch (err) {
         console.error('Failed to load customer financial history:', err);
@@ -622,7 +662,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     } else if (tabType === 'cheques') {
       headers = ['Cheque #', 'Cheque Date', 'Bank Name', 'Invoice / Ref #', 'Amount', 'Status'];
       rows = filteredCustomerCheques.map((chq) => [
-        `"${chq.chequeNo || chq.id}"`,
+        `"${chq.chequeNo || chq.referenceNumber || chq.paymentNumber || chq.id}"`,
         `"${chq.displayDate || chq.chequeDate || ''}"`,
         `"${chq.bankName || ''}"`,
         `"${chq.invoiceNo || ''}"`,
@@ -731,6 +771,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleToggleCustomerActive = async (id, currentStatus) => {
     try {
       await customerApi.toggleActive(id);
+      if (currentStatus) {
+        setCustomers((list) => list.filter((c) => String(c.id) !== String(id)));
+        if (String(viewingCustomer?.id) === String(id)) setViewingCustomer(null);
+        if (String(editingCustomer?.id) === String(id)) { setEditingCustomer(null); setShowCustomerModal(false); }
+        if (String(selectedHistoryCustomerId) === String(id)) { setSelectedHistoryCustomerId(''); setCustomerSearchInput(''); setPreviewModalDoc(null); }
+      }
       addToast(`Status changed to ${currentStatus ? 'Inactive' : 'Active'}`, 'success');
       loadInitialData();
     } catch (err) {
@@ -1549,7 +1595,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               >
                 <option value="ALL">All Statuses</option>
                 <option value="ACTIVE">Active Only</option>
-                <option value="INACTIVE">Inactive Only</option>
+
               </select>
 
               {/* Reset Filters button */}
@@ -2563,40 +2609,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {/* Print Customer Group A4 */}
-                    <button
-                      type="button"
-                      onClick={() => handlePrintCustomerGroup(selectedRoute)}
-                      style={{
-                        width: '34px',
-                        height: '34px',
-                        minWidth: '34px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        color: '#334155',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        padding: 0,
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#94a3b8';
-                        e.currentTarget.style.color = '#0f172a';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.color = '#334155';
-                      }}
-                      title="Print Customer Group (A4)"
-                    >
-                      <Printer size={14} />
-                    </button>
+
 
                     <button
                       type="button"
@@ -2894,7 +2907,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     borderTop: '1px solid #e2e8f0',
                     backgroundColor: '#ffffff',
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justifyContent: 'flex-end',
+                    gap: '8px',
                     alignItems: 'center',
                     flexShrink: 0,
                   }}
@@ -2946,8 +2960,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     >
                       Close
                     </button>
-                  </div>
-
                   {/* Update Group Action in Footer */}
                   {canEditCustomer && (
                     <button
@@ -2982,6 +2994,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       <Edit2 size={14} /> Update Customer Group
                     </button>
                   )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -4641,11 +4654,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   return (
                                     <tr
                                       key={inv.id || inv.invoiceNumber}
-                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      tabIndex={0}
+                                      aria-label={`View invoice ${historyDocumentReference(inv)}`}
+                                      onClick={() => openHistoryDocument('Invoice', inv)}
+                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Invoice', inv); } }}
+                                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}>
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
                                       <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
@@ -4684,7 +4701,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                         <button
                                           type="button"
-                                          onClick={() => setPreviewModalDoc({ docType: 'Invoice', data: inv })}
+                                          onClick={(e) => { e.stopPropagation(); printHistoryDocument('Invoice', inv); }}
                                           style={{
                                             border: '1px solid #e2e8f0',
                                             backgroundColor: '#ffffff',
@@ -4696,9 +4713,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                           }}
-                                          title="View invoice details"
+                                          title="Print invoice"
                                         >
-                                          <Eye size={14} />
+                                          <Printer size={14} />
                                         </button>
                                       </td>
                                     </tr>
@@ -4743,11 +4760,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   return (
                                     <tr
                                       key={adv.id || adv.voucherNo}
-                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      tabIndex={0}
+                                      aria-label={`View advance payment ${historyDocumentReference(adv)}`}
+                                      onClick={() => openHistoryDocument('Advance Payment', adv)}
+                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Advance Payment', adv); } }}
+                                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}>
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {adv.voucherNo || adv.id}
                                       </td>
                                       <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
@@ -4781,11 +4802,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                         <button
                                           type="button"
-                                          onClick={() => setPreviewModalDoc({ docType: 'Advance Payment', data: adv })}
+                                          onClick={(e) => { e.stopPropagation(); printHistoryDocument('Advance Payment', adv); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                          title="View advance voucher details"
+                                          title="Print advance voucher"
                                         >
-                                          <Eye size={14} />
+                                          <Printer size={14} />
                                         </button>
                                       </td>
                                     </tr>
@@ -4828,11 +4849,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 filteredCustomerPayments.map((pmt) => (
                                   <tr
                                     key={pmt.id || pmt.receiptNo}
-                                    style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      tabIndex={0}
+                                      aria-label={`View payment receipt ${historyDocumentReference(pmt)}`}
+                                      onClick={() => openHistoryDocument('Payment Receipt', pmt)}
+                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Payment Receipt', pmt); } }}
+                                    style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                   >
-                                    <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}>
+                                    <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                       {pmt.receiptNo || pmt.id}
                                     </td>
                                     <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
@@ -4866,11 +4891,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                       <button
                                         type="button"
-                                        onClick={() => setPreviewModalDoc({ docType: 'Payment Receipt', data: pmt })}
+                                        onClick={(e) => { e.stopPropagation(); printHistoryDocument('Payment Receipt', pmt); }}
                                         style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                        title="View receipt details"
+                                        title="Print receipt"
                                       >
-                                        <Eye size={14} />
+                                        <Printer size={14} />
                                       </button>
                                     </td>
                                   </tr>
@@ -4917,15 +4942,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   return (
                                     <tr
                                       key={chq.id || chq.chequeNo}
-                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      tabIndex={0}
+                                      aria-label={`View cheque ${historyDocumentReference(chq)}`}
+                                      onClick={() => openHistoryDocument('Cheque', chq)}
+                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Cheque', chq); } }}
+                                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}>
-                                        {chq.chequeNo || chq.id}
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                        {chq.chequeNo || chq.referenceNumber || chq.paymentNumber || chq.id}
                                       </td>
                                       <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
-                                        {chq.displayDate || chq.chequeDate}
+                                        {chq.displayDate || chq.chequeDate || chq.paymentDate || '—'}
                                       </td>
                                       <td style={{ padding: '12px 14px', color: '#0f172a', fontWeight: 500 }}>
                                         {chq.bankName || '—'}
@@ -4955,11 +4984,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                         <button
                                           type="button"
-                                          onClick={() => setPreviewModalDoc({ docType: 'Cheque', data: chq })}
+                                          onClick={(e) => { e.stopPropagation(); printHistoryDocument('Cheque', chq); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                          title="View cheque details"
+                                          title="Print cheque"
                                         >
-                                          <Eye size={14} />
+                                          <Printer size={14} />
                                         </button>
                                       </td>
                                     </tr>
@@ -5005,11 +5034,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   return (
                                     <tr
                                       key={inv.id || inv.invoiceNumber}
-                                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.12s ease' }}
+                                      tabIndex={0}
+                                      aria-label={`View outstanding invoice ${historyDocumentReference(inv)}`}
+                                      onClick={() => openHistoryDocument('Outstanding Invoice', inv)}
+                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Outstanding Invoice', inv); } }}
+                                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}>
+                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
                                       <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
@@ -5048,11 +5081,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                         <button
                                           type="button"
-                                          onClick={() => setPreviewModalDoc({ docType: 'Outstanding Invoice', data: inv })}
+                                          onClick={(e) => { e.stopPropagation(); printHistoryDocument('Outstanding Invoice', inv); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                          title="View outstanding invoice details"
+                                          title="Print outstanding invoice"
                                         >
-                                          <Eye size={14} />
+                                          <Printer size={14} />
                                         </button>
                                       </td>
                                     </tr>
@@ -5213,26 +5246,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 >
                   <Edit2 size={13} /> Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrintSingleCustomer(viewingCustomer)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#0284c7',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                  title="Print Customer Statement (A4)"
-                >
-                  <Printer size={13} /> Print
-                </button>
+
                 <button
                   type="button"
                   onClick={() => setViewingCustomer(null)}
@@ -5447,181 +5461,33 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* MODAL: Customer History Document Preview Modal                */}
       {/* ------------------------------------------------------------- */}
       {previewModalDoc && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '560px',
-              padding: '24px 28px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingBottom: '14px',
-                borderBottom: '1px solid #e2e8f0',
-                marginBottom: '16px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    backgroundColor: '#eff6ff',
-                    color: '#0284c7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <FileText size={18} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                    {previewModalDoc.docType} Details
-                  </h3>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
-                    Ref: {previewModalDoc.data.invoiceNumber || previewModalDoc.data.receiptNo || previewModalDoc.data.voucherNo || previewModalDoc.data.chequeNo || previewModalDoc.data.id}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewModalDoc(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8',
-                  padding: '4px',
-                }}
-              >
-                <X size={18} />
-              </button>
+        <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setPreviewModalDoc(null)}>
+          <div role="dialog" aria-modal="true" aria-label={`${previewModalDoc.docType} details`} onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: 'min(850px, 94vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><h3>{previewModalDoc.docType} Details</h3><p>Ref: {historyDocumentReference(previewModalDoc.data)}</p></div>
+              <button type="button" aria-label="Close details" onClick={() => setPreviewModalDoc(null)}><X size={20} /></button>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                <span style={{ color: '#64748b' }}>Customer:</span>
-                <strong style={{ color: '#0f172a' }}>{selectedHistoryCustomer?.name || previewModalDoc.data.customerName || '—'}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                <span style={{ color: '#64748b' }}>Date:</span>
-                <strong style={{ color: '#0f172a' }}>{previewModalDoc.data.displayDate || previewModalDoc.data.invoiceDate || previewModalDoc.data.paymentDate || previewModalDoc.data.chequeDate || previewModalDoc.data.date || '—'}</strong>
-              </div>
-              {previewModalDoc.data.paymentType && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                  <span style={{ color: '#64748b' }}>Payment Type:</span>
-                  <strong style={{ color: '#0284c7' }}>{previewModalDoc.data.paymentType}</strong>
-                </div>
-              )}
-              {previewModalDoc.data.paymentMethod && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                  <span style={{ color: '#64748b' }}>Payment Method:</span>
-                  <strong style={{ color: '#0f172a' }}>{previewModalDoc.data.paymentMethod}</strong>
-                </div>
-              )}
-              {previewModalDoc.data.bankName && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                  <span style={{ color: '#64748b' }}>Bank Name:</span>
-                  <strong style={{ color: '#0f172a' }}>{previewModalDoc.data.bankName}</strong>
-                </div>
-              )}
-              {previewModalDoc.data.invoiceNo && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                  <span style={{ color: '#64748b' }}>Linked Invoice Ref:</span>
-                  <strong style={{ color: '#0284c7', fontFamily: 'monospace' }}>{previewModalDoc.data.invoiceNo}</strong>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                <span style={{ color: '#64748b' }}>Status:</span>
-                <strong style={{ color: '#16a34a' }}>{previewModalDoc.data.status || 'Active'}</strong>
-              </div>
-
-              {/* Amount Breakdown */}
-              <div
-                style={{
-                  marginTop: '8px',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: '#f1f5f9',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                }}
-              >
-                {previewModalDoc.data.totalAmount !== undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Total Invoice Amount:</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>LKR {Number(previewModalDoc.data.totalAmount || 0).toFixed(2)}</span>
-                  </div>
-                )}
-                {previewModalDoc.data.paidAmount !== undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Paid Amount:</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>LKR {Number(previewModalDoc.data.paidAmount || 0).toFixed(2)}</span>
-                  </div>
-                )}
-                {previewModalDoc.data.balanceAmount !== undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>
-                    <strong style={{ color: '#0f172a' }}>Balance Due:</strong>
-                    <strong style={{ fontFamily: 'monospace', color: Number(previewModalDoc.data.balanceAmount || 0) > 0 ? '#dc2626' : '#16a34a' }}>
-                      LKR {Number(previewModalDoc.data.balanceAmount || 0).toFixed(2)}
-                    </strong>
-                  </div>
-                )}
-                {previewModalDoc.data.amount !== undefined && previewModalDoc.data.totalAmount === undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Document Amount:</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>LKR {Number(previewModalDoc.data.amount || 0).toFixed(2)}</span>
-                  </div>
-                )}
-                {previewModalDoc.data.balance !== undefined && previewModalDoc.data.balanceAmount === undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #cbd5e1', paddingTop: '6px' }}>
-                    <strong style={{ color: '#0f172a' }}>Available Balance:</strong>
-                    <strong style={{ fontFamily: 'monospace', color: '#16a34a' }}>LKR {Number(previewModalDoc.data.balance || 0).toFixed(2)}</strong>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-              <button
-                type="button"
-                onClick={() => setPreviewModalDoc(null)}
-                style={{
-                  padding: '7px 18px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
+            {previewModalDoc.loading && <p role="status">Loading full details…</p>}
+            {previewModalDoc.error && <p role="alert">{previewModalDoc.error}</p>}
+            {!previewModalDoc.loading && !previewModalDoc.error && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
+                {historyDetailRows(previewModalDoc.data).map((field) => (
+                  <tr key={field.label} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '9px', textAlign: 'left', width: '40%', color: '#64748b' }}>{field.label}</th>
+                    <td style={{ padding: '9px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{field.value}</td>
+                  </tr>
+                ))}
+              </tbody></table>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button type="button" disabled={previewModalDoc.loading || Boolean(previewModalDoc.error)} onClick={() => printHistoryDocument(previewModalDoc.docType, previewModalDoc.data)}><Printer size={14} /> Print</button>
+              <button type="button" onClick={() => setPreviewModalDoc(null)}>Close</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: Add / Edit Customer */}
       {/* ------------------------------------------------------------- */}
       {showCustomerModal && (
         <div
@@ -5888,7 +5754,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   {isCustomerActive(confirmStatusModal.customer)
-                    ? '⚠️ When marked Inactive, this customer will be hidden from customer lists, sales invoicing, quotations, and assignments until reactivated.'
+                    ? '⚠️ When marked Inactive, this customer will be hidden throughout the system and cannot be used for operations.'
                     : '✓ When marked Active, this customer will be visible and available across all transactions and modules.'}
                 </div>
               </div>

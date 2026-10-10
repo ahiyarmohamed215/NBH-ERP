@@ -1,11 +1,13 @@
 import { mergeGrnItems, calculateGrnStaging, buildGrnItemsPayload } from '../utils/grnItems';
 import './GrnView.css';
+import GrnDetailsModal from '../components/GrnDetailsModal';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useRef } from 'react';
 import { grnApi, supplierApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
+import { printA4Report } from '../utils/printReport';
 import {
   FileCheck,
   Plus,
@@ -25,10 +27,9 @@ import {
   Layers,
   History,
   Info,
-  Download,
   Edit2,
-  XCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 
 const GRN_TYPES = [
@@ -60,6 +61,8 @@ const INITIAL_STAGING_ITEM = {
   amount: 0,
   costPrice: 0,
   salePrice: 0,
+  markupPercent: 0,
+  useBrandMarkup: true,
   creditPrice: 0,
   markupPrice: 0,
   wholesalePrice: 0,
@@ -77,7 +80,7 @@ const INITIAL_STAGING_ITEM = {
 
 const GrnView = React.forwardRef(function GrnView(props, ref) {
   const { user } = useAuth();
-  const canEditGrn = canEditModule(user, 'GRN');
+  const canEditGrn = canEditModule(user, 'GRN') || (user?.permissions || []).includes('GRN_PROCESS');
   const [showGrnForm, setShowGrnForm] = useState(false);
   useEffect(() => {
     props.onFormModeChange?.(showGrnForm);
@@ -90,17 +93,21 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingGrnId, setEditingGrnId] = useState(null);
+  const [editingGrnStatus, setEditingGrnStatus] = useState(null);
+  const [processingGrnId, setProcessingGrnId] = useState(null);
   const [cancellingGrn, setCancellingGrn] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
 
   // Staging line workstation state for adding items one by one
   const [stagingItem, setStagingItem] = useState({ ...INITIAL_STAGING_ITEM });
+  const [editingLineIndex, setEditingLineIndex] = useState(null);
   const [productQuery, setProductQuery] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const productSearchRef = useRef(null);
 
   const resetStagingItem = () => {
+    setEditingLineIndex(null);
     setStagingItem({ ...INITIAL_STAGING_ITEM });
     setProductQuery('');
     setShowProductDropdown(false);
@@ -250,15 +257,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       addToast('Set a default warehouse on this product before creating a GRN.', 'error');
       return;
     }
-    const existingWarehouse = formData.items.map(item => products.find(p => String(p.id) === String(item.productId)))
-      .find(p => p?.defaultWarehouseId || p?.warehouseId);
-    if (existingWarehouse && String(existingWarehouse.defaultWarehouseId || existingWarehouse.warehouseId) !== String(warehouseId)) {
-      addToast('Use a separate GRN for products in a different warehouse.', 'error');
-      return;
-    }
     const currentStock = null;
     const cost = Number(prod.costPrice) || 0;
-    const sale = Number(prod.sellingPrice) || 0;
+    const markupPercent = Number(prod.brandMarkupPercent) || 0;
+    const sale = Number((cost * (1 + markupPercent / 100)).toFixed(2));
     const wholesale = Number(prod.wholesalePrice) || (sale ? sale * 0.9 : cost * 1.15);
     const credit = Number(prod.creditPrice) || (sale ? sale * 1.05 : cost * 1.25);
     const markup = sale > cost ? sale - cost : 0;
@@ -295,6 +297,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       amount: netAmt,
       costPrice: cost,
       salePrice: sale,
+      markupPercent,
+      useBrandMarkup: true,
       creditPrice: Number(credit.toFixed(2)),
       markupPrice: Number(markup.toFixed(2)),
       wholesalePrice: Number(wholesale.toFixed(2)),
@@ -342,6 +346,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       packSize: Number(stagingItem.packSize) || 1,
       unitCost: Number(stagingItem.costPrice),
       salePrice: Number(stagingItem.salePrice),
+      markupPercent: Number(stagingItem.markupPercent),
+      useBrandMarkup: stagingItem.useBrandMarkup,
       creditPrice: Number(stagingItem.creditPrice),
       wholesalePrice: Number(stagingItem.wholesalePrice),
       purchaseValue: Number(stagingItem.purchaseValue),
@@ -356,21 +362,44 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
     setFormData((prev) => ({
       ...prev,
-      items: mergeGrnItems([...prev.items, newItem]),
+      items: mergeGrnItems(editingLineIndex === null
+        ? [...prev.items, newItem]
+        : prev.items.map((item, index) => index === editingLineIndex ? newItem : item)),
     }));
 
-    addToast(`Added "${stagingItem.tradeName}" to GRN intake!`, 'success');
+    addToast(`${editingLineIndex === null ? 'Added' : 'Updated'} "${stagingItem.tradeName}" in GRN intake!`, 'success');
 
     // Reset staging item for next scan/search
     resetStagingItem();
   };
 
   const handleRemoveItem = (index) => {
+    if (editingLineIndex === index) resetStagingItem();
+    else if (editingLineIndex !== null && index < editingLineIndex) setEditingLineIndex(editingLineIndex - 1);
     setFormData((prev) => {
       const updated = [...prev.items];
       updated.splice(index, 1);
       return { ...prev, items: updated };
     });
+  };
+
+  const handleEditItem = async (index) => {
+    const item = formData.items[index];
+    const product = products.find((p) => String(p.id) === String(item.productId));
+    setEditingLineIndex(index);
+    setProductQuery('');
+    setShowProductDropdown(false);
+    setStagingItem(calculateGrnStaging({
+      ...INITIAL_STAGING_ITEM, ...item,
+      quantity: item.quantityReceived, costPrice: item.unitCost,
+      markupPercent: item.markupPercent ?? Number(product?.brandMarkupPercent || 0),
+      useBrandMarkup: item.useBrandMarkup ?? false,
+      lastCostPrice: product?.costPrice ?? null, currentSellingPrice: product?.sellingPrice ?? null,
+      stockLoading: true,
+    }, 'quantity', item.quantityReceived));
+    const stock = await loadStockForWarehouse(product?.defaultWarehouseId || product?.warehouseId || item.warehouseId);
+    setStagingItem((prev) => String(prev.productId) === String(item.productId)
+      ? { ...prev, stockLoading: false, currentQuantity: stock ? stock[item.productId] ?? 0 : null } : prev);
   };
 
   const calculateGrandTotals = () => {
@@ -389,6 +418,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
   const resetAll = () => {
     setEditingGrnId(null);
+    setEditingGrnStatus(null);
     const defaultSup = suppliers.length > 0 ? suppliers[0].id : '';
 
     setFormData({
@@ -439,7 +469,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       const grnNum = res.data?.grnNumber || formData.grnNumber || 'GRN';
 
       addToast(
-        `GRN ${grnNum} ${processImmediately ? 'processed! Inventory posted to warehouse.' : (editingGrnId ? 'draft updated successfully!' : 'saved as draft.')}`,
+        `GRN ${grnNum} ${res.data?.status === 'PROCESSED' || processImmediately
+          ? editingGrnStatus === 'PROCESSED' ? 'updated! Inventory adjusted.' : 'processed! Inventory updated.'
+          : editingGrnStatus === 'CANCELLED' ? 'updated and remains cancelled.' : editingGrnId ? 'draft updated successfully!' : 'saved as draft.'}`,
         'success'
       );
 
@@ -447,7 +479,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       loadData();
       setShowGrnForm(false);
     } catch (err) {
-      addToast(err.message || 'Failed to save GRN', 'error');
+      addToast(err.response?.data?.message || err.message || 'Failed to save GRN', 'error');
     } finally {
       setSaving(false);
     }
@@ -455,10 +487,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
   const handlePrintPdf = (id) => {
     pdfApi.printGrn(id);
-  };
-
-  const handleDownloadPdf = (id, grnNumber) => {
-    pdfApi.downloadGrn(id, grnNumber);
   };
 
   const handleInspectGrn = async (id) => {
@@ -471,19 +499,17 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const handleEditGrn = async (g) => {
+    if (g.status === 'CANCELLED') return;
     if (!canEditGrn) {
       addToast('Permission denied: Only permissible staff can edit GRNs', 'error');
-      return;
-    }
-    if (g.status === 'PROCESSED') {
-      addToast(`GRN ${g.grnNumber} is already processed and posted to inventory. Cannot be modified.`, 'info');
-      handleInspectGrn(g.id);
       return;
     }
     try {
       const res = await grnApi.getById(g.id);
       const fullGrn = res.data;
+      if (fullGrn.status === 'CANCELLED') return;
       setEditingGrnId(g.id);
+      setEditingGrnStatus(fullGrn.status);
       setFormData({
         grnNumber: fullGrn.grnNumber || '',
         grnDate: fullGrn.receivedDate || formatBusinessDate(),
@@ -502,7 +528,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           packQty: 1,
           packSize: 1,
           unitCost: Number(it.unitCost || 0),
-          salePrice: 0,
+          salePrice: Number(it.sellingPrice ?? it.notes?.match(/Sale:\s*\$?([\d.]+)/i)?.[1] ?? 0),
+          markupPercent: Number(it.markupPercent ?? 0),
+          useBrandMarkup: it.useBrandMarkup ?? false,
+          warehouseId: it.warehouseId,
           creditPrice: 0,
           wholesalePrice: 0,
           purchaseValue: Number(it.totalCost || 0),
@@ -527,6 +556,21 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     setCancelReason('');
   };
 
+  const handleProcessGrn = async (g) => {
+    if (processingGrnId !== null) return;
+    try {
+      setProcessingGrnId(g.id);
+      const res = await grnApi.process(g.id);
+      setSelectedGrn((current) => current?.id === g.id ? res.data : current);
+      addToast(`GRN ${g.grnNumber} processed and inventory updated.`, 'success');
+      await loadData();
+    } catch (err) {
+      addToast(err.response?.data?.message || err.message || 'Cannot process GRN', 'error');
+    } finally {
+      setProcessingGrnId(null);
+    }
+  };
+
   const handleConfirmCancelGrn = async () => {
     if (!cancellingGrn) return;
     if (!cancelReason.trim()) {
@@ -538,7 +582,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       setCancelLoading(true);
       const res = await grnApi.cancel(cancellingGrn.id, { reason: cancelReason.trim() });
       addToast(
-        `GRN ${cancellingGrn.grnNumber} has been cancelled and inventory reversed!`,
+        `GRN ${cancellingGrn.grnNumber} cancelled${cancellingGrn.status === 'PROCESSED' ? ' and received quantities deducted from inventory' : ''}.`,
         'success'
       );
       if (selectedGrn && selectedGrn.id === cancellingGrn.id) {
@@ -597,7 +641,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           const discAmt = (grossVal * discountPct) / 100;
           const netAmt = grossVal - discAmt;
           const finalCost = costPrice || matched.costPrice || 0;
-          const finalSale = salePrice || matched.sellingPrice || 0;
+          const markupPercent = Number(matched.brandMarkupPercent || 0);
+          const finalSale = salePrice || Number((finalCost * (1 + markupPercent / 100)).toFixed(2));
           const gp = finalSale > 0 ? ((finalSale - finalCost) / finalSale) * 100 : 0;
           const totalUnits = qty + freeQty;
           const freeCost = totalUnits > 0 ? netAmt / totalUnits : finalCost;
@@ -613,6 +658,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             packSize: 1,
             unitCost: finalCost,
             salePrice: finalSale,
+            markupPercent,
+            useBrandMarkup: !salePrice,
             creditPrice: finalSale * 1.05,
             wholesalePrice: finalSale * 0.9,
             purchaseValue: grossVal,
@@ -689,7 +736,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       !q ||
       g.grnNumber?.toLowerCase().includes(q) ||
       g.supplierName?.toLowerCase().includes(q) ||
-      g.warehouseName?.toLowerCase().includes(q) ||
       g.supplierInvoiceNumber?.toLowerCase().includes(q);
 
     const matchStatus =
@@ -701,24 +747,32 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     return matchSearch && matchStatus;
   });
 
-  const handleExportCSV = () => {
-    if (filteredGrns.length === 0) {
-      addToast('No GRN records to export', 'warning');
-      return;
-    }
-    const headers = 'GRN Number,Supplier,Warehouse,Status,Total Cost,Date,Invoice Number\n';
-    const rows = filteredGrns.map((g) =>
-      `"${g.grnNumber || ''}","${g.supplierName || ''}","${g.warehouseName || ''}","${g.status || ''}",${Number(g.totalAmount || 0).toFixed(2)},"${g.receivedDate || ''}","${g.supplierInvoiceNumber || ''}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `grn_records_${formatBusinessDate()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('GRN records exported to CSV', 'success');
+  const getTotalProducts = (grn) => new Set((grn.items || []).map((item) => item.productId)).size;
+
+  const handlePrintGrnDirectory = () => {
+    const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[character]));
+    printA4Report({
+      title: 'Goods Received Notes',
+      metaItems: [
+        { label: 'Search', value: escapeText(searchTerm) || 'All GRNs' },
+        { label: 'Status', value: statusFilter === 'ALL' ? 'All' : statusFilter },
+      ],
+      columns: [
+        { header: 'GRN Number', accessor: 'number' },
+        { header: 'Supplier', accessor: 'supplier' },
+        { header: 'Total Products', accessor: 'products', align: 'right' },
+        { header: 'Date', accessor: 'date' },
+        { header: 'Status', accessor: 'status' },
+      ],
+      data: filteredGrns.map((grn) => ({
+        number: escapeText(grn.grnNumber), supplier: escapeText(grn.supplierName),
+        products: getTotalProducts(grn), date: escapeText(grn.receivedDate || grn.createdAt?.slice(0, 10)),
+        status: escapeText(grn.status),
+      })),
+      summaryItems: [{ label: 'Total GRNs', value: String(filteredGrns.length) }],
+    });
   };
 
   const totals = calculateGrandTotals();
@@ -771,7 +825,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               />
               <input
                 type="text"
-                placeholder="Search GRNs by #, supplier, warehouse, invoice..."
+                placeholder="Search GRNs by #, supplier, invoice..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -818,7 +872,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               )}
             </div>
 
-            {/* Right Controls: Filters, Upload, Export, Refresh */}
+            {/* Right Controls: Filters, Upload, Print, Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               <select
                 value={statusFilter}
@@ -886,37 +940,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
               <button
                 type="button"
-                onClick={() => {
-                  resetAll();
-                  setShowGrnForm(true);
-                }}
-                style={{
-                  height: '38px',
-                  padding: '0 16px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-              >
-                <Plus size={16} /> + Create GRN
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setShowUploadModal(true)}
                 style={{
                   height: '38px',
@@ -946,10 +969,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
               <button
                 type="button"
-                onClick={handleExportCSV}
+                onClick={handlePrintGrnDirectory}
                 style={{
                   height: '38px',
-                  padding: '0 14px',
+                  width: '38px',
+                  minWidth: '38px',
+                  padding: 0,
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
@@ -958,6 +983,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
@@ -976,9 +1002,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Export GRNs to CSV"
+                title="Print GRN Directory (A4)"
+                aria-label="Print GRN Directory (A4)"
               >
-                <Download size={14} /> Export
+                <Printer size={14} />
               </button>
 
               <button
@@ -986,7 +1013,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 onClick={loadData}
                 style={{
                   height: '38px',
-                  padding: '0 14px',
+                  width: '38px',
+                  minWidth: '38px',
+                  padding: 0,
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
@@ -995,6 +1024,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
@@ -1014,8 +1044,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   e.currentTarget.style.color = '#334155';
                 }}
                 title="Refresh records"
+                aria-label="Refresh records"
+                disabled={loading}
               >
-                <RefreshCw size={14} /> Refresh
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1048,16 +1080,13 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                       SUPPLIER
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      WAREHOUSE
-                    </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      STATUS
-                    </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
-                      TOTAL COST
+                      TOTAL PRODUCTS
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       DATE
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
                     </th>
                     <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
@@ -1067,13 +1096,13 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading GRN records...
                       </td>
                     </tr>
                   ) : filteredGrns.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No GRN records found. Click <strong>+ New Inward GRN Intake</strong> to create a new intake.
                       </td>
                     </tr>
@@ -1105,7 +1134,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                           {g.supplierName || '—'}
                         </td>
                         <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
-                          {g.warehouseName || '—'}
+                          {getTotalProducts(g)}
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                          {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span
@@ -1154,15 +1186,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                             {g.status || 'DRAFT'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontSize: '0.85rem' }}>
-                          ${Number(g.totalAmount || 0).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
-                          {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
-                        </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            {g.status === 'DRAFT' && canEditGrn && (
+                            {canEditGrn && g.status !== 'CANCELLED' && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1184,7 +1210,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                                 }}
                                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
                                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                                title="Edit Draft GRN"
+                                title="Edit GRN"
                               >
                                 <Edit2 size={13} />
                               </button>
@@ -1261,10 +1287,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    {editingGrnId ? `Edit Draft Goods Received Note (GRN) — ${formData.grnNumber}` : 'Create Goods Received Note (GRN)'}
+                    {editingGrnId ? `Edit Goods Received Note (GRN) — ${formData.grnNumber}` : 'Create Goods Received Note (GRN)'}
                   </h2>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '1px 0 0 0' }}>
-                    Inward delivery workstation — stock updates, unit pricing & consignment verification
+                    {editingGrnStatus === 'PROCESSED' ? 'Saving adjusts inventory by the quantity difference. Reductions require available stock.' : 'Inward delivery workstation — stock updates, unit pricing & consignment verification'}
                   </p>
                 </div>
               </div>
@@ -1312,30 +1338,18 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
             <div className="grn-form-body">
           <div className="grn-form-content">
-          <div className="grn-header-fields">
-            <label>Supplier *<select className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
-              <option value="">Select supplier</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select></label>
-            <label>GRN type<select className="input-glass" value={formData.grnType} onChange={e => setFormData({...formData, grnType:e.target.value})}>
-              {GRN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select></label>
-            <label>Supplier invoice<input className="input-glass" maxLength={100} placeholder="Invoice reference" value={formData.supplierInvoiceNumber} onChange={e => setFormData({...formData, supplierInvoiceNumber:e.target.value})} /></label>
-            <label>Remarks / notes<input className="input-glass" placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
-            <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
-          </div>
           <div className="grn-workspace">
           {/* Product search and entry */}
           <div className="grn-entry"
             style={{
-              padding: '14px 16px',
+              padding: '12px',
               borderRadius: '10px',
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
+              gap: '8px',
             }}
           >
             {/* Row 1: Product Search Input */}
@@ -1456,18 +1470,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '12px' }}>
                           <span>Last cost: <strong style={{ color: '#0f172a' }}>${Number(p.costPrice || 0).toFixed(2)}</strong></span>
                           <span>Selling: <strong>${Number(p.sellingPrice || 0).toFixed(2)}</strong></span>
-                          <span>{p.defaultWarehouseName || 'No default warehouse'}</span>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
               )}
-            </div>
-
-            <div className="grn-selected-product">
-              <span title={stagingItem.tradeName}>{stagingItem.productId ? `${stagingItem.productCode} — ${stagingItem.tradeName}` : 'Select a product to add a receipt line'}</span>
-
             </div>
 
             {stagingItem.productId && (
@@ -1481,22 +1489,35 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <div className="grn-line-fields">
               {[
                 ['quantity', 'RECEIVED QTY *', 0, '1'],
-                ['freeQuantity', 'FREE (FOC)', 0, '1'],
                 ['costPrice', 'UNIT COST ($) *', 0, '0.01'],
-                ['discountPercent', 'DISCOUNT %', 0, '0.1'],
-                ['salePrice', 'SELLING PRICE ($)', 0, '0.01'],
               ].map(([field, label, min, step]) => (
                 <label key={field}>{label}
                   <input className="input-glass" type="number" min={min} step={step}
-                    max={field === 'discountPercent' ? 100 : undefined}
+                    name={field}
                     value={stagingItem[field]} onChange={e => handleStagingChange(field, e.target.value)} />
                 </label>
               ))}
-              <label>LINE TOTAL<output className="grn-line-total">${Number(stagingItem.amount || 0).toFixed(2)}</output></label>
+              <label>
+                <span className="grn-markup-label"><input type="checkbox" checked={stagingItem.useBrandMarkup}
+                  aria-label="Use brand MP%" onChange={(e) => handleStagingChange('useBrandMarkup', e.target.checked)} /> MP% (Brand)</span>
+                <input className="input-glass" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly disabled={!stagingItem.useBrandMarkup} />
+              </label>
+              <label>SELLING PRICE ($)<input className="input-glass" type="number" name="salePrice" min="0" step="0.01"
+                readOnly={stagingItem.useBrandMarkup} value={stagingItem.salePrice}
+                onChange={(e) => handleStagingChange('salePrice', e.target.value)} /></label>
             </div>
             <button type="button" className="btn btn-primary grn-add-item" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
-              <Plus size={16} /> Add item
+              {editingLineIndex === null ? <Plus size={16} /> : <Edit2 size={16} />} {editingLineIndex === null ? 'Add item' : 'Update item'}
             </button>
+            {editingLineIndex !== null && <button type="button" className="btn btn-glass" onClick={resetStagingItem}>Cancel line edit</button>}
+          <div className="grn-header-fields">
+            <label>Supplier *<select className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
+              <option value="">Select supplier</option>
+              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></label>
+            <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
+            <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass" name="remarks" rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
+          </div>
           </div>
 
           {/* Received items */}
@@ -1506,122 +1527,49 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 Received items ({formData.items.length})
               </span>
               <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px' }}>
-                Total Received Units: <strong style={{ color: '#0f172a' }}>{totals.totalQty}</strong> + <strong style={{ color: '#15803d' }}>{totals.totalFree} FOC</strong> = <strong style={{ color: '#1d4ed8' }}>{totals.totalQty + totals.totalFree} units</strong>
+                Received units: <strong style={{ color: '#1d4ed8' }}>{totals.totalQty + totals.totalFree}</strong>
               </span>
             </div>
 
-            {formData.items.length === 0 ? (
-              <div
-                style={{
-                  padding: '24px 16px',
-                  textAlign: 'center',
-                  background: '#f8fafc',
-                  borderRadius: '8px',
-                  border: '1.5px dashed #cbd5e1',
-                  color: '#64748b',
-                  fontSize: '0.86rem',
-                }}
-              >
-                No items added yet. Search a product and click <strong>"Add item"</strong> or upload a sheet.
-              </div>
-            ) : (
-              <div className="grn-table-scroll">
-                <table className="glass-table" style={{ margin: 0, minWidth: '650px', width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: '8px 12px', width: '40px' }}>#</th>
-                      <th style={{ padding: '8px 12px' }}>Product</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>Qty</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>Free</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>Unit Cost</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>Disc ($)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>Net Total</th>
-                      <th style={{ textAlign: 'right', padding: '8px 12px' }}>GP%</th>
-                      <th style={{ padding: '8px 12px', width: '40px' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.items.map((it, idx) => (
-                      <tr key={idx}>
-                        <td style={{ padding: '8px 12px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>{idx + 1}</td>
-                        <td style={{ padding: '8px 12px' }}>
-                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.86rem' }}>
-                            {it.tradeName}
-                          </div>
-                          <div style={{ fontFamily: 'monospace', fontSize: '0.74rem', color: '#2563eb' }}>
-                            {it.productCode} {it.priceCode ? `• ${it.priceCode}` : ''}
-                          </div>
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '0.86rem', padding: '8px 12px' }}>{it.quantityReceived}</td>
-                        <td style={{ textAlign: 'right', color: '#15803d', fontWeight: 700, fontSize: '0.86rem', padding: '8px 12px' }}>
-                          {it.freeQuantity || '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.86rem', padding: '8px 12px' }}>${Number(it.unitCost).toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', color: '#475569', fontSize: '0.86rem', padding: '8px 12px' }}>
-                          {it.discountAmount > 0 ? `$${it.discountAmount.toFixed(2)}` : '—'}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 900, color: '#1d4ed8', fontSize: '0.9rem', padding: '8px 12px' }}>
-                          ${Number(it.amount).toFixed(2)}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '0.86rem', padding: '8px 12px', color: it.gpPercent >= 20 ? '#15803d' : '#b45309' }}>
-                          {it.gpPercent}%
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '8px 12px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }}
-                            title="Remove line"
-                          >
-                            <X size={15} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+            <div className="grn-table-scroll">
+              <table className="glass-table" style={{ margin: 0, minWidth: '600px', width: '100%' }}>
+                <thead><tr>
+                  <th>Product code</th><th>Product name</th><th className="grn-number">Qty</th><th className="grn-number">Unit cost</th>
+                  <th className="grn-number">MP%</th><th className="grn-number">Selling price</th><th className="grn-number">Actions</th>
+                </tr></thead>
+                <tbody>
+                  {formData.items.length === 0 && <tr><td colSpan="7" className="grn-empty">Search a product and add it to the GRN.</td></tr>}
+                  {formData.items.map((item, index) => <tr key={item.productId} className={editingLineIndex === index ? 'grn-editing-row' : ''}>
+                    <td><strong className="grn-product-code">{item.productCode}</strong></td>
+                    <td>{item.tradeName || '—'}</td>
+                    <td className="grn-number">{item.quantityReceived}</td>
+                    <td className="grn-number">${Number(item.unitCost || 0).toFixed(2)}</td>
+                    <td className="grn-number">{item.useBrandMarkup ? Number(item.markupPercent || 0).toFixed(2) + '%' : 'Manual'}</td>
+                    <td className="grn-number">${Number(item.salePrice || 0).toFixed(2)}</td>
+                    <td className="grn-number"><div className="grn-row-actions">
+                      <button type="button" title="Edit line" aria-label={`Edit item ${index + 1}`} onClick={() => handleEditItem(index)}><Edit2 size={14} /></button>
+                      <button type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => handleRemoveItem(index)}><Trash2 size={14} /></button>
+                    </div></td>
+                  </tr>)}
+                </tbody>
+              </table>
             </div>
           </div>
-
-            </div>
-            {/* Pinned totals and actions */}
+            {/* Pinned actions */}
             <div
+              className="grn-form-actions"
               style={{
                 padding: '12px 20px',
                 borderTop: '1px solid #e2e8f0',
                 backgroundColor: '#ffffff',
                 display: 'flex',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-end',
                 alignItems: 'center',
                 flexShrink: 0,
                 flexWrap: 'wrap',
                 gap: '12px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>ITEMS:</span>{' '}
-                  <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{formData.items.length} ({totals.totalQty + totals.totalFree} units)</strong>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>GROSS:</span>{' '}
-                  <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>${totals.grossValue.toFixed(2)}</strong>
-                </div>
-                {totals.totalDiscount > 0 && (
-                  <div>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>DISC:</span>{' '}
-                    <strong style={{ fontSize: '0.9rem', color: '#16a34a' }}>-${totals.totalDiscount.toFixed(2)}</strong>
-                  </div>
-                )}
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>NET PAYABLE:</span>{' '}
-                  <strong style={{ fontSize: '1.25rem', color: '#0284c7', fontWeight: 900 }}>${totals.netPayable.toFixed(2)}</strong>
-                </div>
-              </div>
-
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
@@ -1639,7 +1587,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 >
                   Back to GRNs
                 </button>
-                <button
+                {editingGrnStatus !== 'PROCESSED' && <button
                   type="button"
                   onClick={() => handleSaveGrn(false)}
                   disabled={saving}
@@ -1654,8 +1602,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     cursor: 'pointer',
                   }}
                 >
-                  {editingGrnId ? 'Update Draft' : 'Save Draft'}
-                </button>
+                  {editingGrnStatus === 'CANCELLED' ? 'Save Changes' : editingGrnId ? 'Update Draft' : 'Save Draft'}
+                </button>}
                 <button
                   type="button"
                   onClick={() => handleSaveGrn(true)}
@@ -1676,9 +1624,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   }}
                 >
                   <CheckCircle size={16} />
-                  {saving ? 'Saving Inventory...' : 'Save Inventory'}
+                  {saving ? 'Saving...' : editingGrnStatus === 'PROCESSED' ? 'Save Changes' : editingGrnStatus === 'CANCELLED' ? 'Save & Reprocess' : 'Save Inventory'}
                 </button>
               </div>
+            </div>
+            </div>
+          </div>
             </div>
           </div>
         </div>
@@ -1773,348 +1724,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
       {/* GRN INSPECTION MODAL (Modern, Large, High-Contrast for 45+ Decision Makers) */}
       {selectedGrn && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: 'min(1040px, 96vw)',
-              maxWidth: '1040px',
-              height: 'min(92vh, calc(100vh - 24px))',
-              maxHeight: 'calc(100vh - 24px)',
-              background: '#ffffff',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header with Title and Quick Document Action Buttons (Sticky Top) */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: '1px solid #e2e8f0',
-                padding: '12px 18px',
-                flexShrink: 0,
-                backgroundColor: '#ffffff',
-                gap: '10px',
-              }}
-            >
-              <div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  INWARD GOODS RECEIVED NOTE
-                </span>
-                <h2 style={{ fontSize: '1.25rem', color: '#0f172a', margin: '1px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Package size={20} color="#2563eb" /> {selectedGrn.grnNumber}
-                </h2>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass"
-                  onClick={() => handleDownloadPdf(selectedGrn.id, selectedGrn.grnNumber)}
-                  title="Download PDF file to computer"
-                  style={{ fontSize: '0.82rem', fontWeight: 700, color: '#15803d', borderColor: '#86efac', padding: '6px 11px' }}
-                >
-                  <Download size={13} color="#15803d" /> PDF
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => handlePrintPdf(selectedGrn.id)}
-                  title="Open system print dialog directly"
-                  style={{ fontSize: '0.82rem', fontWeight: 700, padding: '6px 13px' }}
-                >
-                  <Printer size={13} /> Print
-                </button>
-                <button
-                  onClick={() => setSelectedGrn(null)}
-                  style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    padding: '5px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Close window"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Modal Content */}
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: 'auto',
-                padding: '18px 20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                backgroundColor: '#ffffff',
-              }}
-            >
-              {/* Cancellation Status Banner */}
-              {selectedGrn.status === 'CANCELLED' && (
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    background: '#fff1f2',
-                    borderRadius: '8px',
-                    border: '1px solid #fecdd3',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#be123c', fontWeight: 800, fontSize: '0.92rem' }}>
-                    <XCircle size={17} /> Consignment Cancelled & Live Stock Reversed
-                  </div>
-                  <div style={{ fontSize: '0.84rem', color: '#9f1239' }}>
-                    <strong>Cancelled By:</strong> {selectedGrn.cancelledBy || 'User'} &nbsp;|&nbsp;{' '}
-                    <strong>Cancelled At:</strong> {selectedGrn.cancelledAt ? new Date(selectedGrn.cancelledAt).toLocaleString() : '—'}
-                  </div>
-                  <div style={{ fontSize: '0.84rem', color: '#9f1239' }}>
-                    <strong>Cancellation Reason:</strong> {selectedGrn.cancelReason || 'No reason specified'}
-                  </div>
-                </div>
-              )}
-
-              {/* High-Contrast Decision Highlight Tiles */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                <div style={{ padding: '14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase' }}>
-                    TOTAL INWARD VALUE
-                  </div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1d4ed8', marginTop: '3px' }}>
-                    ${Number(selectedGrn.totalAmount || 0).toFixed(2)}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '2px' }}>
-                    Total billed intake for this consignment
-                  </div>
-                </div>
-
-                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                    CONSIGNMENT STATUS
-                  </div>
-                  <div style={{ marginTop: '6px' }}>
-                    <span
-                      style={{
-                        fontSize: '0.88rem',
-                        padding: '4px 10px',
-                        fontWeight: 800,
-                        display: 'inline-block',
-                        borderRadius: '6px',
-                        backgroundColor:
-                          selectedGrn.status === 'PROCESSED'
-                            ? '#dcfce7'
-                            : selectedGrn.status === 'CANCELLED'
-                            ? '#ffe4e6'
-                            : '#fef3c7',
-                        color:
-                          selectedGrn.status === 'PROCESSED'
-                            ? '#16a34a'
-                            : selectedGrn.status === 'CANCELLED'
-                            ? '#e11d48'
-                            : '#d97706',
-                        border:
-                          selectedGrn.status === 'PROCESSED'
-                            ? '1px solid #bbf7d0'
-                            : selectedGrn.status === 'CANCELLED'
-                            ? '1px solid #fecdd3'
-                            : '1px solid #fde68a',
-                      }}
-                    >
-                      {selectedGrn.status}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                    {selectedGrn.status === 'PROCESSED'
-                      ? 'Inventory posted to live stock'
-                      : selectedGrn.status === 'CANCELLED'
-                      ? 'Consignment cancelled & stock reversed'
-                      : 'Draft / pending approval'}
-                  </div>
-                </div>
-
-                <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                    DESTINATION WAREHOUSE
-                  </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '3px' }}>
-                    {selectedGrn.warehouseName}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
-                    Received Date: {selectedGrn.receivedDate || (selectedGrn.createdAt ? new Date(selectedGrn.createdAt).toLocaleDateString() : '—')}
-                  </div>
-                </div>
-              </div>
-
-              {/* Supplier & Consignment Metadata */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.88rem' }}>
-                <div>
-                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>SUPPLIER / VENDOR</div>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.96rem', marginTop: '2px' }}>
-                    {selectedGrn.supplierName}
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Code: {selectedGrn.supplierCode || 'N/A'}</div>
-                </div>
-
-                <div>
-                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>SUPPLIER INVOICE / DC #</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.94rem', marginTop: '2px' }}>
-                    {selectedGrn.supplierInvoiceNumber || '—'}
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>Vendor delivery reference</div>
-                </div>
-
-                <div>
-                  <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>RECORDED BY</div>
-                  <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
-                    {selectedGrn.createdBy || 'System Administrator'}
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                    {selectedGrn.createdAt ? new Date(selectedGrn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </div>
-                </div>
-              </div>
-
-              {selectedGrn.notes && (
-                <div style={{ padding: '8px 12px', background: '#fffbeb', borderRadius: '6px', border: '1px solid #fef3c7', fontSize: '0.84rem', color: '#92400e' }}>
-                  <span style={{ fontWeight: 700 }}>Notes / Remarks:</span> {selectedGrn.notes}
-                </div>
-              )}
-
-              {/* Line Items Table (with overflowX: auto) */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Consignment Line Items ({selectedGrn.items?.length || 0} products)
-                  </h3>
-                </div>
-
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflowX: 'auto', maxWidth: '100%' }}>
-                  <table className="glass-table" style={{ margin: 0, minWidth: '600px' }}>
-                    <thead style={{ background: '#f1f5f9' }}>
-                      <tr>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem' }}>#</th>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem' }}>Product Description</th>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem' }}>Code (SKU)</th>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem', textAlign: 'right' }}>Received Qty</th>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem', textAlign: 'right' }}>Unit Cost</th>
-                        <th style={{ padding: '10px 12px', color: '#334155', fontWeight: 800, fontSize: '0.78rem', textAlign: 'right' }}>Total Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedGrn.items?.map((it, idx) => (
-                        <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '0.82rem' }}>{idx + 1}</td>
-                          <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
-                            {it.productName}
-                          </td>
-                          <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#1d4ed8', fontWeight: 600, fontSize: '0.82rem' }}>
-                            {it.productSku || '—'}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
-                            {it.quantityReceived} {it.unitOfMeasure || ''}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155', fontSize: '0.86rem' }}>
-                            ${Number(it.unitCost || 0).toFixed(2)}
-                          </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#1d4ed8', fontSize: '0.94rem' }}>
-                            ${Number(it.totalCost || (it.quantityReceived * it.unitCost) || 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Bottom Footer Actions (Sticky Bottom) */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid #e2e8f0',
-                padding: '12px 20px',
-                backgroundColor: '#f8fafc',
-                flexShrink: 0,
-                flexWrap: 'wrap',
-                gap: '10px',
-              }}
-            >
-              <div style={{ fontSize: '0.98rem', color: '#334155', fontWeight: 700 }}>
-                Consignment Total: <strong style={{ color: '#1d4ed8', fontSize: '1.25rem', fontWeight: 900 }}>${Number(selectedGrn.totalAmount || 0).toFixed(2)}</strong>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {selectedGrn.status === 'PROCESSED' && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenCancelModal(selectedGrn)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backgroundColor: '#fff1f2',
-                      color: '#e11d48',
-                      border: '1px solid #fecdd3',
-                      borderRadius: '6px',
-                      padding: '7px 14px',
-                      fontSize: '0.84rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#ffe4e6')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#fff1f2')}
-                    title="Cancel GRN and reverse live stock"
-                  >
-                    <RotateCcw size={14} /> Cancel GRN
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-glass"
-                  onClick={() => handleDownloadPdf(selectedGrn.id, selectedGrn.grnNumber)}
-                  style={{ fontSize: '0.84rem', fontWeight: 700, color: '#15803d', borderColor: '#86efac', padding: '7px 12px' }}
-                >
-                  <Download size={14} color="#15803d" /> PDF
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => handlePrintPdf(selectedGrn.id)}
-                  style={{ fontSize: '0.84rem', fontWeight: 700, padding: '7px 14px' }}
-                >
-                  <Printer size={14} /> Print
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-glass"
-                  onClick={() => setSelectedGrn(null)}
-                  style={{ fontSize: '0.84rem', padding: '7px 14px' }}
-                >
-                  Back to GRNs
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <GrnDetailsModal grn={selectedGrn} onClose={() => setSelectedGrn(null)}
+          onPrint={() => handlePrintPdf(selectedGrn.id)} onCancel={() => handleOpenCancelModal(selectedGrn)}
+          canManage={canEditGrn} processing={processingGrnId !== null} onProcess={() => handleProcessGrn(selectedGrn)}
+          onEdit={() => { const grn = selectedGrn; setSelectedGrn(null); handleEditGrn(grn); }} />
       )}
 
       {/* CANCEL GRN MODAL DIALOG */}
@@ -2146,8 +1759,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <div style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px', lineHeight: 1.5 }}>
               {cancellingGrn.status === 'PROCESSED' ? (
                 <div style={{ padding: '10px 14px', background: '#fff1f2', borderRadius: '6px', border: '1px solid #fecdd3', color: '#be123c' }}>
-                  Cancelling this processed GRN will deduct received quantities from warehouse live inventory.
-                  If available stock in <strong>{cancellingGrn.warehouseName}</strong> is insufficient, the cancellation will be rejected.
+                  Cancelling this processed GRN will reverse the received quantities from inventory.
+                  If any product has insufficient available stock, the cancellation will be rejected.
                 </div>
               ) : (
                 <div>

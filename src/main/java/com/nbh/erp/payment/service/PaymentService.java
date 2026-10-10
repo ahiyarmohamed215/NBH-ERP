@@ -61,6 +61,7 @@ public class PaymentService {
     public PaymentDto getPaymentById(Long id) {
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", "id", id));
+        CustomerRepository.requireActive(payment.getCustomer());
         return PaymentDto.from(payment);
     }
 

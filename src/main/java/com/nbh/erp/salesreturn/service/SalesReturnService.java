@@ -74,6 +74,7 @@ public class SalesReturnService {
     public SalesReturnDto getSalesReturnById(Long id) {
         SalesReturn sr = salesReturnRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sales Return", "id", id));
+        CustomerRepository.requireActive(sr.getCustomer());
         return SalesReturnDto.from(sr);
     }
 

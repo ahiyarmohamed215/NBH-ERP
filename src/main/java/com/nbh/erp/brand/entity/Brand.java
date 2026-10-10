@@ -26,6 +26,10 @@ public class Brand extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "markup_percent", nullable = false, precision = 9, scale = 4)
+    @Builder.Default
+    private java.math.BigDecimal markupPercent = java.math.BigDecimal.ZERO;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;

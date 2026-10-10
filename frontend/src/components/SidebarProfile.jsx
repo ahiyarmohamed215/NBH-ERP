@@ -273,10 +273,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
       <div
         onClick={() => setMenuOpen(!menuOpen)}
         style={{
-          padding: isCollapsed ? '12px 0' : '10px 14px',
+          padding: isCollapsed ? '12px 0' : '10px 10px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isCollapsed ? 'center' : 'space-between',
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
           cursor: 'pointer',
           backgroundColor: menuOpen ? '#f1f5f9' : 'transparent',
           transition: 'background-color 0.15s ease',
@@ -293,9 +293,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: isCollapsed ? '0' : '10px',
+            gap: isCollapsed ? '0' : '9px',
             minWidth: 0,
             justifyContent: isCollapsed ? 'center' : 'flex-start',
+            flex: isCollapsed ? 'none' : 1,
             width: isCollapsed ? '100%' : 'auto',
           }}
         >
@@ -341,36 +342,61 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
           {/* Profile Name & Connected Status (Shown when sidebar is expanded) */}
           {!isCollapsed && (
             <div className="profile-details" style={{ minWidth: 0, flex: 1 }}>
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: '0.88rem',
-                  color: '#0f172a',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  lineHeight: 1.25,
-                }}
-              >
-                {user?.fullName || user?.username}
-              </div>
+              {/* Top Row: User Full Name & ChevronUp Icon aligned together */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  justifyContent: 'space-between',
+                  gap: '4px',
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '0.86rem',
+                    color: '#0f172a',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {user?.fullName || user?.username}
+                </div>
+                <ChevronUp
+                  size={15}
+                  color="#64748b"
+                  style={{
+                    flexShrink: 0,
+                    transform: menuOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease',
+                    display: 'block',
+                  }}
+                />
+              </div>
+
+              {/* Bottom Row: Status & Version Badges */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
                   marginTop: '3px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
                 }}
               >
                 <div
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    padding: '1.5px 7px',
+                    gap: '4px',
+                    padding: '1px 6px',
                     borderRadius: '10px',
                     backgroundColor: '#ecfdf5',
                     border: '1px solid #d1fae5',
+                    flexShrink: 0,
                   }}
                 >
                   <span
@@ -388,7 +414,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                     style={{
                       color: '#047857',
                       fontWeight: 600,
-                      fontSize: '0.72rem',
+                      fontSize: '0.7rem',
                       letterSpacing: '0.01em',
                     }}
                   >
@@ -405,6 +431,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                     backgroundColor: '#f1f5f9',
                     border: '1px solid #e2e8f0',
                     lineHeight: '1.3',
+                    flexShrink: 0,
                   }}
                   title="ERP System Version"
                 >
@@ -414,19 +441,6 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
             </div>
           )}
         </div>
-
-        {!isCollapsed && (
-          <ChevronUp
-            size={16}
-            color="#64748b"
-            className="profile-details"
-            style={{
-              flexShrink: 0,
-              transform: menuOpen ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.2s ease',
-            }}
-          />
-        )}
       </div>
 
       {/* Edit Profile Modal */}

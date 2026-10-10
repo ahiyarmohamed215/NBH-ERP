@@ -23,6 +23,7 @@ public class ProductDto {
     private String categoryName;
     private Long brandId;
     private String brandName;
+    private BigDecimal brandMarkupPercent;
     private Long supplierId;
     private String supplierName;
     private Long warehouseId;
@@ -58,6 +59,7 @@ public class ProductDto {
                 .categoryName(p.getCategory() != null ? p.getCategory().getName() : null)
                 .brandId(p.getBrand() != null ? p.getBrand().getId() : null)
                 .brandName(p.getBrand() != null ? p.getBrand().getName() : null)
+                .brandMarkupPercent(p.getBrand() != null ? p.getBrand().getMarkupPercent() : BigDecimal.ZERO)
                 .supplierId(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getId() : null)
                 .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getName() : null)
                 .warehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)

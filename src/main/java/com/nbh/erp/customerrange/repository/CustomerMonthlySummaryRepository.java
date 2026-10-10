@@ -19,16 +19,16 @@ public interface CustomerMonthlySummaryRepository extends JpaRepository<Customer
 
     List<CustomerMonthlySummary> findByCustomerIdOrderByYearMonthDesc(Long customerId);
 
-    @Query("SELECT COUNT(s) FROM CustomerMonthlySummary s WHERE s.yearMonth = :yearMonth AND s.currentRange.id = :rangeId")
+    @Query("SELECT COUNT(s) FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth AND s.currentRange.id = :rangeId")
     long countByYearMonthAndCurrentRangeId(@Param("yearMonth") String yearMonth, @Param("rangeId") Long rangeId);
 
-    @Query("SELECT COUNT(s) FROM CustomerMonthlySummary s WHERE s.yearMonth = :yearMonth AND s.qualifyingPurchases > 0")
+    @Query("SELECT COUNT(s) FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth AND s.qualifyingPurchases > 0")
     long countActivePurchasersByYearMonth(@Param("yearMonth") String yearMonth);
 
-    @Query("SELECT COALESCE(SUM(s.qualifyingPurchases), 0) FROM CustomerMonthlySummary s WHERE s.yearMonth = :yearMonth")
+    @Query("SELECT COALESCE(SUM(s.qualifyingPurchases), 0) FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth")
     BigDecimal getTotalQualifyingSalesByYearMonth(@Param("yearMonth") String yearMonth);
 
-    @Query("SELECT s FROM CustomerMonthlySummary s WHERE s.yearMonth = :yearMonth " +
+    @Query("SELECT s FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth " +
             "AND (:rangeId IS NULL OR s.currentRange.id = :rangeId) " +
             "AND (:staffId IS NULL OR s.assignedStaff.id = :staffId) " +
             "AND (:search IS NULL OR :search = '' OR " +
@@ -43,7 +43,7 @@ public interface CustomerMonthlySummaryRepository extends JpaRepository<Customer
             Pageable pageable
     );
 
-    @Query("SELECT s FROM CustomerMonthlySummary s WHERE s.yearMonth = :yearMonth " +
+    @Query("SELECT s FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth " +
             "AND s.assignedStaff.id = :staffId " +
             "AND (:rangeId IS NULL OR s.currentRange.id = :rangeId) " +
             "AND (:search IS NULL OR :search = '' OR " +
@@ -66,7 +66,7 @@ public interface CustomerMonthlySummaryRepository extends JpaRepository<Customer
             "SUM(CASE WHEN s.currentRange.minSpend > 0 THEN 1 ELSE 0 END) AS promotedCustomers, " +
             "COALESCE(SUM(s.qualifyingPurchases), 0) AS totalQualifyingPurchases " +
             "FROM CustomerMonthlySummary s " +
-            "WHERE s.yearMonth = :yearMonth AND s.assignedStaff IS NOT NULL " +
+            "WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth AND s.assignedStaff IS NOT NULL " +
             "GROUP BY s.assignedStaff.id, s.assignedStaff.fullName, s.assignedStaff.username")
     List<StaffPerformanceProjection> getStaffPerformanceForMonth(@Param("yearMonth") String yearMonth);
 

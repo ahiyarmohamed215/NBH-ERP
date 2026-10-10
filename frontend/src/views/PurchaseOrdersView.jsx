@@ -1,3 +1,4 @@
+import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect } from 'react';
@@ -694,27 +695,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             </div>
 
             <div className="purchase-body">
-              <div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Delivery warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Order date<input type="date" value={formData.orderDate || ''} onChange={e=>setFormData({...formData, orderDate:e.target.value})}/></label><label>Expected date<input type="date" value={formData.expectedDate || ''} onChange={e=>setFormData({...formData, expectedDate:e.target.value})}/></label><label>Payment terms<select value={formData.terms} onChange={e=>setFormData({...formData, terms:e.target.value})}>{['Net 30 Days','Net 15 Days','COD','Advance Payment','End of Month'].map(t=><option key={t} value={t}>{t}</option>)}</select></label><label>Remarks / notes<input type="text" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})}/></label></div>
               <PurchaseLines products={products} items={formData.items} quantityField="quantity" withCost={true}
-                onChange={items=>setFormData(previous=>({...previous,items}))} />
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div
-              style={{
-                padding: '12px 20px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
-                Order Grand Total: <strong style={{ color: '#0284c7', fontSize: '1.25rem', fontWeight: 900 }}>${calculateGrandTotal().toFixed(2)}</strong>
-              </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Delivery warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Order date<input type="date" value={formData.orderDate || ''} onChange={e=>setFormData({...formData, orderDate:e.target.value})}/></label><label>Expected date<input type="date" value={formData.expectedDate || ''} onChange={e=>setFormData({...formData, expectedDate:e.target.value})}/></label><label>Payment terms<select value={formData.terms} onChange={e=>setFormData({...formData, terms:e.target.value})}>{['Net 30 Days','Net 15 Days','COD','Advance Payment','End of Month'].map(t=><option key={t} value={t}>{t}</option>)}</select></label><label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})}/></label></div>}
+                actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
@@ -766,141 +749,24 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 >
                   Issue Purchase Order
                 </button>
-              </div>
+              </div>} />
             </div>
           </div>
         </div>
       )}
 
       {/* INSPECT PURCHASE ORDER MODAL */}
-      {selectedPo && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1100,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '12px',
-            overflowY: 'auto',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(960px, 96vw)',
-              maxWidth: '960px',
-              maxHeight: 'calc(100vh - 24px)',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                  Purchase Order: <span style={{ color: '#0284c7', fontFamily: 'monospace' }}>{selectedPo.poNumber}</span>
-                </h2>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  Ordered on {selectedPo.orderDate} • Status: <strong>{selectedPo.status}</strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedPo(null)}
-                style={{ width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
+      {selectedPo && <PurchaseInspectionModal type="PO" number={selectedPo.poNumber} status={selectedPo.status} rows={selectedPo.items || []}
+        onClose={() => setSelectedPo(null)}
+        actions={['PENDING', 'APPROVED'].includes(selectedPo.status) ? [{ label: 'Edit PO', icon: Edit2, onClick: () => { const po = selectedPo; setSelectedPo(null); handleEditPo(po); } }] : []}
+        columns={[
+          { label: 'Product code', value: item => item.sku || item.productSku || '—' },
+          { label: 'Product', value: item => item.productName },
+          { label: 'Qty', numeric: true, value: item => item.quantity },
+          { label: 'Unit cost', numeric: true, value: item => '$' + Number(item.unitCost || 0).toFixed(2) },
+          { label: 'Line total', numeric: true, value: item => '$' + Number(item.totalCost || 0).toFixed(2) },
+        ]} />}
 
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '18px' }}>
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>SUPPLIER / VENDOR</div>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem', marginTop: '2px' }}>{selectedPo.supplierName}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>DESTINATION WAREHOUSE</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem', marginTop: '2px' }}>{selectedPo.warehouseName}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>EXPECTED DELIVERY</div>
-                  <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedPo.expectedDate || '—'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>PAYMENT TERMS</div>
-                  <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedPo.terms || 'Standard'}</div>
-                </div>
-              </div>
-
-              {selectedPo.notes && (
-                <div style={{ padding: '10px 14px', background: '#fffbeb', borderRadius: '6px', border: '1px solid #fef3c7', marginBottom: '16px', fontSize: '0.86rem', color: '#92400e' }}>
-                  <strong>Notes:</strong> {selectedPo.notes}
-                </div>
-              )}
-
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
-                Order Line Items ({selectedPo.items?.length || 0})
-              </h4>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <tr>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569' }}>#</th>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569' }}>SKU</th>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569' }}>Product Name</th>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', textAlign: 'right' }}>Qty</th>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', textAlign: 'right' }}>Unit Cost</th>
-                      <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: '#475569', textAlign: 'right' }}>Line Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPo.items?.map((it, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 14px', fontSize: '0.84rem', color: '#64748b' }}>{idx + 1}</td>
-                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{it.sku}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800 }}>{it.quantity}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', color: '#334155' }}>${Number(it.unitCost).toFixed(2)}</td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>${Number(it.totalCost).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                Total Order Value: <span style={{ color: '#0284c7', fontSize: '1.25rem' }}>${Number(selectedPo.totalAmount || 0).toFixed(2)}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  <Printer size={15} style={{ display: 'inline', marginRight: '6px' }} /> Print PO
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPo(null)}
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#334155', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 });
