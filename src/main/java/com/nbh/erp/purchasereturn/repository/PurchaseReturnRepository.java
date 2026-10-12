@@ -12,9 +12,11 @@ import java.util.Optional;
 
 @Repository
 public interface PurchaseReturnRepository extends JpaRepository<PurchaseReturn, Long> {
-    @org.springframework.data.jpa.repository.Query("select coalesce(sum(i.quantityReturned),0) from PurchaseReturnItem i where i.purchaseReturn.sourceGrnId=:grnId and i.product.id=:productId and i.purchaseReturn.status='PROCESSED'")
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(i.quantityReturned),0) from PurchaseReturnItem i where coalesce(i.sourceGrn.id,i.purchaseReturn.sourceGrnId)=:grnId and i.product.id=:productId and i.purchaseReturn.status='PROCESSED'")
     java.math.BigDecimal returnedQuantity(Long grnId,Long productId);
-    @org.springframework.data.jpa.repository.Query("select coalesce(sum(p.totalAmount),0) from PurchaseReturn p where p.sourceGrnId=:id and p.status='PROCESSED'") java.math.BigDecimal totalReturned(Long id);
+    @Query("select coalesce(sum(i.quantityReturned),0) from PurchaseReturnItem i where coalesce(i.sourceGrn.id,i.purchaseReturn.sourceGrnId)=:grnId and i.product.id=:productId and coalesce(i.warehouse.id,i.purchaseReturn.warehouse.id)=:warehouseId and i.purchaseReturn.status='PROCESSED'")
+    java.math.BigDecimal returnedQuantityInWarehouse(Long grnId, Long productId, Long warehouseId);
+    @Query("select coalesce(sum(i.totalCost),0) from PurchaseReturnItem i where coalesce(i.sourceGrn.id,i.purchaseReturn.sourceGrnId)=:id and i.purchaseReturn.status='PROCESSED'") java.math.BigDecimal totalReturned(Long id);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select e from PurchaseReturn e where e.id = :id")
@@ -24,8 +26,8 @@ public interface PurchaseReturnRepository extends JpaRepository<PurchaseReturn, 
     Optional<PurchaseReturn> findByPrnNumber(String prnNumber);
 
     @Query("SELECT p FROM PurchaseReturn p WHERE " +
-            "(:warehouseId IS NULL OR p.warehouse.id = :warehouseId) AND " +
-            "(:supplierId IS NULL OR p.supplier.id = :supplierId) AND " +
+            "(:warehouseId IS NULL OR EXISTS (select i.id from PurchaseReturnItem i where i.purchaseReturn=p and coalesce(i.warehouse.id,p.warehouse.id)=:warehouseId)) AND " +
+            "(:supplierId IS NULL OR EXISTS (select i.id from PurchaseReturnItem i where i.purchaseReturn=p and coalesce(i.sourceGrn.supplier.id,p.supplier.id)=:supplierId)) AND " +
             "(:status IS NULL OR p.status = :status) AND " +
             "(:query IS NULL OR :query = '' OR LOWER(p.prnNumber) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<PurchaseReturn> searchPurchaseReturns(

@@ -20,8 +20,8 @@ public interface GtnRepository extends JpaRepository<Gtn, Long> {
     Optional<Gtn> findByGtnNumber(String gtnNumber);
 
     @Query("SELECT g FROM Gtn g WHERE " +
-            "(:sourceWarehouseId IS NULL OR g.sourceWarehouse.id = :sourceWarehouseId) AND " +
-            "(:destinationWarehouseId IS NULL OR g.destinationWarehouse.id = :destinationWarehouseId) AND " +
+            "(:sourceWarehouseId IS NULL OR EXISTS (SELECT i.id FROM GtnItem i WHERE i.gtn = g AND COALESCE(i.sourceWarehouse.id, g.sourceWarehouse.id) = :sourceWarehouseId)) AND " +
+            "(:destinationWarehouseId IS NULL OR EXISTS (SELECT i.id FROM GtnItem i WHERE i.gtn = g AND COALESCE(i.destinationWarehouse.id, g.destinationWarehouse.id) = :destinationWarehouseId)) AND " +
             "(:status IS NULL OR g.status = :status) AND " +
             "(:query IS NULL OR :query = '' OR LOWER(g.gtnNumber) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<Gtn> searchGtns(

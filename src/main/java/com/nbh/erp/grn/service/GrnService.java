@@ -50,6 +50,7 @@ public class GrnService {
 
     private java.util.List<GrnItem> buildItems(Grn grn, CreateGrnRequest request) {
         var destinations = savedDestinations(grn);
+        if(request.getPurchaseOrderId()!=null) purchaseOrders.deliveryWarehouses(request.getPurchaseOrderId(),request.getSupplierId()).forEach(destinations::putIfAbsent);
         var merged = new java.util.LinkedHashMap<Long, GrnItem>();
         for (var incoming : request.getItems()) {
             Product product = productRepository.findById(incoming.getProductId())
@@ -74,8 +75,11 @@ public class GrnService {
                 line.setSellingPrice(line.getUnitCost().multiply(BigDecimal.ONE.add(markup.movePointLeft(2)))
                         .setScale(2, java.math.RoundingMode.HALF_UP));
             } else {
-                line.setMarkupPercent(incoming.getMarkupPercent());
                 line.setSellingPrice(incoming.getSellingPrice());
+                line.setMarkupPercent(incoming.getSellingPrice() == null ? incoming.getMarkupPercent()
+                        : line.getUnitCost().signum() == 0 ? BigDecimal.ZERO
+                        : incoming.getSellingPrice().subtract(line.getUnitCost()).multiply(new BigDecimal("100"))
+                            .divide(line.getUnitCost(), 2, java.math.RoundingMode.HALF_UP));
             }
         }
         return new ArrayList<>(merged.values());
@@ -108,13 +112,15 @@ public class GrnService {
 
     private Warehouse resolveWarehouse(CreateGrnRequest request, java.util.Map<Long, Warehouse> destinations) {
         Warehouse warehouse = null;
+        var orderedDestinations=request.getPurchaseOrderId()!=null ? purchaseOrders.deliveryWarehouses(request.getPurchaseOrderId(),request.getSupplierId()) : java.util.Map.<Long,Warehouse>of();
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new BusinessException("GRN must have at least one line item");
         }
         for (var item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product", "id", item.getProductId()));
-            Warehouse destination = destinations.getOrDefault(product.getId(), product.getDefaultWarehouse());
+            if(request.getPurchaseOrderId()!=null && !orderedDestinations.containsKey(product.getId())) throw new BusinessException("Product not ordered: "+product.getSku());
+            Warehouse destination = destinations.getOrDefault(product.getId(),orderedDestinations.getOrDefault(product.getId(),product.getDefaultWarehouse()));
             if (!Boolean.TRUE.equals(product.getIsActive())) throw new BusinessException("Product is inactive: " + product.getSku());
             if (destination == null || !Boolean.TRUE.equals(destination.getIsActive())) {
                 throw new BusinessException("Set an active default warehouse on product " + product.getSku() + " before receiving goods");
@@ -189,6 +195,9 @@ public class GrnService {
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
 
         SecurityUtils.enforceCanEdit("GRN", grn.getGrnNumber());
+        String previousStatus = grn.getStatus();
+        String statusReason = autoProcess && !"PROCESSED".equals(previousStatus)
+                ? com.nbh.erp.common.dto.StatusChangeRequest.requireReason(request.getStatusReason()) : null;
 
         if (!java.util.Set.of("DRAFT", "PROCESSED", "CANCELLED").contains(grn.getStatus())) {
             throw new BusinessException("Cannot edit GRN " + grn.getGrnNumber() + " with status " + grn.getStatus());
@@ -230,7 +239,9 @@ public class GrnService {
         );
 
         if (autoProcess && !wasProcessed) {
-            return processGrnInternal(savedGrn);
+            var result = processGrnInternal(savedGrn);
+            auditLogService.log("GRN_STATUS", "PURCHASING", "Grn", savedGrn.getGrnNumber(), previousStatus + " -> PROCESSED: " + statusReason);
+            return result;
         }
 
         return GrnDto.from(savedGrn);
@@ -249,6 +260,16 @@ public class GrnService {
     }
 
     @Transactional
+    public GrnDto processGrn(Long id, String reason) {
+        reason = com.nbh.erp.common.dto.StatusChangeRequest.requireReason(reason);
+        var grn = grnRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
+        String previous = grn.getStatus();
+        var result = processGrnInternal(grn);
+        auditLogService.log("GRN_STATUS", "PURCHASING", "Grn", grn.getGrnNumber(), previous + " -> PROCESSED: " + reason);
+        return result;
+    }
+
+    @Transactional
     public GrnDto cancelGrn(Long id, String reason) {
         Grn grn = grnRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GRN", "id", id));
@@ -262,6 +283,8 @@ public class GrnService {
         }
 
         String trimmedReason = reason.trim();
+        com.nbh.erp.common.dto.StatusChangeRequest.requireReason(trimmedReason);
+        String previousStatus = grn.getStatus();
 
         // If the GRN was PROCESSED, reverse inventory
         if ("PROCESSED".equals(grn.getStatus())) {
@@ -314,8 +337,7 @@ public class GrnService {
                 "GRN_CANCEL",
                 "Grn",
                 grn.getGrnNumber(),
-                String.format("GRN %s cancelled by '%s'. Reason: %s",
-                        grn.getGrnNumber(), currentUsername, trimmedReason)
+                previousStatus + " -> CANCELLED: " + trimmedReason
         );
 
         log.info("GRN '{}' cancelled successfully by '{}'. Reason: {}", grn.getGrnNumber(), currentUsername, trimmedReason);
@@ -429,11 +451,8 @@ public class GrnService {
 
     private void updateOrderReceipt(Grn grn,boolean reverse) {
         if(grn.getPurchaseOrderId()==null) return;
-        if (grn.getItems().stream().anyMatch(i -> !i.getReceivingWarehouse().getId().equals(grn.getWarehouse().getId()))) {
-            throw new BusinessException("Products on a linked purchase order must use the order's destination");
-        }
-        java.util.Map<Long,BigDecimal> qty=new java.util.TreeMap<>();
-        grn.getItems().forEach(i -> qty.merge(i.getProduct().getId(),i.getQuantityReceived(),BigDecimal::add));
-        purchaseOrders.receive(grn.getPurchaseOrderId(),grn.getSupplier().getId(),grn.getWarehouse().getId(),qty,reverse);
+        java.util.Map<Long,java.util.Map<Long,BigDecimal>> destinations=new java.util.TreeMap<>();
+        grn.getItems().forEach(i -> destinations.computeIfAbsent(i.getReceivingWarehouse().getId(),key->new java.util.TreeMap<>()).merge(i.getProduct().getId(),i.getQuantityReceived(),BigDecimal::add));
+        for(var destination:destinations.entrySet()) purchaseOrders.receive(grn.getPurchaseOrderId(),grn.getSupplier().getId(),destination.getKey(),destination.getValue(),reverse);
     }
 }

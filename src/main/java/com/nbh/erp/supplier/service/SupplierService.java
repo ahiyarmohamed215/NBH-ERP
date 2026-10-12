@@ -123,17 +123,19 @@ public class SupplierService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
-        Supplier supplier = supplierRepository.findById(id)
+    public void toggleActive(Long id, String reason) {
+        reason = com.nbh.erp.common.dto.StatusChangeRequest.requireReason(reason);
+        Supplier supplier = supplierRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
 
         SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + supplier.getName());
 
+        String previous = Boolean.TRUE.equals(supplier.getIsActive()) ? "ACTIVE" : "INACTIVE";
         supplier.setIsActive(!supplier.getIsActive());
         supplierRepository.save(supplier);
 
         auditLogService.log("SUPPLIER_STATUS", "PURCHASING", "Supplier", supplier.getSupplierCode(),
-                String.format("Set supplier '%s' active status to %s", supplier.getName(), supplier.getIsActive()));
+                previous + " -> " + (supplier.getIsActive() ? "ACTIVE" : "INACTIVE") + ": " + reason);
     }
 
     @Transactional

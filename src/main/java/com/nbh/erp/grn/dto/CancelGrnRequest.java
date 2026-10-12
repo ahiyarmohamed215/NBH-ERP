@@ -13,5 +13,6 @@ import lombok.NoArgsConstructor;
 public class CancelGrnRequest {
 
     @NotBlank(message = "Cancellation reason is required")
+    @jakarta.validation.constraints.Size(max=1000)
     private String reason;
 }

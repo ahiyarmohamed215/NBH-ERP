@@ -19,8 +19,8 @@ export default function GrnDetailsModal({ grn, onClose, onPrint, onCancel, onEdi
       { label: 'Product code', value: item => item.productSku || item.productBarcode || '—' },
       { label: 'Product name', value: item => item.productName || '—' },
       { label: 'Qty', numeric: true, value: item => item.quantityReceived },
-      { label: 'Unit price', numeric: true, value: item => '$' + Number(item.unitCost || 0).toFixed(2) },
+      { label: 'Unit price', numeric: true, value: item => 'LKR ' + Number(item.unitCost || 0).toFixed(2) },
       { label: 'MP%', numeric: true, value: item => item.markupPercent == null ? '—' : Number(item.markupPercent) + '%' },
-      { label: 'Selling price', numeric: true, value: item => item.sellingPrice == null ? '—' : '$' + Number(item.sellingPrice).toFixed(2) },
+      { label: 'Selling price', numeric: true, value: item => item.sellingPrice == null ? '—' : 'LKR ' + Number(item.sellingPrice).toFixed(2) },
     ]} />;
 }

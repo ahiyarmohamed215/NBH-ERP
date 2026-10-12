@@ -257,12 +257,20 @@ public class PdfGenerationService {
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, new Color(30, 41, 59));
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, new Color(15, 23, 42));
             Font tableHeadFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, Color.WHITE);
-            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 10, new Color(51, 65, 85));
-            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, new Color(15, 23, 42));
+            Font bodyFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new Color(51, 65, 85));
+            Font boldBody = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, new Color(15, 23, 42));
 
+            var sources = gtn.getItems().stream().collect(java.util.stream.Collectors.groupingBy(item -> item.getTransferSource().getId(), java.util.TreeMap::new, java.util.stream.Collectors.toList()));
+            if (sources.isEmpty()) sources.put(gtn.getSourceWarehouse().getId(), java.util.List.of());
+            int sourceCopy = 0;
+            for (var sourceItems : sources.values()) {
+            if (sourceCopy > 0) document.newPage();
+            sourceCopy++;
+            var sourceWarehouse = sourceItems.isEmpty() ? gtn.getSourceWarehouse() : sourceItems.getFirst().getTransferSource();
+            var destinations = sourceItems.stream().map(GtnItem::getTransferDestination).collect(java.util.stream.Collectors.toMap(warehouse -> warehouse.getId(), warehouse -> warehouse, (first, second) -> first, java.util.TreeMap::new));
             document.add(new Paragraph(companyName, headerFont));
             Paragraph addr = new Paragraph("GOODS TRANSFER NOTE (GTN)", titleFont);
-            addr.setSpacingAfter(15);
+            addr.setSpacingAfter(10);
             document.add(addr);
 
             PdfPTable meta = new PdfPTable(2);
@@ -271,25 +279,27 @@ public class PdfGenerationService {
             PdfPCell c1 = new PdfPCell();
             c1.setBorder(Rectangle.NO_BORDER);
             c1.addElement(new Paragraph("GTN #: " + gtn.getGtnNumber(), boldBody));
-            c1.addElement(new Paragraph("Source: " + gtn.getSourceWarehouse().getName(), bodyFont));
-            c1.addElement(new Paragraph("Destination: " + gtn.getDestinationWarehouse().getName(), bodyFont));
+            c1.addElement(new Paragraph("Source: " + sourceWarehouse.getName(), bodyFont));
+            c1.addElement(new Paragraph("Destinations: " + destinations.values().stream().map(warehouse -> warehouse.getName()).collect(java.util.stream.Collectors.joining(", ")), bodyFont));
+            c1.addElement(new Paragraph("Source copy " + sourceCopy + " of " + sources.size(), bodyFont));
+            c1.addElement(new Paragraph("Responsible staff: " + (gtn.getResponsibleStaff() == null ? "-" : gtn.getResponsibleStaff().getFullName()), boldBody));
 
             PdfPCell c2 = new PdfPCell();
             c2.setBorder(Rectangle.NO_BORDER);
-            c2.addElement(new Paragraph("Status: " + gtn.getStatus(), boldBody));
+            c2.addElement(new Paragraph("Status: " + ("RECEIVED".equals(gtn.getStatus()) ? "TRANSFERRED" : gtn.getStatus()), boldBody));
             c2.addElement(new Paragraph("Dispatch Date: " + (gtn.getDispatchDate() != null ? DateUtils.formatDate(gtn.getDispatchDate()) : "-"), bodyFont));
             c2.addElement(new Paragraph("Notes: " + (gtn.getNotes() != null ? gtn.getNotes() : "-"), bodyFont));
 
             meta.addCell(c1);
             meta.addCell(c2);
-            meta.setSpacingAfter(15);
+            meta.setSpacingAfter(8);
             document.add(meta);
 
-            PdfPTable items = new PdfPTable(4);
+            PdfPTable items = new PdfPTable(5);
             items.setWidthPercentage(100);
-            items.setWidths(new float[]{1f, 5f, 2f, 2f});
+            items.setWidths(new float[]{.7f, 3.5f, 2.4f, 1.4f, 1.4f});
 
-            String[] heads = {"#", "Product Description & SKU", "Qty Transferred", "Unit Cost (" + currencySymbol + ")"};
+            String[] heads = {"#", "Product Description & SKU", "Destination", "Transfer Qty", "Received Qty"};
             for (String h : heads) {
                 PdfPCell c = new PdfPCell(new Phrase(h, tableHeadFont));
                 c.setBackgroundColor(new Color(37, 99, 235));
@@ -298,22 +308,47 @@ public class PdfGenerationService {
                 items.addCell(c);
             }
 
+            items.setHeaderRows(1);
             int idx = 1;
             java.math.BigDecimal totalUnits = java.math.BigDecimal.ZERO;
-            for (GtnItem it : gtn.getItems()) {
+            for (GtnItem it : sourceItems) {
                 addTableCell(items, String.valueOf(idx++), bodyFont, Element.ALIGN_CENTER);
                 addTableCell(items, it.getProduct().getName() + " (" + it.getProduct().getSku() + ")", bodyFont, Element.ALIGN_LEFT);
+                addTableCell(items, it.getTransferDestination().getName(), bodyFont, Element.ALIGN_LEFT);
                 addTableCell(items, NumberUtils.formatQuantity(it.getQuantityTransferred()), bodyFont, Element.ALIGN_RIGHT);
-                addTableCell(items, NumberUtils.formatCurrency(it.getUnitCost()), bodyFont, Element.ALIGN_RIGHT);
+                addTableCell(items, "____________", bodyFont, Element.ALIGN_CENTER);
                 totalUnits = totalUnits.add(it.getQuantityTransferred() != null ? it.getQuantityTransferred() : java.math.BigDecimal.ZERO);
             }
 
-            items.setSpacingAfter(15);
+            items.setSpacingAfter(10);
             document.add(items);
 
             Paragraph tot = new Paragraph("Total Transfer Units: " + NumberUtils.formatQuantity(totalUnits), boldBody);
             tot.setAlignment(Element.ALIGN_RIGHT);
             document.add(tot);
+            Paragraph instructions = new Paragraph("Return this signed copy to the office. Mark the GTN TRANSFERRED only after all items are received at the destination.", bodyFont);
+            instructions.setSpacingBefore(8); instructions.setSpacingAfter(10); document.add(instructions);
+            PdfPTable signatures = new PdfPTable(2); signatures.setWidthPercentage(100);
+            for (String label : new String[]{"Issued by source warehouse", "Collected by responsible staff"}) {
+                PdfPCell signature = new PdfPCell(); signature.setPadding(5); signature.setBorder(Rectangle.NO_BORDER);
+                signature.addElement(new Paragraph(label, boldBody));
+                signature.addElement(new Paragraph("Name: __________  Signature: __________", bodyFont));
+                signature.addElement(new Paragraph("Date: ___________________", bodyFont));
+                signatures.addCell(signature);
+            }
+            document.add(signatures);
+            Paragraph receiptHeading = new Paragraph("Accepted by destination warehouse", boldBody);
+            receiptHeading.setSpacingBefore(12); receiptHeading.setSpacingAfter(6); document.add(receiptHeading);
+            PdfPTable acceptances = new PdfPTable(4); acceptances.setWidthPercentage(100); acceptances.setWidths(new float[]{3f,2f,2f,1.5f});
+            for (String label : new String[]{"Destination", "Receiver name", "Signature", "Date"}) addTableCell(acceptances, label, boldBody, Element.ALIGN_LEFT);
+            for (var destinationWarehouse : destinations.values()) {
+                addTableCell(acceptances, destinationWarehouse.getName(), bodyFont, Element.ALIGN_LEFT);
+                for (int blank = 0; blank < 3; blank++) addTableCell(acceptances, "__________", bodyFont, Element.ALIGN_LEFT);
+            }
+            document.add(acceptances);
+
+            }
+
 
             document.close();
         } catch (Exception e) {

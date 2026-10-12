@@ -21,6 +21,7 @@ public class PurchaseReturnDto {
     private Long id;
     private String prnNumber;
     private Long sourceGrnId;
+    private String originalGrnNumber;
     private Long supplierId;
     private String supplierCode;
     private String supplierName;
@@ -31,6 +32,7 @@ public class PurchaseReturnDto {
     private BigDecimal totalAmount;
     private LocalDate returnDate;
     private String reason;
+    private String remarks;
     private List<PurchaseReturnItemDto> items;
     private String createdBy;
     private LocalDateTime createdAt;
@@ -39,17 +41,19 @@ public class PurchaseReturnDto {
         return PurchaseReturnDto.builder()
                 .id(prn.getId())
                 .prnNumber(prn.getPrnNumber())
-                .sourceGrnId(prn.getSourceGrnId())
-                .supplierId(prn.getSupplier().getId())
-                .supplierCode(prn.getSupplier().getSupplierCode())
-                .supplierName(prn.getSupplier().getName())
-                .warehouseId(prn.getWarehouse().getId())
-                .warehouseCode(prn.getWarehouse().getCode())
-                .warehouseName(prn.getWarehouse().getName())
+                .sourceGrnId(prn.getItems().stream().map(PurchaseReturnItem::getOriginalGrnId).distinct().count() == 1 ? prn.getItems().getFirst().getOriginalGrnId() : null)
+                .originalGrnNumber(prn.getItems().stream().filter(item -> item.getSourceGrn() != null).map(item -> item.getSourceGrn().getGrnNumber()).distinct().collect(Collectors.joining(", ")))
+                .supplierId(prn.getItems().stream().map(item -> item.getReturnSupplier().getId()).distinct().count() <= 1 ? prn.getSupplier().getId() : null)
+                .supplierCode(prn.getItems().stream().map(item -> item.getReturnSupplier().getId()).distinct().count() <= 1 ? prn.getSupplier().getSupplierCode() : null)
+                .supplierName(prn.getItems().stream().map(item -> item.getReturnSupplier().getName()).distinct().collect(Collectors.joining(", ")))
+                .warehouseId(prn.getItems().stream().map(item -> item.getReturnWarehouse().getId()).distinct().count() <= 1 ? prn.getWarehouse().getId() : null)
+                .warehouseCode(prn.getItems().stream().map(item -> item.getReturnWarehouse().getId()).distinct().count() <= 1 ? prn.getWarehouse().getCode() : null)
+                .warehouseName(prn.getItems().stream().map(item -> item.getReturnWarehouse().getName()).distinct().collect(Collectors.joining(", ")))
                 .status(prn.getStatus())
                 .totalAmount(prn.getTotalAmount())
                 .returnDate(prn.getReturnDate())
-                .reason(prn.getReason())
+                .reason(prn.getReason() != null ? prn.getReason() : prn.getItems().stream().map(PurchaseReturnItem::getReason).filter(java.util.Objects::nonNull).distinct().collect(Collectors.joining(", ")))
+                .remarks(prn.getRemarks() != null ? prn.getRemarks() : prn.getItems().stream().map(PurchaseReturnItem::getRemarks).filter(java.util.Objects::nonNull).filter(value -> !value.isBlank()).distinct().collect(Collectors.joining("; ")))
                 .createdBy(prn.getCreatedBy())
                 .createdAt(prn.getCreatedAt())
                 .items(prn.getItems() != null
@@ -72,6 +76,13 @@ public class PurchaseReturnDto {
         private BigDecimal unitCost;
         private BigDecimal totalCost;
         private String reason;
+        private String remarks;
+        private Long sourceGrnId;
+        private String originalGrnNumber;
+        private Long supplierId;
+        private String supplierName;
+        private Long warehouseId;
+        private String warehouseName;
 
         public static PurchaseReturnItemDto from(PurchaseReturnItem item) {
             return PurchaseReturnItemDto.builder()
@@ -84,6 +95,11 @@ public class PurchaseReturnDto {
                     .unitCost(item.getUnitCost())
                     .totalCost(item.getTotalCost())
                     .reason(item.getReason())
+                    .remarks(item.getRemarks())
+                    .sourceGrnId(item.getOriginalGrnId())
+                    .originalGrnNumber(item.getSourceGrn() != null ? item.getSourceGrn().getGrnNumber() : null)
+                    .supplierId(item.getReturnSupplier().getId()).supplierName(item.getReturnSupplier().getName())
+                    .warehouseId(item.getReturnWarehouse().getId()).warehouseName(item.getReturnWarehouse().getName())
                     .build();
         }
     }

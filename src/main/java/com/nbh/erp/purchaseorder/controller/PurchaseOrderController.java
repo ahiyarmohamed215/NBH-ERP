@@ -15,6 +15,5 @@ public class PurchaseOrderController {
  @GetMapping("/{id}") public ApiResponse<PurchaseOrderDto> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
  @PostMapping public ApiResponse<PurchaseOrderDto> create(@Valid @RequestBody PurchaseOrderRequest req) { return ApiResponse.ok(service.save(null,req)); }
  @PutMapping("/{id}") public ApiResponse<PurchaseOrderDto> update(@PathVariable Long id,@Valid @RequestBody PurchaseOrderRequest req) { return ApiResponse.ok(service.save(id,req)); }
- @PostMapping("/{id}/approve") public ApiResponse<PurchaseOrderDto> approve(@PathVariable Long id) { return ApiResponse.ok(service.transition(id,"APPROVED")); }
- @PostMapping("/{id}/cancel") public ApiResponse<PurchaseOrderDto> cancel(@PathVariable Long id) { return ApiResponse.ok(service.transition(id,"CANCELLED")); }
+ @PostMapping("/{id}/status") public ApiResponse<PurchaseOrderDto> changeStatus(@PathVariable Long id,@Valid @RequestBody PurchaseOrderStatusRequest request) { return ApiResponse.ok(service.transition(id,request.status(),request.reason())); }
 }

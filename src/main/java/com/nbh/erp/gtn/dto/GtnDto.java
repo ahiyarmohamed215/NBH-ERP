@@ -26,7 +26,10 @@ public class GtnDto {
     private Long destinationWarehouseId;
     private String destinationWarehouseCode;
     private String destinationWarehouseName;
+    private Long responsibleStaffId;
+    private String responsibleStaffName;
     private String status;
+    private String lastStatusReason;
     private LocalDate dispatchDate;
     private LocalDate receiveDate;
     private String notes;
@@ -35,16 +38,23 @@ public class GtnDto {
     private LocalDateTime createdAt;
 
     public static GtnDto from(Gtn gtn) {
+        var sources = gtn.getItems().stream().map(GtnItem::getTransferSource).collect(java.util.stream.Collectors.toMap(warehouse -> warehouse.getId(), warehouse -> warehouse, (first, second) -> first));
+        var destinations = gtn.getItems().stream().map(GtnItem::getTransferDestination).collect(java.util.stream.Collectors.toMap(warehouse -> warehouse.getId(), warehouse -> warehouse, (first, second) -> first));
+        var source = sources.size() == 1 ? sources.values().iterator().next() : null;
+        var destination = destinations.size() == 1 ? destinations.values().iterator().next() : null;
         return GtnDto.builder()
                 .id(gtn.getId())
                 .gtnNumber(gtn.getGtnNumber())
-                .sourceWarehouseId(gtn.getSourceWarehouse().getId())
-                .sourceWarehouseCode(gtn.getSourceWarehouse().getCode())
-                .sourceWarehouseName(gtn.getSourceWarehouse().getName())
-                .destinationWarehouseId(gtn.getDestinationWarehouse().getId())
-                .destinationWarehouseCode(gtn.getDestinationWarehouse().getCode())
-                .destinationWarehouseName(gtn.getDestinationWarehouse().getName())
-                .status(gtn.getStatus())
+                .sourceWarehouseId(source == null ? null : source.getId())
+                .sourceWarehouseCode(source == null ? null : source.getCode())
+                .sourceWarehouseName(source == null ? null : source.getName())
+                .destinationWarehouseId(destination == null ? null : destination.getId())
+                .destinationWarehouseCode(destination == null ? null : destination.getCode())
+                .destinationWarehouseName(destination == null ? null : destination.getName())
+                .responsibleStaffId(gtn.getResponsibleStaff() == null ? null : gtn.getResponsibleStaff().getId())
+                .responsibleStaffName(gtn.getResponsibleStaff() == null ? null : gtn.getResponsibleStaff().getFullName())
+                .status("RECEIVED".equals(gtn.getStatus()) ? "TRANSFERRED" : gtn.getStatus())
+                .lastStatusReason(gtn.getLastStatusReason())
                 .dispatchDate(gtn.getDispatchDate())
                 .receiveDate(gtn.getReceiveDate())
                 .notes(gtn.getNotes())
@@ -66,6 +76,12 @@ public class GtnDto {
         private String productSku;
         private String productName;
         private String unitOfMeasure;
+        private Long sourceWarehouseId;
+        private String sourceWarehouseName;
+        private String sourceWarehouseCode;
+        private Long destinationWarehouseId;
+        private String destinationWarehouseName;
+        private String destinationWarehouseCode;
         private BigDecimal quantityTransferred;
         private BigDecimal unitCost;
         private String notes;
@@ -77,6 +93,12 @@ public class GtnDto {
                     .productSku(item.getProduct().getSku())
                     .productName(item.getProduct().getName())
                     .unitOfMeasure(item.getProduct().getUnitOfMeasure())
+                    .sourceWarehouseId(item.getTransferSource().getId())
+                    .sourceWarehouseName(item.getTransferSource().getName())
+                    .sourceWarehouseCode(item.getTransferSource().getCode())
+                    .destinationWarehouseId(item.getTransferDestination().getId())
+                    .destinationWarehouseName(item.getTransferDestination().getName())
+                    .destinationWarehouseCode(item.getTransferDestination().getCode())
                     .quantityTransferred(item.getQuantityTransferred())
                     .unitCost(item.getUnitCost())
                     .notes(item.getNotes())

@@ -73,8 +73,8 @@ public class SupplierController {
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
     @Operation(summary = "Toggle supplier active status")
-    public ResponseEntity<ApiResponse<Void>> toggleActive(@PathVariable Long id) {
-        supplierService.toggleActive(id);
+    public ResponseEntity<ApiResponse<Void>> toggleActive(@PathVariable Long id, @Valid @RequestBody com.nbh.erp.common.dto.StatusChangeRequest request) {
+        supplierService.toggleActive(id, request.reason());
         return ResponseEntity.ok(ApiResponse.ok("Supplier status updated", null));
     }
 

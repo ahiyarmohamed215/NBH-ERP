@@ -35,7 +35,11 @@ public class Gtn extends BaseEntity {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String status = "DRAFT"; // DRAFT, DISPATCHED, RECEIVED, CANCELLED
+    private String status = "DRAFT"; // DRAFT, PENDING, TRANSFERRED, CANCELLED
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responsible_staff_id")
+    private com.nbh.erp.user.entity.User responsibleStaff;
 
     @Column(name = "dispatch_date")
     private LocalDate dispatchDate;
@@ -45,6 +49,9 @@ public class Gtn extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "last_status_reason", columnDefinition = "TEXT")
+    private String lastStatusReason;
 
     @OneToMany(mappedBy = "gtn", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

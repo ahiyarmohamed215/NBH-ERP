@@ -2,12 +2,16 @@
 export function calculateGrnStaging(previous, field, value) {
   const updated = { ...previous, [field]: value };
   for (const key of ['quantity', 'freeQuantity', 'costPrice', 'salePrice', 'packQty', 'packSize']) {
+    if (['quantity', 'costPrice', 'salePrice'].includes(key) && updated[key] === '') continue;
     updated[key] = Math.max(key === 'packQty' || key === 'packSize' ? 1 : 0, Number(updated[key]) || 0);
   }
   if (field === 'packQty' || field === 'packSize') updated.quantity = updated.packQty * updated.packSize;
-  updated.markupPercent = Math.max(0, Number(updated.markupPercent) || 0);
+  updated.brandMarkupPercent = Math.max(0, Number(previous.brandMarkupPercent ?? previous.markupPercent) || 0);
   if (updated.useBrandMarkup) {
+    updated.markupPercent = updated.brandMarkupPercent;
     updated.salePrice = Number((updated.costPrice * (1 + updated.markupPercent / 100)).toFixed(2));
+  } else {
+    updated.markupPercent = updated.costPrice ? Number(((updated.salePrice / updated.costPrice - 1) * 100).toFixed(2)) : 0;
   }
   updated.purchaseValue = updated.quantity * updated.costPrice;
   if (field === 'discountAmount') {
@@ -20,7 +24,7 @@ export function calculateGrnStaging(previous, field, value) {
   updated.amount = updated.purchaseValue - updated.discountAmount;
   updated.markupPrice = Math.max(0, updated.salePrice - updated.costPrice);
   updated.gpPercent = updated.salePrice ? (updated.salePrice - updated.costPrice) / updated.salePrice * 100 : 0;
-  const units = updated.quantity + updated.freeQuantity;
+  const units = Number(updated.quantity) + Number(updated.freeQuantity);
   updated.freeCostPrice = units ? updated.amount / units : updated.costPrice;
   return updated;
 }
@@ -34,7 +38,7 @@ export function buildGrnItemsPayload(items) {
     if (!Number.isFinite(quantityReceived) || quantityReceived <= 0 || !Number.isFinite(amount) || amount < 0) {
       throw new Error(`Line ${index + 1}: enter a positive received quantity and a valid non-negative cost.`);
     }
-    if (!Number.isFinite(sellingPrice) || sellingPrice < 0 || !Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 99999) {
+    if (!Number.isFinite(sellingPrice) || sellingPrice < 0 || !Number.isFinite(markupPercent) || markupPercent < -100 || markupPercent > 99999) {
       throw new Error(`Line ${index + 1}: enter a valid selling price and MP%.`);
     }
     return {
@@ -65,15 +69,16 @@ export function mergeGrnItems(items) {
       + Number(item.amount ?? item.quantityReceived * item.unitCost);
     const unitCost = quantityReceived ? purchaseValue / quantityReceived : 0;
     const discountPercent = purchaseValue ? discountAmount / purchaseValue * 100 : 0;
-    const markupPercent = Number(item.markupPercent || 0);
+    let markupPercent = Number(item.markupPercent || 0);
     const salePrice = item.useBrandMarkup
       ? Number((unitCost * (1 + markupPercent / 100)).toFixed(2))
       : Number(item.salePrice ?? previous.salePrice ?? 0);
+    if (!item.useBrandMarkup) markupPercent = unitCost ? Number(((salePrice / unitCost - 1) * 100).toFixed(2)) : 0;
     const gpPercent = salePrice ? (salePrice - unitCost) / salePrice * 100 : 0;
     lines.set(key, { ...previous, ...item, quantityReceived, freeQuantity, purchaseValue,
       discountAmount, amount, unitCost, discountPercent, salePrice, markupPercent, gpPercent,
       freeCostPrice: amount / (quantityReceived + freeQuantity),
-      notes: `Free: ${freeQuantity} | Disc: ${discountPercent.toFixed(2)}% | Sale: $${salePrice.toFixed(2)}` });
+      notes: `Free: ${freeQuantity} | Disc: ${discountPercent.toFixed(2)}% | Sale: LKR ${salePrice.toFixed(2)}` });
   }
   return [...lines.values()];
 }

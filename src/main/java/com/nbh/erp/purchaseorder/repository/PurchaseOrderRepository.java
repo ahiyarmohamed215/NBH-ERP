@@ -6,6 +6,6 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,Long> {
  @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select p from PurchaseOrder p where p.id=:id") Optional<PurchaseOrder> lockById(Long id);
- @Query("select p from PurchaseOrder p where (:status is null or p.status=:status) and (:query is null or lower(p.poNumber) like lower(concat('%',:query,'%')) or lower(p.supplier.name) like lower(concat('%',:query,'%')))")
+ @Query("select p from PurchaseOrder p where (:status is null or p.status=:status) and (:query is null or lower(p.poNumber) like lower(concat('%',:query,'%')) or lower(p.supplier.name) like lower(concat('%',:query,'%')) or exists (select i.id from PurchaseOrderItem i where i.purchaseOrder=p and lower(i.supplier.name) like lower(concat('%',:query,'%'))))")
  Page<PurchaseOrder> search(String status,String query,Pageable pageable);
 }

@@ -16,19 +16,18 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreatePurchaseReturnRequest {
+    private String statusReason;
 
-    @NotNull(message = "Supplier ID is required")
     private Long supplierId;
-    @NotNull(message="Original GRN ID is required")
     private Long sourceGrnId;
 
-    @NotNull(message = "Warehouse ID is required")
     private Long warehouseId;
 
     @NotNull(message = "Return date is required")
     private LocalDate returnDate;
 
     private String reason;
+    private String remarks;
 
     @NotEmpty(message = "Purchase return must contain at least one line item")
     @Valid
@@ -47,9 +46,12 @@ public class CreatePurchaseReturnRequest {
         private BigDecimal quantityReturned;
 
         @NotNull(message = "Unit cost is required")
-        @Positive(message = "Unit cost must be greater than zero")
+        @jakarta.validation.constraints.PositiveOrZero(message = "Unit cost cannot be negative")
         private BigDecimal unitCost;
 
         private String reason;
+        private Long sourceGrnId;
+        private Long warehouseId;
+        private String remarks;
     }
 }

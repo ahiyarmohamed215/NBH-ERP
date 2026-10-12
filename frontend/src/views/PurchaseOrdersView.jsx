@@ -1,19 +1,25 @@
+import FilterSelect from '../components/FilterSelect';
+import '../components/PurchasingAppearance.css';
+import { availableStock, loadPurchaseInventory } from '../utils/purchaseInventory';
+import StatusBadge from '../components/StatusBadge';
+import DateRangePicker from '../components/DateRangePicker';
+import { printPurchaseOrder, printPurchaseOrders, purchaseOrderDate } from '../utils/poPrint';
 import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
-import { formatBusinessDate } from '../utils/invoiceMapping';
-import React, { useState, useEffect } from 'react';
+import { usePurchasingStatusChange } from '../hooks/usePurchasingStatusChange';
+import React, { useState, useEffect, useRef } from 'react';
 import { supplierApi, warehouseApi, productApi, purchaseOrderApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
   ShoppingBag,
-  Plus,
   Search,
   CheckCircle,
   RefreshCw,
   Edit2,
   X,
   Printer,
-  Download,
+  RotateCw,
+  Ban,
   Calendar,
   DollarSign,
   Package,
@@ -25,33 +31,39 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const [suppliers, setSuppliers] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [products, setProducts] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [inventoryLoaded,setInventoryLoaded]=useState(false);
+  const [intakeProduct,setIntakeProduct]=useState(null);
   const [loading, setLoading] = useState(false);
+  const loadGeneration = useRef(0);
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [fromDate,setFromDate]=useState('');
+  const [toDate,setToDate]=useState('');
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [editingPoId, setEditingPoId] = useState(null);
+  const [editingPoStatus,setEditingPoStatus]=useState('DRAFT');
   // Modal State for Inspecting PO
   const [selectedPo, setSelectedPo] = useState(null);
 
   const { addToast } = useToast();
+  const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
 
   React.useImperativeHandle(ref, () => ({
     openCreate: () => {
       resetForm();
       setShowCreateForm(true);
     },
-    refresh: loadData,
+    refresh: () => loadData({force:true,notify:true}),
   }));
 
   // Create PO Form State
   const [formData, setFormData] = useState({
     supplierId: '',
     warehouseId: '',
-    orderDate: formatBusinessDate(),
-    expectedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    terms: 'Net 30 Days',
     notes: '',
     items: [],
   });
@@ -60,65 +72,65 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     loadData();
   }, []);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [supRes, whRes, prodRes, poRes] = await Promise.all([
-        supplierApi.getActive(),
-        warehouseApi.getActive(),
-        productApi.getProducts({ size: 300, activeOnly: true }),
-        purchaseOrderApi.search(),
-      ]);
-      const sList = supRes.data || [];
-      const wList = whRes.data || [];
-      const pList = prodRes.data?.content || prodRes.data || [];
-
-      setPurchaseOrders(poRes.data?.content || []);
-      setSuppliers(sList);
-      setWarehouses(wList);
-      setProducts(pList);
-
-      if (sList.length > 0 && !formData.supplierId) {
-        setFormData((prev) => ({
-          ...prev,
-          supplierId: sList[0].id,
-          warehouseId: wList.length > 0 ? wList[0].id : '',
-        }));
-      }
-    } catch (err) {
-      addToast(err.message, 'error');
-    } finally {
-      setLoading(false);
+  const loadData = async ({force=false,notify=false} = {}) => {
+    const generation = ++loadGeneration.current;
+    const config = force ? {skipCache:true,skipDedupe:true} : {};
+    setLoading(true);
+    const apply = setter => response => {
+      if (generation === loadGeneration.current) setter(response);
+    };
+    const requests = [
+      ['purchase orders', () => purchaseOrderApi.search({},config), response => setPurchaseOrders(response.data?.content || (Array.isArray(response.data) ? response.data : []))],
+      ['suppliers', () => supplierApi.getActive(config), response => setSuppliers(response.data || [])],
+      ['warehouses', () => warehouseApi.getActive(config), response => setWarehouses(response.data || [])],
+      ['products', () => productApi.getProducts({size:300,activeOnly:false},config), response => setProducts(response.data?.content || response.data || [])],
+      ['stock quantities', () => loadPurchaseInventory(config), rows => {setInventory(rows);setInventoryLoaded(true);}],
+    ];
+    const results = await Promise.allSettled(requests.map(([,fetch,update]) => Promise.resolve().then(fetch).then(apply(update))));
+    if (generation !== loadGeneration.current) return;
+    setLoading(false);
+    if (results[4].status === 'rejected') setInventoryLoaded(false);
+    if (results[0].status === 'rejected') {
+      const error = results[0].reason;
+      addToast(error.response?.data?.message || error.message || 'Unable to refresh purchase orders.','error');
+      return;
     }
+    const failed = requests.filter((_,index) => results[index].status === 'rejected').map(([name]) => name);
+    if (failed.length) addToast(`Purchase orders loaded; could not refresh ${failed.join(', ')}.`,'warning');
+    else if (notify) addToast('Purchase orders refreshed.','success');
   };
 
   const resetForm = () => {
-    const sId = suppliers.length > 0 ? suppliers[0].id : '';
-    const wId = warehouses.length > 0 ? warehouses[0].id : '';
-
-    setEditingPoId(null);
+    setEditingPoId(null);setEditingPoStatus('DRAFT');setIntakeProduct(null);
     setFormData({
-      supplierId: sId,
-      warehouseId: wId,
-      orderDate: formatBusinessDate(),
-      expectedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      terms: 'Net 30 Days',
-      notes: '',
+      supplierId: '',
+      warehouseId: '',
+        notes: '',
       items: [],
     });
 
   };
 
+  const handlePoStatus = async (status, reason) => {
+    if (!selectedPo || saving) return;
+    if (!reason) {requestStatusChange({type:'PO',number:selectedPo.poNumber,current:selectedPo.status,target:status,onConfirm:reason=>handlePoStatus(status,reason)});return;}
+    setSaving(true);
+    try {
+      const response = await purchaseOrderApi.changeStatus(selectedPo.id,status,reason);
+      setSelectedPo(response.data);
+      addToast(status === 'INFORM_TO_ORDER' ? 'PO marked Inform to Order. Ready to print.' : status === 'CANCELLED' ? 'PO cancelled.' : 'PO returned to draft.', 'success');
+      await loadData();
+    } catch (error) {addToast(error.response?.data?.message || error.message || 'Unable to update PO','error');return false;}
+    finally {setSaving(false);}
+  };
+
   const handleEditPo = (po) => {
-    setEditingPoId(po.id);
+    setEditingPoId(po.id);setEditingPoStatus(po.status);setIntakeProduct(null);
     setFormData({
       supplierId: po.supplierId || '',
       warehouseId: po.warehouseId || '',
-      orderDate: po.orderDate || formatBusinessDate(),
-      expectedDate: po.expectedDate || '',
-      terms: po.terms || 'Net 30 Days',
       notes: po.notes || '',
-      items: po.items || [],
+      items: (po.items || []).map(item=>({...item,warehouseId:item.warehouseId || po.warehouseId,warehouseName:item.warehouseName || po.warehouseName,supplierId:item.supplierId || po.supplierId,supplierName:item.supplierName || po.supplierName})),
     });
     setShowCreateForm(true);
   };
@@ -126,42 +138,42 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const calculateGrandTotal = () => {
     return formData.items.reduce((sum, it) => sum + (it.totalCost || 0), 0);
   };
+  const productWarehouse=product=>product?.defaultWarehouseId || product?.warehouseId;
+  const productWarehouseName=product=>warehouses.find(warehouse=>String(warehouse.id)===String(productWarehouse(product)))?.name || product?.defaultWarehouseName || product?.warehouseName;
+  const stockQuantity=product=>inventory.filter(stock=>String(stock.productId)===String(product.id)).reduce((sum,stock)=>sum+availableStock(stock),0);
+  const orderSearchProducts=products.map(product=>({...product,warehouseName:productWarehouseName(product)}));
+  const selectOrderProduct=(product,item)=>{
+    setIntakeProduct(product ? item ? {...product,...item,defaultWarehouseId:item.warehouseId,id:item.productId} : product : null);
+    if(item) setFormData(previous=>({...previous,supplierId:item.supplierId || ''}));
+  };
+  const canOrderProduct=product=>product && product.isActive!==false && product.active!==false && warehouses.some(warehouse=>String(warehouse.id)===String(productWarehouse(product)));
+  const validateOrderItem=(product,quantity,editing)=>{
+    if(!canOrderProduct(intakeProduct)) {addToast('Select an active product with an active delivery warehouse configured in Inventory.','error');return false;}
+    if(!formData.supplierId) {addToast('Select a supplier for this product.','error');return false;}
+    if(formData.items.some((item,index)=>index!==editing && String(item.productId)===String(product.id) && String(item.supplierId)===String(formData.supplierId))) {addToast('This product is already ordered from that supplier. Use its edit icon to update quantity.','error');return false;}
+    return true;
+  };
 
-  const handleSavePurchaseOrder = async (status = 'PENDING') => {
-    if(!formData.supplierId || !formData.warehouseId || !formData.items.length) { addToast('Select supplier, warehouse and order lines', 'error'); return; }
+  const handleSavePurchaseOrder = async (status = 'DRAFT', statusReason) => {
+    if(!formData.items.length || formData.items.some(item=>!item.supplierId)) { addToast('Choose a supplier for each product and add order lines', 'error'); return; }
+    if(formData.items.some(item=>!item.warehouseId)) {addToast('Every product needs its configured delivery warehouse.','error');return;}
+    if(editingPoId && status!==editingPoStatus && !statusReason) {requestStatusChange({type:'PO',number:purchaseOrders.find(document=>document.id===editingPoId)?.poNumber || `PO ${editingPoId}`,current:editingPoStatus,target:status,onConfirm:reason=>handleSavePurchaseOrder(status,reason)});return;}
     setLoading(true);
     try {
-      const payload = { ...formData, status, supplierId: Number(formData.supplierId), warehouseId: Number(formData.warehouseId),
-        items: formData.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) };
-      if(editingPoId) await purchaseOrderApi.update(editingPoId, payload); else await purchaseOrderApi.create(payload);
+      const payload = { ...formData, status, statusReason, supplierId: Number(formData.items[0].supplierId),warehouseId:Number(formData.items[0].warehouseId),expectedDate:null,
+        items: formData.items.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity), unitCost: Number(i.unitCost),warehouseId:Number(i.warehouseId),supplierId:Number(i.supplierId) })) };
+      const response = editingPoId ? await purchaseOrderApi.update(editingPoId, payload) : await purchaseOrderApi.create(payload);
+      if(status === 'INFORM_TO_ORDER') setSelectedPo(response.data);
       await loadData(); setShowCreateForm(false); resetForm(); addToast('Purchase order saved', 'success');
-    } catch(e) { addToast(e.message, 'error'); } finally { setLoading(false); }
+    } catch(e) { addToast(e.message, 'error');return false; } finally { setLoading(false); }
   };
 
-  const handleExportCSV = () => {
-    if (purchaseOrders.length === 0) {
-      addToast('No purchase orders to export', 'warning');
-      return;
-    }
-    const headers = 'PO Number,Supplier,Warehouse,Order Date,Expected Date,Status,Total Amount\n';
-    const rows = filteredOrders
-      .map(
-        (po) =>
-          `"${po.poNumber}","${po.supplierName}","${po.warehouseName}","${po.orderDate}","${po.expectedDate}","${po.status}",${Number(po.totalAmount || 0).toFixed(2)}`
-      )
-      .join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `purchase_orders_${formatBusinessDate()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Purchase orders exported to CSV', 'success');
-  };
+  const handlePrintList = () => {if(!filteredOrders.length) {addToast('No purchase orders match these filters.','info');return;}printPurchaseOrders(filteredOrders);};
 
   const filteredOrders = purchaseOrders.filter((po) => {
+    const date=purchaseOrderDate(po);
+    if(fromDate && (!date || date<fromDate)) return false;
+    if(toDate && (!date || date>toDate)) return false;
     if (statusFilter !== 'ALL' && po.status !== statusFilter) return false;
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
@@ -174,7 +186,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   });
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+    <div className="purchasing-no-shadows" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
       {!showCreateForm && <>
       {/* Top Filter & Actions Bar (Sticky Toolbar Card - Customer/Employee Style) */}
       <div
@@ -222,16 +234,16 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               backgroundColor: '#ffffff',
               color: '#0f172a',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+              boxShadow: 'none',
+              transition: 'border-color 0.15s ease',
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = '#0284c7';
-              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           />
           {searchTerm && (
@@ -255,49 +267,26 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           )}
         </div>
 
-        {/* Right Controls: Filter, Reset, New PO, Export, Refresh */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-          <select
+        {/* Right Controls: Filter, Reset, Print, Refresh */}
+        <div className="purchase-date-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          <DateRangePicker from={fromDate} to={toDate} onChange={(from,to)=>{setFromDate(from);setToDate(to);}}/>
+          <FilterSelect
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{
-              height: '38px',
-              padding: '0 30px 0 12px',
-              width: '140px',
-              minWidth: '120px',
-              borderRadius: '6px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.86rem',
-              fontFamily: 'inherit',
-              fontWeight: 500,
-              color: '#334155',
-              backgroundColor: '#ffffff',
-              cursor: 'pointer',
-              outline: 'none',
-              flexShrink: 0,
-              boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none',
-              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 10px center',
-            }}
+            style={{width:'140px'}}
           >
             <option value="ALL">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="RECEIVED">Received</option>
+            <option value="DRAFT">Draft</option>
+            <option value="INFORM_TO_ORDER">Inform to Order</option>
             <option value="CANCELLED">Cancelled</option>
-          </select>
+          </FilterSelect>
 
-          {(statusFilter !== 'ALL' || searchTerm) && (
+          {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
             <button
               type="button"
               onClick={() => {
                 setStatusFilter('ALL');
-                setSearchTerm('');
+                setSearchTerm('');setFromDate('');setToDate('');
               }}
               style={{
                 height: '38px',
@@ -322,43 +311,14 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              resetForm();
-              setShowCreateForm(true);
-            }}
-            style={{
-              height: '38px',
-              padding: '0 16px',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '0.86rem',
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              transition: 'background-color 0.15s ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-          >
-            <Plus size={16} /> + Create Purchase Order
-          </button>
+
 
           <button
             type="button"
-            onClick={handleExportCSV}
+            onClick={handlePrintList}
             style={{
               height: '38px',
-              padding: '0 14px',
+              padding: '0', width: '38px', justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
@@ -370,7 +330,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               gap: '6px',
               cursor: 'pointer',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              boxShadow: 'none',
               whiteSpace: 'nowrap',
               flexShrink: 0,
               transition: 'all 0.15s ease',
@@ -385,17 +345,17 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               e.currentTarget.style.borderColor = '#cbd5e1';
               e.currentTarget.style.color = '#334155';
             }}
-            title="Export POs to CSV"
+            title="Print PO list" aria-label="Print PO list"
           >
-            <Download size={14} /> Export
+            <Printer size={15} />
           </button>
 
           <button
             type="button"
-            onClick={loadData}
+            onClick={() => loadData({force:true,notify:true})} disabled={loading} aria-busy={loading}
             style={{
               height: '38px',
-              padding: '0 14px',
+              padding: '0', width: '38px', justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
@@ -407,7 +367,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               gap: '6px',
               cursor: 'pointer',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              boxShadow: 'none',
               whiteSpace: 'nowrap',
               flexShrink: 0,
               transition: 'all 0.15s ease',
@@ -422,9 +382,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               e.currentTarget.style.borderColor = '#cbd5e1';
               e.currentTarget.style.color = '#334155';
             }}
-            title="Refresh records"
+            title="Refresh records" aria-label="Refresh records"
           >
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={15} className={loading ? 'animate-spin' : undefined} />
           </button>
         </div>
       </div>
@@ -439,7 +399,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+          boxShadow: 'none',
           flex: 1,
           minHeight: 0,
           display: 'flex',
@@ -448,34 +408,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       >
         <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
           <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  PO NUMBER
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  SUPPLIER
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  DESTINATION WAREHOUSE
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  ORDER DATE
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  EXPECTED DELIVERY
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  STATUS
-                </th>
-                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
-                  TOTAL VALUE
-                </th>
-                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                  ACTIONS
-                </th>
-              </tr>
-            </thead>
+            <thead style={{position:'sticky',top:0,zIndex:10}}><tr>{['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS'].map(label=><th key={label} style={{padding:'12px 14px',fontSize:'.74rem',fontWeight:600,color:'#475569',background:'#fafbfc',borderBottom:'1px solid #e2e8f0'}}>{label}</th>)}</tr></thead>
             <tbody>
               {filteredOrders.length === 0 ? (
                 <tr>
@@ -508,73 +441,13 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
                       {po.warehouseName}
                     </td>
-                    <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
-                      {po.orderDate}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
-                      {po.expectedDate || '—'}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor:
-                            po.status === 'RECEIVED'
-                              ? '#dcfce7'
-                              : po.status === 'APPROVED'
-                              ? '#eff6ff'
-                              : po.status === 'PENDING'
-                              ? '#fef3c7'
-                              : '#fee2e2',
-                          color:
-                            po.status === 'RECEIVED'
-                              ? '#16a34a'
-                              : po.status === 'APPROVED'
-                              ? '#2563eb'
-                              : po.status === 'PENDING'
-                              ? '#d97706'
-                              : '#dc2626',
-                          border:
-                            po.status === 'RECEIVED'
-                              ? '1px solid #bbf7d0'
-                              : po.status === 'APPROVED'
-                              ? '1px solid #bfdbfe'
-                              : po.status === 'PENDING'
-                              ? '1px solid #fde68a'
-                              : '1px solid #fecaca',
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            backgroundColor:
-                              po.status === 'RECEIVED'
-                                ? '#16a34a'
-                                : po.status === 'APPROVED'
-                                ? '#2563eb'
-                                : po.status === 'PENDING'
-                                ? '#d97706'
-                                : '#dc2626',
-                            display: 'inline-block',
-                          }}
-                        />
-                        {po.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontSize: '0.85rem' }}>
-                      ${Number(po.totalAmount || 0).toFixed(2)}
-                    </td>
+                    <td style={{padding:'12px 14px'}}>{new Set((po.items || []).map(item=>item.productId)).size}</td>
+                    <td style={{padding:'12px 14px',fontSize:'.82rem',color:'#64748b'}}>{purchaseOrderDate(po)}</td>
+                    <td style={{padding:'12px 14px'}}><StatusBadge status={po.status}/></td>
+                    <td style={{padding:'12px 14px',fontSize:'.82rem',color:'#475569',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={po.notes || ''}>{po.notes || '—'}</td>
                     <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                        <button
+                        {['DRAFT','INFORM_TO_ORDER'].includes(po.status) && (<button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -598,12 +471,12 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                           title="Edit Purchase Order"
                         >
                           <Edit2 size={13} />
-                        </button>
+                        </button>)}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.print();
+                            printPurchaseOrder(po);
                           }}
                           style={{
                             width: '30px',
@@ -636,7 +509,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
       </>}
       {showCreateForm && (
-        <div className="purchase-document">
+        <div className="purchase-document po-document">
           <div className="purchase-document-content">
             {/* Modal Header */}
             <div
@@ -670,7 +543,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     {editingPoId ? 'Edit Purchase Order (PO)' : 'Create Purchase Order (PO)'}
                   </h2>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
-                    Generate procurement order with approved supplier and line items
+                    Save a draft, or create an order to print and hand over
                   </p>
                 </div>
               </div>
@@ -696,7 +569,20 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
             <div className="purchase-body">
               <PurchaseLines products={products} items={formData.items} quantityField="quantity" withCost={true}
-                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label>Supplier *<select value={formData.supplierId} onChange={e=>setFormData({...formData, supplierId:e.target.value})}>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Delivery warehouse *<select value={formData.warehouseId} onChange={e=>setFormData({...formData, warehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Order date<input type="date" value={formData.orderDate || ''} onChange={e=>setFormData({...formData, orderDate:e.target.value})}/></label><label>Expected date<input type="date" value={formData.expectedDate || ''} onChange={e=>setFormData({...formData, expectedDate:e.target.value})}/></label><label>Payment terms<select value={formData.terms} onChange={e=>setFormData({...formData, terms:e.target.value})}>{['Net 30 Days','Net 15 Days','COD','Advance Payment','End of Month'].map(t=><option key={t} value={t}>{t}</option>)}</select></label><label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})}/></label></div>}
+                costReadOnly showCostField={false} initialQuantity="" intakeLayout="gtn" inlineIntakeFields quantityLabel="Qty"
+                searchProducts={orderSearchProducts} searchResultLimit={Infinity} resultQuantity={inventoryLoaded ? stockQuantity : undefined}
+                resultDetails={product=>product.isActive===false || product.active===false ? 'Inactive product' : !productWarehouse(product) ? 'No delivery warehouse' : null}
+                quantityDetails={product=><div className="prn-return-card po-product-card">
+                  <small className="po-card-caption">Delivery warehouse</small><h4 title={product && intakeProduct ? productWarehouseName(intakeProduct) : undefined}>{product && intakeProduct ? productWarehouseName(intakeProduct) || 'Not configured' : 'Select a product'}</h4>
+                  <div className="prn-return-card-metrics"><div><span>Unit cost</span><b>{product && intakeProduct ? `LKR ${Number(intakeProduct.unitCost ?? intakeProduct.costPrice ?? 0).toFixed(2)}` : '—'}</b></div>
+                    <div><span>Stock in system</span><b>{product && intakeProduct && inventoryLoaded ? stockQuantity(intakeProduct) : '—'}</b></div></div>
+                </div>}
+                intakeFields={<label className="po-supplier-field">Supplier *<FilterSelect variant="field" aria-label="Supplier" value={formData.supplierId} onChange={event=>setFormData(previous=>({...previous,supplierId:event.target.value}))}><option value="">Choose supplier</option>{suppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</FilterSelect></label>}
+                onProductSelect={selectOrderProduct} validateItem={validateOrderItem} addDisabled={!canOrderProduct(intakeProduct) || !formData.supplierId}
+                addHint={intakeProduct && !canOrderProduct(intakeProduct) ? 'Ordering needs an active product with a delivery warehouse set in Inventory.' : undefined}
+                buildItemData={()=>({warehouseName:productWarehouseName(intakeProduct),supplierId:Number(formData.supplierId),supplierName:suppliers.find(supplier=>String(supplier.id)===String(formData.supplierId))?.name})} onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,supplierId:''}));}}
+                extraColumns={[{label:'Supplier name',value:item=>item.supplierName || '—'}]}
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.notes || ''} onChange={event=>setFormData(previous=>({...previous,notes:event.target.value}))}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
@@ -716,7 +602,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSavePurchaseOrder('PENDING')}
+                  onClick={() => handleSavePurchaseOrder(editingPoStatus)}
                   disabled={loading}
                   style={{
                     padding: '8px 16px',
@@ -729,11 +615,11 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     cursor: 'pointer',
                   }}
                 >
-                  Save as Draft
+                  {editingPoId ? 'Save Changes' : 'Save as Draft'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSavePurchaseOrder('APPROVED')}
+                  onClick={() => handleSavePurchaseOrder('INFORM_TO_ORDER')}
                   disabled={loading}
                   style={{
                     padding: '8px 20px',
@@ -744,10 +630,10 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                    boxShadow: 'none',
                   }}
                 >
-                  Issue Purchase Order
+                  {editingPoId ? 'Save & Inform to Order' : 'Inform to Order'}
                 </button>
               </div>} />
             </div>
@@ -757,16 +643,33 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
       {/* INSPECT PURCHASE ORDER MODAL */}
       {selectedPo && <PurchaseInspectionModal type="PO" number={selectedPo.poNumber} status={selectedPo.status} rows={selectedPo.items || []}
+        details={[
+          { label: 'Supplier name', value: selectedPo.supplierName },
+          { label: 'Created date', value: purchaseOrderDate(selectedPo) },
+          { label: 'Delivery warehouse', value: selectedPo.warehouseName },
+          { label: 'Remarks', value: selectedPo.notes, wide: true },
+        ]}
         onClose={() => setSelectedPo(null)}
-        actions={['PENDING', 'APPROVED'].includes(selectedPo.status) ? [{ label: 'Edit PO', icon: Edit2, onClick: () => { const po = selectedPo; setSelectedPo(null); handleEditPo(po); } }] : []}
+        onPrint={() => printPurchaseOrder(selectedPo)}
+        actions={[
+          ...(selectedPo.status !== 'INFORM_TO_ORDER' ? [{label:'Inform to Order',icon:CheckCircle,disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
+          ...(selectedPo.status !== 'DRAFT' ? [{label:'Return to Draft',icon:RotateCw,disabled:saving,onClick:()=>handlePoStatus('DRAFT')}] : []),
+          ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [
+            {label:'Edit PO',icon:Edit2,disabled:saving,onClick:()=>{const po=selectedPo;setSelectedPo(null);handleEditPo(po);}},
+            {label:'Cancel PO',icon:Ban,tone:'danger',disabled:saving,onClick:()=>handlePoStatus('CANCELLED')},
+          ] : []),
+        ]}
         columns={[
           { label: 'Product code', value: item => item.sku || item.productSku || '—' },
-          { label: 'Product', value: item => item.productName },
+          { label: 'Product name', value: item => item.productName },
+          { label: 'Supplier name', value:item=>item.supplierName || selectedPo.supplierName },
+          { label: 'Delivery warehouse', value:item=>item.warehouseName || selectedPo.warehouseName },
           { label: 'Qty', numeric: true, value: item => item.quantity },
-          { label: 'Unit cost', numeric: true, value: item => '$' + Number(item.unitCost || 0).toFixed(2) },
-          { label: 'Line total', numeric: true, value: item => '$' + Number(item.totalCost || 0).toFixed(2) },
+          { label: 'Unit cost', numeric: true, value: item => 'LKR ' + Number(item.unitCost || 0).toFixed(2) },
+          { label: 'Line total', numeric: true, value: item => 'LKR ' + Number(item.totalCost || 0).toFixed(2) },
         ]} />}
 
+      {statusChangeDialog}
     </div>
   );
 });

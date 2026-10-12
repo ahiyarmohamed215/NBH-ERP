@@ -1,3 +1,4 @@
+import '../components/PurchasingAppearance.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import MastersView from './MastersView';
@@ -119,7 +120,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   };
 
   return (
-    <div
+    <div className="purchasing-no-shadows"
       style={{
         padding: focusedDocument ? '12px' : '24px 32px',
         flex: 1,
@@ -179,7 +180,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
@@ -203,7 +204,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
@@ -227,7 +228,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
@@ -251,7 +252,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
@@ -275,7 +276,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',

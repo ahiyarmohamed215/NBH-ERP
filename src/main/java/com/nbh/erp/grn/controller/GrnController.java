@@ -58,8 +58,8 @@ public class GrnController {
     @PostMapping("/{id}/process")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GRN_PROCESS')")
     @Operation(summary = "Process a draft or restore a cancelled GRN and increment stock balances")
-    public ResponseEntity<ApiResponse<GrnDto>> processGrn(@PathVariable Long id) {
-        GrnDto processed = grnService.processGrn(id);
+    public ResponseEntity<ApiResponse<GrnDto>> processGrn(@PathVariable Long id, @Valid @RequestBody com.nbh.erp.common.dto.StatusChangeRequest request) {
+        GrnDto processed = grnService.processGrn(id, request.reason());
         return ResponseEntity.ok(ApiResponse.ok("GRN processed and inventory updated", processed));
     }
 
@@ -88,7 +88,7 @@ public class GrnController {
     @Operation(summary = "Cancel a processed or draft GRN and reverse stock balances")
     public ResponseEntity<ApiResponse<GrnDto>> cancelGrn(
             @PathVariable Long id,
-            @Valid @RequestBody(required = false) CancelGrnRequest request
+            @Valid @RequestBody CancelGrnRequest request
     ) {
         String reason = (request != null) ? request.getReason() : null;
         GrnDto cancelled = grnService.cancelGrn(id, reason);

@@ -1,0 +1,12 @@
+.erp-status-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:0; border-radius:5px; font-family:inherit; font-size:.67rem; font-weight:600; letter-spacing:.035em; line-height:1.4; white-space:nowrap; vertical-align:middle; }
+.erp-status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.erp-status-success { background:#dcfce7; color:#15803d; }
+.erp-status-pending { background:#fef3c7; color:#a16207; }
+.erp-status-inactive { background:#fff1f2; color:#be123c; }
+.erp-status-neutral { background:#f1f5f9; color:#64748b; }
+button.erp-status-badge { cursor:pointer; }
+button.erp-status-badge:hover { filter:brightness(.97); }
+button.erp-status-badge:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+button.erp-status-badge:disabled { cursor:default; opacity:.6; }
+
+.erp-status-badge[data-status="PENDING"] { background:#dbeafe; color:#1d4ed8; }

@@ -24,6 +24,19 @@ public class PurchaseReturnController {
 
     private final PurchaseReturnService purchaseReturnService;
 
+    @GetMapping("/return-sources")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRN_PROCESS') or hasAuthority('PRN_VIEW')")
+    public ResponseEntity<ApiResponse<java.util.List<PurchaseReturnService.ReturnSource>>> getReturnSources() {
+        return ResponseEntity.ok(ApiResponse.ok(purchaseReturnService.getReturnSources()));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRN_PROCESS')")
+    public ResponseEntity<ApiResponse<PurchaseReturnDto>> updatePurchaseReturn(@PathVariable Long id,
+            @Valid @RequestBody CreatePurchaseReturnRequest request, @RequestParam(defaultValue = "false") boolean process) {
+        return ResponseEntity.ok(ApiResponse.ok(purchaseReturnService.updatePurchaseReturn(id, request, process)));
+    }
+
     @GetMapping
     @Operation(summary = "Search purchase returns with filters")
     public ResponseEntity<ApiResponse<PagedResponse<PurchaseReturnDto>>> searchPurchaseReturns(
@@ -56,17 +69,16 @@ public class PurchaseReturnController {
 
     @PostMapping("/{id}/process")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRN_PROCESS')")
-    @Operation(summary = "Process draft purchase return and decrease warehouse inventory")
-    public ResponseEntity<ApiResponse<PurchaseReturnDto>> processPurchaseReturn(@PathVariable Long id) {
-        PurchaseReturnDto processed = purchaseReturnService.processPurchaseReturn(id);
+    @Operation(summary = "Process or reprocess purchase return and decrease warehouse inventory")
+    public ResponseEntity<ApiResponse<PurchaseReturnDto>> processPurchaseReturn(@PathVariable Long id, @Valid @RequestBody com.nbh.erp.common.dto.StatusChangeRequest request) {
+        PurchaseReturnDto processed = purchaseReturnService.processPurchaseReturn(id, request.reason());
         return ResponseEntity.ok(ApiResponse.ok("Purchase return processed and inventory deducted", processed));
     }
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRN_PROCESS')")
-    @Operation(summary = "Cancel draft purchase return")
-    public ResponseEntity<ApiResponse<Void>> cancelPurchaseReturn(@PathVariable Long id) {
-        purchaseReturnService.cancelPurchaseReturn(id);
-        return ResponseEntity.ok(ApiResponse.ok("Purchase return cancelled successfully", null));
+    @Operation(summary = "Cancel purchase return and restore processed inventory")
+    public ResponseEntity<ApiResponse<PurchaseReturnDto>> cancelPurchaseReturn(@PathVariable Long id, @Valid @RequestBody com.nbh.erp.common.dto.StatusChangeRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Purchase return cancelled successfully", purchaseReturnService.cancelPurchaseReturn(id, request.reason())));
     }
 }

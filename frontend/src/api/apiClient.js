@@ -238,10 +238,10 @@ export const refreshSession = () => {
   return refreshPromise;
 };
 // Exhaust pages for existing local-filter tables and complete exports; never silently truncate at page 1.
-export const fetchAllPages = async (url, params = {}) => {
+export const fetchAllPages = async (url, params = {}, requestConfig = {}) => {
   let content = [], page = 0, result;
   do {
-    result = await api.get(url, { params: { ...params, page, size: 200, sort: params.sort || 'id,asc' } });
+    result = await api.get(url, { ...requestConfig, params: { ...params, page, size: 200, sort: params.sort || 'id,asc' } });
     if (!Array.isArray(result.data?.content)) return result;
     content.push(...result.data.content);
     page += 1;
@@ -249,11 +249,10 @@ export const fetchAllPages = async (url, params = {}) => {
   return { ...result, data: { ...result.data, content, totalElements: content.length } };
 };
 export const purchaseOrderApi = {
-  search: (params) => fetchAllPages('/purchase-orders', params),
+  search: (params, config = {}) => fetchAllPages('/purchase-orders', params, config),
   create: (data) => api.post('/purchase-orders', data),
   update: (id, data) => api.put(`/purchase-orders/${id}`, data),
-  approve: (id) => api.post(`/purchase-orders/${id}/approve`),
-  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
+  changeStatus: (id, status, reason) => api.post(`/purchase-orders/${id}/status`, {status,reason}),
 };
 export const downloadAuthenticated = async (url, filename) => {
   const res = await api.get(url, { responseType: 'blob' });
@@ -301,7 +300,7 @@ export const dashboardApi = {
 
 export const warehouseApi = {
   getAll: () => api.get('/warehouses'),
-  getActive: () => api.get('/warehouses/active'),
+  getActive: (config = {}) => api.get('/warehouses/active', config),
   getById: (id) => api.get(`/warehouses/${id}`),
   create: (data) => api.post('/warehouses', data),
   update: (id, data) => api.put(`/warehouses/${id}`, data),
@@ -330,7 +329,7 @@ export const brandApi = {
 };
 
 export const productApi = {
-  getProducts: (params) => fetchAllPages('/products', params),
+  getProducts: (params, config = {}) => fetchAllPages('/products', params, config),
   searchActive: (query) => api.get('/products/search', { params: { query } }),
   getByBarcode: (barcode) => api.get(`/products/barcode/${barcode}`),
   getById: (id) => api.get(`/products/${id}`),
@@ -363,12 +362,12 @@ export const customerTargetApi = {
 
 export const supplierApi = {
   getAll: () => api.get('/suppliers'),
-  getActive: () => api.get('/suppliers/active'),
+  getActive: (config = {}) => api.get('/suppliers/active', config),
   search: (query) => api.get('/suppliers/search', { params: { query } }),
   getById: (id) => api.get(`/suppliers/${id}`),
   create: (data) => api.post('/suppliers', data),
   update: (id, data) => api.put(`/suppliers/${id}`, data),
-  toggleActive: (id) => api.patch(`/suppliers/${id}/toggle-active`),
+  toggleActive: (id, reason) => api.patch(`/suppliers/${id}/toggle-active`, {reason}),
   delete: (id) => api.delete(`/suppliers/${id}`),
 };
 
@@ -382,7 +381,7 @@ export const salesmanApi = {
 };
 
 export const inventoryApi = {
-  getBalances: (params) => api.get('/inventory/balances', { params }),
+  getBalances: (params, config = {}) => api.get('/inventory/balances', { ...config, params }),
   getWarehouseStock: (whId) => api.get(`/inventory/warehouse/${whId}`),
   getLowStock: (whId) => api.get('/inventory/low-stock', { params: { warehouseId: whId } }),
   getLedger: (params) => api.get('/inventory/ledger', { params }),
@@ -405,7 +404,7 @@ export const grnApi = {
   getById: (id) => api.get(`/grns/${id}`),
   create: (data, process = false) => api.post(`/grns?process=${process}`, data),
   update: (id, data, process = false) => api.put(`/grns/${id}?process=${process}`, data),
-  process: (id) => api.post(`/grns/${id}/process`),
+  process: (id, reason) => api.post(`/grns/${id}/process`, {reason}),
   cancel: (id, data) => api.post(`/grns/${id}/cancel`, data),
   delete: (id) => api.delete(`/grns/${id}`),
 };
@@ -414,16 +413,22 @@ export const gtnApi = {
   search: (params) => api.get('/gtns', { params }),
   getById: (id) => api.get(`/gtns/${id}`),
   create: (data, transfer = false) => api.post(`/gtns?transfer=${transfer}`, data),
-  transfer: (id) => api.post(`/gtns/${id}/transfer`),
-  cancel: (id) => api.post(`/gtns/${id}/cancel`),
+  update: (id, data) => api.put(`/gtns/${id}`, data),
+  getResponsibleStaff: () => api.get('/gtns/responsible-staff'),
+  dispatch: (id, responsibleStaffId, reason) => api.post(`/gtns/${id}/dispatch`, { responsibleStaffId: Number(responsibleStaffId) || null, reason }),
+  transfer: (id, reason) => api.post(`/gtns/${id}/transfer`, { signedCopyReceived: true, reason }),
+  cancel: (id, reason) => api.post(`/gtns/${id}/cancel`, { status: 'CANCELLED', reason }),
+  changeStatus: (id, data) => api.post(`/gtns/${id}/status`, data),
 };
 
 export const prnApi = {
+  getReturnSources: () => api.get('/purchase-returns/return-sources'),
+  update: (id, data, process = false) => api.put(`/purchase-returns/${id}?process=${process}`, data),
   search: (params) => api.get('/purchase-returns', { params }),
   getById: (id) => api.get(`/purchase-returns/${id}`),
   create: (data, process = false) => api.post(`/purchase-returns?process=${process}`, data),
-  process: (id) => api.post(`/purchase-returns/${id}/process`),
-  cancel: (id) => api.post(`/purchase-returns/${id}/cancel`),
+  process: (id, reason) => api.post(`/purchase-returns/${id}/process`, {reason}),
+  cancel: (id, reason) => api.post(`/purchase-returns/${id}/cancel`, {reason}),
 };
 
 export const adjustmentApi = {

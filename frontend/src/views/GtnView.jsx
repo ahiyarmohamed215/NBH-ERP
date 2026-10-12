@@ -1,22 +1,31 @@
+import FilterSelect from '../components/FilterSelect';
+import '../components/PurchasingAppearance.css';
+import DateRangePicker, {matchesDateRange} from '../components/DateRangePicker';
+import { gtnWarehouseSummary, itemSourceId, itemDestinationId } from '../utils/gtnRoutes';
+import GtnStatusDialog from '../components/GtnStatusDialog';
+import { usePurchasingStatusChange } from '../hooks/usePurchasingStatusChange';
+import StaffSearch from '../components/StaffSearch';
+import { availableStock, loadPurchaseInventory } from '../utils/purchaseInventory';
+import StatusBadge from '../components/StatusBadge';
+import { printPurchaseList } from '../utils/purchasePrint';
 import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
-import { formatBusinessDate } from '../utils/invoiceMapping';
+
 import React, { useState, useEffect } from 'react';
-import { gtnApi, warehouseApi, productApi, pdfApi } from '../api/apiClient';
+import { gtnApi, warehouseApi, productApi, pdfApi, inventoryApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import {
   ArrowRightLeft,
-  Plus,
   Search,
   CheckCircle,
   RefreshCw,
   RotateCcw,
   Edit2,
   X,
-  ArrowRight,
   Package,
   Printer,
-  Download,
+  Ban,
+  RotateCw,
 } from 'lucide-react';
 
 const GtnView = React.forwardRef(function GtnView(props, ref) {
@@ -24,11 +33,24 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [gtns, setGtns] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [editingGtnId, setEditingGtnId] = useState(null);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [statusReason, setStatusReason] = useState('');
+  const [editingGtnStatus, setEditingGtnStatus] = useState(null);
+  const [originalGtnStock, setOriginalGtnStock] = useState({});
+  const [signedCopyReceived, setSignedCopyReceived] = useState(false);
   const [products, setProducts] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [fromDate,setFromDate]=useState('');
+  const [toDate,setToDate]=useState('');
   const [saving, setSaving] = useState(false);
+  const [warehouseStock, setWarehouseStock] = useState(null);
+  const [stockError, setStockError] = useState(false);
+  const [intakeProduct, setIntakeProduct] = useState(null);
 
   React.useImperativeHandle(ref, () => ({
     openCreate: () => {
@@ -46,6 +68,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   const [formData, setFormData] = useState({
     sourceWarehouseId: '',
     destinationWarehouseId: '',
+    responsibleStaffId: '',
     remarks: '',
     items: [],
   });
@@ -54,18 +77,22 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   const [selectedGtn, setSelectedGtn] = useState(null);
 
   const { addToast } = useToast();
+  const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
 
   useEffect(() => {
     loadData();
   }, []);
 
   const resetForm = (whList = warehouses, prodList = products) => {
-    const srcId = whList.length > 0 ? whList[0].id : '';
-    const dstId = whList.length > 1 ? whList[1].id : (whList[0]?.id || '');
+    const srcId = '';
+    setIntakeProduct(null);
+    setEditingGtnId(null); setEditingGtnStatus(null); setOriginalGtnStock({});
+    const dstId = '';
 
     setFormData({
       sourceWarehouseId: srcId,
       destinationWarehouseId: dstId,
+      responsibleStaffId: '',
       remarks: '',
       items: [],
     });
@@ -74,10 +101,12 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [gtnRes, whRes, prodRes] = await Promise.all([
+      const [gtnRes, whRes, prodRes, stockRows, staffRes] = await Promise.all([
         gtnApi.search({ size: 100 }),
         warehouseApi.getActive(),
         productApi.getProducts({ size: 250, activeOnly: true }),
+        loadPurchaseInventory(),
+        gtnApi.getResponsibleStaff(),
       ]);
 
       const gList = gtnRes.data?.content || gtnRes.data || [];
@@ -87,6 +116,8 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
       setGtns(gList);
       setWarehouses(whList);
       setProducts(prodList);
+      setInventory(stockRows);
+      setStaff(staffRes.data || []);
 
       if (formData.items.length === 0) {
         resetForm(whList, prodList);
@@ -98,78 +129,127 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     }
   };
 
+  const productWarehouse = product => product?.defaultWarehouseId || product?.warehouseId;
+  const stockWarehouseId = productWarehouse(intakeProduct) || formData.sourceWarehouseId;
+  useEffect(() => {
+    let current = true;
+    setWarehouseStock(null); setStockError(false);
+    if (stockWarehouseId) {
+      inventoryApi.getWarehouseStock(stockWarehouseId).then(response => {
+        if (current) setWarehouseStock(Object.fromEntries((response.data || []).map(stock => [stock.productId,
+          Math.max(0, Number(stock.availableQuantity ?? (Number(stock.quantity || 0) - Number(stock.reservedQuantity || 0))))])));
+      }).catch(() => { if (current) setStockError(true); });
+    }
+    return () => { current = false; };
+  }, [stockWarehouseId, intakeProduct]);
+
+  const selectTransferProduct = (product, item) => {
+    setIntakeProduct(product || null);
+    const source = productWarehouse(product);
+    setFormData(previous => ({ ...previous, sourceWarehouseId: source || '',
+      destinationWarehouseId: item ? item.destinationWarehouseId || '' : String(previous.destinationWarehouseId) === String(source) ? '' : previous.destinationWarehouseId }));
+  };
+  const originalStockCredit = (productId, warehouseId) => editingGtnStatus === 'TRANSFERRED' ? originalGtnStock[`${warehouseId}:${productId}`] || 0 : 0;
+  const remainingStock = (product, editing) => !product || warehouseStock === null ? null : Math.max(0,
+    (warehouseStock[product.id] || 0) + originalStockCredit(product.id, stockWarehouseId) - formData.items.reduce((sum, item, index) =>
+      index !== editing && String(itemSourceId(item)) === String(stockWarehouseId) && String(item.productId) === String(product.id) ? sum + Number(item.quantityTransferred || 0) : sum, 0));
+  const transferSearchProducts = inventory.flatMap(stock => {
+    const product = products.find(product => String(product.id) === String(stock.productId));
+    if (!product) return [];
+    const quantity = availableStock(stock) + originalStockCredit(stock.productId, stock.warehouseId) - formData.items.reduce((sum, item) => String(itemSourceId(item)) === String(stock.warehouseId) && String(item.productId) === String(stock.productId) ? sum + Number(item.quantityTransferred || 0) : sum, 0);
+    return quantity > 0 ? [{ ...product, defaultWarehouseId: stock.warehouseId, warehouseName: stock.warehouseName,
+      availableQuantity: quantity, searchKey: `${stock.productId}:${stock.warehouseId}` }] : [];
+  });
+  const validateTransferItem = (product, quantity, editing) => {
+    if (!formData.destinationWarehouseId || isSameWarehouse) { addToast('Select a destination warehouse before adding products.', 'error'); return false; }
+    const source = productWarehouse(product);
+    if (!source) { addToast('This product has no source warehouse. Set its warehouse in Inventory first.', 'error'); return false; }
+    const available = remainingStock(product, editing);
+    if (stockError || available === null) { addToast('Available stock could not be checked yet. Please select the product again.', 'error'); return false; }
+    if (quantity > available) { addToast(`Insufficient stock. Available quantity: ${available}.`, 'error'); return false; }
+    return true;
+  };
+
   const calculateTotalUnits = () => {
     return formData.items.reduce((sum, it) => sum + (it.quantityTransferred || 0), 0);
   };
 
-  const handleSaveGtn = async (transferImmediately = true) => {
-    if (!formData.sourceWarehouseId || !formData.destinationWarehouseId) {
-      addToast('Please select both source and destination warehouses', 'error');
-      return;
-    }
-    if (Number(formData.sourceWarehouseId) === Number(formData.destinationWarehouseId)) {
-      addToast('Source and destination warehouse cannot be the same', 'error');
-      return;
+  const handleSaveGtn = async (submitPending = true, statusReason) => {
+    if (formData.items.some(item=>!itemSourceId(item) || !itemDestinationId(item) || String(itemSourceId(item))===String(itemDestinationId(item)))) {
+      addToast('Every item must have different source and destination warehouses.', 'error'); return;
     }
     if (formData.items.length === 0) {
       addToast('Add at least one product item to transfer', 'error');
       return;
     }
 
+    if ((submitPending || editingGtnStatus === 'TRANSFERRED') && !formData.responsibleStaffId) { addToast('Select a responsible staff member before saving the GTN.', 'error'); return; }
+    if(editingGtnId && editingGtnStatus==='DRAFT' && submitPending && !statusReason) {
+      requestStatusChange({type:'GTN',number:gtns.find(document=>document.id===editingGtnId)?.gtnNumber || `GTN ${editingGtnId}`,current:'DRAFT',target:'PENDING',onConfirm:reason=>handleSaveGtn(submitPending,reason)});return;
+    }
     try {
       setSaving(true);
       const payload = {
-        sourceWarehouseId: Number(formData.sourceWarehouseId),
-        destinationWarehouseId: Number(formData.destinationWarehouseId),
-        remarks: formData.remarks.trim() || null,
+        statusReason,
+        notes: formData.remarks.trim() || null,
+        responsibleStaffId: Number(formData.responsibleStaffId) || null,
+        status: editingGtnStatus === 'TRANSFERRED' ? 'TRANSFERRED' : editingGtnStatus === 'PENDING' ? 'PENDING' : submitPending ? 'PENDING' : 'DRAFT',
+        ...(formData.dispatchDate ? { dispatchDate: formData.dispatchDate } : {}),
         items: formData.items.map((it) => ({
           productId: Number(it.productId),
+          sourceWarehouseId: Number(itemSourceId(it)),
+          destinationWarehouseId: Number(itemDestinationId(it)),
           quantityTransferred: Number(it.quantityTransferred),
         })),
       };
 
-      const res = await gtnApi.create(payload, transferImmediately);
+      const res = editingGtnId ? await gtnApi.update(editingGtnId, payload) : await gtnApi.create(payload, false);
       const gtnNum = res.data?.gtnNumber || 'transfer';
       addToast(
-        `GTN ${gtnNum} created ${transferImmediately ? 'and dispatched to destination!' : 'as draft.'}`,
+        `GTN ${gtnNum} ${editingGtnStatus === 'TRANSFERRED' ? 'updated. Inventory adjusted for the changes.' : res.data?.status === 'PENDING' ? 'saved as pending. Inventory will move after office confirmation.' : 'saved as draft.'}`,
         'success'
       );
       resetForm();
-      loadData();
+      await loadData();
       setShowCreateForm(false);
+      if (submitPending && res.data?.status === 'PENDING') {
+        setSelectedGtn(res.data);
+        setSignedCopyReceived(false);
+        try { await pdfApi.printGtn(res.data.id); } catch { addToast('GTN saved as pending, but printing failed. Use Print in the view popup to retry.', 'warning'); }
+      }
     } catch (err) {
       addToast(err.message || 'Failed to create GTN', 'error');
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  const handleExecuteTransfer = async (id, gtnNumber) => {
-    if (saving) return;
+  const openStatusChange = target => { setStatusTarget(target); setStatusReason(''); setSignedCopyReceived(false); };
+  const handleStatusChange = async () => {
+    if (saving || !selectedGtn || !statusTarget || !statusReason.trim()) return;
+    if (statusTarget === 'TRANSFERRED' && !signedCopyReceived) return;
     setSaving(true);
     try {
-      const res = await gtnApi.transfer(id);
-      setSelectedGtn((current) => current?.id === id ? res.data : current);
-      addToast(`GTN ${gtnNumber} transferred! Stocks updated in both warehouses.`, 'success');
-      loadData();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Transfer failed: ' + err.message, 'error');
-    } finally {
-      setSaving(false);
-    }
+      const response = await gtnApi.changeStatus(selectedGtn.id, { status: statusTarget, reason: statusReason.trim(), signedCopyReceived });
+      setSelectedGtn(response.data); setStatusTarget(null); setSignedCopyReceived(false);
+      await loadData(); addToast(`GTN status changed to ${response.data.status.toLowerCase()}.`, 'success');
+    } catch (error) { addToast(error.response?.data?.message || error.message || 'Status change failed', 'error'); }
+    finally { setSaving(false); }
   };
 
   const handleInspectGtn = async (id) => {
     try {
       const res = await gtnApi.getById(id);
       setSelectedGtn(res.data);
+      setSignedCopyReceived(false);
     } catch (err) {
       addToast('Failed to load GTN details: ' + err.message, 'error');
     }
   };
 
   const handleEditGtn = async (g) => {
-    if (g.status === 'TRANSFERRED' || g.status === 'COMPLETED') {
+    if (!['DRAFT', 'PENDING', 'TRANSFERRED'].includes(g.status)) {
       addToast(`GTN ${g.gtnNumber} is already completed/transferred. Cannot be modified.`, 'info');
       handleInspectGtn(g.id);
       return;
@@ -177,16 +257,26 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     try {
       const res = await gtnApi.getById(g.id);
       const fullGtn = res.data;
+      setEditingGtnId(fullGtn.id); setEditingGtnStatus(fullGtn.status);
+      setOriginalGtnStock((fullGtn.items || []).reduce((stock,item)=>{const key=`${itemSourceId(item,fullGtn)}:${item.productId}`;return {...stock,[key]:(stock[key] || 0)+Number(item.quantityTransferred ?? item.quantity ?? 0)};},{}));
+      setSelectedGtn(null);
       setFormData({
-        sourceWarehouseId: fullGtn.sourceWarehouseId || '',
-        destinationWarehouseId: fullGtn.destinationWarehouseId || '',
-        remarks: fullGtn.remarks || '',
+        sourceWarehouseId: '',
+        destinationWarehouseId: '',
+        remarks: fullGtn.notes || fullGtn.remarks || '',
+        responsibleStaffId: fullGtn.responsibleStaffId || '',
+        dispatchDate: fullGtn.dispatchDate,
         items: (fullGtn.items || []).map((it) => ({
           productId: it.productId,
+          warehouseId: itemSourceId(it, fullGtn),
+          sourceWarehouseId: itemSourceId(it, fullGtn),
+          sourceWarehouseName: it.sourceWarehouseName || fullGtn.sourceWarehouseName,
+          destinationWarehouseId: itemDestinationId(it, fullGtn),
+          destinationWarehouseName: it.destinationWarehouseName || fullGtn.destinationWarehouseName,
           productCode: it.productSku || '',
           productName: it.productName || '',
           unitOfMeasure: it.unitOfMeasure || 'PCS',
-          quantity: Number(it.quantity || 1),
+          quantityTransferred: Number(it.quantityTransferred ?? it.quantity ?? 1),
         })),
       });
       setShowCreateForm(true);
@@ -196,42 +286,25 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   };
 
   const filteredGtns = gtns.filter((g) => {
+    if(!matchesDateRange(g.dispatchDate || g.createdAt,fromDate,toDate)) return false;
     const q = searchTerm.toLowerCase();
     const matchSearch =
       !q ||
       g.gtnNumber?.toLowerCase().includes(q) ||
-      g.sourceWarehouseName?.toLowerCase().includes(q) ||
-      g.destinationWarehouseName?.toLowerCase().includes(q) ||
-      g.remarks?.toLowerCase().includes(q);
+      [...gtnWarehouseSummary(g).sources,...gtnWarehouseSummary(g).destinations].some(name=>name.toLowerCase().includes(q)) ||
+      g.notes?.toLowerCase().includes(q) || g.remarks?.toLowerCase().includes(q);
 
     const matchStatus =
       statusFilter === 'ALL' ||
-      (statusFilter === 'TRANSFERRED' && g.status === 'TRANSFERRED') ||
+      (statusFilter === 'TRANSFERRED' && ['RECEIVED', 'TRANSFERRED', 'COMPLETED'].includes(g.status)) ||
       (statusFilter === 'PENDING' && g.status === 'PENDING') ||
+      (statusFilter === 'DRAFT' && g.status === 'DRAFT') ||
       (statusFilter === 'CANCELLED' && g.status === 'CANCELLED');
 
     return matchSearch && matchStatus;
   });
 
-  const handleExportCSV = () => {
-    if (filteredGtns.length === 0) {
-      addToast('No GTN records to export', 'warning');
-      return;
-    }
-    const headers = 'GTN Number,Source Warehouse,Destination Warehouse,Status,Date,Remarks\n';
-    const rows = filteredGtns.map((g) =>
-      `"${g.gtnNumber || ''}","${g.sourceWarehouseName || ''}","${g.destinationWarehouseName || ''}","${g.status || ''}","${g.transferredAt || g.createdAt || ''}","${g.remarks || ''}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `gtn_records_${formatBusinessDate()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('GTN records exported to CSV', 'success');
-  };
+  const handlePrintList = () => printPurchaseList('GTN', filteredGtns);
 
   const isSameWarehouse =
     formData.sourceWarehouseId &&
@@ -239,7 +312,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     Number(formData.sourceWarehouseId) === Number(formData.destinationWarehouseId);
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+    <div className="purchasing-no-shadows" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
       {!showCreateForm && <>
       {/* Top Filter & Actions Bar (Sticky Toolbar Card) */}
       <div
@@ -286,16 +359,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {searchTerm && (
@@ -319,47 +392,26 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               )}
             </div>
 
-            {/* Right Controls: Filter, Reset, Export, Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              <select
+            {/* Right Controls: Filter, Reset, Print, Refresh */}
+            <div className="purchase-date-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <DateRangePicker documentType="GTN" from={fromDate} to={toDate} onChange={(from,to)=>{setFromDate(from);setToDate(to);}}/>
+              <FilterSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 30px 0 12px',
-                  width: '140px',
-                  minWidth: '120px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                }}
+                style={{width:'140px'}}
               >
                 <option value="ALL">All Statuses</option>
-                <option value="TRANSFERRED">Transferred</option>
+                <option value="DRAFT">Draft</option>
                 <option value="PENDING">Pending</option>
+                <option value="TRANSFERRED">Transferred</option>
                 <option value="CANCELLED">Cancelled</option>
-              </select>
+              </FilterSelect>
 
-              {(statusFilter !== 'ALL' || searchTerm) && (
+              {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setStatusFilter('ALL');
+                    setStatusFilter('ALL');setFromDate('');setToDate('');
                     setSearchTerm('');
                   }}
                   style={{
@@ -385,43 +437,14 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm();
-                  setShowCreateForm(true);
-                }}
-                style={{
-                  height: '38px',
-                  padding: '0 16px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.86rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.2)',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-              >
-                <Plus size={16} /> + New Stock Transfer
-              </button>
+
 
               <button
                 type="button"
-                onClick={handleExportCSV}
+                onClick={handlePrintList}
                 style={{
                   height: '38px',
-                  padding: '0 14px',
+                  padding: '0', width: '38px', justifyContent: 'center',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
@@ -433,7 +456,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -448,9 +471,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Export GTNs to CSV"
+                title="Print GTN list" aria-label="Print GTN list"
               >
-                <Download size={14} /> Export
+                <Printer size={15} />
               </button>
 
               <button
@@ -458,7 +481,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 onClick={loadData}
                 style={{
                   height: '38px',
-                  padding: '0 14px',
+                  padding: '0', width: '38px', justifyContent: 'center',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
@@ -470,7 +493,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -485,9 +508,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Refresh records"
+                title="Refresh records" aria-label="Refresh records"
               >
-                <RefreshCw size={14} /> Refresh
+                <RefreshCw size={15} />
               </button>
             </div>
           </div>
@@ -501,7 +524,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               overflow: 'hidden',
               width: '100%',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               flex: 1,
               minHeight: 0,
               display: 'flex',
@@ -513,16 +536,19 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      GTN #
+                      GTN NUMBER
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      ROUTE (FROM → TO)
+                      WAREHOUSE
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      STATUS
+                      TOTAL PRODUCTS
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       DATE
+                    </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      STATUS
                     </th>
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
@@ -535,13 +561,13 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading transfer notes...
                       </td>
                     </tr>
                   ) : filteredGtns.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No transfer records found. Fill the form on the left to initiate a transfer.
                       </td>
                     </tr>
@@ -565,52 +591,25 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem' }}>
-                            <span style={{ fontWeight: 600, color: '#334155' }}>{g.sourceWarehouseName}</span>
-                            <ArrowRight size={13} color="#94a3b8" />
-                            <span style={{ fontWeight: 600, color: '#0284c7' }}>{g.destinationWarehouseName}</span>
+                          <div title={`Sources: ${gtnWarehouseSummary(g).sources.join(', ')}; Destinations: ${gtnWarehouseSummary(g).destinations.join(', ')}`}>
+                            <strong style={{fontSize:'.82rem',color:'#334155'}}>{gtnWarehouseSummary(g).text}</strong>
                           </div>
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              backgroundColor: g.status === 'TRANSFERRED' ? '#dcfce7' : g.status === 'PENDING' ? '#fef3c7' : '#fee2e2',
-                              color: g.status === 'TRANSFERRED' ? '#16a34a' : g.status === 'PENDING' ? '#d97706' : '#dc2626',
-                              border: g.status === 'TRANSFERRED' ? '1px solid #bbf7d0' : g.status === 'PENDING' ? '1px solid #fde68a' : '1px solid #fecaca',
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: g.status === 'TRANSFERRED' ? '#16a34a' : g.status === 'PENDING' ? '#d97706' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {g.status}
-                          </span>
+                        <td style={{ padding: '12px 14px', fontSize: '.84rem', fontWeight: 600, color: '#334155' }}>
+                          {new Set((g.items || []).map(item=>item.productId)).size}
                         </td>
                         <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
-                          {g.transferredAt
-                            ? new Date(g.transferredAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
-                            : g.createdAt
-                            ? new Date(g.createdAt).toLocaleDateString()
-                            : '—'}
+                          {g.dispatchDate || g.createdAt?.slice(0, 10) || '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <StatusBadge status={g.status} />
                         </td>
                         <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {g.remarks || '—'}
+                          {g.notes || g.remarks || '—'}
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            <button
+                            {['DRAFT', 'PENDING', 'TRANSFERRED'].includes(g.status) && (<button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -634,7 +633,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                               title="Edit GTN Transfer"
                             >
                               <Edit2 size={13} />
-                            </button>
+                            </button>)}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -660,35 +659,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                             >
                               <Printer size={13} />
                             </button>
-                            {g.status === 'PENDING' && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleExecuteTransfer(g.id, g.gtnNumber);
-                                }}
-                                style={{
-                                  height: '30px',
-                                  padding: '0 8px',
-                                  background: '#ffffff',
-                                  border: '1px solid #bbf7d0',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  color: '#16a34a',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  transition: 'all 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0fdf4')}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                                title="Execute Transfer"
-                              >
-                                <CheckCircle size={13} /> Execute
-                              </button>
-                            )}
+
                           </div>
                         </td>
                       </tr>
@@ -732,10 +703,10 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    New Stock Transfer (GTN)
+                    {editingGtnId ? 'Edit Stock Transfer (GTN)' : 'New Stock Transfer (GTN)'}
                   </h2>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
-                    Dispatch and transfer inventory movement between registered warehouse centers
+                    Create a pending transfer, print for handover, then confirm receipt.
                   </p>
                 </div>
               </div>
@@ -782,8 +753,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             </div>
 
             <div className="purchase-body">
-              <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false}
-                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label>Source warehouse *<select value={formData.sourceWarehouseId} onChange={e=>setFormData({...formData, sourceWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label>Destination warehouse *<select value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><label className="purchase-remarks">Remarks / transfer reason<textarea rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+              <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false} intakeLayout="gtn"
+                onProductSelect={selectTransferProduct}
+                onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,sourceWarehouseId:''}));}}
+                buildItemData={product=>({sourceWarehouseId:productWarehouse(product),sourceWarehouseName:warehouses.find(warehouse=>String(warehouse.id)===String(productWarehouse(product)))?.name || product.warehouseName,
+                  destinationWarehouseId:formData.destinationWarehouseId,destinationWarehouseName:warehouses.find(warehouse=>String(warehouse.id)===String(formData.destinationWarehouseId))?.name})}
+                extraColumns={[{label:'Source',value:item=>item.sourceWarehouseName || '—'},{label:'Destination',value:item=>item.destinationWarehouseName || '—'}]} validateItem={validateTransferItem} quantityLabel="Transfer qty"
+                addDisabled={!formData.destinationWarehouseId || Boolean(isSameWarehouse)} addHint={!formData.destinationWarehouseId ? 'Select the destination warehouse before adding products.' : undefined}
+                searchProducts={transferSearchProducts} resultQuantity={product=>product.availableQuantity} searchEmptyMessage="No matching products with available stock."
+                quantityDetails={(product, editing) => <><span>Available qty</span><strong>{!product ? '—' : stockError ? 'Unavailable' : remainingStock(product, editing) ?? 'Loading...'}</strong></>}
+                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
@@ -804,7 +783,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 <button
                   type="button"
                   onClick={() => handleSaveGtn(false)}
-                  disabled={saving || isSameWarehouse}
+                  disabled={saving}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
@@ -816,12 +795,12 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     cursor: 'pointer',
                   }}
                 >
-                  Save Draft
+                  {editingGtnStatus === 'TRANSFERRED' || editingGtnStatus === 'PENDING' ? 'Save Changes' : 'Save Draft'}
                 </button>
-                <button
+{editingGtnStatus !== 'TRANSFERRED' && (                <button
                   type="button"
                   onClick={() => handleSaveGtn(true)}
-                  disabled={saving || isSameWarehouse}
+                  disabled={saving}
                   style={{
                     padding: '8px 20px',
                     borderRadius: '6px',
@@ -831,12 +810,12 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                    boxShadow: 'none',
                   }}
                 >
                   <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
-                  {saving ? 'Processing...' : 'Direct Transfer & Dispatch'}
-                </button>
+                  {saving ? 'Saving...' : editingGtnId ? 'Save Pending & Print' : 'Create Pending & Print'}
+                </button>)}
               </div>} />
             </div>
           </div>
@@ -845,14 +824,33 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
 
       {/* GTN Inspection Drawer / Modal */}
       {selectedGtn && <PurchaseInspectionModal type="GTN" number={selectedGtn.gtnNumber} status={selectedGtn.status} rows={selectedGtn.items || []}
+        details={[
+          { label: 'Source warehouses', value: gtnWarehouseSummary(selectedGtn).sources.join(', ') },
+          { label: 'Destination warehouses', value: gtnWarehouseSummary(selectedGtn).destinations.join(', ') },
+          { label: 'Responsible staff', value: selectedGtn.responsibleStaffName || staff.find(member=>String(member.id)===String(selectedGtn.responsibleStaffId))?.fullName },
+          { label: 'Dispatch date', value: selectedGtn.dispatchDate || (selectedGtn.transferredAt || selectedGtn.createdAt)?.slice(0, 10) },
+          ...(selectedGtn.receiveDate ? [{ label: 'Confirmed received', value: selectedGtn.receiveDate }] : []),
+          ...(selectedGtn.lastStatusReason ? [{ label: 'Last status change reason', value: selectedGtn.lastStatusReason, wide: true }] : []),
+          { label: 'Remarks', value: selectedGtn.notes || selectedGtn.remarks, wide: true },
+        ]}
         onClose={() => setSelectedGtn(null)} onPrint={() => pdfApi.printGtn(selectedGtn.id)}
-        actions={['DRAFT', 'PENDING'].includes(selectedGtn.status) ? [{ label: 'Transfer GTN', icon: CheckCircle, disabled: saving, onClick: () => handleExecuteTransfer(selectedGtn.id, selectedGtn.gtnNumber) }] : []}
+        actions={[
+          ...(['DRAFT','PENDING','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Edit GTN', icon: Edit2, disabled: saving, onClick:()=>handleEditGtn(selectedGtn) }] : []),
+          ...(['DRAFT','CANCELLED','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Change to Pending', icon: RotateCw, disabled: saving, onClick:()=>openStatusChange('PENDING') }] : []),
+          ...(['PENDING','CANCELLED'].includes(selectedGtn.status) ? [{ label: 'Mark Transferred', icon: CheckCircle, disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
+          ...(selectedGtn.status !== 'CANCELLED' ? [{ label: 'Cancel GTN', icon: Ban, tone: 'danger', disabled: saving, onClick:()=>openStatusChange('CANCELLED') }] : []),
+        ]}
         columns={[
           { label: 'Product code', value: item => item.productSku || '—' },
-          { label: 'Product', value: item => item.productName },
-          { label: 'Qty transferred', numeric: true, value: item => item.quantityTransferred ?? item.quantity },
+          { label: 'Product name', value: item => item.productName },
+          { label: 'Source', value:item=>item.sourceWarehouseName || selectedGtn.sourceWarehouseName || '—' },
+          { label: 'Destination', value:item=>item.destinationWarehouseName || selectedGtn.destinationWarehouseName || '—' },
+          { label: 'Transfer qty', numeric: true, value: item => item.quantityTransferred ?? item.quantity },
         ]} />}
 
+      {selectedGtn && statusTarget && <GtnStatusDialog document={selectedGtn} target={statusTarget} reason={statusReason} onReasonChange={setStatusReason}
+        confirmed={signedCopyReceived} onConfirmChange={setSignedCopyReceived} busy={saving} onClose={()=>setStatusTarget(null)} onSave={handleStatusChange}/>}
+      {statusChangeDialog}
     </div>
   );
 });

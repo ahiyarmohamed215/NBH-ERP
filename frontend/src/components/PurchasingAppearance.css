@@ -1,0 +1,20 @@
+:where(.purchasing-no-shadows, .purchasing-no-shadows *) {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+:where(.purchasing-no-shadows, .purchasing-no-shadows *)::before,
+:where(.purchasing-no-shadows, .purchasing-no-shadows *)::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.purchasing-no-shadows svg { filter: none !important; }
+.purchase-date-controls > select,
+.purchase-date-controls > select option {
+  font-family: inherit;
+  font-size: .86rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.purchasing-no-shadows .animate-spin { animation:purchasing-refresh-spin .8s linear infinite; }
+@keyframes purchasing-refresh-spin { to { transform:rotate(360deg); } }

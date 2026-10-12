@@ -1,9 +1,17 @@
+import {usePurchaseItemRemoval} from '../hooks/usePurchaseItemRemoval';
+import PurchaseProductSearch from '../components/PurchaseProductSearch';
+import FilterSelect from '../components/FilterSelect';
+import '../components/PurchasingAppearance.css';
+import DateRangePicker, {matchesDateRange} from '../components/DateRangePicker';
+import StatusBadge from '../components/StatusBadge';
 import { mergeGrnItems, calculateGrnStaging, buildGrnItemsPayload } from '../utils/grnItems';
 import './GrnView.css';
 import GrnDetailsModal from '../components/GrnDetailsModal';
+import { usePurchasingStatusChange } from '../hooks/usePurchasingStatusChange';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useRef } from 'react';
-import { grnApi, supplierApi, productApi, inventoryApi, pdfApi } from '../api/apiClient';
+import { grnApi, supplierApi, productApi, brandApi, inventoryApi, pdfApi } from '../api/apiClient';
+import { readNumericInput } from '../utils/numericInput';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
@@ -86,6 +94,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     props.onFormModeChange?.(showGrnForm);
   }, [showGrnForm, props.onFormModeChange]);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [fromDate,setFromDate]=useState('');
+  const [toDate,setToDate]=useState('');
   const [grns, setGrns] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -158,6 +168,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const [selectedGrn, setSelectedGrn] = useState(null);
 
   const { addToast } = useToast();
+  const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
 
   useEffect(() => {
     loadData();
@@ -226,13 +237,14 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           lastRealCost = matched.unitCost;
           lastSupCost = matched.unitCost;
           lastCount = g.items.length;
+          lastSale = matched.sellingPrice ?? null;
           if (matched.notes) {
             const freeM = matched.notes.match(/Free:\s*([\d.]+)/i);
             if (freeM) lastFree = parseFloat(freeM[1]);
             const discM = matched.notes.match(/Disc:\s*([\d.]+%?)/i);
             if (discM) lastDisc = discM[1];
-            const saleM = matched.notes.match(/Sale:\s*([\d.]+)/i);
-            if (saleM) lastSale = parseFloat(saleM[1]);
+            const saleM = matched.notes.match(/Sale:\s*(?:\$|LKR\s*|Rs\.?\s*)?([\d.]+)/i);
+            if (lastSale == null && saleM) lastSale = parseFloat(saleM[1]);
           }
           break;
         }
@@ -250,8 +262,27 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     };
   };
 
+  const refreshProductPricing = async (product) => {
+    let current = product;
+    try {
+      const response = await productApi.getById(product.id);
+      if (response.data?.id) current = { ...product, ...response.data };
+    } catch { /* Retain product details while resolving its brand below. */ }
+    if (current.brandId) {
+      try {
+        const response = await brandApi.getById(current.brandId);
+        if (response.data?.markupPercent != null) current = { ...current, brandMarkupPercent: Number(response.data.markupPercent) };
+      } catch {
+        addToast('Unable to refresh the brand MP%. Please check the connection and select the product again.', 'warning');
+      }
+    }
+    setProducts(previous=>previous.map(item=>String(item.id)===String(current.id) ? current : item));
+    return current;
+  };
+
   const selectProductForStaging = async (prod) => {
     if (!prod) return;
+    prod = await refreshProductPricing(prod);
     const warehouseId = prod.defaultWarehouseId || prod.warehouseId;
     if (!warehouseId) {
       addToast('Set a default warehouse on this product before creating a GRN.', 'error');
@@ -298,6 +329,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       costPrice: cost,
       salePrice: sale,
       markupPercent,
+      brandMarkupPercent: markupPercent,
       useBrandMarkup: true,
       creditPrice: Number(credit.toFixed(2)),
       markupPrice: Number(markup.toFixed(2)),
@@ -308,7 +340,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       ...hist,
     });
 
-    setProductQuery('');
+    setProductQuery(`${prod.sku || ''} — ${prod.name || ''}`);
     setShowProductDropdown(false);
     const stockMap = await loadStockForWarehouse(warehouseId);
     setStagingItem(prev => String(prev.productId) === String(prod.id)
@@ -324,6 +356,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const handleAddItemToGrn = () => {
     if (!stagingItem.productId) {
       addToast('Please select a product first', 'error');
+      return;
+    }
+    if (stagingItem.quantity === '' || stagingItem.costPrice === '' || stagingItem.salePrice === '') {
+      addToast('Enter received quantity, unit cost, and selling price before adding the product.', 'error');
       return;
     }
     if (stagingItem.quantity <= 0 && stagingItem.freeQuantity <= 0) {
@@ -357,7 +393,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       gpPercent: Number(stagingItem.gpPercent),
       freeCostPrice: Number(stagingItem.freeCostPrice),
       priceCode: stagingItem.priceCode || '',
-      notes: `Pack: ${stagingItem.packQty}x${stagingItem.packSize} | Free: ${stagingItem.freeQuantity} | Disc: ${stagingItem.discountPercent}% ($${stagingItem.discountAmount.toFixed(2)}) | Sale: $${stagingItem.salePrice.toFixed(2)} | GP: ${stagingItem.gpPercent.toFixed(1)}% | Code: ${stagingItem.priceCode || 'N/A'}`,
+      notes: `Pack: ${stagingItem.packQty}x${stagingItem.packSize} | Free: ${stagingItem.freeQuantity} | Disc: ${stagingItem.discountPercent}% (LKR ${stagingItem.discountAmount.toFixed(2)}) | Sale: LKR ${stagingItem.salePrice.toFixed(2)} | GP: ${stagingItem.gpPercent.toFixed(1)}% | Code: ${stagingItem.priceCode || 'N/A'}`,
     };
 
     setFormData((prev) => ({
@@ -373,6 +409,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     resetStagingItem();
   };
 
+  const {requestRemove,removalDialog}=usePurchaseItemRemoval({items:formData.items,products,onRemove:index=>handleRemoveItem(index)});
+
   const handleRemoveItem = (index) => {
     if (editingLineIndex === index) resetStagingItem();
     else if (editingLineIndex !== null && index < editingLineIndex) setEditingLineIndex(editingLineIndex - 1);
@@ -385,7 +423,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
   const handleEditItem = async (index) => {
     const item = formData.items[index];
-    const product = products.find((p) => String(p.id) === String(item.productId));
+    const storedProduct = products.find((p) => String(p.id) === String(item.productId));
+    const product = storedProduct ? await refreshProductPricing(storedProduct) : null;
     setEditingLineIndex(index);
     setProductQuery('');
     setShowProductDropdown(false);
@@ -393,6 +432,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       ...INITIAL_STAGING_ITEM, ...item,
       quantity: item.quantityReceived, costPrice: item.unitCost,
       markupPercent: item.markupPercent ?? Number(product?.brandMarkupPercent || 0),
+      brandMarkupPercent: Number(product?.brandMarkupPercent ?? item.brandMarkupPercent ?? item.markupPercent ?? 0),
       useBrandMarkup: item.useBrandMarkup ?? false,
       lastCostPrice: product?.costPrice ?? null, currentSellingPrice: product?.sellingPrice ?? null,
       stockLoading: true,
@@ -434,7 +474,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     resetStagingItem();
   };
 
-  const handleSaveGrn = async (processImmediately = true) => {
+  const handleSaveGrn = async (processImmediately = true, statusReason) => {
     if (!formData.supplierId) {
       addToast('Please select a supplier', 'error');
       return;
@@ -447,10 +487,14 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       addToast('Add at least one product item to the GRN', 'error');
       return;
     }
+    if(editingGrnId && processImmediately && editingGrnStatus !== 'PROCESSED' && !statusReason) {
+      requestStatusChange({type:'GRN',number:formData.grnNumber,current:editingGrnStatus,target:'PROCESSED',onConfirm:reason=>handleSaveGrn(processImmediately,reason)});return;
+    }
 
     try {
       setSaving(true);
       const payload = {
+        statusReason,
         purchaseOrderId: formData.purchaseOrderId ? Number(formData.purchaseOrderId) : null,
         supplierId: Number(formData.supplierId),
         grnType: formData.grnType,
@@ -480,6 +524,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       setShowGrnForm(false);
     } catch (err) {
       addToast(err.response?.data?.message || err.message || 'Failed to save GRN', 'error');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -528,7 +573,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           packQty: 1,
           packSize: 1,
           unitCost: Number(it.unitCost || 0),
-          salePrice: Number(it.sellingPrice ?? it.notes?.match(/Sale:\s*\$?([\d.]+)/i)?.[1] ?? 0),
+          salePrice: Number(it.sellingPrice ?? it.notes?.match(/Sale:\s*(?:\$|LKR\s*|Rs\.?\s*)?([\d.]+)/i)?.[1] ?? 0),
           markupPercent: Number(it.markupPercent ?? 0),
           useBrandMarkup: it.useBrandMarkup ?? false,
           warehouseId: it.warehouseId,
@@ -556,16 +601,18 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     setCancelReason('');
   };
 
-  const handleProcessGrn = async (g) => {
+  const handleProcessGrn = async (g,reason) => {
+    if(!reason) {requestStatusChange({type:'GRN',number:g.grnNumber,current:g.status,target:'PROCESSED',description:'Processing this GRN adds the received quantities to their warehouses. Enter the reason for processing or restoring this receipt.',onConfirm:reason=>handleProcessGrn(g,reason)});return;}
     if (processingGrnId !== null) return;
     try {
       setProcessingGrnId(g.id);
-      const res = await grnApi.process(g.id);
+      const res = await grnApi.process(g.id,reason);
       setSelectedGrn((current) => current?.id === g.id ? res.data : current);
       addToast(`GRN ${g.grnNumber} processed and inventory updated.`, 'success');
       await loadData();
     } catch (err) {
       addToast(err.response?.data?.message || err.message || 'Cannot process GRN', 'error');
+      return false;
     } finally {
       setProcessingGrnId(null);
     }
@@ -658,7 +705,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             packSize: 1,
             unitCost: finalCost,
             salePrice: finalSale,
-            markupPercent,
+            markupPercent: salePrice && finalCost ? Number(((finalSale / finalCost - 1) * 100).toFixed(2)) : markupPercent,
+            brandMarkupPercent: markupPercent,
             useBrandMarkup: !salePrice,
             creditPrice: finalSale * 1.05,
             wholesalePrice: finalSale * 0.9,
@@ -669,7 +717,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             gpPercent: Number(gp.toFixed(1)),
             freeCostPrice: Number(freeCost.toFixed(2)),
             priceCode: 'CSV-IMPORT',
-            notes: `Imported via Spreadsheet | Free: ${freeQty} | Disc: ${discountPct}% | Sale: $${finalSale}`,
+            notes: `Imported via Spreadsheet | Free: ${freeQty} | Disc: ${discountPct}% | Sale: LKR ${finalSale}`,
           });
         }
       }
@@ -722,7 +770,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const filteredProducts = products.filter((p) => {
-    const q = productQuery.toLowerCase();
+    const q = (stagingItem.productId && productQuery === `${stagingItem.productCode} — ${stagingItem.tradeName}` ? '' : productQuery).trim().toLowerCase();
     return (
       p.sku?.toLowerCase().includes(q) ||
       p.name?.toLowerCase().includes(q) ||
@@ -731,6 +779,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   });
 
   const filteredGrns = grns.filter((g) => {
+    if(!matchesDateRange(g.receivedDate || g.createdAt,fromDate,toDate)) return false;
     const q = searchTerm.toLowerCase();
     const matchSearch =
       !q ||
@@ -778,7 +827,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   const totals = calculateGrandTotals();
 
   return (
-    <div
+    <div className="purchasing-no-shadows"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -839,16 +888,16 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {searchTerm && (
@@ -873,46 +922,24 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </div>
 
             {/* Right Controls: Filters, Upload, Print, Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              <select
+            <div className="purchase-date-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <DateRangePicker documentType="GRN" from={fromDate} to={toDate} onChange={(from,to)=>{setFromDate(from);setToDate(to);}}/>
+              <FilterSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 30px 0 12px',
-                  width: '140px',
-                  minWidth: '120px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                }}
+                style={{width:'140px'}}
               >
                 <option value="ALL">All Statuses</option>
                 <option value="PROCESSED">Processed</option>
                 <option value="DRAFT">Draft</option>
                 <option value="CANCELLED">Cancelled</option>
-              </select>
+              </FilterSelect>
 
-              {(statusFilter !== 'ALL' || searchTerm) && (
+              {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setStatusFilter('ALL');
+                    setStatusFilter('ALL');setFromDate('');setToDate('');
                     setSearchTerm('');
                   }}
                   style={{
@@ -955,7 +982,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -987,7 +1014,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -1005,7 +1032,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 title="Print GRN Directory (A4)"
                 aria-label="Print GRN Directory (A4)"
               >
-                <Printer size={14} />
+                <Printer size={15} />
               </button>
 
               <button
@@ -1028,7 +1055,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -1047,7 +1074,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 aria-label="Refresh records"
                 disabled={loading}
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1062,7 +1089,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               width: '100%',
               maxWidth: '100%',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               flex: 1,
               minHeight: 0,
               display: 'flex',
@@ -1088,6 +1115,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
+                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      REMARKS
+                    </th>
                     <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
@@ -1096,13 +1126,13 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         Loading GRN records...
                       </td>
                     </tr>
                   ) : filteredGrns.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
                         No GRN records found. Click <strong>+ New Inward GRN Intake</strong> to create a new intake.
                       </td>
                     </tr>
@@ -1140,51 +1170,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                           {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              backgroundColor:
-                                g.status === 'PROCESSED'
-                                  ? '#dcfce7'
-                                  : g.status === 'CANCELLED'
-                                  ? '#ffe4e6'
-                                  : '#fef3c7',
-                              color:
-                                g.status === 'PROCESSED'
-                                  ? '#16a34a'
-                                  : g.status === 'CANCELLED'
-                                  ? '#e11d48'
-                                  : '#d97706',
-                              border:
-                                g.status === 'PROCESSED'
-                                  ? '1px solid #bbf7d0'
-                                  : g.status === 'CANCELLED'
-                                  ? '1px solid #fecdd3'
-                                  : '1px solid #fde68a',
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor:
-                                  g.status === 'PROCESSED'
-                                  ? '#16a34a'
-                                  : g.status === 'CANCELLED'
-                                  ? '#e11d48'
-                                  : '#d97706',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {g.status || 'DRAFT'}
-                          </span>
+                          <StatusBadge status={g.status} />
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.notes || g.remarks || ''}>
+                          {g.notes || g.remarks || '—'}
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
@@ -1346,175 +1335,59 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               borderRadius: '10px',
               background: '#ffffff',
               border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px',
             }}
           >
-            {/* Row 1: Product Search Input */}
-            <div ref={productSearchRef} style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Search size={15} color="#2563eb" /> Product search & intake
-                </label>
-                {stagingItem.productId && (
-                  <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <CheckCircle size={13} /> Product selected
-                  </span>
-                )}
-              </div>
-
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Search
-                  size={16}
-                  color="#94a3b8"
-                  style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }}
-                />
-                <input
-                  type="text"
-                  className="input-glass"
-                  style={{
-                    width: '100%',
-                    fontSize: '0.9rem',
-                    padding: '8px 36px 8px 36px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontWeight: 500,
-                    background: stagingItem.productId ? '#f8fafc' : '#ffffff',
-                  }}
-                  placeholder={
-                    stagingItem.productId
-                      ? `${stagingItem.productCode} — ${stagingItem.tradeName} (Click to change / search again)`
-                      : 'Search product by SKU, trade name or barcode...'
-                  }
-                  value={productQuery}
-                  onFocus={() => setShowProductDropdown(true)}
-                  onChange={(e) => {
-                    setProductQuery(e.target.value);
-                    setShowProductDropdown(true);
-                  }}
-                />
-                {productQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductQuery('');
-                      setShowProductDropdown(false);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#94a3b8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '4px',
-                    }}
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown Results */}
-              {showProductDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 40,
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    maxHeight: '260px',
-                    overflowY: 'auto',
-                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.12)',
-                    marginTop: '4px',
-                  }}
-                >
-                  {filteredProducts.length === 0 ? (
-                    <div style={{ padding: '14px', fontSize: '0.84rem', color: '#64748b', textAlign: 'center' }}>
-                      No matching products found.
-                    </div>
-                  ) : (
-                    filteredProducts.slice(0, 50).map((p) => (
-                      <div
-                        key={p.id}
-                        onClick={() => selectProductForStaging(p)}
-                        style={{
-                          padding: '9px 14px',
-                          cursor: 'pointer',
-                          borderBottom: '1px solid #f1f5f9',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          fontSize: '0.86rem',
-                          backgroundColor: stagingItem.productId === p.id ? '#eff6ff' : '#ffffff',
-                          transition: 'background 0.12s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = stagingItem.productId === p.id ? '#eff6ff' : '#ffffff')}
-                      >
-                        <div>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb', fontSize: '0.84rem' }}>
-                            {p.sku}
-                          </span>{' '}
-                          — <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</span>
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '12px' }}>
-                          <span>Last cost: <strong style={{ color: '#0f172a' }}>${Number(p.costPrice || 0).toFixed(2)}</strong></span>
-                          <span>Selling: <strong>${Number(p.sellingPrice || 0).toFixed(2)}</strong></span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+            <div ref={productSearchRef} className="purchase-search-group">
+              <PurchaseProductSearch query={productQuery} onQueryChange={setProductQuery} results={filteredProducts.slice(0,50)}
+                onSelect={selectProductForStaging} selected={Boolean(stagingItem.productId)} editing={editingLineIndex!==null}
+                open={showProductDropdown} onOpenChange={setShowProductDropdown} showWarehouse={false}
+                resultDetails={product=>`Selling price: LKR ${Number(product.sellingPrice || 0).toFixed(2)}`}
+                onClear={()=>{setProductQuery('');resetStagingItem();}}/>
             </div>
 
             {stagingItem.productId && (
               <div className="grn-product-summary" aria-live="polite">
-                <div><span>Last cost price</span><strong>{stagingItem.lastCostPrice == null ? 'Unavailable' : '$' + Number(stagingItem.lastCostPrice).toFixed(2)}</strong></div>
+                <div><span>Last cost price</span><strong>{stagingItem.lastCostPrice == null ? 'Unavailable' : 'LKR ' + Number(stagingItem.lastCostPrice).toFixed(2)}</strong></div>
                 <div><span>Available qty</span><strong>{stagingItem.stockLoading ? 'Loading…' : stagingItem.currentQuantity == null ? 'Unavailable' : stagingItem.currentQuantity + ' ' + stagingItem.unitOfMeasure}</strong></div>
-                <div><span>Current selling price</span><strong>{stagingItem.currentSellingPrice == null ? 'Unavailable' : '$' + Number(stagingItem.currentSellingPrice).toFixed(2)}</strong></div>
+                <div><span>Current selling price</span><strong>{stagingItem.currentSellingPrice == null ? 'Unavailable' : 'LKR ' + Number(stagingItem.currentSellingPrice).toFixed(2)}</strong></div>
               </div>
             )}
 
             <div className="grn-line-fields">
               {[
                 ['quantity', 'RECEIVED QTY *', 0, '1'],
-                ['costPrice', 'UNIT COST ($) *', 0, '0.01'],
+                ['costPrice', 'UNIT COST (LKR) *', 0, '0.01'],
               ].map(([field, label, min, step]) => (
                 <label key={field}>{label}
                   <input className="input-glass" type="number" min={min} step={step}
+                    inputMode={field === 'quantity' ? 'numeric' : 'decimal'} onFocus={event=>event.target.select()}
                     name={field}
-                    value={stagingItem[field]} onChange={e => handleStagingChange(field, e.target.value)} />
+                    value={stagingItem[field]} onChange={e => handleStagingChange(field, readNumericInput(e))} />
                 </label>
               ))}
               <label>
                 <span className="grn-markup-label"><input type="checkbox" checked={stagingItem.useBrandMarkup}
-                  aria-label="Use brand MP%" onChange={(e) => handleStagingChange('useBrandMarkup', e.target.checked)} /> MP% (Brand)</span>
-                <input className="input-glass" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly disabled={!stagingItem.useBrandMarkup} />
+                  aria-label="Use brand MP%" onChange={(e) => handleStagingChange('useBrandMarkup', e.target.checked)} /> MP% ({stagingItem.useBrandMarkup ? 'Brand' : 'Calculated'})</span>
+                <input className="input-glass" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly />
               </label>
-              <label>SELLING PRICE ($)<input className="input-glass" type="number" name="salePrice" min="0" step="0.01"
+              <label>SELLING PRICE (LKR)<input className="input-glass" type="number" name="salePrice" min="0" step="0.01"
+                inputMode="decimal" onFocus={event=>{if(!event.target.readOnly)event.target.select();}}
                 readOnly={stagingItem.useBrandMarkup} value={stagingItem.salePrice}
-                onChange={(e) => handleStagingChange('salePrice', e.target.value)} /></label>
+                onChange={(e) => handleStagingChange('salePrice', readNumericInput(e))} /></label>
             </div>
             <button type="button" className="btn btn-primary grn-add-item" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
               {editingLineIndex === null ? <Plus size={16} /> : <Edit2 size={16} />} {editingLineIndex === null ? 'Add item' : 'Update item'}
             </button>
             {editingLineIndex !== null && <button type="button" className="btn btn-glass" onClick={resetStagingItem}>Cancel line edit</button>}
           <div className="grn-header-fields">
-            <label>Supplier *<select className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
+            <label>Supplier *<FilterSelect variant="field" aria-label="Supplier" className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
               <option value="">Select supplier</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select></label>
+            </FilterSelect></label>
             <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
             <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass" name="remarks" rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
           </div>
@@ -1543,12 +1416,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     <td><strong className="grn-product-code">{item.productCode}</strong></td>
                     <td>{item.tradeName || '—'}</td>
                     <td className="grn-number">{item.quantityReceived}</td>
-                    <td className="grn-number">${Number(item.unitCost || 0).toFixed(2)}</td>
-                    <td className="grn-number">{item.useBrandMarkup ? Number(item.markupPercent || 0).toFixed(2) + '%' : 'Manual'}</td>
-                    <td className="grn-number">${Number(item.salePrice || 0).toFixed(2)}</td>
+                    <td className="grn-number">LKR {Number(item.unitCost || 0).toFixed(2)}</td>
+                    <td className="grn-number">{Number(item.markupPercent || 0).toFixed(2)}%</td>
+                    <td className="grn-number">LKR {Number(item.salePrice || 0).toFixed(2)}</td>
                     <td className="grn-number"><div className="grn-row-actions">
                       <button type="button" title="Edit line" aria-label={`Edit item ${index + 1}`} onClick={() => handleEditItem(index)}><Edit2 size={14} /></button>
-                      <button type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => handleRemoveItem(index)}><Trash2 size={14} /></button>
+                      <button type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => requestRemove(index)}><Trash2 size={14} /></button>
                     </div></td>
                   </tr>)}
                 </tbody>
@@ -1617,7 +1490,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                    boxShadow: 'none',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
@@ -1723,6 +1596,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       )}
 
       {/* GRN INSPECTION MODAL (Modern, Large, High-Contrast for 45+ Decision Makers) */}
+      {showGrnForm && removalDialog}
       {selectedGrn && (
         <GrnDetailsModal grn={selectedGrn} onClose={() => setSelectedGrn(null)}
           onPrint={() => handlePrintPdf(selectedGrn.id)} onCancel={() => handleOpenCancelModal(selectedGrn)}
@@ -1776,6 +1650,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               <textarea
                 rows={3}
                 value={cancelReason}
+                maxLength={1000}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Enter cancellation reason (e.g., incorrect supplier delivery, wrong pricing, damaged goods returned)..."
                 style={{
@@ -1827,6 +1702,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           </div>
         </div>
       )}
+      {statusChangeDialog}
     </div>
   );
 });

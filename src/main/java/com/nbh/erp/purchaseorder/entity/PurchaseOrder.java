@@ -14,7 +14,7 @@ public class PurchaseOrder extends com.nbh.erp.common.entity.BaseEntity {
  private LocalDate expectedDate;
  private String terms;
  @Column(columnDefinition="TEXT") private String notes;
- @Column(nullable=false) private String status="PENDING";
+ @Column(nullable=false) private String status="DRAFT";
  @Column(nullable=false,precision=15,scale=2) private BigDecimal totalAmount=BigDecimal.ZERO;
  @OneToMany(mappedBy="purchaseOrder",cascade=CascadeType.ALL,orphanRemoval=true)
  private List<PurchaseOrderItem> items=new ArrayList<>();

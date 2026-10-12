@@ -12,6 +12,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @org.springframework.data.jpa.repository.Query("select e from User e where e.id = :id")
     java.util.Optional<User> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
+    java.util.List<User> findByIsActiveTrueAndApprovalStatusOrderByFullNameAsc(String approvalStatus);
+
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameIgnoreCase(String username);

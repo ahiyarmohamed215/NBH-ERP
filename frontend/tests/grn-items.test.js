@@ -1,18 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeGrnItems, calculateGrnStaging, buildGrnItemsPayload } from '../src/utils/grnItems.js';
+import { normalizeNumericInput } from '../src/utils/numericInput.js';
+test('cleared fields stay blank and leading zeros are removed', () => {
+  let item = { quantity: 1, freeQuantity: 0, costPrice: 0, salePrice: 0, useBrandMarkup: false };
+  for (const field of ['quantity', 'costPrice', 'salePrice']) {
+    item = calculateGrnStaging(item, field, '');
+    assert.equal(item[field], '');
+  }
+  item = calculateGrnStaging(item, 'quantity', '045');
+  assert.equal(item.quantity, 45);
+  assert.equal(normalizeNumericInput(''), '');
+  assert.equal(normalizeNumericInput('045'), '45');
+  assert.equal(normalizeNumericInput('000.45'), '0.45');
+  assert.equal(normalizeNumericInput('0'), '0');
+});
 const line = (id, qty, cost, free = 0, discount = 0) => ({ productId:id, quantityReceived:qty, freeQuantity:free, unitCost:cost, purchaseValue:qty*cost, discountAmount:discount, amount:qty*cost-discount, salePrice:20 });
 test('brand markup follows unit cost and manual selling price stays editable', () => {
   let item = calculateGrnStaging({ quantity: 2, costPrice: 10, markupPercent: 25, useBrandMarkup: true }, 'costPrice', '12');
   assert.equal(item.salePrice, 15);
   item = calculateGrnStaging(item, 'useBrandMarkup', false);
   item = calculateGrnStaging(item, 'salePrice', '17.25');
+  assert.equal(item.markupPercent, 43.75);
   item = calculateGrnStaging(item, 'costPrice', '14');
+  assert.equal(item.markupPercent, 23.21);
   assert.equal(item.salePrice, 17.25);
   const [payload] = buildGrnItemsPayload([{ ...item, productId: 1, quantityReceived: item.quantity }]);
   assert.equal(payload.sellingPrice, 17.25); assert.equal(payload.useBrandMarkup, false);
   item = calculateGrnStaging(item, 'useBrandMarkup', true);
   assert.equal(item.salePrice, 17.5);
+});
+test('manual selling prices below cost show their actual negative markup', () => {
+  const item = calculateGrnStaging({ quantity: 1, costPrice: 100, markupPercent: 25, useBrandMarkup: false }, 'salePrice', '80');
+  assert.equal(item.markupPercent, -20);
+  assert.equal(buildGrnItemsPayload([{ ...item, productId: 1, quantityReceived: 1 }])[0].markupPercent, -20);
 });
 test('repeated automatic receipt lines recalculate markup on the combined unit cost', () => {
   const [item] = mergeGrnItems([

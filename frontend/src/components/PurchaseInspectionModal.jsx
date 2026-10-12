@@ -2,6 +2,7 @@ import React from 'react';
 import { Printer, X, FileCheck, ArrowLeftRight, RotateCcw, ClipboardList, UserRound, Calendar, MessageSquare, Warehouse } from 'lucide-react';
 import { printA4Report } from '../utils/printReport';
 import './PurchaseInspectionModal.css';
+import StatusBadge from './StatusBadge';
 
 export default function PurchaseInspectionModal({ type, number, status, rows = [], columns, actions = [], onPrint, onClose, actionsPosition = 'bottom', details = [] }) {
   const DocumentIcon = { GRN: FileCheck, GTN: ArrowLeftRight, PRN: RotateCcw, PO: ClipboardList }[type] || FileCheck;
@@ -21,10 +22,10 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
   return (
     <div className="modal-backdrop" style={{ padding: '12px', zIndex: 1100 }}>
       <div className={`glass-modal purchase-inspection${type === 'GRN' ? ' grn-inspection' : ''}${actionsPosition === 'bottom' ? ' purchase-inspection-bottom-actions' : ''}`} role="dialog" aria-modal="true" aria-label={`${type} ${number}`}>
-        <header className="purchase-inspection-header"><div className="purchase-inspection-title"><div className="grn-inspection-symbol"><DocumentIcon size={22} strokeWidth={1.7} /></div><div><span>{documentTitle}</span><h2>{number}</h2></div></div><strong className={`purchase-document-status status-${status?.toLowerCase()}`}>{status}</strong></header>
+        <header className="purchase-inspection-header"><div className="purchase-inspection-title"><div className="grn-inspection-symbol"><DocumentIcon size={22} strokeWidth={1.7} /></div><div><span>{documentTitle}</span><h2>{number}</h2></div></div><StatusBadge status={status} /></header>
         {details.length > 0 && <dl className="purchase-inspection-details" aria-label={`${type} details`}>
           {details.map(({ label, value, wide, icon }) => {
-            const Icon = icon || (/supplier/i.test(label) ? UserRound : /date/i.test(label) ? Calendar : /remarks/i.test(label) ? MessageSquare : Warehouse);
+            const Icon = icon || (/supplier|staff/i.test(label) ? UserRound : /date/i.test(label) ? Calendar : /remarks/i.test(label) ? MessageSquare : Warehouse);
             return <div key={label} className={wide ? 'purchase-inspection-detail-wide' : undefined}><dt><Icon size={13} strokeWidth={1.7} />{label}</dt><dd>{value || '—'}</dd></div>;
           })}
         </dl>}

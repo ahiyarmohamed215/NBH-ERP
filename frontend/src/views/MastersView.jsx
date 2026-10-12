@@ -1,3 +1,8 @@
+import FilterSelect from '../components/FilterSelect';
+import {printCurrentDirectory} from '../utils/printDirectory';
+import '../components/PurchasingAppearance.css';
+import StatusBadge from '../components/StatusBadge';
+import { usePurchasingStatusChange } from '../hooks/usePurchasingStatusChange';
 import React, { useState, useEffect } from 'react';
 import {
   warehouseApi,
@@ -12,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule } from '../utils/permissionUtils';
 import { printA4Report } from '../utils/printReport';
+
 import {
   Database,
   Building2,
@@ -30,8 +36,15 @@ import {
   Download,
   Printer,
   Award,
+  Phone,
+  Mail,
 } from 'lucide-react';
 
+const supplierActionStyle = {
+  width: '30px', height: '30px', background: '#ffffff', border: '1px solid #bae6fd',
+  borderRadius: '6px', cursor: 'pointer', color: '#0284c7', display: 'flex',
+  alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease',
+};
 const MastersView = React.forwardRef(function MastersView({
   activeSubTab,
   onSubTabChange,
@@ -40,8 +53,11 @@ const MastersView = React.forwardRef(function MastersView({
   title = '',
   subtitle = '',
   hideHeader = false,
+  printDirectory = false,
 }, ref) {
+  const directoryRef=React.useRef(null);
   const [activeTab, setActiveTab] = useState(() => activeSubTab || 'products');
+  const ToolbarFilter=printDirectory || activeTab==='suppliers' ? FilterSelect : 'select';
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +69,7 @@ const MastersView = React.forwardRef(function MastersView({
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
 
   const getBrandForProduct = (p) => {
     if (!p) return 'General';
@@ -361,10 +378,14 @@ const MastersView = React.forwardRef(function MastersView({
     }
   };
 
-  const handleToggleActive = async (id, currentStatus) => {
+  const handleToggleActive = async (id, currentStatus, reason) => {
     if (!canEditCurrentTab) {
       addToast('Permission denied: Only authorized staff can change record status.', 'error');
       return;
+    }
+    if(activeTab==='suppliers' && !reason) {
+      const supplier=suppliers.find(item=>item.id===id) || viewingItem;
+      requestStatusChange({type:'Supplier',number:supplier?.name || supplier?.supplierCode,current:currentStatus?'ACTIVE':'INACTIVE',target:currentStatus?'INACTIVE':'ACTIVE',onConfirm:reason=>handleToggleActive(id,currentStatus,reason)});return false;
     }
     try {
       if (activeTab === 'products') await productApi.toggleActive(id);
@@ -372,12 +393,16 @@ const MastersView = React.forwardRef(function MastersView({
       else if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
       else if (activeTab === 'categories') await categoryApi.toggleActive(id);
       else if (activeTab === 'customers') await customerApi.toggleActive(id);
-      else if (activeTab === 'suppliers') await supplierApi.toggleActive(id);
+      else if (activeTab === 'suppliers') {
+        await supplierApi.toggleActive(id,reason);
+        setViewingItem(previous=>previous?.id===id && previous.type==='suppliers' ? {...previous,active:!currentStatus,isActive:!currentStatus,status:currentStatus?'INACTIVE':'ACTIVE'} : previous);
+      }
 
       addToast(`Status changed to ${currentStatus ? 'Inactive' : 'Active'}`, 'success');
       loadTabData();
     } catch (err) {
       addToast('Status update failed: ' + err.message, 'error');
+      return false;
     }
   };
 
@@ -623,7 +648,7 @@ const MastersView = React.forwardRef(function MastersView({
   };
 
   return (
-    <div
+    <div ref={directoryRef} className={activeTab === 'suppliers' ? 'purchasing-no-shadows' : undefined}
       style={{
         flex: 1,
         height: '100%',
@@ -710,7 +735,7 @@ const MastersView = React.forwardRef(function MastersView({
       )}
 
       {/* Search Bar & Action Buttons (Fixed / Sticky - Customer/Employee Look) */}
-      <div
+      <div className="master-toolbar"
         style={{
           backgroundColor: '#ffffff',
           borderRadius: '8px',
@@ -797,9 +822,9 @@ const MastersView = React.forwardRef(function MastersView({
         </div>
 
         {/* Right Controls: Status Filter, Reset, Export CSV (icon only), & Refresh (icon only) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+        <div className={activeTab === 'suppliers' ? 'purchase-date-controls' : undefined} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
           {/* Status Filter Dropdown */}
-          <select
+          <ToolbarFilter
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{
@@ -839,7 +864,7 @@ const MastersView = React.forwardRef(function MastersView({
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active Only</option>
             <option value="INACTIVE">Inactive Only</option>
-          </select>
+          </ToolbarFilter>
 
           {/* Reset Filters button */}
           {(statusFilter !== 'ALL' || searchTerm) && (
@@ -876,7 +901,7 @@ const MastersView = React.forwardRef(function MastersView({
           {/* Supplier print / other master-data CSV export */}
           <button
             type="button"
-            onClick={activeTab === 'suppliers' ? () => handlePrintSuppliers() : handleExportCSV}
+            onClick={activeTab === 'suppliers' ? () => handlePrintSuppliers() : printDirectory ? ()=>printCurrentDirectory(directoryRef.current,displayTitle) : handleExportCSV}
             style={{
               height: '38px',
               width: '38px',
@@ -884,7 +909,7 @@ const MastersView = React.forwardRef(function MastersView({
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               padding: 0,
-              color: '#64748b',
+              color: activeTab === 'suppliers' ? '#334155' : '#64748b',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -901,12 +926,12 @@ const MastersView = React.forwardRef(function MastersView({
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#ffffff';
               e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.color = activeTab === 'suppliers' ? '#334155' : '#64748b';
             }}
-            title={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : `Export ${activeTab} to CSV`}
-            aria-label={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : `Export ${activeTab} to CSV`}
+            title={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : printDirectory ? `Print ${displayTitle} (A4)` : `Export ${activeTab} to CSV`}
+            aria-label={activeTab === 'suppliers' ? 'Print Supplier Directory (A4)' : printDirectory ? `Print ${displayTitle} (A4)` : `Export ${activeTab} to CSV`}
           >
-            {activeTab === 'suppliers' ? <Printer size={15} /> : <Download size={15} />}
+            {activeTab === 'suppliers' || printDirectory ? <Printer size={15} /> : <Download size={15} />}
           </button>
 
           {/* Refresh Records - Icon only */}
@@ -920,7 +945,7 @@ const MastersView = React.forwardRef(function MastersView({
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               padding: 0,
-              color: '#64748b',
+              color: activeTab === 'suppliers' ? '#334155' : '#64748b',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -937,7 +962,7 @@ const MastersView = React.forwardRef(function MastersView({
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#ffffff';
               e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.color = activeTab === 'suppliers' ? '#334155' : '#64748b';
             }}
             title="Refresh records"
           >
@@ -1626,7 +1651,7 @@ const MastersView = React.forwardRef(function MastersView({
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER CODE</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER NAME</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
                   <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
@@ -1662,88 +1687,34 @@ const MastersView = React.forwardRef(function MastersView({
                         <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
                         <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{s.name}</td>
                         <td style={{ padding: '12px 18px', color: '#475569' }}>{s.contactPerson || '—'}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>{s.phone || s.email || '—'}</td>
+                        <td style={{ padding: '12px 18px', color: '#475569' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '250px' }}>
+                            {s.phone && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.82rem', fontWeight: 500 }}><Phone size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} />{s.phone}</span>}
+                            {s.email && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.78rem', color: '#64748b' }}><Mail size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} /><span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{s.email}</span></span>}
+                            {!s.phone && !s.email && '—'}
+                          </div>
+                        </td>
                         <td style={{ padding: '12px 18px', color: '#64748b' }}>{s.address || '—'}</td>
                         <td style={{ padding: '12px 18px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(s.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
+                          <StatusBadge status={active ? 'ACTIVE' : 'INACTIVE'}
                             title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
+                            onClick={event=>{event.stopPropagation();handleToggleActive(s.id,active);}} />
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              title="Print Supplier Details (A4)"
-                              aria-label="Print Supplier Details (A4)"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePrintSuppliers(s);
-                              }}
-                              style={{ width: '30px', height: '30px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                              <Printer size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit({ ...s, code });
-                              }}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#475569',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.color = '#0f172a';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.color = '#475569';
-                              }}
-                              title="Edit Supplier"
-                            >
+                            <button type="button" title="Edit Supplier" aria-label="Edit Supplier"
+                              onClick={event=>{event.stopPropagation();handleOpenEdit({...s,code});}}
+                              style={supplierActionStyle}
+                              onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f0f9ff';}}
+                              onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#ffffff';}}>
                               <Edit2 size={13} />
+                            </button>
+                            <button type="button" title="Print Supplier Details (A4)" aria-label="Print Supplier Details (A4)"
+                              onClick={event=>{event.stopPropagation();handlePrintSuppliers(s);}}
+                              style={supplierActionStyle}
+                              onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f0f9ff';}}
+                              onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#ffffff';}}>
+                              <Printer size={13} />
                             </button>
                           </div>
                         </td>
@@ -1781,7 +1752,8 @@ const MastersView = React.forwardRef(function MastersView({
                 {viewingItem.type === 'suppliers' && (
                   <button
                     type="button"
-                    className="btn btn-glass"
+                    className="btn btn-primary"
+                    style={{ background: '#2563eb', color: '#fff', border: '1px solid #2563eb', borderRadius: '8px', boxShadow: 'none' }}
                     title="Print Supplier Details (A4)"
                     onClick={() => handlePrintSuppliers(viewingItem)}
                   >
@@ -1804,7 +1776,9 @@ const MastersView = React.forwardRef(function MastersView({
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Status</span>
                 <div>
-                  <button
+                  {viewingItem.type === 'suppliers' ? <StatusBadge status={isItemActive(viewingItem) ? 'ACTIVE' : 'INACTIVE'}
+                    title={`Status: ${isItemActive(viewingItem) ? 'Active' : 'Inactive'} (Click to toggle)`}
+                    onClick={()=>handleToggleActive(viewingItem.id,isItemActive(viewingItem))} /> :<button
                     type="button"
                     className={`badge ${isItemActive(viewingItem) ? 'badge-success' : 'badge-danger'}`}
                     style={{
@@ -1825,7 +1799,7 @@ const MastersView = React.forwardRef(function MastersView({
                   >
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'currentColor', display: 'inline-block' }} />
                     {isItemActive(viewingItem) ? 'Active' : 'Inactive'}
-                  </button>
+                  </button>}
                 </div>
               </div>
 
@@ -2135,6 +2109,7 @@ const MastersView = React.forwardRef(function MastersView({
                     <input type="number" className="input-glass" min="0" max="99999" step="0.01"
                       value={modalForm.markupPercent ?? 0}
                       onChange={(e) => setModalForm({ ...modalForm, markupPercent: e.target.value })} />
+                    <small style={{ fontSize: '.72rem', fontWeight: 400, color: '#64748b' }}>Used to calculate the selling price when receiving this brand’s products.</small>
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
                     <div>
@@ -2370,7 +2345,7 @@ const MastersView = React.forwardRef(function MastersView({
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CODE</label>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER CODE</label>
                       <input
                         type="text"
                         className="input-glass"
@@ -2448,6 +2423,7 @@ const MastersView = React.forwardRef(function MastersView({
           </div>
         </div>
       )}
+      {statusChangeDialog}
     </div>
   );
 });

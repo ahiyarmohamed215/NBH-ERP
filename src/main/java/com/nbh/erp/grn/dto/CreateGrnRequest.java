@@ -17,6 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateGrnRequest {
+    private String statusReason;
 
     @NotNull(message = "Supplier ID is required")
     private Long supplierId;
@@ -56,7 +57,7 @@ public class CreateGrnRequest {
         @PositiveOrZero(message = "Selling price cannot be negative")
         private BigDecimal sellingPrice;
 
-        @PositiveOrZero(message = "MP% cannot be negative")
+        @jakarta.validation.constraints.DecimalMin(value = "-100", message = "MP% cannot be less than -100")
         @jakarta.validation.constraints.DecimalMax("99999")
         private BigDecimal markupPercent;
 

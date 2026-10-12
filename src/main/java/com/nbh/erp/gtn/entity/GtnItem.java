@@ -27,6 +27,21 @@ public class GtnItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_warehouse_id")
+    private com.nbh.erp.warehouse.entity.Warehouse sourceWarehouse;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_warehouse_id")
+    private com.nbh.erp.warehouse.entity.Warehouse destinationWarehouse;
+
+    public com.nbh.erp.warehouse.entity.Warehouse getTransferSource() {
+        return sourceWarehouse != null ? sourceWarehouse : gtn.getSourceWarehouse();
+    }
+    public com.nbh.erp.warehouse.entity.Warehouse getTransferDestination() {
+        return destinationWarehouse != null ? destinationWarehouse : gtn.getDestinationWarehouse();
+    }
+
     @Column(name = "quantity_transferred", nullable = false)
     private BigDecimal quantityTransferred;
 

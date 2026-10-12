@@ -12,6 +12,8 @@ import java.util.Optional;
 
 @Repository
 public interface GrnRepository extends JpaRepository<Grn, Long> {
+    @Query("select distinct g from Grn g join fetch g.supplier join fetch g.items i join fetch i.product left join fetch i.warehouse where g.status='PROCESSED' order by g.id desc")
+    java.util.List<Grn> findProcessedReturnReceipts();
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select e from Grn e where e.id = :id")
     java.util.Optional<Grn> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);

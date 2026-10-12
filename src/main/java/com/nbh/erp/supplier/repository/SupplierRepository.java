@@ -11,6 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Supplier s where s.id=:id")
+    Optional<Supplier> findByIdForUpdate(@Param("id") Long id);
     Optional<Supplier> findBySupplierCode(String supplierCode);
     boolean existsBySupplierCode(String supplierCode);
     List<Supplier> findByIsActiveTrue();

@@ -1,3 +1,8 @@
+import FilterSelect from '../components/FilterSelect';
+import {printCurrentDirectory} from '../utils/printDirectory';
+import './InventoryTheme.css';
+import '../components/PurchasingAppearance.css';
+import StatusBadge from '../components/StatusBadge';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +35,7 @@ import {
   RotateCcw,
   Calendar,
   Filter,
-  Download,
+  Printer,
   ListFilter,
   Boxes,
   TrendingUp,
@@ -64,6 +69,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const canSeeCost = canViewCostPrice(user);
   const { addToast } = useToast();
   const mastersRef = useRef(null);
+  const directoryRef=useRef(null);
 
   const INVENTORY_TABS = [
     { id: 'inventory-list', label: 'Inventory List', icon: Boxes },
@@ -569,85 +575,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     setInvStatusFilter('ALL');
   };
 
-  const handleExportInventoryCSV = () => {
-    if (filteredInventory.length === 0) {
-      addToast('No inventory records to export', 'error');
-      return;
-    }
-    const headers = [
-      'SKU',
-      'Product Name',
-      'Brand',
-      'Warehouse',
-      'Category',
-      'Unit',
-      'Quantity',
-      ...(canSeeCost ? ['Cost Price (LKR)'] : []),
-      'Selling Price (LKR)',
-      'Min Stock Level',
-      'Stock Status',
-    ];
-    const rows = filteredInventory.map((item) => [
-      `"${item.sku || ''}"`,
-      `"${(item.productName || '').replace(/"/g, '""')}"`,
-      `"${(item.brandName || 'General').replace(/"/g, '""')}"`,
-      `"${(item.warehouseName || '').replace(/"/g, '""')}"`,
-      `"${(item.categoryName || '').replace(/"/g, '""')}"`,
-      `"${item.unitOfMeasure || 'PCS'}"`,
-      item.quantity ?? 0,
-      ...(canSeeCost ? [(Number(item.costPrice) || 0).toFixed(2)] : []),
-      (Number(item.sellingPrice) || 0).toFixed(2),
-      item.minStockLevel ?? 0,
-      item.isOutOfStock ? 'Out of Stock' : item.isLowStock ? 'Low Stock Alert' : 'In Stock',
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `inventory_list_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Inventory list exported to CSV', 'success');
-  };
-
-  const handleExportQuotasCSV = () => {
-    if (filteredQuotas.length === 0) {
-      addToast('No inventory allocation records to export', 'error');
-      return;
-    }
-    const headers = [
-      'SKU',
-      'Product Name',
-      'Staff Member',
-      'Username',
-      'Employee Code',
-      'Total Stock Available',
-      'Given to Staff',
-      'Unit',
-      'Status',
-    ];
-    const rows = filteredQuotas.map((q) => [
-      `"${(q.productSku || '').replace(/"/g, '""')}"`,
-      `"${(q.productName || '').replace(/"/g, '""')}"`,
-      `"${(q.userFullName || q.username || '').replace(/"/g, '""')}"`,
-      `"${(q.username || '').replace(/"/g, '""')}"`,
-      `"${(q.userEmployeeCode || '').replace(/"/g, '""')}"`,
-      Number(q.totalStockAvailable ?? q.currentStockInWarehouse ?? 0),
-      Number(q.allocatedQuantity || 0),
-      `"${q.productUnit || 'Units'}"`,
-      q.isActive ? 'Active' : 'Inactive',
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `inventory_allocation_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Inventory allocation exported to CSV', 'success');
-  };
+  const handlePrintDirectory = title => printCurrentDirectory(directoryRef.current,title);
 
   const handleNavigateGTN = () => {
     if (onNavigate) {
@@ -807,39 +735,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     }
   };
 
-  // Export stock adjustments to CSV
-  const handleExportCSV = () => {
-    if (filteredAdjustments.length === 0) {
-      addToast('No adjustment records to export', 'error');
-      return;
-    }
-    const headers = ['Record #', 'Date', 'Type', 'Warehouse', 'SKU', 'Product Name', 'Batch', 'Quantity', 'Reason', 'Status'];
-    const rows = filteredAdjustments.map((rec) => [
-      `"${(rec.recordNo || '').replace(/"/g, '""')}"`,
-      `"${rec.date || ''}"`,
-      `"${rec.type || ''}"`,
-      `"${(rec.warehouse || '').replace(/"/g, '""')}"`,
-      `"${(rec.sku || '').replace(/"/g, '""')}"`,
-      `"${(rec.productName || '').replace(/"/g, '""')}"`,
-      `"${(rec.batch || '').replace(/"/g, '""')}"`,
-      rec.quantity,
-      `"${(rec.reason || '').replace(/"/g, '""')}"`,
-      `"${rec.status || ''}"`,
-    ]);
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `stock_adjustments_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Stock adjustments exported to CSV', 'success');
-  };
-
   return (
-    <div
+    <div ref={directoryRef} className="inventory-theme purchasing-no-shadows"
       style={{
         flex: 1,
         height: '100%',
@@ -894,7 +791,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
             }}
@@ -915,7 +812,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
             }}
@@ -936,7 +833,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
             }}
@@ -957,7 +854,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              boxShadow: 'none',
               border: 'none',
               cursor: 'pointer',
             }}
@@ -968,7 +865,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <div
+      <div className="inventory-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -997,8 +894,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 borderBottom: isActive ? '2.5px solid #0284c7' : '2.5px solid transparent',
                 backgroundColor: 'transparent',
                 color: isActive ? '#0284c7' : '#64748b',
-                fontSize: '0.92rem',
-                fontWeight: isActive ? 700 : 500,
+                fontSize: '0.88rem',
+                fontWeight: isActive ? 600 : 500,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 marginBottom: '-1px',
@@ -1018,7 +915,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {currentTab === 'inventory-list' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           {/* Search Bar & Action Buttons (Matched with Products Table Layout) */}
-          <div
+          <div className="inventory-toolbar"
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
@@ -1033,7 +930,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               boxSizing: 'border-box',
               flexWrap: 'wrap',
               flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
             }}
           >
             {/* Left Control: Search Input matching table width */}
@@ -1064,16 +961,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {invSearchQuery && (
@@ -1097,45 +994,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
             </div>
 
-            {/* Right Controls: Filters, Reset Filters, Export CSV, & Refresh */}
+            {/* Right Controls: Filters, Reset Filters, Print, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Warehouse selector */}
-              <select
+              <FilterSelect
                 value={invWarehouseFilter}
                 onChange={(e) => setInvWarehouseFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '150px',
-                  minWidth: '130px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'150px'}}
                 title="Filter by warehouse"
               >
                 <option value="ALL">All Warehouses</option>
@@ -1144,52 +1009,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     {w.name}
                   </option>
                 ))}
-              </select>
+              </FilterSelect>
 
               {/* Stock Status selector */}
-              <select
+              <FilterSelect
                 value={invStatusFilter}
                 onChange={(e) => setInvStatusFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '145px',
-                  minWidth: '125px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'145px'}}
                 title="Filter by stock status"
               >
                 <option value="ALL">All Stock Levels</option>
                 <option value="IN_STOCK">In Stock Only</option>
                 <option value="LOW_STOCK">Low Stock Only</option>
                 <option value="OUT_OF_STOCK">Out of Stock Only</option>
-              </select>
+              </FilterSelect>
 
               {/* Reset Filters button */}
               {(invSearchQuery || invStatusFilter !== 'ALL' || invWarehouseFilter !== 'ALL') && (
@@ -1220,10 +1053,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 </button>
               )}
 
-              {/* Export CSV - Icon only */}
+              {/* Print directory - Icon only */}
               <button
                 type="button"
-                onClick={handleExportInventoryCSV}
+                onClick={()=>handlePrintDirectory('Inventory List')}
                 style={{
                   height: '34px',
                   width: '36px',
@@ -1237,7 +1070,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -1251,9 +1084,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Export inventory to CSV"
+                title="Print Inventory List (A4)" aria-label="Print Inventory List (A4)"
               >
-                <Download size={14} />
+                <Printer size={15} />
               </button>
 
               {/* Refresh Records - Icon only */}
@@ -1273,7 +1106,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -1303,7 +1136,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               width: '100%',
               maxWidth: '100%',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               flex: 1,
               minHeight: 0,
               display: 'flex',
@@ -1407,55 +1240,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           Rs. {Number(item.sellingPrice || 0).toFixed(2)}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
-                          {item.isOutOfStock ? (
-                            <span
-                              style={{
-                                backgroundColor: '#fee2e2',
-                                color: '#dc2626',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              Out of Stock
-                            </span>
-                          ) : item.isLowStock ? (
-                            <span
-                              style={{
-                                backgroundColor: '#fef3c7',
-                                color: '#d97706',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              Low Stock
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                backgroundColor: '#dcfce7',
-                                color: '#16a34a',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              In Stock
-                            </span>
-                          )}
+                          <StatusBadge status={item.isOutOfStock ? 'OUT_OF_STOCK' : item.isLowStock ? 'LOW_STOCK' : 'IN_STOCK'} />
                         </td>
                       </tr>
                     ))
@@ -1478,6 +1263,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             isStandalone={true}
             allowedTabs={['products']}
             hideHeader={true}
+            printDirectory={true}
           />
         </div>
       )}
@@ -1493,6 +1279,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             isStandalone={true}
             allowedTabs={['brands']}
             hideHeader={true}
+            printDirectory={true}
           />
         </div>
       )}
@@ -1508,6 +1295,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             isStandalone={true}
             allowedTabs={['warehouses']}
             hideHeader={true}
+            printDirectory={true}
           />
         </div>
       )}
@@ -1523,6 +1311,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             isStandalone={true}
             allowedTabs={['categories']}
             hideHeader={true}
+            printDirectory={true}
           />
         </div>
       )}
@@ -1534,7 +1323,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
           {/* Search Bar & Filter Controls (Matched with Products Table Layout) */}
-          <div
+          <div className="inventory-toolbar"
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
@@ -1579,16 +1368,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {searchQuery && (
@@ -1612,88 +1401,24 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
             </div>
 
-            {/* Right Controls: Filters, Reset, Export CSV, & Refresh */}
+            {/* Right Controls: Filters, Reset, Print, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Type filter */}
-              <select
+              <FilterSelect
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 28px 0 10px',
-                  width: '115px',
-                  minWidth: '100px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'115px'}}
               >
                 <option value="ALL">All Types</option>
                 <option value="Addition">Addition</option>
                 <option value="Reduction">Reduction</option>
-              </select>
+              </FilterSelect>
 
               {/* Warehouse filter */}
-              <select
+              <FilterSelect
                 value={filterWarehouse}
                 onChange={(e) => setFilterWarehouse(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 28px 0 10px',
-                  width: '145px',
-                  minWidth: '120px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'145px'}}
               >
                 <option value="ALL">All Warehouses</option>
                 {warehousesList.map((w) => (
@@ -1701,45 +1426,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     {w.name}
                   </option>
                 ))}
-              </select>
+              </FilterSelect>
 
               {/* Reason filter */}
-              <select
+              <FilterSelect
                 value={filterReason}
                 onChange={(e) => setFilterReason(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 28px 0 10px',
-                  width: '135px',
-                  minWidth: '115px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'135px'}}
               >
                 <option value="ALL">All Reasons</option>
                 {uniqueReasons.map((r) => (
@@ -1747,7 +1440,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     {r}
                   </option>
                 ))}
-              </select>
+              </FilterSelect>
 
               {/* Reset Filters button */}
               {(filterType !== 'ALL' || filterWarehouse !== 'ALL' || filterReason !== 'ALL' || searchQuery) && (
@@ -1778,10 +1471,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 </button>
               )}
 
-              {/* Export CSV - Icon only */}
+              {/* Print directory - Icon only */}
               <button
                 type="button"
-                onClick={handleExportCSV}
+                onClick={()=>handlePrintDirectory('Stock Adjustments')}
                 style={{
                   height: '34px',
                   width: '36px',
@@ -1795,7 +1488,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -1809,9 +1502,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   e.currentTarget.style.borderColor = '#e2e8f0';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Export stock adjustments to CSV"
+                title="Print Stock Adjustments (A4)" aria-label="Print Stock Adjustments (A4)"
               >
-                <Download size={14} />
+                <Printer size={15} />
               </button>
 
               {/* Refresh Records - Icon only */}
@@ -1833,7 +1526,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -1864,7 +1557,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               width: '100%',
               maxWidth: '100%',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               flex: 1,
               minHeight: 0,
               display: 'flex',
@@ -1998,7 +1691,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {currentTab === 'pos-quotas' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           
-          {/* Search Bar & Filter Controls */}          <div
+          {/* Search Bar & Filter Controls */}          <div className="inventory-toolbar"
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
@@ -2013,7 +1706,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               boxSizing: 'border-box',
               flexWrap: 'wrap',
               flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
             }}
           >
             {/* Search */}
@@ -2044,16 +1737,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {quotaSearch && (
@@ -2077,51 +1770,19 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               )}
             </div>
 
-            {/* Right Controls: Status Filter, Reset, Export CSV (Icon only), Refresh (Icon only) */}
+            {/* Right Controls: Status Filter, Reset, Print (Icon only), Refresh (Icon only) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Status Filter */}
-              <select
+              <FilterSelect
                 value={quotaStatusFilter}
                 onChange={(e) => setQuotaStatusFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '140px',
-                  minWidth: '120px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                style={{width:'140px'}}
                 title="Filter allocations by status"
               >
                 <option value="ALL">All Status</option>
                 <option value="ACTIVE">Active Only</option>
                 <option value="INACTIVE">Inactive Only</option>
-              </select>
+              </FilterSelect>
 
               {/* Reset Filters button */}
               {(quotaSearch || quotaStatusFilter !== 'ALL') && (
@@ -2155,10 +1816,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 </button>
               )}
 
-              {/* Export CSV - Icon only */}
+              {/* Print directory - Icon only */}
               <button
                 type="button"
-                onClick={handleExportQuotasCSV}
+                onClick={()=>handlePrintDirectory('Inventory Allocation')}
                 style={{
                   height: '34px',
                   width: '36px',
@@ -2172,7 +1833,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -2186,9 +1847,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Export inventory allocations to CSV"
+                title="Print Inventory Allocation (A4)" aria-label="Print Inventory Allocation (A4)"
               >
-                <Download size={14} />
+                <Printer size={15} />
               </button>
 
               {/* Refresh Records - Icon only */}
@@ -2209,7 +1870,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   justifyContent: 'center',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                 }}
@@ -2241,7 +1902,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              boxShadow: 'none',
             }}
           >
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
@@ -2416,7 +2077,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 10px', borderRadius: '6px' }}>
                               <UserCheck size={14} color="#0284c7" />
-                              <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '0.92rem' }}>
+                              <span style={{ fontWeight: 700, color: '#0284c7', fontSize: '0.88rem' }}>
                                 {givenQty.toLocaleString()}
                               </span>
                               <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
@@ -2425,39 +2086,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             </div>
                           </td>
 
-                          {/* Status (Clickable to switch Active / Inactive) */}
-                          <td style={{ padding: '12px 16px' }} onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleQuotaStatus(q)}
-                              title={`Click to switch to ${q.isActive ? 'INACTIVE' : 'ACTIVE'}`}
-                              style={{
-                                backgroundColor: isInactive ? '#f1f5f9' : '#f0fdf4',
-                                color: isInactive ? '#64748b' : '#16a34a',
-                                border: `1px solid ${isInactive ? '#cbd5e1' : '#bbf7d0'}`,
-                                padding: '4px 10px',
-                                borderRadius: '20px',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.04em',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              <span
-                                style={{
-                                  width: '6px',
-                                  height: '6px',
-                                  borderRadius: '50%',
-                                  backgroundColor: isInactive ? '#94a3b8' : '#16a34a',
-                                }}
-                              />
-                              {q.isActive ? 'ACTIVE' : 'INACTIVE'}
-                            </button>
+                          {/* Status */}
+                          <td style={{padding:'12px 16px'}} onClick={event=>event.stopPropagation()}>
+                            <StatusBadge status={q.isActive ? 'ACTIVE' : 'INACTIVE'} title={`Click to switch to ${q.isActive ? 'INACTIVE' : 'ACTIVE'}`} onClick={()=>handleToggleQuotaStatus(q)}/>
                           </td>
 
                           {/* Actions */}
@@ -2551,7 +2182,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               maxWidth: '1000px',
               backgroundColor: '#ffffff',
               borderRadius: '14px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+              boxShadow: 'none',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -2936,7 +2567,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                   }}
                                   onFocus={(e) => {
                                     e.currentTarget.style.borderColor = '#0284c7';
-                                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                   }}
                                   onBlur={(e) => {
                                     e.currentTarget.style.borderColor = '#cbd5e1';
@@ -3099,7 +2730,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                   ? '#ef4444'
                                   : '#cbd5e1'
                               }`,
-                              fontSize: '0.92rem',
+                              fontSize: '0.88rem',
                               fontWeight: 700,
                               color: isOos ? '#dc2626' : '#0f172a',
                               backgroundColor: isOos || !quotaForm.productId ? '#ffffff' : '#ffffff',
@@ -3109,7 +2740,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             onFocus={(e) => {
                               if (!isOos && quotaForm.productId) {
                                 e.currentTarget.style.borderColor = '#0284c7';
-                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                                e.currentTarget.style.boxShadow = 'none';
                               }
                             }}
                             onBlur={(e) => {
@@ -3349,7 +2980,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                                   }}
                                   onFocus={(e) => {
                                     e.currentTarget.style.borderColor = '#0284c7';
-                                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                   }}
                                   onBlur={(e) => {
                                     e.currentTarget.style.borderColor = '#cbd5e1';
@@ -3506,7 +3137,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = '#0284c7';
-                              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                              e.currentTarget.style.boxShadow = 'none';
                             }}
                             onBlur={(e) => {
                               e.currentTarget.style.borderColor = '#cbd5e1';
@@ -3673,7 +3304,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               maxWidth: '540px',
               backgroundColor: '#ffffff',
               borderRadius: '12px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -3826,36 +3457,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 {/* Status with Toggle */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Status</span>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleQuotaStatus(viewingQuota)}
-                    title={`Click to switch to ${viewingQuota.isActive ? 'INACTIVE' : 'ACTIVE'}`}
-                    style={{
-                      backgroundColor: !viewingQuota.isActive ? '#f1f5f9' : '#f0fdf4',
-                      color: !viewingQuota.isActive ? '#64748b' : '#16a34a',
-                      border: `1px solid ${!viewingQuota.isActive ? '#cbd5e1' : '#bbf7d0'}`,
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: !viewingQuota.isActive ? '#94a3b8' : '#16a34a',
-                      }}
-                    />
-                    {viewingQuota.isActive ? 'ACTIVE' : 'INACTIVE'} (Click to toggle)
-                  </button>
+                  <StatusBadge status={viewingQuota.isActive ? 'ACTIVE' : 'INACTIVE'} title={`Click to switch to ${viewingQuota.isActive ? 'INACTIVE' : 'ACTIVE'}`} onClick={()=>handleToggleQuotaStatus(viewingQuota)}/>
+
                 </div>
 
                 {viewingQuota.notes && (
@@ -3946,7 +3549,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               padding: '16px 20px',
               borderRadius: '12px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               maxHeight: '96vh',
               overflow: 'hidden',
               boxSizing: 'border-box',
@@ -4390,7 +3993,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)',
+                      boxShadow: 'none',
                     }}
                   >
                     <Plus size={15} /> Add Stock
@@ -4412,7 +4015,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      boxShadow: '0 1px 3px rgba(220, 38, 38, 0.25)',
+                      boxShadow: 'none',
                     }}
                   >
                     <Minus size={15} /> Reduce Stock
@@ -4527,7 +4130,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               padding: '22px 28px',
               borderRadius: '14px',
               backgroundColor: '#ffffff',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.22)',
+              boxShadow: 'none',
               boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -4554,19 +4157,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     >
                       {viewingStockItem.brandName || 'General'}
                     </span>
-                    {viewingStockItem.isOutOfStock ? (
-                      <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={12} /> Out of Stock
-                      </span>
-                    ) : viewingStockItem.isLowStock ? (
-                      <span style={{ backgroundColor: '#fef3c7', color: '#d97706', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={12} /> Low Stock Alert ({Math.max(1, (viewingStockItem.minStockLevel || 5) - viewingStockItem.quantity)} needed)
-                      </span>
-                    ) : (
-                      <span style={{ backgroundColor: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={12} /> In Stock (Healthy)
-                      </span>
-                    )}
+                    <StatusBadge status={viewingStockItem.isOutOfStock ? 'OUT_OF_STOCK' : viewingStockItem.isLowStock ? 'LOW_STOCK' : 'IN_STOCK'}/>
+                    {viewingStockItem.isLowStock && !viewingStockItem.isOutOfStock && <span style={{fontSize:'.74rem',color:'#a16207'}}>{Math.max(1,(viewingStockItem.minStockLevel || 5)-viewingStockItem.quantity)} needed</span>}
+
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span>SKU: <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{viewingStockItem.sku}</strong></span>

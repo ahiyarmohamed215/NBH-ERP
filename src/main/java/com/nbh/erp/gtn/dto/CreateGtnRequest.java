@@ -16,12 +16,15 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateGtnRequest {
+    private String statusReason;
 
-    @NotNull(message = "Source warehouse ID is required")
     private Long sourceWarehouseId;
 
-    @NotNull(message = "Destination warehouse ID is required")
     private Long destinationWarehouseId;
+
+    private Long responsibleStaffId;
+
+    private String status;
 
     private LocalDate dispatchDate;
 
@@ -38,6 +41,9 @@ public class CreateGtnRequest {
 
         @NotNull(message = "Product ID is required")
         private Long productId;
+
+        private Long sourceWarehouseId;
+        private Long destinationWarehouseId;
 
         @NotNull(message = "Transfer quantity is required")
         @Positive(message = "Transfer quantity must be greater than zero")

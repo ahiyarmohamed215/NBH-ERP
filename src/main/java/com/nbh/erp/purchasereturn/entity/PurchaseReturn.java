@@ -50,6 +50,9 @@ public class PurchaseReturn extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String reason;
 
+    @Column(columnDefinition = "TEXT")
+    private String remarks;
+
     @OneToMany(mappedBy = "purchaseReturn", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PurchaseReturnItem> items = new ArrayList<>();
