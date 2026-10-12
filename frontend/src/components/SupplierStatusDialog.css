@@ -1,0 +1,10 @@
+.supplier-status-dialog{--status-tone:#e11d48;--status-pale:#fff1f2;--status-border:#fecdd3;--status-text:#be123c;width:min(520px,96vw);max-width:520px;max-height:calc(100dvh - 24px);overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+.supplier-status-activate{--status-tone:#16a34a;--status-pale:#f0fdf4;--status-border:#bbf7d0;--status-text:#15803d}
+.supplier-status-dialog header{display:flex;align-items:center;gap:10px;color:var(--status-tone);margin-bottom:14px}
+.supplier-status-dialog h3{margin:0;font-size:1.22rem;font-weight:700;color:#0f172a}
+.supplier-status-dialog header>button{margin-left:auto;display:flex;align-items:center;padding:4px;border:0;background:none;color:#64748b;cursor:pointer}
+.supplier-status-summary{padding:10px 14px;margin-bottom:16px;background:var(--status-pale);border:1px solid var(--status-border);border-radius:6px;color:var(--status-text);font-size:.88rem;line-height:1.5}
+.supplier-status-summary strong,.supplier-status-summary>span{display:block}.supplier-status-summary>span{margin-top:3px;font-size:.8rem}.supplier-status-summary p{margin:8px 0 0}
+.supplier-status-dialog label{display:block;font-size:.84rem;font-weight:700;color:#334155}.supplier-status-dialog label>span{color:var(--status-tone)}
+.supplier-status-dialog textarea{display:block;box-sizing:border-box;width:100%;margin:6px 0 18px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-family:inherit;font-size:.88rem;font-weight:400;color:#334155;outline:none;resize:vertical}.supplier-status-dialog textarea:focus{border-color:#0284c7}
+.supplier-status-dialog footer{display:flex;justify-content:flex-end;gap:10px}.supplier-status-confirm{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:0;border-radius:6px;background:var(--status-tone);color:#fff;font-family:inherit;font-size:.88rem;font-weight:700;cursor:pointer}.supplier-status-confirm:disabled{opacity:.6;cursor:not-allowed}.supplier-status-confirm:focus-visible{outline:2px solid var(--status-tone);outline-offset:2px}

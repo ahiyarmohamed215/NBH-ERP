@@ -823,7 +823,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
       )}
 
       {/* GTN Inspection Drawer / Modal */}
-      {selectedGtn && <PurchaseInspectionModal type="GTN" number={selectedGtn.gtnNumber} status={selectedGtn.status} rows={selectedGtn.items || []}
+      {selectedGtn && <PurchaseInspectionModal tableToolbar type="GTN" number={selectedGtn.gtnNumber} status={selectedGtn.status} rows={selectedGtn.items || []}
         details={[
           { label: 'Source warehouses', value: gtnWarehouseSummary(selectedGtn).sources.join(', ') },
           { label: 'Destination warehouses', value: gtnWarehouseSummary(selectedGtn).destinations.join(', ') },
@@ -837,7 +837,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
         actions={[
           ...(['DRAFT','PENDING','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Edit GTN', icon: Edit2, disabled: saving, onClick:()=>handleEditGtn(selectedGtn) }] : []),
           ...(['DRAFT','CANCELLED','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Change to Pending', icon: RotateCw, disabled: saving, onClick:()=>openStatusChange('PENDING') }] : []),
-          ...(['PENDING','CANCELLED'].includes(selectedGtn.status) ? [{ label: 'Mark Transferred', icon: CheckCircle, disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
+          ...(['PENDING','CANCELLED'].includes(selectedGtn.status) ? [{ label: 'Mark Transferred', icon: CheckCircle, tone: 'success', disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
           ...(selectedGtn.status !== 'CANCELLED' ? [{ label: 'Cancel GTN', icon: Ban, tone: 'danger', disabled: saving, onClick:()=>openStatusChange('CANCELLED') }] : []),
         ]}
         columns={[

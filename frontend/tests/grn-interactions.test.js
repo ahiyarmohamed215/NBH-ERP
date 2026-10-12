@@ -20,7 +20,7 @@ test('GRN directory prints and intake accepts products with different destinatio
       { id: 1, sku: 'P-1', name: 'First product', defaultWarehouseId: 10, defaultWarehouseName: 'Hidden North Warehouse', categoryName: 'Rice', brandName: 'First brand', brandMarkupPercent: 25, costPrice: 4 },
       { id: 2, sku: 'P-2', name: 'Second product', defaultWarehouseId: 20, defaultWarehouseName: 'Hidden South Warehouse', categoryName: 'Flour', brandName: 'Second brand', costPrice: 6 },
     ];
-    const grn = { id: 5, grnNumber: 'GRN-5', supplierName: 'Test supplier', warehouseName: 'Hidden North Warehouse', receivedDate: '2026-10-10', status: 'PROCESSED', items: [{ productId: 1 }, { productId: 1 }, { productId: 2 }] };
+    const grn = { id: 5, grnNumber: 'GRN-5', supplierName: 'Test supplier', notes:'Delivery checked', warehouseName: 'Hidden North Warehouse', receivedDate: '2026-10-10', status: 'PROCESSED', items: [{ productId: 1,productSku:'P-1',productName:'First product' }, { productId: 1,productSku:'P-1',productName:'First product' }, { productId: 2,productSku:'P-2',productName:'Second product' }] };
     apis.grnApi.search = async () => ({ data: { content: [grn,{...grn,id:9,grnNumber:'GRN-OLDER',receivedDate:'2026-10-09'}] } });
     apis.grnApi.getById = async () => ({ data: grn });
     apis.supplierApi.getActive = async () => ({ data: [{ id: 3, name: 'Test supplier' }] });
@@ -34,7 +34,8 @@ test('GRN directory prints and intake accepts products with different destinatio
     apis.inventoryApi.getWarehouseStock = async (id) => { stockRequests.push(id); return { data: [] }; };
     let saved;
     apis.grnApi.create = async (payload) => { saved = payload; return { data: { grnNumber: 'GRN-6' } }; };
-    let printed;
+    let printed,printedGrnId;
+    apis.pdfApi.printGrn=async id=>{printedGrnId=id;};
     window.open = () => ({ document: { open() {}, write(html) { printed = html; }, close() {} } });
     const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
     const { ToastProvider } = await server.ssrLoadModule('/src/context/ToastContext.jsx');
@@ -61,12 +62,31 @@ test('GRN directory prints and intake accepts products with different destinatio
     const popup = host.querySelector('[role="dialog"]');
     assert.equal(popup.querySelector('.grn-inspection-details'), null);
     assert.ok(popup.querySelector('.purchase-inspection-items table'));
-    assert.ok(popup.querySelector('.purchase-inspection-actions'));
+    const header=popup.querySelector('.purchase-inspection-header');
+    assert.equal(popup.querySelector('.purchase-inspection-sidebar'),null);
+    const details=header.querySelector('.purchase-inspection-details-card');assert.ok(details.querySelector('.purchase-inspection-details'));
+    for(const text of ['GRN-5','PROCESSED']) assert.ok(header.textContent.includes(text));
+    for(const text of ['Test supplier','2026-10-10','Delivery checked']) assert.ok(details.textContent.includes(text));
+    assert.ok(header.querySelector('[aria-label="Close GRN details"]'));
+    assert.equal(popup.querySelector('.purchase-inspection-actions'),null,'No bottom buttons remain');
+    const toolbar=popup.querySelector('.purchase-inspection-table-toolbar');assert.ok(toolbar);
+    assert.ok(toolbar.querySelector('[aria-label="Print GRN"]'));assert.equal(toolbar.querySelector('.modern-filter-trigger'),null);assert.equal(toolbar.querySelector('[aria-label="Print GRN"]').textContent.trim(),'Print');
+    const tableSearch=toolbar.querySelector('[aria-label="Search GRN products"]');
+    const searchRows=async value=>act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(tableSearch,value);tableSearch.dispatchEvent(new window.Event('input',{bubbles:true}));});
+    await searchRows('P-2');assert.equal(popup.querySelectorAll('tbody tr').length,1);assert.ok(popup.querySelector('tbody').textContent.includes('Second product'));
+    await searchRows('Unknown product');assert.ok(popup.querySelector('tbody').textContent.includes('No matching products'));
+    await searchRows('Second');assert.equal(popup.querySelectorAll('tbody tr').length,1);assert.ok(popup.querySelector('tbody').textContent.includes('Second product'));
+    await act(async()=>toolbar.querySelector('[aria-label="Print GRN"]').click());assert.equal(printedGrnId,5,'Toolbar keeps the selected GRN print action');
+    await act(async()=>toolbar.querySelector('[aria-label="Clear table search"]').click());assert.equal(popup.querySelectorAll('tbody tr').length,3);
+
     assert.equal(popup.querySelectorAll('[title="Print GRN"]').length, 1);
     assert.equal(popup.querySelector('footer'), null);
     assert.ok(!popup.textContent.includes('TOTAL INWARD VALUE'));
     assert.ok(!popup.textContent.includes('PDF'));
     await act(async () => popup.querySelector('[aria-label="Close GRN details"]').click());
+    await act(async()=>host.querySelector('tbody tr').click());
+    await act(async()=>host.querySelector('[aria-label="Close GRN details"]').click());
+    assert.equal(host.querySelector('[role="dialog"]'),null);
     await act(async () => ref.current.openCreate());
     assert.deepEqual([...host.querySelectorAll('thead th')].map((cell) => cell.textContent.trim()), ['Product code', 'Product name', 'Qty', 'Unit cost', 'MP%', 'Selling price', 'Actions']);
     assert.ok(!host.textContent.includes('Supplier invoice') && !host.textContent.includes('GRN type'));

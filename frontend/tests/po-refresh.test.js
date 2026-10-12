@@ -14,14 +14,14 @@ test('PO refresh updates records when supporting product data fails', async () =
     const apis=await server.ssrLoadModule('/src/api/apiClient.js');
     for(const [name,api] of Object.entries(apis)) if(name.endsWith('Api') && api && typeof api==='object')
       for(const method of Object.keys(api)) if(typeof api[method]==='function') api[method]=async()=>({data:[]});
-    let refreshing=false,release;
+    let refreshing=false,productsFail=true,release;
     const check=config=>{if(refreshing) assert.deepEqual(config,{skipCache:true,skipDedupe:true});};
     apis.purchaseOrderApi.search=async(params,config)=>{
       check(config);
       if(refreshing) await new Promise(resolve=>{release=resolve;});
       return {data:{content:[{id:1,poNumber:refreshing?'PO-NEW':'PO-OLD',status:'DRAFT',createdAt:'2026-10-12T10:00:00',items:[]}]}};
     };
-    apis.productApi.getProducts=async(params,config)=>{check(config);if(refreshing) throw new Error('Product service unavailable');return {data:[]};};
+    apis.productApi.getProducts=async(params,config)=>{check(config);if(refreshing && productsFail) throw new Error('Product service unavailable');return {data:[]};};
     apis.supplierApi.getActive=async config=>{check(config);return {data:[]};};
     apis.warehouseApi.getActive=async config=>{check(config);return {data:[]};};
     apis.inventoryApi.getBalances=async(params,config)=>{check(config);return {data:[]};};
@@ -35,11 +35,18 @@ test('PO refresh updates records when supporting product data fails', async () =
     assert.equal(button.disabled,true);
     assert.equal(button.getAttribute('aria-busy'),'true');
     assert.ok(button.querySelector('.animate-spin'));
+    assert.ok(host.querySelector('tbody').textContent.includes('Loading purchase orders'));
+    assert.ok(!host.querySelector('tbody').textContent.includes('PO-OLD'),'Old rows are hidden during refresh');
     await act(async()=>release());
     assert.ok(host.textContent.includes('PO-NEW'));
     assert.ok(!host.textContent.includes('PO-OLD'));
     assert.equal(button.disabled,false);
     assert.ok(document.body.textContent.includes('could not refresh products'));
+    productsFail=false;
+    await act(async()=>button.click());assert.equal(button.disabled,true);
+    await act(async()=>release());assert.equal(button.disabled,false);
+    assert.ok(!document.body.textContent.includes('Purchase orders refreshed.'),'Successful refresh is silent');
+
   } finally {
     await act(async()=>root.unmount());await server.close();window.happyDOM.abort();
   }

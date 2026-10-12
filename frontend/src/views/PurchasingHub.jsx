@@ -61,7 +61,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
     },
     {
       id: 'purchase-orders',
-      label: 'Purchase Orders',
+      label: 'Purchase Order (PO)',
       icon: ShoppingBag,
       permission: 'PURCHASE_MANAGE',
     },
@@ -188,7 +188,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
           >
-            <Plus size={17} /> Add Supplier
+            <Plus size={17} /> New Supplier
           </button>
         ) : currentTab === 'grn' ? (
           <button
@@ -212,7 +212,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
           >
-            <Plus size={17} /> Create GRN
+            <Plus size={17} /> New Goods Received
           </button>
         ) : currentTab === 'gtn' ? (
           <button
@@ -284,7 +284,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
           >
-            <Plus size={17} /> Create Purchase Order
+            <Plus size={17} /> New Purchase Order
           </button>
         ) : null}
       </div>

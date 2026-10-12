@@ -1,3 +1,4 @@
+import SupplierDetailsModal from '../components/SupplierDetailsModal';
 import FilterSelect from '../components/FilterSelect';
 import {printCurrentDirectory} from '../utils/printDirectory';
 import '../components/PurchasingAppearance.css';
@@ -1697,8 +1698,7 @@ const MastersView = React.forwardRef(function MastersView({
                         <td style={{ padding: '12px 18px', color: '#64748b' }}>{s.address || '—'}</td>
                         <td style={{ padding: '12px 18px' }}>
                           <StatusBadge status={active ? 'ACTIVE' : 'INACTIVE'}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                            onClick={event=>{event.stopPropagation();handleToggleActive(s.id,active);}} />
+                            title={`Status: ${active ? 'Active' : 'Inactive'}`} />
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
@@ -1729,7 +1729,10 @@ const MastersView = React.forwardRef(function MastersView({
       </div>
 
       {/* View Details Modal */}
-      {viewingItem && (
+      {viewingItem?.type === 'suppliers' && <SupplierDetailsModal supplier={viewingItem} active={isItemActive(viewingItem)} canManage={canEditCurrentTab}
+        onClose={()=>setViewingItem(null)} onPrint={()=>handlePrintSuppliers(viewingItem)} onStatusChange={()=>handleToggleActive(viewingItem.id,isItemActive(viewingItem))}
+        onEdit={()=>{const item=viewingItem;setViewingItem(null);handleOpenEdit(item);}}/>}
+      {viewingItem && viewingItem.type !== 'suppliers' && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}

@@ -930,8 +930,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 style={{width:'140px'}}
               >
                 <option value="ALL">All Statuses</option>
-                <option value="PROCESSED">Processed</option>
                 <option value="DRAFT">Draft</option>
+                <option value="PROCESSED">Processed</option>
                 <option value="CANCELLED">Cancelled</option>
               </FilterSelect>
 
@@ -1133,7 +1133,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   ) : filteredGrns.length === 0 ? (
                     <tr>
                       <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                        No GRN records found. Click <strong>+ New Inward GRN Intake</strong> to create a new intake.
+                        No GRN records found. Click <strong>+ New Goods Received</strong> to create a new intake.
                       </td>
                     </tr>
                   ) : (
@@ -1276,7 +1276,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    {editingGrnId ? `Edit Goods Received Note (GRN) — ${formData.grnNumber}` : 'Create Goods Received Note (GRN)'}
+                    {editingGrnId ? `Edit Goods Received Note (GRN) — ${formData.grnNumber}` : 'New Goods Received Note (GRN)'}
                   </h2>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '1px 0 0 0' }}>
                     {editingGrnStatus === 'PROCESSED' ? 'Saving adjusts inventory by the quantity difference. Reductions require available stock.' : 'Inward delivery workstation — stock updates, unit pricing & consignment verification'}

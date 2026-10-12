@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createServer } from 'vite';
 import { Window } from 'happy-dom';
 
-test('GTN, PRN and PO popups share GRN styling, common details and bottom actions', async () => {
+test('Purchasing popups share compact details, table controls and status workflows', async () => {
   const window = new Window();
   Object.assign(globalThis, { window, document: window.document, localStorage: window.localStorage, IS_REACT_ACT_ENVIRONMENT: true });
   const { createRoot } = await import('react-dom/client');
@@ -76,10 +76,30 @@ test('GTN, PRN and PO popups share GRN styling, common details and bottom action
       const popup = host.querySelector('[role="dialog"]');
       assert.ok(popup, `${type} popup opens`);
       assert.ok(popup.querySelector('.purchase-inspection-items table').textContent.includes('Test product'));
-      const actions = popup.querySelector('.purchase-inspection-actions');
-      assert.ok(actions, `${type} has an action panel`);
+      const actions = popup.querySelector('.purchase-inspection-table-toolbar');
+      assert.ok(actions, `${type} has table search and print controls`);
+      assert.equal(popup.querySelector('.purchase-inspection-actions'),null,'Popup has no bottom Print or Close buttons');
+      const search=actions.querySelector(`[aria-label="Search ${type} products"]`);assert.ok(search);
+      assert.equal(actions.querySelector('.modern-filter-trigger'),null);
+      assert.equal(actions.querySelector(`[aria-label="Print ${type}"]`).textContent.trim(),'Print');
+      const changeSearch=async value=>act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(search,value);search.dispatchEvent(new window.Event('input',{bubbles:true}));});
+      await changeSearch('Missing product');assert.ok(popup.querySelector('tbody').textContent.includes('No matching products'));
+      await changeSearch('TEST-1');assert.ok(popup.querySelector('tbody').textContent.includes('Test product'));
+      await act(async()=>actions.querySelector('[aria-label="Clear table search"]').click());
+      const header=popup.querySelector('.purchase-inspection-header');
+      assert.ok(header.querySelector('.purchase-inspection-number-row .erp-status-badge'),'Status is alongside the document number');
+      assert.ok(header.querySelector('.purchase-inspection-details-card'),'Document details use the same coloured card');
+      assert.equal(popup.querySelector('.purchase-inspection-sidebar'),null,'Details are above the full-width table');
+      assert.equal(popup.querySelector('.purchase-inspection-header-actions'),null,'Management buttons are grouped together in the details card');
+      const card=header.querySelector('.purchase-inspection-details-card');
+      assert.ok(card.querySelectorAll('.purchase-inspection-detail-actions button').length>=2);
+
+      assert.ok(header.querySelector('[aria-label="Close '+type+' details"]'),'Top-right close icon is available');
+      assert.equal(header.querySelector('.purchase-inspection-header-controls').querySelectorAll('button').length,1,'Only the close icon occupies the top-right controls');
+
       assert.ok(popup.classList.contains('purchase-inspection-bottom-actions'));
       assert.ok(popup.querySelector('.purchase-inspection-details'));
+      if(type==='PO') assert.equal(popup.querySelector('.purchase-inspection-detail-actions button').textContent.trim(),'Edit PO');
       if(type==='PRN') assert.ok(popup.querySelector('.purchase-inspection-details').textContent.includes('Total valueLKR 10.00'));
       assert.ok(popup.querySelector('.grn-inspection-symbol'));
       assert.ok([...popup.querySelectorAll('th')].some(cell => cell.textContent === 'Product name'));
@@ -90,10 +110,11 @@ test('GTN, PRN and PO popups share GRN styling, common details and bottom action
       printed = '';
       await act(async () => actions.querySelector(`[title="Print ${type}"]`).click());
       assert.ok(printed.includes(type + '-'), `${type} prints the selected document`);
-      const actionByText=text=>[...host.querySelectorAll('.purchase-inspection-actions button')].find(button=>button.textContent.trim()===text);
-      if(type !== 'PO') assert.ok(actionByText(`Cancel ${type}`),`${type}: cancellation is available in the popup`);
+      const actionByText=text=>[...host.querySelectorAll('.purchase-inspection-detail-actions button, .purchase-inspection-header-actions button')].find(button=>button.textContent.trim()===text);
+      if(type !== 'PO') {assert.ok(actionByText(`Cancel ${type}`),`${type}: cancellation is available in the popup`);assert.ok(actionByText(`Cancel ${type}`).closest('.purchase-inspection-details-card'),'Cancel is inside the details card');}
+      assert.ok(actionByText(`Edit ${type}`).closest('.purchase-inspection-details-card'),'Edit is beside Cancel in the card');
       if(type==='GTN') {
-        assert.equal(popup.querySelector('select, input, textarea'),null,'GTN view shows details without editable fields');
+        assert.equal(popup.querySelector('.purchase-inspection-header').querySelector('select, input, textarea'),null,'GTN view shows details without editable fields');
         assert.ok(popup.textContent.includes('Transfer staff'));
         assert.ok(actionByText('Edit GTN'));
         const transition=async(label,status)=>{
@@ -113,6 +134,7 @@ test('GTN, PRN and PO popups share GRN styling, common details and bottom action
           assert.ok(host.querySelector('.purchase-inspection-details').textContent.includes('Warehouse correction'));
         };
         await transition('Change to Pending','PENDING');
+        assert.ok(actionByText('Mark Transferred').classList.contains('purchase-inspection-success'));
         await transition('Cancel GTN','CANCELLED');
         assert.equal(actionByText('Edit GTN'),undefined);
         assert.ok(actionByText('Mark Transferred'));assert.ok(actionByText('Change to Pending'));
@@ -120,7 +142,7 @@ test('GTN, PRN and PO popups share GRN styling, common details and bottom action
         await transition('Cancel GTN','CANCELLED');
         await transition('Change to Pending','PENDING');
         await transition('Mark Transferred','TRANSFERRED');
-        assert.equal(host.querySelector('.purchase-inspection-items').closest('[role="dialog"]').querySelector('select, input, textarea'),null);
+        assert.equal(host.querySelector('.purchase-inspection-items').closest('[role="dialog"]').querySelector('.purchase-inspection-header').querySelector('select, input, textarea'),null);
       } else {
         const changeStatus=async(label)=>{
           const previousStatus=docs[type].status;

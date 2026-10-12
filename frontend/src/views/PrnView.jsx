@@ -407,9 +407,9 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             style={{width:'140px'}}
           >
             <option value="ALL">All Statuses</option>
-            <option value="PROCESSED">Processed</option>
-                  <option value="CANCELLED">Cancelled</option>
             <option value="DRAFT">Draft</option>
+            <option value="PROCESSED">Processed</option>
+            <option value="CANCELLED">Cancelled</option>
           </FilterSelect>
 
           {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
@@ -851,7 +851,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
       )}
 
       {/* PRN Inspection Drawer / Modal */}
-      {selectedPrn && <PurchaseInspectionModal type="PRN" number={selectedPrn.prnNumber} status={selectedPrn.status} rows={selectedPrn.items || []}
+      {selectedPrn && <PurchaseInspectionModal tableToolbar type="PRN" number={selectedPrn.prnNumber} status={selectedPrn.status} rows={selectedPrn.items || []}
         onPrint={()=>printPrnDocument(selectedPrn)}
         details={[
           { label: 'Supplier name', value: selectedPrn.supplierName },
@@ -863,7 +863,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
         onClose={() => setSelectedPrn(null)}
         actions={[
           ...(selectedPrn.status !== 'CANCELLED' ? [{label:'Edit PRN',icon:Edit2,disabled:saving,onClick:()=>handleEditPrn(selectedPrn)}] : []),
-          ...(['DRAFT', 'PENDING', 'CANCELLED'].includes(selectedPrn.status) ? [{ label: selectedPrn.status === 'CANCELLED' ? 'Reprocess PRN' : 'Process PRN', icon: selectedPrn.status === 'CANCELLED' ? RotateCw : CheckCircle, disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []),
+          ...(['DRAFT', 'PENDING', 'CANCELLED'].includes(selectedPrn.status) ? [{ label: selectedPrn.status === 'CANCELLED' ? 'Reprocess PRN' : 'Process PRN', icon: selectedPrn.status === 'CANCELLED' ? RotateCw : CheckCircle, tone:'success', disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []),
           ...(selectedPrn.status !== 'CANCELLED' ? [{ label: 'Cancel PRN', icon: Ban, tone: 'danger', disabled: saving, onClick: ()=>handleCancelPRN() }] : []),
         ]}
         columns={[

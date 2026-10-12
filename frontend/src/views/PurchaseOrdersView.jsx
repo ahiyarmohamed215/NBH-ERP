@@ -57,7 +57,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       resetForm();
       setShowCreateForm(true);
     },
-    refresh: () => loadData({force:true,notify:true}),
+    refresh: () => loadData({force:true}),
   }));
 
   // Create PO Form State
@@ -72,7 +72,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     loadData();
   }, []);
 
-  const loadData = async ({force=false,notify=false} = {}) => {
+  const loadData = async ({force=false} = {}) => {
     const generation = ++loadGeneration.current;
     const config = force ? {skipCache:true,skipDedupe:true} : {};
     setLoading(true);
@@ -97,7 +97,6 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     }
     const failed = requests.filter((_,index) => results[index].status === 'rejected').map(([name]) => name);
     if (failed.length) addToast(`Purchase orders loaded; could not refresh ${failed.join(', ')}.`,'warning');
-    else if (notify) addToast('Purchase orders refreshed.','success');
   };
 
   const resetForm = () => {
@@ -352,7 +351,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
           <button
             type="button"
-            onClick={() => loadData({force:true,notify:true})} disabled={loading} aria-busy={loading}
+            onClick={() => loadData({force:true})} disabled={loading} aria-busy={loading}
             style={{
               height: '38px',
               padding: '0', width: '38px', justifyContent: 'center',
@@ -407,13 +406,13 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         }}
       >
         <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table aria-busy={loading} style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{position:'sticky',top:0,zIndex:10}}><tr>{['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS'].map(label=><th key={label} style={{padding:'12px 14px',fontSize:'.74rem',fontWeight:600,color:'#475569',background:'#fafbfc',borderBottom:'1px solid #e2e8f0'}}>{label}</th>)}</tr></thead>
             <tbody>
-              {filteredOrders.length === 0 ? (
+              {loading ? <tr><td colSpan="8" style={{textAlign:'center',padding:'48px 20px',color:'#64748b'}}><span role="status">Loading purchase orders...</span></td></tr> : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                    No purchase orders found. Click <strong>+ Create Purchase Order</strong> to issue a new order.
+                    No purchase orders found. Click <strong>+ New Purchase Order</strong> to issue a new order.
                   </td>
                 </tr>
               ) : (
@@ -540,7 +539,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    {editingPoId ? 'Edit Purchase Order (PO)' : 'Create Purchase Order (PO)'}
+                    {editingPoId ? 'Edit Purchase Order (PO)' : 'New Purchase Order (PO)'}
                   </h2>
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
                     Save a draft, or create an order to print and hand over
@@ -642,7 +641,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       )}
 
       {/* INSPECT PURCHASE ORDER MODAL */}
-      {selectedPo && <PurchaseInspectionModal type="PO" number={selectedPo.poNumber} status={selectedPo.status} rows={selectedPo.items || []}
+      {selectedPo && <PurchaseInspectionModal tableToolbar type="PO" number={selectedPo.poNumber} status={selectedPo.status} rows={selectedPo.items || []}
         details={[
           { label: 'Supplier name', value: selectedPo.supplierName },
           { label: 'Created date', value: purchaseOrderDate(selectedPo) },
@@ -652,12 +651,10 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         onClose={() => setSelectedPo(null)}
         onPrint={() => printPurchaseOrder(selectedPo)}
         actions={[
-          ...(selectedPo.status !== 'INFORM_TO_ORDER' ? [{label:'Inform to Order',icon:CheckCircle,disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
+          ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Edit PO',icon:Edit2,disabled:saving,onClick:()=>{const po=selectedPo;setSelectedPo(null);handleEditPo(po);}}] : []),
+          ...(selectedPo.status !== 'INFORM_TO_ORDER' ? [{label:'Inform to Order',icon:CheckCircle,tone:'success',disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
           ...(selectedPo.status !== 'DRAFT' ? [{label:'Return to Draft',icon:RotateCw,disabled:saving,onClick:()=>handlePoStatus('DRAFT')}] : []),
-          ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [
-            {label:'Edit PO',icon:Edit2,disabled:saving,onClick:()=>{const po=selectedPo;setSelectedPo(null);handleEditPo(po);}},
-            {label:'Cancel PO',icon:Ban,tone:'danger',disabled:saving,onClick:()=>handlePoStatus('CANCELLED')},
-          ] : []),
+          ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Cancel PO',icon:Ban,tone:'danger',disabled:saving,onClick:()=>handlePoStatus('CANCELLED')}] : []),
         ]}
         columns={[
           { label: 'Product code', value: item => item.sku || item.productSku || '—' },

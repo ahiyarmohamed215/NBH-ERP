@@ -1,44 +1,426 @@
-.purchase-inspection { width:min(1280px,96vw); max-width:1280px; height:min(88vh,calc(100vh - 24px)); padding:0 !important; background:#fff; display:flex; flex-direction:column; overflow:hidden; }
-.purchase-inspection-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid #e2e8f0; flex-shrink:0; }
-.purchase-inspection-header .purchase-inspection-title span { font-size:.7rem; font-weight:700; letter-spacing:.04em; color:#64748b; }
-.purchase-inspection-header h2 { margin:4px 0 0; font-size:1.2rem; color:#0f172a; }
-.purchase-inspection-details { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,2fr); gap:12px 24px; margin:0; padding:14px 18px; border-bottom:1px solid #e2e8f0; background:#f8fafc; flex-shrink:0; max-height:24vh; overflow:auto; }
-.purchase-inspection-details dt { font-size:.75rem; font-weight:600; color:#64748b; margin-bottom:5px; }
-.purchase-inspection-details dd { margin:0; font-size:.875rem; color:#0f172a; overflow-wrap:anywhere; white-space:pre-wrap; }
-@media(max-width:760px) { .purchase-inspection-details { grid-template-columns:minmax(0,1fr) minmax(0,1fr); padding:12px; gap:10px 16px; } .purchase-inspection-detail-wide { grid-column:1 / -1; } }
-.purchase-inspection-body { display:grid; grid-template-columns:minmax(0,1fr) 180px; flex:1; min-height:0; }
-.purchase-inspection-items { min-height:0; min-width:0; display:flex; padding:16px; }
-.purchase-inspection-table { flex:1; min-height:0; min-width:0; overflow:auto; border:1px solid #e2e8f0; border-radius:8px; }
-.purchase-inspection-table table { margin:0; width:100%; min-width:560px; }
-.purchase-inspection-table thead { position:sticky; top:0; z-index:1; background:#f8fafc; }
-.purchase-inspection-number { text-align:right !important; white-space:nowrap; }
-.purchase-inspection-empty { text-align:center; padding:28px 12px !important; color:#64748b; }
-.purchase-inspection-actions { display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:16px; border-left:1px solid #e2e8f0; background:#fafbfc; overflow:auto; }
-.purchase-inspection-actions .btn { justify-content:center; font-size:.8rem; min-height:36px; flex-shrink:0; }
-.purchase-inspection-bottom-actions .purchase-inspection-body { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto; }
-.purchase-inspection-bottom-actions .purchase-inspection-actions { flex-direction:row; flex-wrap:wrap; justify-content:flex-end; border-left:0; border-top:1px solid #e2e8f0; }
-@media(max-width:760px) { .purchase-inspection-body { grid-template-columns:minmax(0,1fr) 145px; } .purchase-inspection-items, .purchase-inspection-actions { padding:10px; } }
+.purchase-inspection {
+  width: min(1280px, 96vw);
+  max-width: 1280px;
+  height: min(88vh, calc(100vh - 24px));
+  padding: 0 !important;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-.purchase-inspection { border:1px solid #e2e8f0; border-radius:16px; box-shadow:none; }
-.purchase-inspection .purchase-inspection-header { padding:20px 24px; border-bottom:0; }
-.purchase-inspection .purchase-inspection-title { display:flex; align-items:center; gap:12px; }
-.grn-inspection-symbol { display:flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:12px; background:#eff6ff; color:#2563eb; border:1px solid #dbeafe; flex-shrink:0; }
-.purchase-inspection .purchase-inspection-header .purchase-inspection-title span { font-size:.73rem; font-weight:500; letter-spacing:.01em; }
-.purchase-inspection .purchase-inspection-header h2 { font-size:1.3rem; font-weight:650; letter-spacing:-.025em; }
-.purchase-inspection .purchase-inspection-details { margin:0 24px; padding:16px 0; background:transparent; border-top:1px solid #edf0f4; border-bottom:1px solid #edf0f4; }
-.purchase-inspection .purchase-inspection-details dt { display:flex; align-items:center; gap:6px; font-size:.72rem; font-weight:500; margin-bottom:7px; }
-.purchase-inspection .purchase-inspection-details dd { font-size:.86rem; font-weight:550; line-height:1.5; }
-.purchase-inspection .purchase-inspection-detail-wide dd { color:#64748b; font-weight:400; }
-.purchase-inspection-details:has(> :nth-child(4)) .purchase-inspection-detail-wide { grid-column:1 / -1; }
-.purchase-inspection .purchase-inspection-items { padding:20px 24px; }
-.purchase-inspection .purchase-inspection-table { border-color:#edf0f4; border-radius:10px; }
-.purchase-inspection .purchase-inspection-table th { padding:13px 16px; font-size:.68rem; font-weight:600; letter-spacing:.035em; color:#64748b; background:#f8fafc; border-bottom:1px solid #edf0f4; }
-.purchase-inspection .purchase-inspection-table td { padding:15px 16px; font-size:.84rem; border-bottom:1px solid #f1f5f9; color:#334155; font-variant-numeric:tabular-nums; }
-.purchase-inspection .purchase-inspection-table td:first-child { font-family:monospace; font-size:.83rem; font-weight:600; color:#1e40af; }
-.purchase-inspection .purchase-inspection-table tbody tr:hover { background:#f8fafc; }
-.purchase-inspection .purchase-inspection-actions { padding:14px 24px; background:#fff; border-top-color:#edf0f4; gap:10px; }
-.purchase-inspection .purchase-inspection-actions .btn { border-radius:8px; min-height:38px; padding:8px 14px; box-shadow:none; }
-.purchase-inspection .purchase-inspection-actions .btn-primary { background:#2563eb; color:#fff; border:1px solid #2563eb; }
-.purchase-inspection .purchase-inspection-actions .btn-glass { background:#fff; border:1px solid #e2e8f0; color:#475569; }
-.purchase-inspection .purchase-inspection-actions .btn-glass:hover { background:#f8fafc; border-color:#cbd5e1; }
-@media(max-width:760px) { .purchase-inspection .purchase-inspection-header { padding:16px; } .purchase-inspection .purchase-inspection-details { margin:0 16px; } .purchase-inspection .purchase-inspection-items, .purchase-inspection .purchase-inspection-actions { padding:12px 16px; } }
+.purchase-inspection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.purchase-inspection-header .purchase-inspection-title .purchase-inspection-caption {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: #64748b;
+}
+
+.purchase-inspection-header h2 {
+  margin: 4px 0 0;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.purchase-inspection-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px 24px;
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  flex-shrink: 0;
+  max-height: 24vh;
+  overflow: auto;
+}
+
+.purchase-inspection-details dt {
+  font-size: .75rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 5px;
+}
+
+.purchase-inspection-details dd {
+  margin: 0;
+  font-size: .875rem;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media(max-width:760px) {
+  .purchase-inspection-details {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 12px;
+    gap: 10px 16px;
+  }
+
+  .purchase-inspection-detail-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.purchase-inspection-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  flex: 1;
+  min-height: 0;
+}
+
+.purchase-inspection-items {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  padding: 16px;
+}
+
+.purchase-inspection-table {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.purchase-inspection-table table {
+  margin: 0;
+  width: 100%;
+  min-width: 560px;
+}
+
+.purchase-inspection-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
+.purchase-inspection-number {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.purchase-inspection-empty {
+  text-align: center;
+  padding: 28px 12px !important;
+  color: #64748b;
+}
+
+.purchase-inspection-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 16px;
+  border-left: 1px solid #e2e8f0;
+  background: #fafbfc;
+  overflow: auto;
+}
+
+.purchase-inspection-actions .btn {
+  justify-content: center;
+  font-size: .8rem;
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.purchase-inspection-bottom-actions .purchase-inspection-body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.purchase-inspection-bottom-actions .purchase-inspection-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-left: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+@media(max-width:760px) {
+  .purchase-inspection-body {
+    grid-template-columns: minmax(0, 1fr) 145px;
+  }
+
+  .purchase-inspection-items,
+  .purchase-inspection-actions {
+    padding: 10px;
+  }
+}
+
+.purchase-inspection {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.purchase-inspection .purchase-inspection-header {
+  padding: 20px 24px;
+  border-bottom: 0;
+}
+
+.purchase-inspection .purchase-inspection-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grn-inspection-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+  flex-shrink: 0;
+}
+
+.purchase-inspection .purchase-inspection-header .purchase-inspection-title .purchase-inspection-caption {
+  font-size: .73rem;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+
+.purchase-inspection .purchase-inspection-header h2 {
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+.purchase-inspection .purchase-inspection-details {
+  margin: 0 24px;
+  padding: 16px 0;
+  background: transparent;
+  border-top: 1px solid #edf0f4;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.purchase-inspection .purchase-inspection-details dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .72rem;
+  font-weight: 500;
+  margin-bottom: 7px;
+}
+
+.purchase-inspection .purchase-inspection-details dd {
+  font-size: .86rem;
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+.purchase-inspection .purchase-inspection-detail-wide dd {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.purchase-inspection-details:has(> :nth-child(4)) .purchase-inspection-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.purchase-inspection .purchase-inspection-items {
+  padding: 20px 24px;
+}
+
+.purchase-inspection .purchase-inspection-table {
+  border-color: #edf0f4;
+  border-radius: 10px;
+}
+
+.purchase-inspection .purchase-inspection-table th {
+  padding: 13px 16px;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .035em;
+  color: #64748b;
+  background: #f8fafc;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.purchase-inspection .purchase-inspection-table td {
+  padding: 15px 16px;
+  font-size: .84rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+
+.purchase-inspection .purchase-inspection-table td:first-child {
+  font-family: monospace;
+  font-size: .83rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.purchase-inspection .purchase-inspection-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.purchase-inspection .purchase-inspection-actions {
+  padding: 14px 24px;
+  background: #fff;
+  border-top-color: #edf0f4;
+  gap: 10px;
+}
+
+.purchase-inspection .purchase-inspection-actions .btn {
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 8px 14px;
+  box-shadow: none;
+}
+
+.purchase-inspection .purchase-inspection-actions .btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border: 1px solid #2563eb;
+}
+
+.purchase-inspection .purchase-inspection-actions .btn-glass {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.purchase-inspection .purchase-inspection-actions .btn-glass:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+@media(max-width:760px) {
+  .purchase-inspection .purchase-inspection-header {
+    padding: 16px;
+  }
+
+  .purchase-inspection .purchase-inspection-details {
+    margin: 0 16px;
+  }
+
+  .purchase-inspection .purchase-inspection-items,
+  .purchase-inspection .purchase-inspection-actions {
+    padding: 12px 16px;
+  }
+}
+.purchase-inspection-header-main{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-width:0}
+.purchase-inspection-header-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.purchase-inspection-header-actions .btn,.purchase-inspection-detail-actions .btn{min-height:34px;padding:7px 11px;font-size:.78rem;border-radius:6px;background:#fff;border:1px solid #e2e8f0;color:#475569;white-space:nowrap}
+.purchase-inspection-header-actions .purchase-inspection-danger,.purchase-inspection-detail-actions .purchase-inspection-danger{color:#e11d48;border-color:#fecdd3;background:#fff1f2}
+.purchase-inspection-close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#64748b;cursor:pointer;flex-shrink:0}
+.purchase-inspection-close:hover{background:#f8fafc;color:#0f172a}
+.purchase-inspection .purchase-inspection-header-details{flex-direction:column;align-items:stretch;gap:16px;border-bottom:1px solid #edf0f4;max-height:44vh;overflow:auto}
+.purchase-inspection .purchase-inspection-header-details .purchase-inspection-details{margin:0;padding:14px 16px;border:1px solid #edf0f4;border-radius:8px;background:#f8fafc;max-height:22vh;overflow:auto;grid-template-columns:minmax(0,1fr) minmax(0,.8fr) minmax(0,1.5fr);gap:12px 24px}
+.purchase-inspection-header-details .purchase-inspection-title{min-width:0;flex-shrink:0}
+.purchase-inspection-header-details .purchase-inspection-title h2{overflow-wrap:anywhere}
+@media(max-width:760px){
+ .purchase-inspection-header-details .purchase-inspection-header-main{align-items:flex-start;flex-wrap:wrap;position:relative;padding-right:40px;box-sizing:border-box;gap:12px}
+ .purchase-inspection-header-details .purchase-inspection-close{position:absolute;right:0;top:0}
+ .purchase-inspection-header-details .purchase-inspection-header-controls{justify-content:flex-start}
+ .purchase-inspection .purchase-inspection-header-details .purchase-inspection-details{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:12px}
+ .purchase-inspection-header-details .purchase-inspection-detail-wide{grid-column:1 / -1}
+}
+
+.purchase-inspection-header-details .purchase-inspection-header-main{position:relative;padding-right:44px;box-sizing:border-box}
+.purchase-inspection-header-details .purchase-inspection-close{position:absolute;right:0;top:0}
+
+.purchase-inspection-header-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.purchase-inspection-header-details .purchase-inspection-header-main{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;padding-right:0}
+.purchase-inspection-header-details .purchase-inspection-header-controls{flex-wrap:nowrap;justify-content:flex-end;align-items:center}
+.purchase-inspection-header-details .purchase-inspection-title{min-width:0}
+.purchase-inspection-header-details .purchase-inspection-close{position:static}
+
+.purchase-inspection-number-row{display:flex;align-items:center;gap:12px;min-width:0}
+.purchase-inspection .purchase-inspection-number-row h2{margin:4px 0 0}
+.purchase-inspection-number-row .erp-status-badge{flex-shrink:0;margin-top:4px}
+
+.purchase-inspection-details-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px;padding:18px;border:1px solid #bfdbfe;border-radius:12px;background:linear-gradient(120deg,#eff6ff 0%,#f0fdfa 100%)}
+.purchase-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{padding:0;border:0;border-radius:0;background:transparent}
+.purchase-inspection-detail-actions{display:flex;align-items:center;justify-content:flex-end;align-self:center;gap:8px;flex-wrap:wrap}
+@media(max-width:600px){
+ .purchase-inspection-details-card{grid-template-columns:minmax(0,1fr);padding:12px;gap:12px}
+ .purchase-inspection-detail-actions{justify-content:flex-end}
+}
+
+.purchase-inspection .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
+.purchase-inspection .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:1 / -1}
+.purchase-inspection .purchase-inspection-details-card dt svg{color:#0284c7}
+.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success){color:#2563eb;border-color:#bfdbfe;background:#fff}
+.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success):hover{background:#eff6ff;border-color:#93c5fd}
+.purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-danger:hover{color:#e11d48;background:#ffe4e6;border-color:#fda4af}
+
+.purchase-inspection-split.purchase-inspection-bottom-actions .purchase-inspection-body{grid-template-columns:minmax(230px,1fr) minmax(0,3fr);grid-template-rows:minmax(0,1fr) auto}
+.purchase-inspection-sidebar{grid-column:1;grid-row:1 / -1;min-width:0;min-height:0;overflow:auto;padding:20px 0 20px 24px;display:flex;flex-direction:column;gap:12px}
+.purchase-inspection-split .purchase-inspection-items{grid-column:2;grid-row:1}
+.purchase-inspection-split .purchase-inspection-actions{grid-column:2;grid-row:2}
+.purchase-inspection-sidebar .purchase-inspection-details-card{grid-template-columns:minmax(0,1fr);gap:18px;align-items:start;padding:16px}
+.purchase-inspection-split .purchase-inspection-sidebar .purchase-inspection-details{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin:0;padding:0;border:0;background:transparent;max-height:none;overflow:visible}
+.purchase-inspection-sidebar .purchase-inspection-detail-actions{justify-content:flex-start}
+@media(max-width:760px){
+ .purchase-inspection-split.purchase-inspection-bottom-actions .purchase-inspection-body{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
+ .purchase-inspection-sidebar{grid-column:1;grid-row:1;max-height:30vh;padding:12px 16px 0}
+ .purchase-inspection-split .purchase-inspection-items{grid-column:1;grid-row:2}
+ .purchase-inspection-split .purchase-inspection-actions{grid-column:1;grid-row:3}
+}
+
+.purchase-inspection.purchase-inspection .purchase-inspection-header-details{padding:14px 20px;gap:10px}
+.purchase-inspection .purchase-inspection-details-card{height:96px;box-sizing:border-box;padding:12px 16px;gap:16px;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.purchase-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:minmax(0,1fr) minmax(0,.7fr) minmax(0,1.4fr);gap:10px 18px;max-height:70px;overflow:auto}
+.purchase-inspection .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:auto}
+.purchase-inspection .purchase-inspection-details-card dt{font-size:.7rem;margin-bottom:4px}
+.purchase-inspection .purchase-inspection-details-card dd{font-size:.8rem;line-height:1.4;max-height:46px;overflow:auto}
+.purchase-inspection .purchase-inspection-detail-actions{max-width:240px;gap:6px;justify-content:flex-end}
+@media(max-width:600px){
+ .purchase-inspection .purchase-inspection-details-card{height:auto;min-height:96px;max-height:180px;overflow:auto;grid-template-columns:minmax(0,1fr);padding:10px 12px;gap:10px}
+ .purchase-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(2,minmax(0,1fr));max-height:none;overflow:visible}
+ .purchase-inspection .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:1 / -1}
+ .purchase-inspection .purchase-inspection-detail-actions{max-width:none}
+}
+
+.purchase-inspection .purchase-inspection-detail-actions .btn{min-height:32px;padding:6px 10px}
+
+.purchase-inspection-toolbar-layout.purchase-inspection-bottom-actions .purchase-inspection-body{grid-template-rows:minmax(0,1fr)}
+.purchase-inspection-toolbar-layout .purchase-inspection-items{flex-direction:column;gap:10px}
+.purchase-inspection-table-toolbar{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0}
+.purchase-inspection-table-search{display:flex;align-items:center;position:relative;flex:1;min-width:0}
+.purchase-inspection-table-search>svg{position:absolute;left:12px;color:#94a3b8;pointer-events:none}
+.purchase-inspection-table-search input{height:38px;box-sizing:border-box;width:100%;min-width:0;padding:0 32px 0 36px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-family:inherit;font-size:.86rem;outline:none;appearance:none}
+.purchase-inspection-table-search input:focus{border-color:#0284c7}
+.purchase-inspection-table-search input::-webkit-search-cancel-button{appearance:none}
+.purchase-inspection-table-search>button{position:absolute;right:8px;display:flex;align-items:center;padding:4px;border:0;background:none;color:#64748b;cursor:pointer}
+.purchase-inspection-table-print{display:flex;align-items:center;justify-content:center;gap:7px;height:38px;flex-shrink:0;padding:0 14px;border:1px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-family:inherit;font-size:.84rem;font-weight:500;cursor:pointer}
+.purchase-inspection-table-print:hover{border-color:#1d4ed8;background:#1d4ed8}
+.purchase-inspection-table-print:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+
+.purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-success{color:#15803d;border-color:#86efac;background:#dcfce7}
+.purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-success:hover{color:#166534;border-color:#4ade80;background:#bbf7d0}
+
+.grn-inspection .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
+.grn-inspection .purchase-inspection-detail-actions .btn{flex-shrink:0}
+@media(max-width:600px){.grn-inspection .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}}
+
+:is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-details-card{height:128px;padding:14px 18px;gap:16px}
+:is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(var(--purchase-detail-columns,3),minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px 16px;max-height:100px;overflow:auto}
+:is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:auto}
+:is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
+:is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-detail-actions .btn{flex-shrink:0}
+@media(max-width:1000px){
+ :is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-details-card{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:128px;padding:12px 14px;gap:10px}
+ :is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{max-height:62px;gap:8px 14px}
+ :is(.gtn-inspection,.prn-inspection,.po-inspection) .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}
+}
