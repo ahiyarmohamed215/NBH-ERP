@@ -1,3 +1,4 @@
+import StockDetailsModal from '../components/StockDetailsModal';
 import DateRangePicker,{matchesDateRange} from '../components/DateRangePicker';
 import FilterSelect from '../components/FilterSelect';
 import {inventorySellingPrice} from '../utils/inventoryPricing';
@@ -484,7 +485,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       if (prodRes.status === 'fulfilled') setProductsList(fetchedProducts);
       if (catRes.status === 'fulfilled') setCategoriesList(fetchedCategories);
 
-      const primaryWh = fetchedWarehouses[0] || { id: 1, name: 'Warehouse 1', code: 'WH-01' };
+      
 
       let items = [];
 
@@ -493,23 +494,22 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           .filter((b) => Number(b.quantity ?? 0) > 0)
           .map((b) => {
             const prod = fetchedProducts.find((p) => String(p.id) === String(b.productId) || (b.productSku && p.sku === b.productSku));
-            const brandName = getBrandForProduct(prod || b);
             const qty = Number(b.quantity ?? 0);
             const reserved = Number(b.reservedQuantity ?? 0);
             const avail = Number(b.availableQuantity ?? (qty - reserved));
             const cost = canSeeCost ? Number(b.costPrice ?? prod?.costPrice ?? 0) : null;
             const sell = inventorySellingPrice(b,prod,canSeeCost);
-            const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 5);
+            const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 0);
             return {
               id: b.id || `bal-${b.productId}-${b.warehouseId}`,
-              warehouseId: b.warehouseId || primaryWh.id,
-              warehouseName: b.warehouseName || primaryWh.name,
-              warehouseCode: b.warehouseCode || primaryWh.code,
+              warehouseId: b.warehouseId,
+              warehouseName: b.warehouseName || fetchedWarehouses.find(warehouse=>String(warehouse.id)===String(b.warehouseId))?.name || '—',
+              warehouseCode: b.warehouseCode || fetchedWarehouses.find(warehouse=>String(warehouse.id)===String(b.warehouseId))?.code,
               productId: b.productId || prod?.id,
               sku: b.productSku || prod?.sku || '—',
               productName: b.productName || prod?.name || 'Unknown Product',
-              brandName: brandName,
-              categoryName: prod?.categoryName || 'General',
+              brandName: prod?.brandName || b.brandName || '—',
+              categoryName: prod?.categoryName || '—',
               unitOfMeasure: b.unitOfMeasure || prod?.unitOfMeasure || 'PCS',
               quantity: qty,
               reservedQuantity: reserved,
@@ -849,7 +849,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               cursor: 'pointer',
             }}
           >
-            <ArrowRightLeft size={16} /> Stock Transfer (GTN)
+            <ArrowRightLeft size={16} /> New stock transfer (GTN)
           </button>
         ) : (
           <button
@@ -1006,12 +1006,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             </div>
 
             {/* Right Controls: Filters, Reset Filters, Print, & Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <div className="inventory-list-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Warehouse selector */}
               <FilterSelect
                 value={invWarehouseFilter}
                 onChange={(e) => setInvWarehouseFilter(e.target.value)}
-                style={{width:'150px'}}
+                className="inventory-full-label-filter"
                 title="Filter by warehouse"
               >
                 <option value="ALL">All Warehouses</option>
@@ -1026,7 +1026,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               <FilterSelect
                 value={invStatusFilter}
                 onChange={(e) => setInvStatusFilter(e.target.value)}
-                style={{width:'145px'}}
+                className="inventory-full-label-filter"
                 title="Filter by stock status"
               >
                 <option value="ALL">All Stock Levels</option>
@@ -4115,210 +4115,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Stock Item Details (Wide, Scroll-Free Executive View) */}
       {/* ------------------------------------------------------------- */}
-      {viewingStockItem && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '920px',
-              padding: '22px 28px',
-              borderRadius: '14px',
-              backgroundColor: '#ffffff',
-              boxShadow: 'none',
-              boxSizing: 'border-box',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '42px', height: '42px', borderRadius: '10px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Boxes size={22} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{viewingStockItem.productName}</h3>
-                    <span
-                      style={{
-                        backgroundColor: '#f1f5f9',
-                        color: '#334155',
-                        border: '1px solid #e2e8f0',
-                        padding: '1px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.74rem',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {viewingStockItem.brandName || 'General'}
-                    </span>
-                    <StatusBadge status={viewingStockItem.isOutOfStock ? 'OUT_OF_STOCK' : viewingStockItem.isLowStock ? 'LOW_STOCK' : 'IN_STOCK'}/>
-                    {viewingStockItem.isLowStock && !viewingStockItem.isOutOfStock && <span style={{fontSize:'.74rem',color:'#a16207'}}>{Math.max(1,(viewingStockItem.minStockLevel || 5)-viewingStockItem.quantity)} needed</span>}
-
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span>SKU: <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{viewingStockItem.sku}</strong></span>
-                    <span>•</span>
-                    <span>Warehouse: <strong style={{ color: '#334155' }}>{viewingStockItem.warehouseName}</strong> ({viewingStockItem.warehouseCode || 'WH-01'})</span>
-                    <span>•</span>
-                    <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '1px 7px', borderRadius: '3px', fontSize: '0.74rem', fontWeight: 600 }}>
-                      {viewingStockItem.categoryName}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingStockItem(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px' }}
-                title="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* 2-Column Balanced Grid: Left = Quantities & Placement, Right = Commercial & Valuations */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '16px' }}>
-
-              {/* LEFT COLUMN: Stock Quantities & Attributes */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    Stock Quantities & Availability
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>On-Hand Physical Stock</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: viewingStockItem.quantity > 0 ? '#0f172a' : '#dc2626', marginTop: '1px' }}>
-                        {viewingStockItem.quantity.toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Total Warehouse Count</div>
-                    </div>
-                    <div style={{ backgroundColor: '#f0fdf4', padding: '10px 12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 600 }}>Available To Sell</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16a34a', marginTop: '1px' }}>
-                        {viewingStockItem.availableQuantity.toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#166534', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#166534' }}>Unallocated & Free</div>
-                    </div>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Reserved / Allocated</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#475569', marginTop: '1px' }}>
-                        {(viewingStockItem.reservedQuantity || 0).toLocaleString()} <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Committed to Orders</div>
-                    </div>
-                    <div style={{ backgroundColor: '#fffbeb', padding: '10px 12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                      <div style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 600 }}>Min Reorder Threshold</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#b45309', marginTop: '1px' }}>
-                        {viewingStockItem.minStockLevel || 5} <span style={{ fontSize: '0.76rem', color: '#92400e', fontWeight: 500 }}>{viewingStockItem.unitOfMeasure}</span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#b45309' }}>Alert Trigger Level</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Logistics & Placement Info */}
-                <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.82rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Brand & Manufacturer</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.brandName || 'General'}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Category Group</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.categoryName}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Warehouse Location</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingStockItem.warehouseName}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN: Commercial Pricing & Valuations */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    {canSeeCost ? 'Pricing & Profit Margin' : 'Selling Price'}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? 'repeat(3, 1fr)' : '1fr', gap: '8px' }}>
-                    {canSeeCost && (
-                      <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Cost</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#334155', marginTop: '1px' }}>
-                          Rs. {Number(viewingStockItem.costPrice || 0).toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Purchase</div>
-                      </div>
-                    )}
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Unit Selling</div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
-                        Rs. {Number(viewingStockItem.sellingPrice || 0).toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Catalog</div>
-                    </div>
-                    {canSeeCost && (
-                      <div style={{ backgroundColor: '#f0f9ff', padding: '10px 10px', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                        <div style={{ fontSize: '0.70rem', color: '#0369a1', fontWeight: 600 }}>Gross Margin</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
-                          Rs. {(Number(viewingStockItem.sellingPrice || 0) - Number(viewingStockItem.costPrice || 0)).toFixed(2)}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 700 }}>
-                          {Number(viewingStockItem.sellingPrice) > 0
-                            ? (((Number(viewingStockItem.sellingPrice) - Number(viewingStockItem.costPrice)) / Number(viewingStockItem.sellingPrice)) * 100).toFixed(1)
-                            : '0.0'}% margin
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Inventory Valuation Breakdown */}
-                <div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    {canSeeCost ? 'Asset Valuation & Revenue Potential' : 'Revenue Potential'}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? '1fr 1fr' : '1fr', gap: '8px' }}>
-                    {canSeeCost && (
-                      <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Total Asset Valuation (Cost)</div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0284c7', marginTop: '1px' }}>
-                          Rs. {Number(viewingStockItem.totalCostValue || (viewingStockItem.quantity * viewingStockItem.costPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Cost Price</div>
-                      </div>
-                    )}
-                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Potential Retail Revenue</div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
-                        Rs. {Number(viewingStockItem.quantity * (viewingStockItem.sellingPrice || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>On-Hand Stock × Selling Price</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '14px', borderTop: '1px solid #e2e8f0' }}>
-              <button
-                type="button"
-                className="btn btn-glass"
-                onClick={() => setViewingStockItem(null)}
-                style={{ padding: '8px 20px', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600 }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {viewingStockItem && <StockDetailsModal item={viewingStockItem} canSeeCost={canSeeCost} onClose={()=>setViewingStockItem(null)}/>}
 
     </div>
   );

@@ -1,0 +1,21 @@
+.purchase-inspection.inventory-stock-inspection{width:min(880px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px);border:1px solid #e2e8f0;border-radius:12px;box-shadow:none}
+.inventory-stock-inspection .purchase-inspection-header-main{align-items:flex-start}
+.inventory-stock-inspection .purchase-inspection-title{min-width:0}
+.inventory-stock-inspection .purchase-inspection-number-row{flex-wrap:wrap;gap:8px 12px}
+.inventory-stock-inspection h2{overflow-wrap:anywhere}
+.inventory-stock-body{padding:16px 20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;min-height:0}
+.inventory-stock-body dl{margin:0}
+.inventory-stock-body dt{font-size:.74rem;color:#64748b;margin-bottom:6px}
+.inventory-stock-body dd{margin:0;font-size:.86rem;font-weight:600;color:#334155;overflow-wrap:anywhere}
+.inventory-stock-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;padding:14px 16px;border:1px solid #dbeafe;border-radius:8px;background:#f8fbff}
+.inventory-stock-body h3{margin:0 0 10px;font-size:.8rem;font-weight:600;color:#475569}
+.inventory-stock-metrics,.inventory-stock-pricing{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.inventory-stock-metrics>div,.inventory-stock-pricing>div{padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fafbfc}
+.inventory-stock-metrics dd{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.inventory-stock-metrics dd small{font-size:.7rem;font-weight:400;color:#64748b}
+.inventory-stock-pricing{grid-template-columns:repeat(3,minmax(0,1fr))}
+.inventory-stock-pricing>div:first-child{background:#eff6ff;border-color:#dbeafe}
+.inventory-stock-pricing>div:first-child dd{color:#2563eb}
+.inventory-stock-footer{display:flex;justify-content:flex-end;padding:12px 20px;border-top:1px solid #e2e8f0;flex-shrink:0}
+.inventory-stock-footer .btn{min-height:36px;border:1px solid #cbd5e1;background:#fff;color:#475569;padding:7px 18px;box-shadow:none}
+@media(max-width:600px){.inventory-stock-details,.inventory-stock-metrics,.inventory-stock-pricing{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-stock-body{padding:12px;gap:16px}.inventory-stock-footer{padding:12px}.inventory-stock-inspection .purchase-inspection-title{gap:8px}.inventory-stock-inspection h2{font-size:1rem}}

@@ -19,7 +19,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   apis.warehouseApi.getAll=async()=>({data:[{id:10,code:'WH-10',name:'North',isActive:true},{id:20,code:'WH-20',name:'South',isActive:true}]});
   apis.brandApi.getAll=async()=>({data:[{id:1,code:'BRAND-1',name:'Test brand',markupPercent:25,isActive:true}]});
   apis.categoryApi.getAll=apis.categoryApi.getActive=async()=>({data:[{id:1,code:'CAT-1',name:'Test category',isActive:true}]});
-  apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,costPrice:product.costPrice,sellingPrice:0}))}};};
+  apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,minStockLevel:0,reservedQuantity:3,availableQuantity:17,costPrice:product.costPrice,sellingPrice:0}))}};};
   apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]},{id:31,adjustmentNumber:'ADJ-OLD',adjustmentDate:'2026-10-09',warehouseName:'South',items:[{productId:2,productSku:'SKU-SECOND',productName:products[1].name,differenceQuantity:2,reason:'Opening stock'}]}]}});
   apis.staffQuotaApi.search=async()=>({data:{content:[{id:40,productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
   apis.staffQuotaApi.getSummary=async()=>({data:null});
@@ -31,10 +31,23 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    assert.equal(toolbar.querySelector('[title^="Export"]'),null,`${tab}: print replaces CSV export`);
    if(tab==='inventory-list') {
     assert.ok(!host.querySelector('thead').textContent.includes('COST PRICE'));
+    assert.equal(toolbar.querySelectorAll('.inventory-full-label-filter').length,2,'Both inventory filters show full labels');
+    assert.ok(toolbar.textContent.includes('All Warehouses') && toolbar.textContent.includes('All Stock Levels'));
     await act(async()=>toolbar.querySelector('[aria-label="Filter by warehouse"]').click());
     await act(async()=>[...document.querySelectorAll('.modern-filter-options [role="option"]')].find(option=>option.textContent==='North').click());
     assert.equal(host.querySelectorAll('tbody tr').length,1);
     assert.match(host.querySelector('tbody tr td:nth-child(7)').textContent,/35\.00/,'A zero balance price falls back to the product selling price');
+    await act(async()=>host.querySelector('tbody tr').click());
+    const popup=host.querySelector('[role="dialog"]');assert.ok(popup.classList.contains('purchase-inspection'));
+    assert.ok(popup.textContent.includes('LKR 35.00'));
+    assert.ok(!popup.textContent.includes('999991') && !popup.textContent.includes('Unit cost'));
+    const field=label=>[...popup.querySelectorAll('dl>div')].find(row=>row.querySelector('dt').textContent===label).querySelector('dd').textContent;
+    assert.match(field('Available quantity'),/^17/);assert.match(field('Reserved quantity'),/^3/);
+    assert.match(field('Minimum stock level'),/^0/,'A zero backend threshold is preserved');
+    assert.equal(field('Warehouse code'),'WH-10','Warehouse code is resolved from the matching warehouse');
+    assert.ok(!popup.textContent.includes('Potential Retail Revenue') && !popup.textContent.includes('Gross Margin') && !popup.textContent.includes('Manufacturer'));
+    await act(async()=>popup.querySelector('[aria-label="Close stock details"]').click());
+    assert.equal(host.querySelector('[role="dialog"]'),null);
    }
    if(tab==='adjustments') {
     assert.ok(!toolbar.textContent.includes('All Reasons'));
