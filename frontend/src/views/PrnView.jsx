@@ -353,7 +353,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               pointerEvents: 'none',
             }}
           />
-          <input
+          <input className="erp-field"
             type="text"
             placeholder="Search PRNs by #, supplier, warehouse, reason..."
             value={searchTerm}
@@ -362,9 +362,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               width: '100%',
               height: '38px',
               padding: '0 32px 0 38px',
-              borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.88rem',
               outline: 'none',
               backgroundColor: '#ffffff',
               color: '#0f172a',
@@ -417,7 +415,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
           </FilterSelect>
 
           {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setStatusFilter('ALL');setFromDate('');setToDate('');
@@ -426,12 +424,9 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               style={{
                 height: '38px',
                 padding: '0 12px',
-                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
                 backgroundColor: '#f1f5f9',
                 color: '#64748b',
-                fontSize: '0.85rem',
-                fontWeight: 500,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -453,12 +448,14 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             onClick={handlePrintList}
             style={{
               height: '38px',
-              padding: '0', width: '38px', justifyContent: 'center',
+              padding: '0',
+              width: '38px',
+              justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               color: '#334155',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
@@ -489,12 +486,14 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             onClick={loadData}
             style={{
               height: '38px',
-              padding: '0', width: '38px', justifyContent: 'center',
+              padding: '0',
+              width: '38px',
+              justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               color: '#334155',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
@@ -540,31 +539,31 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
             }}
           >
             <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       PRN NUMBER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       SUPPLIER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       WAREHOUSE
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>
                       TOTAL PRODUCTS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       DATE
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -572,13 +571,13 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading purchase returns...
                       </td>
                     </tr>
                   ) : filteredPrns.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                         No purchase returns recorded yet. Fill the form on the left to create a return.
                       </td>
                     </tr>
@@ -596,30 +595,30 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view return details"
                       >
-                        <td style={{ padding: '12px 18px' }}>
+                        <td className="erp-table-cell">
                           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {p.prnNumber}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                           {p.supplierName}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                        <td className="erp-table-cell" style={{ color: '#334155' }}>
                           {p.warehouseName}
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', fontSize: '0.85rem' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
                           {new Set((p.items || []).map(item=>item.productId)).size}
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td className="erp-table-cell" style={{ color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {p.returnDate || p.createdAt?.slice(0,10) || '—'}
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <StatusBadge status={p.status} />
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {p.notes || p.remarks || '—'}
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
                             {p.status !== 'CANCELLED' && (<button
                               type="button"
@@ -714,16 +713,16 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                   <RotateCcw size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     {editingPrnId ? 'Edit Purchase Return (PRN)' : 'New Purchase Return (PRN)'}
                   </h2>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                  <p style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', margin: '2px 0 0 0' }}>
                     Issue vendor debit note and deduct returned inventory stock from warehouse
                   </p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => { resetForm();loadData(); }}
                   style={{
@@ -731,9 +730,6 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                     padding: '0 12px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#475569',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -793,38 +789,32 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                 searchProducts={returnSearchProducts} searchResultLimit={Infinity} resultQuantity={product=>returnAvailable(product)}
                 onProductSelect={selectReturnProduct} validateItem={validateReturnItem} searchEmptyMessage="No matching inventory items with available stock."
                 onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields">
-                  <label className="purchase-remarks">Return reason *<input type="text" maxLength={255} value={formData.reason} placeholder="Enter the reason for this return" onChange={event=>setFormData(previous=>({...previous,reason:event.target.value}))}/></label>
-                  <label className="purchase-remarks">Remarks / notes<textarea maxLength={5000} rows={3} value={formData.remarks || ''} onChange={event=>setFormData(previous=>({...previous,remarks:event.target.value}))}/></label>
+                  <label className="purchase-remarks">Return reason *<input className="erp-field" type="text" maxLength={255} value={formData.reason} placeholder="Enter the reason for this return" onChange={event=>setFormData(previous=>({...previous,reason:event.target.value}))}/></label>
+                  <label className="purchase-remarks">Remarks / notes<textarea className="erp-field" maxLength={5000} rows={3} value={formData.remarks || ''} onChange={event=>setFormData(previous=>({...previous,remarks:event.target.value}))}/></label>
                 </div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => { setShowCreateForm(false);resetForm();loadData(); }}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
                   Back to list
                 </button>
-                {editingPrnStatus !== 'PROCESSED' && <button
+                {editingPrnStatus !== 'PROCESSED' && <button className="erp-button"
                   type="button"
                   onClick={() => handleSavePrn(false)}
                   disabled={saving}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
                     color: '#0f172a',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
@@ -840,7 +830,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                     border: 'none',
                     background: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'none',

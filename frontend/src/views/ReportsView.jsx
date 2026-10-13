@@ -240,7 +240,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
   }, [currentPrimaryTab]);
 
   return (
-    <div
+    <div className="erp-page"
       style={{
         flex: 1,
         height: '100%',
@@ -254,50 +254,36 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       }}
     >
       {/* Top Header matching user screenshot */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '14px',
-          flexWrap: 'wrap',
-          gap: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Reports Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+          <p className="erp-page-description">
             {PRIMARY_TABS.find((t) => t.id === currentPrimaryTab)?.title || 'Customer Reports'} • Financial and analytical reporting across branch operations.
           </p>
         </div>
 
-        <button
+        <button className="erp-button"
           type="button"
           onClick={handleExportCSV}
           style={{
             backgroundColor: '#ffffff',
             color: '#334155',
             border: '1px solid #cbd5e1',
-            borderRadius: '8px',
             padding: '8px 16px',
-            fontSize: '0.84rem',
-            fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
@@ -308,14 +294,11 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       </div>
 
       {/* Primary Category Tabs (Row 1 matching user screenshot) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
-          overflowX: 'auto',
           flexShrink: 0,
         }}
       >
@@ -324,28 +307,14 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           const isActive = currentPrimaryTab === tab.id;
 
           return (
-            <button
+            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
               key={tab.id}
               type="button"
               onClick={() => {
                 setCurrentPrimaryTab(tab.id);
                 if (onSubTabChange) onSubTabChange(tab.id);
               }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 4px',
-                border: 'none',
-                borderBottom: isActive ? '2px solid #0284c7' : '2px solid transparent',
-                backgroundColor: 'transparent',
-                color: isActive ? '#0284c7' : '#64748b',
-                fontSize: '0.92rem',
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease',
-              }}
+
             >
               <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
               {tab.label}
@@ -360,24 +329,15 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       {currentPrimaryTab === 'customer-reports' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
           {/* Sub-Navigation Tabs (Row 2 matching user screenshot) */}
-          <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px', flexShrink: 0 }}>
+          <div className="erp-tabs" style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
             {CUSTOMER_SUB_TABS.map((sub) => {
               const isActive = customerSubTab === sub.id;
               return (
-                <button
+                <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
                   key={sub.id}
                   type="button"
                   onClick={() => setCustomerSubTab(sub.id)}
-                  style={{
-                    padding: '8px 2px',
-                    border: 'none',
-                    borderBottom: isActive ? '2px solid #0284c7' : '2px solid transparent',
-                    backgroundColor: 'transparent',
-                    color: isActive ? '#0284c7' : '#64748b',
-                    fontSize: '0.88rem',
-                    fontWeight: isActive ? 700 : 500,
-                    cursor: 'pointer',
-                  }}
+
                 >
                   {sub.label}
                 </button>
@@ -392,24 +352,21 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
               <div style={{ flexShrink: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                   <div>
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
+                    <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
                       Ageing overview
                     </h3>
-                    <p style={{ color: '#64748b', fontSize: '0.84rem', margin: 0 }}>
+                    <p style={{ color: '#64748b', fontSize: 'var(--erp-text-body)', margin: 0 }}>
                       Outstanding invoices grouped by credit age
                     </p>
                   </div>
 
-                  <button
+                  <button className="erp-button"
                     type="button"
                     onClick={() => setShowAgeingConfigModal(true)}
                     style={{
                       backgroundColor: '#ffffff',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '7px',
                       padding: '6px 12px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
                       color: '#475569',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -436,7 +393,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>0–7 days</span>
+                        <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569' }}>0–7 days</span>
                         <span
                           style={{
                             backgroundColor: '#ecfdf5',
@@ -444,14 +401,14 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                             border: '1px solid #a7f3d0',
                             borderRadius: '9999px',
                             padding: '2px 8px',
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                           }}
                         >
                           {ageingTotals.cnt0to7} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot0to7.toFixed(2)}
                       </div>
                     </div>
@@ -469,7 +426,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>8–21 days</span>
+                        <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569' }}>8–21 days</span>
                         <span
                           style={{
                             backgroundColor: '#fef3c7',
@@ -477,14 +434,14 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                             border: '1px solid #fde68a',
                             borderRadius: '9999px',
                             padding: '2px 8px',
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                           }}
                         >
                           {ageingTotals.cnt8to21} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot8to21.toFixed(2)}
                       </div>
                     </div>
@@ -502,7 +459,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#475569' }}>22+ days</span>
+                        <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569' }}>22+ days</span>
                         <span
                           style={{
                             backgroundColor: '#fee2e2',
@@ -510,14 +467,14 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                             border: '1px solid #fecaca',
                             borderRadius: '9999px',
                             padding: '2px 8px',
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                           }}
                         >
                           {ageingTotals.cnt22Plus} invoices
                         </span>
                       </div>
-                      <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {ageingTotals.tot22Plus.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
@@ -536,7 +493,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                   flexShrink: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: '#475569', fontWeight: 700, fontSize: '0.82rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: '#475569', fontWeight: 700, fontSize: 'var(--erp-text-body)' }}>
                   <Sliders size={14} color="#0284c7" />
                   Filter results
                 </div>
@@ -544,10 +501,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '14px', alignItems: 'flex-start' }}>
                   {/* Search Customer */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Search customer
                     </label>
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="Name, phone, email, or NIC"
                       value={customerSearch}
@@ -555,32 +512,28 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                       style={{
                         width: '100%',
                         padding: '7px 12px',
-                        borderRadius: '7px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.84rem',
                         outline: 'none',
                       }}
                     />
-                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
+                    <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
                       Showing outstanding invoices posted in the selected branch. Search updates as you type.
                     </span>
                   </div>
 
                   {/* Posted By */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Posted by
                     </label>
-                    <select
+                    <select className="erp-field"
                       value={filterPostedBy}
                       onChange={(e) => setFilterPostedBy(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '7px 12px',
-                        borderRadius: '7px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
-                        fontSize: '0.84rem',
                         color: '#334155',
                         cursor: 'pointer',
                       }}
@@ -596,19 +549,17 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
 
                   {/* Customer Group */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                       Customer group
                     </label>
-                    <select
+                    <select className="erp-field"
                       value={filterGroup}
                       onChange={(e) => setFilterGroup(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '7px 12px',
-                        borderRadius: '7px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
-                        fontSize: '0.84rem',
                         color: '#334155',
                         cursor: 'pointer',
                       }}
@@ -640,25 +591,25 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                 }}
               >
                 <div style={{ marginBottom: '14px', flexShrink: 0 }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
+                  <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
                     Customer Outstanding Balances
                   </h3>
-                  <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+                  <p style={{ color: '#64748b', fontSize: 'var(--erp-text-body)', margin: 0 }}>
                     {filteredCustomers.length} customers found
                   </p>
                 </div>
 
                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+                  <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px' }}>CUSTOMER</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>TOTAL OUTSTANDING</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>0–7 DAYS</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>8–21 DAYS</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'right' }}>22+ DAYS</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>INVOICES</th>
-                        <th style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 10, padding: '12px 16px', textAlign: 'center' }}>ACTIONS</th>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10 }}>CUSTOMER</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>TOTAL OUTSTANDING</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>0–7 DAYS</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>8–21 DAYS</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>22+ DAYS</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'center' }}>INVOICES</th>
+                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'center' }}>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -673,41 +624,41 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
                         >
                           {/* Customer Name */}
-                          <td style={{ padding: '12px 16px' }}>
+                          <td className="erp-table-cell">
                             <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{c.phone || c.email}</div>
+                            <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone || c.email}</div>
                           </td>
 
                           {/* Total Outstanding */}
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                             LKR {c.totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* 0-7 Days */}
-                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#64748b', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', color: '#64748b', fontFamily: 'monospace' }}>
                             LKR {c.days0to7.toFixed(2)}
                           </td>
 
                           {/* 8-21 Days */}
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: c.days8to21 > 0 ? 700 : 500, color: c.days8to21 > 0 ? '#b45309' : '#64748b', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: c.days8to21 > 0 ? 700 : 500, color: c.days8to21 > 0 ? '#b45309' : '#64748b', fontFamily: 'monospace' }}>
                             LKR {c.days8to21.toFixed(2)}
                           </td>
 
                           {/* 22+ Days */}
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: c.days22Plus > 0 ? 800 : 500, color: c.days22Plus > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: c.days22Plus > 0 ? 800 : 500, color: c.days22Plus > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
                             LKR {c.days22Plus.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* Invoices Count */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#334155' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600, color: '#334155' }}>
                             {c.invoicesCount}
                           </td>
 
                           {/* Actions */}
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <button
                               type="button"
-                              className="btn btn-glass btn-sm"
+                              className="btn btn-glass btn-sm erp-button"
                               onClick={() => setSelectedStatement(c)}
                               title="View Customer Statement"
                             >
@@ -719,7 +670,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
 
                       {filteredCustomers.length === 0 && (
                         <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                          <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                             No customers found matching current filters.
                           </td>
                         </tr>
@@ -735,10 +686,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           {customerSubTab === 'installment' && (
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
                   Customer Installment Schedules & Tracking
                 </h3>
-                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', marginBottom: '18px' }}>
                   Monitor hire-purchase installment milestones, overdue cycles, and monthly repayment compliance.
                 </p>
                 <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
@@ -752,10 +703,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           {customerSubTab === 'advances' && (
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
                   Customer Advance Deposits & Credit Ledger
                 </h3>
-                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', marginBottom: '18px' }}>
                   Review unallocated customer advances and pre-payments available for invoice clearance.
                 </p>
                 <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
@@ -769,10 +720,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           {customerSubTab === 'top-spending' && (
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
                   Top Spending Customers Ranking
                 </h3>
-                <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+                <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', marginBottom: '18px' }}>
                   Lifetime value, frequency of sales orders, and revenue distribution.
                 </p>
                 <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
@@ -792,47 +743,47 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px 28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
                   Sales Revenue & Performance Summary
                 </h3>
-                <p style={{ color: '#64748b', fontSize: '0.84rem', margin: 0 }}>
+                <p style={{ color: '#64748b', fontSize: 'var(--erp-text-body)', margin: 0 }}>
                   Aggregated gross revenue, net margin, and transaction metrics
                 </p>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <input
+                <input className="erp-field"
                   type="date"
                   value={salesStartDate}
                   onChange={(e) => setSalesStartDate(e.target.value)}
-                  style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}
                 />
-                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>to</span>
-                <input
+                <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b' }}>to</span>
+                <input className="erp-field"
                   type="date"
                   value={salesEndDate}
                   onChange={(e) => setSalesEndDate(e.target.value)}
-                  style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  style={{ padding: '6px 10px', border: '1px solid #cbd5e1' }}
                 />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
               <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>GROSS SALES TURNOVER</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '6px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', fontWeight: 600 }}>GROSS SALES TURNOVER</span>
+                <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', marginTop: '6px', fontFamily: 'monospace' }}>
                   LKR {Number(salesSummary?.totalSales || 184520.0).toFixed(2)}
                 </div>
               </div>
               <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>TOTAL SETTLED CASH/BANK</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a', marginTop: '6px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', fontWeight: 600 }}>TOTAL SETTLED CASH/BANK</span>
+                <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#16a34a', marginTop: '6px', fontFamily: 'monospace' }}>
                   LKR {Number(salesSummary?.totalPaid || 124800.0).toFixed(2)}
                 </div>
               </div>
               <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>TOTAL INVOICE TRANSACTIONS</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0284c7', marginTop: '6px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', fontWeight: 600 }}>TOTAL INVOICE TRANSACTIONS</span>
+                <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0284c7', marginTop: '6px', fontFamily: 'monospace' }}>
                   {salesSummary?.invoiceCount || 48} Invoices
                 </div>
               </div>
@@ -849,21 +800,21 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px 28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
                   Inventory Stock Valuation & Asset Worth
                 </h3>
-                <p style={{ color: '#64748b', fontSize: '0.84rem', margin: 0 }}>
+                <p style={{ color: '#64748b', fontSize: 'var(--erp-text-body)', margin: 0 }}>
                   Real-time FIFO / weighted average stock valuation across warehouses
                 </p>
               </div>
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => {
                   downloadAuthenticated('/reports/inventory/excel', 'inventory.xlsx').catch(() => {});
                 }}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                style={{ borderColor: '#0284c7' }}
               >
                 <Download size={15} /> Download Excel Valuation
               </button>
@@ -882,10 +833,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       {currentPrimaryTab === 'purchase-reports' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '28px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+            <h3 style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
               Supplier Procurement & Spend Analytics
             </h3>
-            <p style={{ color: '#64748b', fontSize: '0.86rem', marginBottom: '18px' }}>
+            <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', marginBottom: '18px' }}>
               Vendor purchase order compliance, goods received notes (GRN) volume, and payables ageing.
             </p>
             <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '8px', textAlign: 'center', color: '#64748b' }}>
@@ -921,7 +872,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Customise Ageing Cards</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>Customise Ageing Cards</h3>
               <button
                 type="button"
                 onClick={() => setShowAgeingConfigModal(false)}
@@ -931,7 +882,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.86rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: 'var(--erp-text-field)' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -963,9 +914,9 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => setShowAgeingConfigModal(false)}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', padding: '6px 16px' }}
+                style={{ borderColor: '#0284c7', padding: '6px 16px' }}
               >
                 Apply
               </button>
@@ -995,8 +946,8 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a' }}>{selectedStatement.name}</h3>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Customer Statement & Outstanding Ageing</span>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>{selectedStatement.name}</h3>
+                <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Customer Statement & Outstanding Ageing</span>
               </div>
               <button
                 type="button"
@@ -1007,10 +958,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.86rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: 'var(--erp-text-field)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b' }}>Total Outstanding</span>
-                <span style={{ fontWeight: 800, color: '#dc2626', fontFamily: 'monospace', fontSize: '1rem' }}>
+                <span style={{ fontWeight: 800, color: '#dc2626', fontFamily: 'monospace', fontSize: 'var(--erp-text-nav)' }}>
                   LKR {selectedStatement.totalOutstanding.toFixed(2)}
                 </span>
               </div>
@@ -1032,28 +983,28 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
 
             {/* Invoices Breakdown */}
             <div style={{ marginTop: '16px' }}>
-              <h4 style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#1e293b', marginBottom: '8px' }}>
                 Unpaid Invoices Breakdown
               </h4>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-small)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
-                      <th style={{ padding: '8px 10px' }}>Invoice #</th>
-                      <th style={{ padding: '8px 10px' }}>Date</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>Balance</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center' }}>Age</th>
+                      <th className="erp-table-heading">Invoice #</th>
+                      <th className="erp-table-heading">Date</th>
+                      <th className="erp-table-heading" style={{ textAlign: 'right' }}>Balance</th>
+                      <th className="erp-table-heading" style={{ textAlign: 'center' }}>Age</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(selectedStatement.invoices || []).map((inv, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0284c7' }}>{inv.invoiceNo}</td>
-                        <td style={{ padding: '8px 10px', color: '#64748b' }}>{inv.date}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7' }}>{inv.invoiceNo}</td>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>{inv.date}</td>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
                           LKR {inv.balance.toFixed(2)}
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>{inv.days} days</td>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', color: '#64748b' }}>{inv.days} days</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1064,7 +1015,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 type="button"
-                className="btn btn-glass"
+                className="btn btn-glass erp-button"
                 onClick={() => window.print()}
               >
                 <Printer size={15} /> Print Statement
@@ -1072,9 +1023,9 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => setSelectedStatement(null)}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', padding: '7px 20px' }}
+                style={{ borderColor: '#0284c7', padding: '7px 20px' }}
               >
                 Close
               </button>

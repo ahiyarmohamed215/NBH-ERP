@@ -95,10 +95,10 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
               <Keyboard size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0 }}>
+              <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                 Standard ERP Keyboard Shortcuts
               </h2>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>
+              <p style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', margin: '2px 0 0 0' }}>
                 Full-screen distraction-free workflow controls
               </p>
             </div>
@@ -118,7 +118,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
             const GroupIcon = group.icon;
             return (
               <div key={idx} style={{ background: '#f8fafc', borderRadius: '10px', padding: '16px 18px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#1e293b', fontWeight: 700, fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#1e293b', fontWeight: 700, fontSize: 'var(--erp-text-button)' }}>
                   <GroupIcon size={16} color="#2563eb" />
                   {group.title}
                 </div>
@@ -130,7 +130,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        fontSize: '0.86rem',
+                        fontSize: 'var(--erp-text-field)',
                         padding: '4px 0',
                       }}
                     >
@@ -138,7 +138,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
                       <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         {sc.keys.map((k, kIdx) =>
                           k === 'or' ? (
-                            <span key={kIdx} style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '0 2px' }}>
+                            <span key={kIdx} style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', margin: '0 2px' }}>
                               or
                             </span>
                           ) : (
@@ -167,10 +167,10 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
             alignItems: 'center',
           }}
         >
-          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+          <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
             Tip: Press <kbd className="erp-kbd">Esc</kbd> anytime to dismiss modals without using mouse.
           </span>
-          <button type="button" className="btn btn-primary" onClick={onClose}>
+          <button type="button" className="btn btn-primary erp-button" onClick={onClose}>
             Got it, continue
           </button>
         </div>

@@ -49,12 +49,11 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     apis.grnApi.cancel=async(id,data)=>{assert.equal(data.reason,'Incorrect receipt');grn={...grn,status:'CANCELLED'};return {data:grn};};
     const {default:Grn}=await server.ssrLoadModule('/src/views/GrnView.jsx');await render(Grn);
     await act(async()=>host.querySelector('tbody tr').click());const action=text=>[...host.querySelectorAll('.purchase-inspection-header-actions button, .purchase-inspection-detail-actions button, .purchase-inspection-actions button')].find(button=>button.textContent.trim()===text);
-    await act(async()=>action('Process GRN').click());dialog=host.querySelector('[aria-label="Change GRN status"]');assert.ok(dialog);assert.equal(processCalls,0);assert.equal(grn.status,'DRAFT');assert.equal(confirmButton(dialog).disabled,true);
-    await enterReason(dialog,'Delivery verified');await act(async()=>confirmButton(dialog).click());assert.equal(processCalls,1);assert.equal(grn.status,'PROCESSED');
+    assert.equal(action('Process GRN'),undefined);assert.ok(action('Edit GRN'));assert.ok(action('Cancel GRN'));
     await act(async()=>action('Cancel GRN').click());const cancellation=host.querySelector('textarea[placeholder^="Enter cancellation reason"]');assert.ok(cancellation);
     await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(cancellation,'Incorrect receipt');cancellation.dispatchEvent(new window.Event('input',{bubbles:true}));});
     await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Confirm Cancellation').click());assert.equal(grn.status,'CANCELLED');
     await act(async()=>action('Reprocess GRN').click());dialog=host.querySelector('[aria-label="Change GRN status"]');assert.ok(dialog);assert.equal(confirmButton(dialog).disabled,true);
-    await enterReason(dialog,'Delivery verified');await act(async()=>confirmButton(dialog).click());assert.equal(processCalls,2);assert.equal(grn.status,'PROCESSED');
+    await enterReason(dialog,'Delivery verified');await act(async()=>confirmButton(dialog).click());assert.equal(processCalls,1);assert.equal(grn.status,'PROCESSED');
   } finally {await act(async()=>new Promise(resolve=>setTimeout(resolve,5100)));await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT']) delete globalThis[key];}
 });

@@ -451,7 +451,7 @@ export default function CustomerTargetsTab({
                 pointerEvents: 'none',
               }}
             />
-            <input
+            <input className="erp-field"
               type="text"
               placeholder="Search targets or customers..."
               value={searchTerm}
@@ -460,9 +460,7 @@ export default function CustomerTargetsTab({
                 width: '100%',
                 height: '32px',
                 padding: '0 24px 0 26px',
-                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
-                fontSize: '0.8rem',
                 outline: 'none',
                 backgroundColor: '#ffffff',
                 color: '#0f172a',
@@ -493,16 +491,13 @@ export default function CustomerTargetsTab({
           </div>
 
           {/* Status Select */}
-          <select
+          <select className="erp-field"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{
               height: '32px',
               padding: '0 24px 0 8px',
-              borderRadius: '6px',
               border: '1px solid #e2e8f0',
-              fontSize: '0.8rem',
-              fontFamily: 'inherit',
               fontWeight: 500,
               color: '#334155',
               backgroundColor: '#ffffff',
@@ -526,17 +521,14 @@ export default function CustomerTargetsTab({
           </select>
 
           {/* Customer Select */}
-          <select
+          <select className="erp-field"
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
             style={{
               height: '32px',
               padding: '0 24px 0 8px',
               maxWidth: '160px',
-              borderRadius: '6px',
               border: '1px solid #e2e8f0',
-              fontSize: '0.8rem',
-              fontFamily: 'inherit',
               fontWeight: 500,
               color: '#334155',
               backgroundColor: '#ffffff',
@@ -562,17 +554,14 @@ export default function CustomerTargetsTab({
           </select>
 
           {/* Salesman Select */}
-          <select
+          <select className="erp-field"
             value={salesmanFilter}
             onChange={(e) => setSalesmanFilter(e.target.value)}
             style={{
               height: '32px',
               padding: '0 24px 0 8px',
               maxWidth: '160px',
-              borderRadius: '6px',
               border: '1px solid #e2e8f0',
-              fontSize: '0.8rem',
-              fontFamily: 'inherit',
               fontWeight: 500,
               color: '#334155',
               backgroundColor: '#ffffff',
@@ -599,7 +588,7 @@ export default function CustomerTargetsTab({
 
           {/* Reset Filters Button */}
           {(searchTerm || statusFilter !== 'ALL' || customerFilter !== 'ALL' || salesmanFilter !== 'ALL') && (
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setSearchTerm('');
@@ -610,12 +599,9 @@ export default function CustomerTargetsTab({
               style={{
                 height: '32px',
                 padding: '0 8px',
-                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
                 backgroundColor: '#f1f5f9',
                 color: '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: 500,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -633,7 +619,7 @@ export default function CustomerTargetsTab({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <span
             style={{
-              fontSize: '0.74rem',
+              fontSize: 'var(--erp-text-caption)',
               fontWeight: 600,
               color: '#64748b',
               backgroundColor: '#f1f5f9',
@@ -670,24 +656,17 @@ export default function CustomerTargetsTab({
           </button>
 
           {canEdit && (
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateModal}
               style={{
                 height: '32px',
                 padding: '0 12px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontSize: '0.8rem',
-                fontWeight: 600,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
               }}
             >
               <Plus size={14} /> New Range & Target
@@ -711,7 +690,7 @@ export default function CustomerTargetsTab({
           }}
         >
           <RefreshCw size={24} className="spin" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-          <p style={{ margin: 0, fontSize: '0.86rem', fontWeight: 500 }}>Loading customer range targets...</p>
+          <p style={{ margin: 0, fontSize: 'var(--erp-text-field)', fontWeight: 500 }}>Loading customer range targets...</p>
         </div>
       ) : filteredTargets.length === 0 ? (
         <div
@@ -738,27 +717,21 @@ export default function CustomerTargetsTab({
           >
             <Target size={22} />
           </div>
-          <h3 style={{ margin: '0 0 6px', fontSize: '1rem', color: '#0f172a', fontWeight: 700 }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: 'var(--erp-text-nav)', color: '#0f172a', fontWeight: 700 }}>
             No Customer Targets Found
           </h3>
-          <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.82rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+          <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: 'var(--erp-text-body)', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
             {searchTerm || statusFilter !== 'ALL' || customerFilter !== 'ALL' || salesmanFilter !== 'ALL'
               ? 'No targets match your current search and filters. Try clearing filters.'
               : 'Create sales targets with progressive discount range tiers for customers to incentivize bulk purchases in POS mode.'}
           </p>
           {canEdit && (
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateModal}
               style={{
                 height: '32px',
                 padding: '0 14px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '0.82rem',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -807,7 +780,7 @@ export default function CustomerTargetsTab({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontFamily: 'monospace',
                         fontWeight: 700,
                         padding: '2px 6px',
@@ -819,12 +792,12 @@ export default function CustomerTargetsTab({
                     >
                       {target.targetCode}
                     </span>
-                    <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a' }}>
                       {target.name}
                     </h3>
                     <span
                       style={{
-                        fontSize: '0.7rem',
+                        fontSize: 'var(--erp-text-badge)',
                         fontWeight: 600,
                         padding: '1px 7px',
                         borderRadius: '9999px',
@@ -849,7 +822,7 @@ export default function CustomerTargetsTab({
                     {isCompleted && (
                       <span
                         style={{
-                          fontSize: '0.7rem',
+                          fontSize: 'var(--erp-text-badge)',
                           fontWeight: 700,
                           padding: '1px 8px',
                           borderRadius: '9999px',
@@ -867,7 +840,7 @@ export default function CustomerTargetsTab({
                     {target.daysRemaining !== undefined && (
                       <span
                         style={{
-                          fontSize: '0.7rem',
+                          fontSize: 'var(--erp-text-badge)',
                           fontWeight: 600,
                           padding: '1px 7px',
                           borderRadius: '9999px',
@@ -883,18 +856,15 @@ export default function CustomerTargetsTab({
 
                   {/* Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => setSelectedTargetDetail(target)}
                       style={{
                         height: '28px',
                         padding: '0 8px',
-                        fontSize: '0.76rem',
-                        fontWeight: 600,
                         color: '#0284c7',
                         backgroundColor: '#f0f9ff',
                         border: '1px solid #bae6fd',
-                        borderRadius: '4px',
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -907,18 +877,15 @@ export default function CustomerTargetsTab({
 
                     {canEdit && (
                       <>
-                        <button
+                        <button className="erp-button"
                           type="button"
                           onClick={() => handleOpenEditModal(target)}
                           style={{
                             height: '28px',
                             padding: '0 8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 500,
                             color: '#334155',
                             backgroundColor: '#ffffff',
                             border: '1px solid #e2e8f0',
-                            borderRadius: '4px',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -935,7 +902,7 @@ export default function CustomerTargetsTab({
                           style={{
                             height: '28px',
                             padding: '0 8px',
-                            fontSize: '0.76rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 500,
                             color: target.isActive ? '#d97706' : '#16a34a',
                             backgroundColor: target.isActive ? '#fffbeb' : '#f0fdf4',
@@ -984,7 +951,7 @@ export default function CustomerTargetsTab({
                     backgroundColor: '#f8fafc',
                     borderRadius: '6px',
                     border: '1px solid #f1f5f9',
-                    fontSize: '0.78rem',
+                    fontSize: 'var(--erp-text-small)',
                     color: '#475569',
                   }}
                 >
@@ -1021,7 +988,7 @@ export default function CustomerTargetsTab({
                   </div>
 
                   {target.description && (
-                    <div style={{ color: '#64748b', fontSize: '0.76rem', marginLeft: 'auto' }}>
+                    <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', marginLeft: 'auto' }}>
                       {target.description}
                     </div>
                   )}
@@ -1030,9 +997,9 @@ export default function CustomerTargetsTab({
                 {/* Progress Bar & Numeric Metrics */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                       <span>Achieved: </span>
-                      <strong style={{ fontSize: '0.96rem', color: '#0f172a', fontFamily: 'monospace', fontWeight: 700 }}>
+                      <strong style={{ fontSize: 'var(--erp-text-nav)', color: '#0f172a', fontFamily: 'monospace', fontWeight: 700 }}>
                         Rs. {achieved.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </strong>
                       <span> / Goal: </span>
@@ -1044,7 +1011,7 @@ export default function CustomerTargetsTab({
                     <div style={{ textAlign: 'right' }}>
                       <span
                         style={{
-                          fontSize: '0.86rem',
+                          fontSize: 'var(--erp-text-field)',
                           fontWeight: 700,
                           fontFamily: 'monospace',
                           color: percentage >= 100 ? '#16a34a' : '#0284c7',
@@ -1080,13 +1047,13 @@ export default function CustomerTargetsTab({
                 {/* Progressive Slabs / Ranges Track */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Target Range Tiers & Progressive Rewards
                     </span>
                     {currentTier && (
                       <span
                         style={{
-                          fontSize: '0.7rem',
+                          fontSize: 'var(--erp-text-badge)',
                           fontWeight: 700,
                           color: '#15803d',
                           backgroundColor: '#dcfce7',
@@ -1139,7 +1106,7 @@ export default function CustomerTargetsTab({
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span
                               style={{
-                                fontSize: '0.76rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 700,
                                 color: isAchievedTier ? '#15803d' : isNext ? '#0369a1' : '#334155',
                               }}
@@ -1148,7 +1115,7 @@ export default function CustomerTargetsTab({
                             </span>
                             <span
                               style={{
-                                fontSize: '0.72rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 700,
                                 fontFamily: 'monospace',
                                 padding: '1px 5px',
@@ -1161,13 +1128,13 @@ export default function CustomerTargetsTab({
                             </span>
                           </div>
 
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                          <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                             Rs. {Number(tier.minAmount).toLocaleString()}
                             {tier.maxAmount ? ` - ${Number(tier.maxAmount).toLocaleString()}` : '+'}
                           </div>
 
                           {/* Status Footer */}
-                          <div style={{ marginTop: '2px', fontSize: '0.68rem', fontWeight: 600 }}>
+                          <div style={{ marginTop: '2px', fontSize: 'var(--erp-text-badge)', fontWeight: 600 }}>
                             {isAchievedTier ? (
                               <span style={{ color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                 <Check size={11} /> Unlocked in POS
@@ -1254,10 +1221,10 @@ export default function CustomerTargetsTab({
                   <Target size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a' }}>
                     {editingTarget ? 'Edit Customer Target & Ranges' : 'New Customer Target & Ranges'}
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                     Configure sales target milestones and tiered discount rewards
                   </p>
                 </div>
@@ -1282,10 +1249,10 @@ export default function CustomerTargetsTab({
               {/* Row 1: Target Name & Code */}
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Name / Promotion Title *
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     required
                     placeholder="e.g. Q1 Growth Target, Monthly Loyalty Milestone..."
@@ -1295,8 +1262,6 @@ export default function CustomerTargetsTab({
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      fontSize: '0.82rem',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
@@ -1306,10 +1271,10 @@ export default function CustomerTargetsTab({
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Code (Auto if blank)
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="e.g. TGT-2026-0001"
                     value={formData.targetCode}
@@ -1318,12 +1283,9 @@ export default function CustomerTargetsTab({
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      fontSize: '0.82rem',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
-                      fontFamily: 'monospace',
                     }}
                     onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
                     onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
@@ -1333,11 +1295,11 @@ export default function CustomerTargetsTab({
 
               {/* Row 2: Target Scope Selection */}
               <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   Target Scope (Who does this target apply to?)
                 </label>
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-body)', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1346,7 +1308,7 @@ export default function CustomerTargetsTab({
                     />
                     Specific Customer
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-body)', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1355,7 +1317,7 @@ export default function CustomerTargetsTab({
                     />
                     Customer Group
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', cursor: 'pointer', color: '#0f172a' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-body)', cursor: 'pointer', color: '#0f172a' }}>
                     <input
                       type="radio"
                       name="scopeType"
@@ -1368,10 +1330,10 @@ export default function CustomerTargetsTab({
 
                 {formData.scopeType === 'CUSTOMER' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
                       Select Customer *
                     </label>
-                    <select
+                    <select className="erp-field"
                       value={formData.customerId}
                       onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
                       required={formData.scopeType === 'CUSTOMER'}
@@ -1379,8 +1341,6 @@ export default function CustomerTargetsTab({
                         width: '100%',
                         height: '34px',
                         padding: '0 10px',
-                        fontSize: '0.82rem',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
                       }}
@@ -1397,10 +1357,10 @@ export default function CustomerTargetsTab({
 
                 {formData.scopeType === 'GROUP' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
                       Select Customer Group *
                     </label>
-                    <select
+                    <select className="erp-field"
                       value={formData.customerGroupId}
                       onChange={(e) => setFormData({ ...formData, customerGroupId: e.target.value })}
                       required={formData.scopeType === 'GROUP'}
@@ -1408,8 +1368,6 @@ export default function CustomerTargetsTab({
                         width: '100%',
                         height: '34px',
                         padding: '0 10px',
-                        fontSize: '0.82rem',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
                       }}
@@ -1428,18 +1386,16 @@ export default function CustomerTargetsTab({
               {/* Row 3: Assigned Salesman & Target Goal */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Assigned Sales Rep / Salesman (Optional)
                   </label>
-                  <select
+                  <select className="erp-field"
                     value={formData.salesmanId}
                     onChange={(e) => setFormData({ ...formData, salesmanId: e.target.value })}
                     style={{
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      fontSize: '0.82rem',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       backgroundColor: '#ffffff',
                     }}
@@ -1454,10 +1410,10 @@ export default function CustomerTargetsTab({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Overall Target Amount (Rs.) *
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="number"
                     step="0.01"
                     min="0"
@@ -1469,13 +1425,10 @@ export default function CustomerTargetsTab({
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      fontSize: '0.82rem',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: 700,
-                      fontFamily: 'monospace',
                     }}
                     onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
                     onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
@@ -1486,54 +1439,45 @@ export default function CustomerTargetsTab({
               {/* Row 4: Date Range & Quick Presets */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <label style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Target Period Dates *
                   </label>
                   <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => setDatePreset('thisMonth')}
                       style={{
                         backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
-                        fontWeight: 500,
                       }}
                     >
                       This Month
                     </button>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => setDatePreset('nextQuarter')}
                       style={{
                         backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
-                        fontWeight: 500,
                       }}
                     >
                       Quarterly (90 Days)
                     </button>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => setDatePreset('thisYear')}
                       style={{
                         backgroundColor: '#f1f5f9',
                         border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
                         cursor: 'pointer',
                         color: '#334155',
-                        fontWeight: 500,
                       }}
                     >
                       Full Year
@@ -1543,8 +1487,8 @@ export default function CustomerTargetsTab({
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Start Date:</span>
-                    <input
+                    <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>Start Date:</span>
+                    <input className="erp-field"
                       type="date"
                       required
                       value={formData.startDate}
@@ -1553,8 +1497,6 @@ export default function CustomerTargetsTab({
                         width: '100%',
                         height: '34px',
                         padding: '0 10px',
-                        fontSize: '0.82rem',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         marginTop: '3px',
                         boxSizing: 'border-box',
@@ -1562,8 +1504,8 @@ export default function CustomerTargetsTab({
                     />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>End Date:</span>
-                    <input
+                    <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>End Date:</span>
+                    <input className="erp-field"
                       type="date"
                       required
                       value={formData.endDate}
@@ -1572,8 +1514,6 @@ export default function CustomerTargetsTab({
                         width: '100%',
                         height: '34px',
                         padding: '0 10px',
-                        fontSize: '0.82rem',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
                         marginTop: '3px',
                         boxSizing: 'border-box',
@@ -1599,59 +1539,50 @@ export default function CustomerTargetsTab({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h4 style={{ margin: 0, fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0f172a' }}>
                       Range Slabs & Progressive Discount Tiers
                     </h4>
-                    <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                    <p style={{ margin: '2px 0 0', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                       When customer purchases reach each range, the unlocked discount applies automatically
                     </p>
                   </div>
 
                   {/* Preset Buttons */}
                   <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => handleApplyPreset('standard3')}
                       style={{
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
                         backgroundColor: '#e0f2fe',
                         color: '#0369a1',
                         border: '1px solid #bae6fd',
-                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
                       3-Tier (3%, 5%, 8%)
                     </button>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => handleApplyPreset('executive4')}
                       style={{
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
                         backgroundColor: '#fef3c7',
                         color: '#b45309',
                         border: '1px solid #fde68a',
-                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
                       4-Tier (2%, 5%, 8%, 12%)
                     </button>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => handleApplyPreset('booster')}
                       style={{
                         padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
                         backgroundColor: '#f3e8ff',
                         color: '#7e22ce',
                         border: '1px solid #e9d5ff',
-                        borderRadius: '4px',
                         cursor: 'pointer',
                       }}
                     >
@@ -1677,8 +1608,8 @@ export default function CustomerTargetsTab({
                       }}
                     >
                       <div>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Tier Name:</span>
-                        <input
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', display: 'block' }}>Tier Name:</span>
+                        <input className="erp-field"
                           type="text"
                           value={tier.tierName}
                           onChange={(e) => handleTierChange(idx, 'tierName', e.target.value)}
@@ -1687,8 +1618,6 @@ export default function CustomerTargetsTab({
                             width: '100%',
                             height: '30px',
                             padding: '0 6px',
-                            fontSize: '0.78rem',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             boxSizing: 'border-box',
                           }}
@@ -1696,8 +1625,8 @@ export default function CustomerTargetsTab({
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Min Spend (Rs.):</span>
-                        <input
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', display: 'block' }}>Min Spend (Rs.):</span>
+                        <input className="erp-field"
                           type="number"
                           step="0.01"
                           min="0"
@@ -1708,19 +1637,16 @@ export default function CustomerTargetsTab({
                             width: '100%',
                             height: '30px',
                             padding: '0 6px',
-                            fontSize: '0.78rem',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             fontWeight: 600,
-                            fontFamily: 'monospace',
                             boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Max Spend (Rs.):</span>
-                        <input
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', display: 'block' }}>Max Spend (Rs.):</span>
+                        <input className="erp-field"
                           type="number"
                           step="0.01"
                           min="0"
@@ -1731,18 +1657,15 @@ export default function CustomerTargetsTab({
                             width: '100%',
                             height: '30px',
                             padding: '0 6px',
-                            fontSize: '0.78rem',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
-                            fontFamily: 'monospace',
                             boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Discount (%):</span>
-                        <input
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', display: 'block' }}>Discount (%):</span>
+                        <input className="erp-field"
                           type="number"
                           step="0.1"
                           min="0"
@@ -1754,20 +1677,17 @@ export default function CustomerTargetsTab({
                             width: '100%',
                             height: '30px',
                             padding: '0 6px',
-                            fontSize: '0.78rem',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             fontWeight: 700,
                             color: '#0284c7',
-                            fontFamily: 'monospace',
                             boxSizing: 'border-box',
                           }}
                         />
                       </div>
 
                       <div>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Reward Note:</span>
-                        <input
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', display: 'block' }}>Reward Note:</span>
+                        <input className="erp-field"
                           type="text"
                           value={tier.rewardDescription}
                           onChange={(e) => handleTierChange(idx, 'rewardDescription', e.target.value)}
@@ -1776,8 +1696,6 @@ export default function CustomerTargetsTab({
                             width: '100%',
                             height: '30px',
                             padding: '0 6px',
-                            fontSize: '0.78rem',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             boxSizing: 'border-box',
                           }}
@@ -1804,7 +1722,7 @@ export default function CustomerTargetsTab({
                   ))}
                 </div>
 
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={handleAddTier}
                   style={{
@@ -1813,12 +1731,9 @@ export default function CustomerTargetsTab({
                     alignItems: 'center',
                     gap: '4px',
                     padding: '4px 10px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
                     color: '#0284c7',
                     backgroundColor: '#ffffff',
                     border: '1px dashed #0284c7',
-                    borderRadius: '4px',
                     cursor: 'pointer',
                     marginTop: '2px',
                   }}
@@ -1836,7 +1751,7 @@ export default function CustomerTargetsTab({
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   style={{ width: '15px', height: '15px', cursor: 'pointer' }}
                 />
-                <label htmlFor="isActiveTarget" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                <label htmlFor="isActiveTarget" style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
                   Target is Active and available in POS
                 </label>
               </div>
@@ -1851,15 +1766,12 @@ export default function CustomerTargetsTab({
                   borderTop: '1px solid #e2e8f0',
                 }}
               >
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowModal(false)}
                   style={{
                     height: '34px',
                     padding: '0 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: 500,
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     backgroundColor: '#ffffff',
                     color: '#475569',
@@ -1874,7 +1786,7 @@ export default function CustomerTargetsTab({
                   style={{
                     height: '34px',
                     padding: '0 18px',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontWeight: 600,
                     borderRadius: '6px',
                     border: 'none',
@@ -1944,7 +1856,7 @@ export default function CustomerTargetsTab({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Target size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a' }}>
                   Target Progress: {selectedTargetDetail.name}
                 </h3>
               </div>
@@ -1972,34 +1884,34 @@ export default function CustomerTargetsTab({
                 }}
               >
                 <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Sales Achieved
                   </div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', marginTop: '3px' }}>
                     Rs. {Number(selectedTargetDetail.currentAchievedAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
                 </div>
 
                 <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '8px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Target Goal
                   </div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'monospace', color: '#0284c7', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 700, fontFamily: 'monospace', color: '#0284c7', marginTop: '3px' }}>
                     Rs. {Number(selectedTargetDetail.targetAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px', fontFamily: 'monospace' }}>
                     {selectedTargetDetail.achievementPercentage}% of goal
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Unlocked Discount
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace', color: '#16a34a', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, fontFamily: 'monospace', color: '#16a34a', marginTop: '3px' }}>
                     {selectedTargetDetail.currentDiscountPercentage > 0 ? `${selectedTargetDetail.currentDiscountPercentage}%` : '0%'}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>
                     {selectedTargetDetail.currentAchievedTier ? selectedTargetDetail.currentAchievedTier.tierName : 'Base tier'}
                   </div>
                 </div>
@@ -2007,7 +1919,7 @@ export default function CustomerTargetsTab({
 
               {/* Slabs Breakdown */}
               <div>
-                <h4 style={{ margin: '0 0 8px', fontSize: '0.76rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Range Slabs & Unlocking Status
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2025,20 +1937,20 @@ export default function CustomerTargetsTab({
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.82rem', color: tr.isAchieved ? '#15803d' : '#0f172a' }}>
+                        <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-body)', color: tr.isAchieved ? '#15803d' : '#0f172a' }}>
                           {tr.tierName}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                           Range: Rs. {Number(tr.minAmount).toLocaleString()} - {tr.maxAmount ? `Rs. ${Number(tr.maxAmount).toLocaleString()}` : 'Unlimited'}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.84rem', fontFamily: 'monospace', color: tr.isAchieved ? '#16a34a' : '#475569' }}>
+                        <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-body)', fontFamily: 'monospace', color: tr.isAchieved ? '#16a34a' : '#475569' }}>
                           {tr.discountPercentage}% Discount
                         </div>
                         <span
                           style={{
-                            fontSize: '0.68rem',
+                            fontSize: 'var(--erp-text-badge)',
                             fontWeight: 700,
                             color: tr.isAchieved ? '#16a34a' : '#94a3b8',
                           }}
@@ -2052,15 +1964,12 @@ export default function CustomerTargetsTab({
               </div>
 
               <div style={{ textAlign: 'right', paddingTop: '6px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setSelectedTargetDetail(null)}
                   style={{
                     height: '32px',
                     padding: '0 14px',
-                    fontSize: '0.82rem',
-                    fontWeight: 500,
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     backgroundColor: '#ffffff',
                     cursor: 'pointer',

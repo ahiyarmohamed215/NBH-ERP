@@ -777,7 +777,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search GRNs by #, supplier, invoice..."
                 value={searchTerm}
@@ -786,9 +786,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -841,7 +839,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               </FilterSelect>
 
               {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setStatusFilter('ALL');setFromDate('');setToDate('');
@@ -850,12 +848,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -870,7 +865,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 </button>
               )}
 
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setShowUploadModal(true)}
                 style={{
@@ -878,16 +873,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   padding: '0 14px',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
                   color: '#16a34a',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
@@ -911,7 +902,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -952,7 +943,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1002,28 +993,28 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       GRN NUMBER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       SUPPLIER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       TOTAL PRODUCTS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       DATE
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1031,13 +1022,13 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading GRN records...
                       </td>
                     </tr>
                   ) : filteredGrns.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         No GRN records found. Click <strong>+ New Goods Received</strong> to create a new intake.
                       </td>
                     </tr>
@@ -1055,32 +1046,32 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view complete GRN details"
                       >
-                        <td style={{ padding: '12px 18px' }}>
+                        <td className="erp-table-cell">
                           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {g.grnNumber}
                           </span>
                           {g.supplierInvoiceNumber && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                            <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>
                               Inv: {g.supplierInvoiceNumber}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                           {g.supplierName || '—'}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                        <td className="erp-table-cell" style={{ color: '#334155' }}>
                           {getTotalProducts(g)}
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <StatusBadge status={g.status} />
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.notes || g.remarks || ''}>
+                        <td className="erp-table-cell" style={{ color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.notes || g.remarks || ''}>
                           {g.notes || g.remarks || '—'}
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             {canEditGrn && g.status !== 'CANCELLED' && (
                               <button
@@ -1180,16 +1171,16 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                   <FileCheck size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     {editingGrnId ? `Edit Goods Received Note (GRN) — ${formData.grnNumber}` : 'New Goods Received Note (GRN)'}
                   </h2>
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '1px 0 0 0' }}>
+                  <p style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', margin: '1px 0 0 0' }}>
                     {editingGrnStatus === 'PROCESSED' ? 'Saving adjusts inventory by the quantity difference. Reductions require available stock.' : 'Inward delivery workstation — stock updates, unit pricing & consignment verification'}
                   </p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowUploadModal(true)}
                   style={{
@@ -1197,9 +1188,6 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     padding: '0 10px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
                     color: '#16a34a',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -1268,7 +1256,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 ['costPrice', 'UNIT COST (LKR) *', 0, '0.01'],
               ].map(([field, label, min, step]) => (
                 <label key={field}>{label}
-                  <input className="input-glass" type="number" min={min} step={step}
+                  <input className="input-glass erp-field" type="number" min={min} step={step}
                     inputMode={field === 'quantity' ? 'numeric' : 'decimal'} onFocus={event=>event.target.select()}
                     name={field}
                     value={stagingItem[field]} onChange={e => handleStagingChange(field, readNumericInput(e))} />
@@ -1277,54 +1265,54 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               <label>
                 <span className="grn-markup-label"><input type="checkbox" checked={stagingItem.useBrandMarkup}
                   aria-label="Use brand MP%" onChange={(e) => handleStagingChange('useBrandMarkup', e.target.checked)} /> MP% ({stagingItem.useBrandMarkup ? 'Brand' : 'Calculated'})</span>
-                <input className="input-glass" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly />
+                <input className="input-glass erp-field" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly />
               </label>
-              <label>SELLING PRICE (LKR)<input className="input-glass" type="number" name="salePrice" min="0" step="0.01"
+              <label>SELLING PRICE (LKR)<input className="input-glass erp-field" type="number" name="salePrice" min="0" step="0.01"
                 inputMode="decimal" onFocus={event=>{if(!event.target.readOnly)event.target.select();}}
                 readOnly={stagingItem.useBrandMarkup} value={stagingItem.salePrice}
                 onChange={(e) => handleStagingChange('salePrice', readNumericInput(e))} /></label>
             </div>
-            <button type="button" className="btn btn-primary grn-add-item" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
+            <button type="button" className="btn btn-primary grn-add-item erp-button" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
               {editingLineIndex === null ? <Plus size={16} /> : <Edit2 size={16} />} {editingLineIndex === null ? 'Add item' : 'Update item'}
             </button>
-            {editingLineIndex !== null && <button type="button" className="btn btn-glass" onClick={resetStagingItem}>Cancel line edit</button>}
+            {editingLineIndex !== null && <button type="button" className="btn btn-glass erp-button" onClick={resetStagingItem}>Cancel line edit</button>}
           <div className="grn-header-fields">
             <label>Supplier *<FilterSelect variant="field" aria-label="Supplier" className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
               <option value="">Select supplier</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </FilterSelect></label>
-            <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
-            <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass" name="remarks" maxLength={5000} rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
+            <label>GRN date *<input className="input-glass erp-field" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
+            <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass erp-field" name="remarks" maxLength={5000} rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
           </div>
           </div>
 
           {/* Received items */}
           <div className="grn-items">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
+              <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 800, color: '#1e293b' }}>
                 Received items ({formData.items.length})
               </span>
-              <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px' }}>
+              <span style={{ fontSize: 'var(--erp-text-small)', color: '#475569', fontWeight: 600, background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px' }}>
                 Received units: <strong style={{ color: '#1d4ed8' }}>{totals.totalQty + totals.totalFree}</strong>
               </span>
             </div>
 
             <div className="grn-table-scroll">
-              <table className="glass-table" style={{ margin: 0, minWidth: '600px', width: '100%' }}>
+              <table className="glass-table erp-table" style={{ margin: 0, minWidth: '600px', width: '100%' }}>
                 <thead><tr>
-                  <th>Product code</th><th>Product name</th><th className="grn-number">Qty</th><th className="grn-number">Unit cost</th>
-                  <th className="grn-number">MP%</th><th className="grn-number">Selling price</th><th className="grn-number">Actions</th>
+                  <th className="erp-table-heading">Product code</th><th className="erp-table-heading">Product name</th><th className="grn-number erp-table-heading">Qty</th><th className="grn-number erp-table-heading">Unit cost</th>
+                  <th className="grn-number erp-table-heading">MP%</th><th className="grn-number erp-table-heading">Selling price</th><th className="grn-number erp-table-heading">Actions</th>
                 </tr></thead>
                 <tbody>
-                  {formData.items.length === 0 && <tr><td colSpan="7" className="grn-empty">Search a product and add it to the GRN.</td></tr>}
+                  {formData.items.length === 0 && <tr><td colSpan="7" className="grn-empty erp-table-cell">Search a product and add it to the GRN.</td></tr>}
                   {formData.items.map((item, index) => <tr key={item.productId} className={editingLineIndex === index ? 'grn-editing-row' : ''}>
-                    <td><strong className="grn-product-code">{item.productCode}</strong></td>
-                    <td>{item.tradeName || '—'}</td>
-                    <td className="grn-number">{item.quantityReceived}</td>
-                    <td className="grn-number">LKR {Number(item.unitCost || 0).toFixed(2)}</td>
-                    <td className="grn-number">{Number(item.markupPercent || 0).toFixed(2)}%</td>
-                    <td className="grn-number">LKR {Number(item.salePrice || 0).toFixed(2)}</td>
-                    <td className="grn-number"><div className="grn-row-actions">
+                    <td className="erp-table-cell"><strong className="grn-product-code">{item.productCode}</strong></td>
+                    <td className="erp-table-cell">{item.tradeName || '—'}</td>
+                    <td className="grn-number erp-table-cell">{item.quantityReceived}</td>
+                    <td className="grn-number erp-table-cell">LKR {Number(item.unitCost || 0).toFixed(2)}</td>
+                    <td className="grn-number erp-table-cell">{Number(item.markupPercent || 0).toFixed(2)}%</td>
+                    <td className="grn-number erp-table-cell">LKR {Number(item.salePrice || 0).toFixed(2)}</td>
+                    <td className="grn-number erp-table-cell"><div className="grn-row-actions">
                       <button type="button" title="Edit line" aria-label={`Edit item ${index + 1}`} onClick={() => handleEditItem(index)}><Edit2 size={14} /></button>
                       <button type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => requestRemove(index)}><Trash2 size={14} /></button>
                     </div></td>
@@ -1349,17 +1337,14 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               }}
             >
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowGrnForm(false)}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
@@ -1375,7 +1360,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
                     color: '#0f172a',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
@@ -1392,7 +1377,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     border: 'none',
                     background: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'none',
@@ -1435,7 +1420,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', marginBottom: '18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <FileSpreadsheet size={24} color="#16a34a" />
-                <h2 style={{ fontSize: '1.35rem', color: '#0f172a', margin: 0 }}>
+                <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                   Upload GRN Spreadsheet
                 </h2>
               </div>
@@ -1447,7 +1432,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               </button>
             </div>
 
-            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '18px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 'var(--erp-text-button)', color: '#475569', marginBottom: '18px', lineHeight: 1.5 }}>
               Upload an Excel (.xlsx) or CSV sheet to fill product rows, supplier and remarks. Use one supplier per sheet. Enter quantities only for products being received; blank quantity rows are skipped. The GRN number is generated automatically when saving. Leave selling price blank to calculate cost + MP%. Prices are in LKR.
             </p>
 
@@ -1464,10 +1449,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadCloud size={42} color="#2563eb" style={{ margin: '0 auto 10px' }} />
-              <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.98rem' }}>
+              <div style={{ fontWeight: 700, color: '#1e40af', fontSize: 'var(--erp-text-nav)' }}>
                 Click to Select Spreadsheet File (.csv / .xlsx)
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '6px' }}>
+              <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '6px' }}>
                 Columns: {GRN_SHEET_HEADERS.join(', ')}
               </div>
               <input
@@ -1481,20 +1466,20 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Need a starting format?</span>
+              <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b' }}>Need a starting format?</span>
               <button
                 type="button"
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={downloadGrnTemplate}
                 disabled={spreadsheetBusy}
-                style={{ fontSize: '0.82rem', padding: '6px 14px' }}
+                style={{ padding: '6px 14px' }}
               >
                 {spreadsheetBusy?'Please wait...':'Download Excel Template'}
               </button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn btn-glass" onClick={() => setShowUploadModal(false)}>
+              <button className="btn btn-glass erp-button" onClick={() => setShowUploadModal(false)}>
                 Cancel
               </button>
             </div>

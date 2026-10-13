@@ -1,0 +1,91 @@
+/* Purchasing is the reference for every operational module. */
+:root {
+  --erp-text-title: 1.65rem;
+  --erp-text-dialog: 1.25rem;
+  --erp-text-section: 1.15rem;
+  --erp-text-nav: .92rem;
+  --erp-text-description: .875rem;
+  --erp-text-button: .88rem;
+  --erp-text-field: .85rem;
+  --erp-text-body: .84rem;
+  --erp-text-small: .78rem;
+  --erp-text-caption: .74rem;
+  --erp-text-badge: .67rem;
+  --erp-accent: #0284c7;
+  --erp-accent-hover: #0369a1;
+  --erp-accent-soft: #f0f9ff;
+  --erp-border: #e2e8f0;
+  --erp-field-border: #cbd5e1;
+  --erp-text: #334155;
+  --erp-muted: #64748b;
+  --erp-heading: #0f172a;
+  --erp-canvas: #f8fafc;
+  --erp-control-height: 38px;
+  --erp-control-radius: 6px;
+  --erp-page-padding: 24px 32px;
+}
+
+.erp-page.erp-page { padding: var(--erp-page-padding) !important; background: var(--erp-canvas); min-width: 0; }
+/* Focused document editors retain their compact workspace padding. */
+.erp-page[data-focused="true"], .erp-page.inventory-allocation-focus { --erp-page-padding: 12px; }
+.erp-page-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:16px; flex-shrink:0; }
+.erp-page-header > div { min-width:0; }
+.erp-page-title { font-family:var(--font-sans); font-size:var(--erp-text-title); font-weight:800; letter-spacing:-.02em; line-height:1.25; color:var(--erp-heading); margin:0 0 4px; }
+.erp-page-description { font-size:var(--erp-text-description); color:var(--erp-muted); line-height:1.5; margin:0; }
+.erp-dialog-title.erp-dialog-title { font-family:var(--font-sans); font-size:var(--erp-text-dialog) !important; font-weight:700; letter-spacing:-.015em; }
+
+.erp-tabs { display:flex; align-items:center; gap:24px; border-bottom:1px solid var(--erp-border); margin-bottom:16px; overflow-x:auto; overflow-y:hidden; flex-shrink:0; max-width:100%; min-width:0; }
+.erp-tab { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; min-height:44px; padding:10px 4px; margin-bottom:-1px; border:0; border-bottom:2.5px solid transparent; border-radius:0; background:transparent; color:var(--erp-muted); font-family:var(--font-sans); font-size:var(--erp-text-nav); font-weight:500; line-height:1.5; white-space:nowrap; cursor:pointer; }
+.erp-tab[data-active="true"] { border-bottom-color:var(--erp-accent); color:var(--erp-accent); font-weight:700; }
+/* Override legacy inline hover handlers as well as sidebar inline colours. */
+:is(.erp-tab,.glass-pill-btn,.sidebar-nav-btn,nav button):hover:not(:disabled) { color:var(--erp-accent) !important; }
+:is(.erp-tab,.glass-pill-btn,.sidebar-nav-btn,nav button):hover:not(:disabled) svg { color:inherit; }
+.erp-tab > svg { width:16px; height:16px; flex-shrink:0; }
+
+/* Explicit roles beat the older module-specific button rules without resizing
+   calendar cells, switches, POS product tiles, or icon-only close controls. */
+.erp-button.erp-button, .btn, .allocation-workspace-actions :is(.allocation-primary,.allocation-secondary) {
+  font-family:var(--font-sans); font-size:var(--erp-text-button) !important; font-weight:600;
+  border-radius:var(--erp-control-radius) !important; min-height:var(--erp-control-height);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; line-height:1.4;
+  padding:8px 16px !important; cursor:pointer; box-shadow:none !important;
+}
+.erp-button-primary.erp-button-primary, .btn-primary, .allocation-workspace-actions .allocation-primary {
+  background:var(--erp-accent); color:#fff; border:1px solid var(--erp-accent);
+}
+.erp-button-primary:hover:not(:disabled), .btn-primary:hover:not(:disabled) { background:var(--erp-accent-hover); border-color:var(--erp-accent-hover); }
+.erp-page-header .erp-button, .erp-page-header .btn { min-height:40px; padding:9px 18px !important; border-radius:8px !important; white-space:nowrap; flex-shrink:0; }
+.erp-page-header :is(.erp-button,.btn) > svg { width:17px; height:17px; flex-shrink:0; }
+.erp-button:disabled { opacity:.55; cursor:not-allowed; }
+
+.erp-field.erp-field { font-family:var(--font-sans); font-size:var(--erp-text-field) !important; border-radius:var(--erp-control-radius) !important; }
+.erp-field::placeholder { font-size:inherit; color:var(--erp-muted); }
+.erp-field:not(textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(.modern-select-native) { height:var(--erp-control-height) !important; }
+.erp-application label { font-size:var(--erp-text-caption); font-weight:600; color:#475569; }
+:is(.erp-field,.erp-button,.erp-tab,.btn):focus-visible { outline:2px solid var(--erp-accent); outline-offset:2px; }
+.erp-field[aria-invalid="true"] { border-color:var(--danger); }
+
+.erp-table { width:100%; border-collapse:collapse; font-size:var(--erp-text-body); font-variant-numeric:tabular-nums; }
+.erp-table .erp-table-heading { padding:12px 14px !important; font-size:var(--erp-text-caption) !important; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:#475569; background:#fafbfc; border-bottom:1px solid var(--erp-border); }
+.erp-table .erp-table-cell { padding:12px 14px !important; font-size:var(--erp-text-body); border-bottom:1px solid #f1f5f9; }
+.erp-table tbody tr:hover { background:var(--erp-canvas); }
+.erp-table button:not(.erp-button):not(.erp-status-badge):is([title^="Edit"],[title^="View"],[title^="Print"],[title^="Delete"]) { width:30px; height:30px; padding:0; border-radius:var(--erp-control-radius); }
+
+/* All modules share Purchasing's flat surfaces. Status colours remain semantic. */
+.erp-application, .erp-application :where(*) { box-shadow:none !important; text-shadow:none !important; }
+.erp-application :where(button,input,select,textarea) { font-family:var(--font-sans); }
+.erp-application { color:var(--erp-text); }
+.erp-application ::selection { background:#bae6fd; color:var(--erp-heading); }
+.erp-application :where(input,textarea) { caret-color:var(--erp-accent); }
+.erp-application :where(*) { scrollbar-color:#cbd5e1 transparent; scrollbar-width:thin; }
+
+@media(max-width:900px) {
+  :root { --erp-page-padding:16px; }
+  .erp-page-header { gap:12px; }
+}
+@media(max-width:600px) {
+  :root { --erp-page-padding:12px; }
+  .erp-page-header > div:first-child { flex-basis:100%; }
+  .erp-page-header > div { flex-wrap:wrap; }
+  .erp-tabs { gap:20px; }
+}

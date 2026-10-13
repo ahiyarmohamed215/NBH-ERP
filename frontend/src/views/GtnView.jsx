@@ -323,15 +323,15 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
           backgroundColor: '#ffffff',
           borderRadius: '8px',
           border: '1px solid #e2e8f0',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              width: '100%',
-              boxSizing: 'border-box',
-              flexWrap: 'wrap',
-              flexShrink: 0,
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          width: '100%',
+          boxSizing: 'border-box',
+          flexWrap: 'wrap',
+          flexShrink: 0,
             }}
           >
             {/* Search Input */}
@@ -346,7 +346,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search GTNs by #, source, destination, remarks..."
                 value={searchTerm}
@@ -355,9 +355,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -411,7 +409,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               </FilterSelect>
 
               {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setStatusFilter('ALL');setFromDate('');setToDate('');
@@ -420,12 +418,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -447,12 +442,14 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 onClick={handlePrintList}
                 style={{
                   height: '38px',
-                  padding: '0', width: '38px', justifyContent: 'center',
+                  padding: '0',
+                  width: '38px',
+                  justifyContent: 'center',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -484,12 +481,14 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 onClick={loadData}
                 style={{
                   height: '38px',
-                  padding: '0', width: '38px', justifyContent: 'center',
+                  padding: '0',
+                  width: '38px',
+                  justifyContent: 'center',
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   color: '#334155',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -535,28 +534,28 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             }}
           >
             <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       GTN NUMBER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       WAREHOUSE
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       TOTAL PRODUCTS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       DATE
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -564,13 +563,13 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading transfer notes...
                       </td>
                     </tr>
                   ) : filteredGtns.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         No transfer records found. Fill the form on the left to initiate a transfer.
                       </td>
                     </tr>
@@ -588,29 +587,29 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view transfer details"
                       >
-                        <td style={{ padding: '12px 18px' }}>
+                        <td className="erp-table-cell">
                           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {g.gtnNumber}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <div title={`Sources: ${gtnWarehouseSummary(g).sources.join(', ')}; Destinations: ${gtnWarehouseSummary(g).destinations.join(', ')}`}>
-                            <strong style={{fontSize:'.82rem',color:'#334155'}}>{gtnWarehouseSummary(g).text}</strong>
+                            <strong style={{ fontSize: 'var(--erp-text-body)', color:'#334155' }}>{gtnWarehouseSummary(g).text}</strong>
                           </div>
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '.84rem', fontWeight: 600, color: '#334155' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#334155' }}>
                           {new Set((g.items || []).map(item=>item.productId)).size}
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {g.dispatchDate || g.createdAt?.slice(0, 10) || '—'}
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <StatusBadge status={g.status} />
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '0.82rem', color: '#64748b', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {g.notes || g.remarks || '—'}
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
                             {['DRAFT', 'PENDING', 'TRANSFERRED'].includes(g.status) && (<button
                               type="button"
@@ -705,16 +704,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                   <ArrowRightLeft size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     {editingGtnId ? 'Edit Stock Transfer (GTN)' : 'New Stock Transfer (GTN)'}
                   </h2>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                  <p style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', margin: '2px 0 0 0' }}>
                     Create a pending transfer, print for handover, then confirm receipt.
                   </p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => resetForm()}
                   style={{
@@ -722,9 +721,6 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     padding: '0 12px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#475569',
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -765,19 +761,16 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 addDisabled={!formData.destinationWarehouseId || Boolean(isSameWarehouse)} addHint={!formData.destinationWarehouseId ? 'Select the destination warehouse before adding products.' : undefined}
                 searchProducts={transferSearchProducts} resultQuantity={product=>product.availableQuantity} searchEmptyMessage="No matching products with available stock."
                 quantityDetails={(product, editing) => <><span>Available qty</span><strong>{!product ? '—' : stockError ? 'Unavailable' : remainingStock(product, editing) ?? 'Loading...'}</strong></>}
-                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea maxLength={5000} rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input className="erp-field" readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea className="erp-field" maxLength={5000} rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowCreateForm(false)}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
@@ -793,7 +786,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
                     color: '#0f172a',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
@@ -810,7 +803,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     border: 'none',
                     background: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'none',

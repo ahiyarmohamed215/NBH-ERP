@@ -145,12 +145,12 @@ export default function RoleSearchSelector({
       {/* Top Label and Count */}
       {label && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          <label style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0f172a', margin: 0 }}>
             {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
           </label>
           <span
             style={{
-              fontSize: '0.74rem',
+              fontSize: 'var(--erp-text-caption)',
               fontWeight: 700,
               padding: '2px 9px',
               borderRadius: '9999px',
@@ -180,13 +180,13 @@ export default function RoleSearchSelector({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Shield size={14} color="#0284c7" />
-            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Assigned Roles ({selectedCount})
             </span>
           </div>
 
           {selectedCount > 0 && !isSuperAdmin && (
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => onChange && onChange([])}
               style={{
@@ -194,10 +194,7 @@ export default function RoleSearchSelector({
                 border: 'none',
                 padding: '2px 6px',
                 color: '#64748b',
-                fontSize: '0.75rem',
                 cursor: 'pointer',
-                fontWeight: 600,
-                borderRadius: '4px',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = '#ef4444';
@@ -216,7 +213,7 @@ export default function RoleSearchSelector({
         {selectedCount === 0 ? (
           <div
             style={{
-              fontSize: '0.82rem',
+              fontSize: 'var(--erp-text-body)',
               color: '#94a3b8',
               fontStyle: 'italic',
               padding: '8px 10px',
@@ -258,7 +255,7 @@ export default function RoleSearchSelector({
                     backgroundColor: '#ffffff',
                     color: '#0f172a',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontWeight: 600,
                     transition: 'all 0.15s ease',
                   }}
@@ -267,7 +264,7 @@ export default function RoleSearchSelector({
                   <span>{format(roleName)}</span>
                   <span
                     style={{
-                      fontSize: '0.68rem',
+                      fontSize: 'var(--erp-text-badge)',
                       fontFamily: 'monospace',
                       color: '#64748b',
                       backgroundColor: '#f1f5f9',
@@ -332,7 +329,7 @@ export default function RoleSearchSelector({
               pointerEvents: 'none',
             }}
           />
-          <input
+          <input className="erp-field"
             ref={inputRef}
             aria-label="Search roles"
             type="text"
@@ -343,9 +340,7 @@ export default function RoleSearchSelector({
               width: '100%',
               height: '34px',
               padding: '0 30px 0 32px',
-              borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.88rem',
               backgroundColor: '#ffffff',
               boxSizing: 'border-box',
               outline: 'none',
@@ -401,51 +396,42 @@ export default function RoleSearchSelector({
         {/* Filter Quick Pills and Match Counter */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setFilterTab('all')}
               style={{
                 padding: '4px 10px',
-                borderRadius: '6px',
                 border: filterTab === 'all' ? '1px solid #0284c7' : '1px solid #e2e8f0',
                 backgroundColor: filterTab === 'all' ? '#f0f9ff' : '#ffffff',
                 color: filterTab === 'all' ? '#0284c7' : '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: filterTab === 'all' ? 700 : 500,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
             >
               All Roles ({combinedRoles.length})
             </button>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setFilterTab('selected')}
               style={{
                 padding: '4px 10px',
-                borderRadius: '6px',
                 border: filterTab === 'selected' ? '1px solid #0284c7' : '1px solid #e2e8f0',
                 backgroundColor: filterTab === 'selected' ? '#f0f9ff' : '#ffffff',
                 color: filterTab === 'selected' ? '#0284c7' : '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: filterTab === 'selected' ? 700 : 500,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
             >
               Selected ({selectedCount})
             </button>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setFilterTab('unassigned')}
               style={{
                 padding: '4px 10px',
-                borderRadius: '6px',
                 border: filterTab === 'unassigned' ? '1px solid #0284c7' : '1px solid #e2e8f0',
                 backgroundColor: filterTab === 'unassigned' ? '#f0f9ff' : '#ffffff',
                 color: filterTab === 'unassigned' ? '#0284c7' : '#64748b',
-                fontSize: '0.78rem',
-                fontWeight: filterTab === 'unassigned' ? 700 : 500,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
@@ -454,7 +440,7 @@ export default function RoleSearchSelector({
             </button>
           </div>
 
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+          <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
             {isSearchingBackend ? (
               <span style={{ color: '#0284c7', fontWeight: 600 }}>Searching server...</span>
             ) : searchQuery ? (
@@ -505,28 +491,25 @@ export default function RoleSearchSelector({
             >
               <Search size={22} />
             </div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+            <div style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#1e293b' }}>
               {searchQuery ? `No roles matching "${searchQuery}"` : 'No roles found in this filter'}
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
+            <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', maxWidth: '320px' }}>
               {searchQuery
                 ? 'Check the spelling or try searching with a different keyword or system code.'
                 : 'Switch filter tabs above to see other roles.'}
             </div>
             {searchQuery && (
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setSearchQuery('')}
                 style={{
                   marginTop: '4px',
-                  fontSize: '0.8rem',
                   color: '#0284c7',
                   backgroundColor: '#f0f9ff',
                   border: '1px solid #bae6fd',
                   padding: '5px 14px',
-                  borderRadius: '6px',
                   cursor: 'pointer',
-                  fontWeight: 600,
                 }}
               >
                 Clear Search Query
@@ -588,12 +571,12 @@ export default function RoleSearchSelector({
                   {/* Role Title, Code, Description and Perms */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>
+                      <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0f172a' }}>
                         <HighlightText text={format(r.name)} query={searchQuery} />
                       </span>
                       <span
                         style={{
-                          fontSize: '0.68rem',
+                          fontSize: 'var(--erp-text-badge)',
                           fontFamily: 'monospace',
                           color: '#475569',
                           backgroundColor: '#f1f5f9',
@@ -610,7 +593,7 @@ export default function RoleSearchSelector({
                       {r.description && (
                         <span
                           style={{
-                            fontSize: '0.78rem',
+                            fontSize: 'var(--erp-text-small)',
                             color: '#64748b',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -625,7 +608,7 @@ export default function RoleSearchSelector({
                       {permsCount > 0 && (
                         <span
                           style={{
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             color: '#0284c7',
                             backgroundColor: '#f0f9ff',
                             border: '1px solid #bae6fd',
@@ -653,7 +636,7 @@ export default function RoleSearchSelector({
                         borderRadius: '6px',
                         backgroundColor: '#0284c7',
                         color: '#ffffff',
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                       }}
                     >
@@ -669,7 +652,7 @@ export default function RoleSearchSelector({
                         backgroundColor: '#f8fafc',
                         border: '1px solid #e2e8f0',
                         color: '#475569',
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                         transition: 'all 0.12s ease',
                       }}

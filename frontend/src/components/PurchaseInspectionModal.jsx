@@ -46,7 +46,7 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
       <div className={`glass-modal purchase-inspection ${type.toLowerCase()}-inspection${tableToolbar ? ' purchase-inspection-toolbar-layout' : ''}${detailsPosition === 'sidebar' ? ' purchase-inspection-split' : ''}${actionsPosition === 'bottom' ? ' purchase-inspection-bottom-actions' : ''}`} role="dialog" aria-modal="true" aria-label={`${type} ${number}`}>
         <header className={`purchase-inspection-header${unifiedDetails ? ' purchase-inspection-header-details' : ''}`}>
           <div className="purchase-inspection-header-main">
-            <div className="purchase-inspection-title"><div className="grn-inspection-symbol"><DocumentIcon size={22} strokeWidth={1.7} /></div><div><span className="purchase-inspection-caption">{documentTitle}</span><div className="purchase-inspection-number-row"><h2>{number}</h2>{unifiedDetails && <StatusBadge status={status}/>}</div></div></div>
+            <div className="purchase-inspection-title"><div className="grn-inspection-symbol"><DocumentIcon size={22} strokeWidth={1.7} /></div><div><span className="purchase-inspection-caption">{documentTitle}</span><div className="purchase-inspection-number-row"><h2 className="erp-dialog-title">{number}</h2>{unifiedDetails && <StatusBadge status={status}/>}</div></div></div>
             <div className="purchase-inspection-header-controls">{!unifiedDetails && <StatusBadge status={status}/>}
               {headerPrint && <button type="button" className="purchase-inspection-table-print" aria-label={`Print ${type}`} onClick={printDocument}><Printer size={15}/> Print</button>}
               {showHeaderClose && <button type="button" className="purchase-inspection-close" aria-label={`Close ${type} details`} title="Close" onClick={onClose}><X size={18}/></button>}
@@ -60,21 +60,21 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
           {detailsPosition === 'sidebar' && <aside className="purchase-inspection-sidebar" aria-label={`${type} information`}>{detailsSection}{managementSection}</aside>}
           <section className="purchase-inspection-items" aria-label={`${type} products`}>
             {tableToolbar && !content && <div className="purchase-inspection-table-toolbar" aria-label={`${type} table controls`}>
-              <div className="purchase-inspection-table-search"><Search size={16}/><input type="search" aria-label={tableSearchLabel || `Search ${type} products`} placeholder={tableSearchPlaceholder || "Search product code or name..."} value={tableQuery} onChange={event=>setTableQuery(event.target.value)}/>{tableQuery && <button type="button" aria-label="Clear table search" onClick={()=>setTableQuery('')}><X size={14}/></button>}</div>
+              <div className="purchase-inspection-table-search"><Search size={16}/><input className="erp-field" type="search" aria-label={tableSearchLabel || `Search ${type} products`} placeholder={tableSearchPlaceholder || "Search product code or name..."} value={tableQuery} onChange={event=>setTableQuery(event.target.value)}/>{tableQuery && <button type="button" aria-label="Clear table search" onClick={()=>setTableQuery('')}><X size={14}/></button>}</div>
               <button type="button" className="purchase-inspection-table-print" title={`Print ${type}`} aria-label={`Print ${type}`} onClick={printDocument}><Printer size={15}/> Print</button>
             </div>}
 
-            {content || <div className="purchase-inspection-table"><table className="glass-table">
-              <thead><tr>{columns.map((column) => <th key={column.label} className={column.numeric ? 'purchase-inspection-number' : ''}>{column.label}</th>)}</tr></thead>
-              <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={column.numeric ? 'purchase-inspection-number' : ''}>{column.value(row) ?? '—'}</td>)}</tr>)}
-                {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty">{emptyMessage || (query ? 'No matching products found.' : 'No products found.')}</td></tr>}
+            {content || <div className="purchase-inspection-table"><table className="glass-table erp-table">
+              <thead><tr>{columns.map((column) => <th key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-heading'}>{column.label}</th>)}</tr></thead>
+              <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-cell'}>{column.value(row) ?? '—'}</td>)}</tr>)}
+                {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty erp-table-cell">{emptyMessage || (query ? 'No matching products found.' : 'No products found.')}</td></tr>}
               </tbody>
             </table></div>}
           </section>
           {!tableToolbar && <aside className="purchase-inspection-actions" aria-label={`${type} actions`}>
-            <button type="button" className="btn btn-primary" title={`Print ${type}`} onClick={printDocument}><Printer size={15} /> Print</button>
-            {footerActions.map(({ label, icon: Icon, onClick, disabled, tone }) => <button key={label} type="button" className="btn btn-glass" onClick={onClick} disabled={disabled} style={tone === 'danger' ? { color: '#e11d48' } : undefined}>{Icon && <Icon size={15} />}{label}</button>)}
-            <button type="button" className="btn btn-glass" aria-label={`Close ${type} ${showHeaderClose ? 'popup' : 'details'}`} onClick={onClose}>{!closeLabel && <X size={15}/>} {closeLabel || `Back to ${type === 'PO' ? 'POs' : `${type}s`}`}</button>
+            <button type="button" className="btn btn-primary erp-button" title={`Print ${type}`} onClick={printDocument}><Printer size={15} /> Print</button>
+            {footerActions.map(({ label, icon: Icon, onClick, disabled, tone }) => <button key={label} type="button" className="btn btn-glass erp-button" onClick={onClick} disabled={disabled} style={tone === 'danger' ? { color: '#e11d48' } : undefined}>{Icon && <Icon size={15} />}{label}</button>)}
+            <button type="button" className="btn btn-glass erp-button" aria-label={`Close ${type} ${showHeaderClose ? 'popup' : 'details'}`} onClick={onClose}>{!closeLabel && <X size={15}/>} {closeLabel || `Back to ${type === 'PO' ? 'POs' : `${type}s`}`}</button>
           </aside>}
         </div>
         {footer}

@@ -175,17 +175,17 @@ export default function SalesReturnsView({ embedded = false }) {
     <div style={{ padding: embedded ? 0 : '24px 32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
       {!embedded && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+        <div className="erp-page-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: '1.7rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+            <h1 className="erp-page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Undo2 size={26} color="#2563eb" /> Customer Sales Returns & Credit Notes
             </h1>
-            <p style={{ color: '#64748b', fontSize: '0.88rem', margin: '4px 0 0 0' }}>
+            <p className="erp-page-description">
               Process invoice returns, credit notes, and restock inventory directly on the left while monitoring return logs on the right
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-glass" onClick={loadData} title="Refresh records">
+            <button className="btn btn-glass erp-button" onClick={loadData} title="Refresh records">
               <RefreshCw size={15} /> Refresh
             </button>
           </div>
@@ -210,13 +210,13 @@ export default function SalesReturnsView({ embedded = false }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Plus size={18} color="#2563eb" />
-              <h2 style={{ fontSize: '1.15rem', color: '#0f172a', margin: 0 }}>
+              <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                 Process Customer Return
               </h2>
             </div>
             <button
               type="button"
-              className="btn btn-glass btn-sm"
+              className="btn btn-glass btn-sm erp-button"
               onClick={resetForm}
               title="Reset fields"
             >
@@ -226,13 +226,13 @@ export default function SalesReturnsView({ embedded = false }) {
 
           {/* Invoice Lookup Row */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
               SEARCH ORIGINAL INVOICE NUMBER *
             </label>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                className="input-glass"
+                className="input-glass erp-field"
                 placeholder="e.g. INV-2026-0001"
                 value={invoiceLookup}
                 onChange={(e) => setInvoiceLookup(e.target.value)}
@@ -245,10 +245,10 @@ export default function SalesReturnsView({ embedded = false }) {
               />
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button"
                 onClick={handleLookupInvoice}
                 disabled={lookingUp}
-                style={{ whiteSpace: 'nowrap', padding: '8px 14px', fontSize: '0.82rem' }}
+                style={{ whiteSpace: 'nowrap', padding: '8px 14px' }}
               >
                 <Receipt size={15} /> {lookingUp ? 'Finding...' : 'Lookup'}
               </button>
@@ -270,10 +270,10 @@ export default function SalesReturnsView({ embedded = false }) {
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem' }}>
+                  <div style={{ fontWeight: 700, color: '#1e40af', fontSize: 'var(--erp-text-button)' }}>
                     Invoice {matchedInvoice.invoiceNumber}
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#3b82f6', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#3b82f6', marginTop: '2px' }}>
                     Customer: {matchedInvoice.customerName || 'Walk-in'} | Total: ${Number(matchedInvoice.grandTotal || 0).toFixed(2)}
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export default function SalesReturnsView({ embedded = false }) {
 
               {/* Items Return Table */}
               <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
                   INVOICE ITEMS TO RETURN
                 </div>
 
@@ -304,36 +304,36 @@ export default function SalesReturnsView({ embedded = false }) {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
-                            <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                            <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-field)' }}>
                               {item.productName}
                             </span>{' '}
-                            <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>
+                            <span style={{ fontFamily: 'monospace', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                               ({item.sku})
                             </span>
                           </div>
-                          <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                          <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                             Sold: <strong>{item.maxQty}</strong> @ ${Number(item.unitPrice || 0).toFixed(2)}
                           </span>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '8px', alignItems: 'center' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', marginBottom: '2px' }}>
+                            <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', color: '#64748b', marginBottom: '2px' }}>
                               Return Qty (Max {item.maxQty})
                             </label>
                             <input
                               type="number"
                               min="0"
                               max={item.maxQty}
-                              className="input-glass"
-                              style={{ padding: '4px 8px', fontSize: '0.82rem', textAlign: 'center' }}
+                              className="input-glass erp-field"
+                              style={{ padding: '4px 8px', textAlign: 'center' }}
                               value={item.quantityReturned}
                               onChange={(e) => handleItemQtyChange(idx, e.target.value)}
                             />
                           </div>
 
                           <div style={{ paddingTop: '14px' }}>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: 'var(--erp-text-small)' }}>
                               <input
                                 type="checkbox"
                                 checked={item.restockable}
@@ -348,7 +348,7 @@ export default function SalesReturnsView({ embedded = false }) {
                           </div>
 
                           <div style={{ textAlign: 'right', paddingTop: '14px' }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: lineRefund > 0 ? '#dc2626' : '#94a3b8' }}>
+                            <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 800, color: lineRefund > 0 ? '#dc2626' : '#94a3b8' }}>
                               ${lineRefund.toFixed(2)}
                             </span>
                           </div>
@@ -362,23 +362,23 @@ export default function SalesReturnsView({ embedded = false }) {
               {/* Reason & Remarks */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     RETURN REASON
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     value={formData.reason}
                     onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     REMARKS / NOTES
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     placeholder="Customer notes..."
                     value={formData.remarks}
                     onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
@@ -398,8 +398,8 @@ export default function SalesReturnsView({ embedded = false }) {
                   border: '1px solid #cbd5e1',
                 }}
               >
-                <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 600 }}>Total Credit Refund:</span>
-                <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#dc2626' }}>
+                <span style={{ fontSize: 'var(--erp-text-field)', color: '#475569', fontWeight: 600 }}>Total Credit Refund:</span>
+                <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#dc2626' }}>
                   ${totalCredit.toFixed(2)}
                 </span>
               </div>
@@ -407,8 +407,8 @@ export default function SalesReturnsView({ embedded = false }) {
               {/* Action Buttons */}
               <button
                 type="button"
-                className="btn btn-primary"
-                style={{ padding: '10px 14px', fontSize: '0.88rem', justifyContent: 'center' }}
+                className="btn btn-primary erp-button"
+                style={{ padding: '10px 14px', justifyContent: 'center' }}
                 onClick={handleSaveReturn}
                 disabled={saving || totalCredit <= 0}
               >
@@ -432,10 +432,10 @@ export default function SalesReturnsView({ embedded = false }) {
               }}
             >
               <Receipt size={32} color="#94a3b8" />
-              <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.9rem' }}>
+              <div style={{ fontWeight: 600, color: '#334155', fontSize: 'var(--erp-text-button)' }}>
                 Lookup an Invoice to Begin
               </div>
-              <div style={{ fontSize: '0.8rem', maxWidth: '320px' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', maxWidth: '320px' }}>
                 Enter the original sales invoice number above to inspect sold items and select which ones to return or restock.
               </div>
             </div>
@@ -460,42 +460,42 @@ export default function SalesReturnsView({ embedded = false }) {
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
               <input
                 type="text"
-                className="input-glass"
-                style={{ paddingLeft: '36px', width: '100%', fontSize: '0.85rem' }}
+                className="input-glass erp-field"
+                style={{ paddingLeft: '36px', width: '100%' }}
                 placeholder="Search returns by return #, invoice #, customer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+            <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>
               Showing {filteredReturns.length} records
             </span>
           </div>
 
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-            <table className="glass-table" style={{ margin: 0 }}>
+            <table className="glass-table erp-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th>Return #</th>
-                  <th>Original Invoice</th>
-                  <th>Credit Note</th>
-                  <th>Customer</th>
-                  <th>Refund Amount</th>
-                  <th>Reason</th>
-                  <th>Date</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th className="erp-table-heading">Return #</th>
+                  <th className="erp-table-heading">Original Invoice</th>
+                  <th className="erp-table-heading">Credit Note</th>
+                  <th className="erp-table-heading">Customer</th>
+                  <th className="erp-table-heading">Refund Amount</th>
+                  <th className="erp-table-heading">Reason</th>
+                  <th className="erp-table-heading">Date</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                       Loading customer returns...
                     </td>
                   </tr>
                 ) : filteredReturns.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                       No sales returns recorded yet.
                     </td>
                   </tr>
@@ -507,32 +507,32 @@ export default function SalesReturnsView({ embedded = false }) {
                       style={{ cursor: 'pointer' }}
                       title="Click row to view return details"
                     >
-                      <td>
+                      <td className="erp-table-cell">
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>
                           {r.returnNumber}
                         </span>
                       </td>
-                      <td>
+                      <td className="erp-table-cell">
                         <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>
                           {r.invoiceNumber}
                         </span>
                       </td>
-                      <td>
+                      <td className="erp-table-cell">
                         <span className="badge badge-warning" style={{ fontFamily: 'monospace' }}>
                           {r.creditNoteNumber || '—'}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{r.customerName}</td>
-                      <td style={{ fontWeight: 700, color: '#dc2626' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{r.customerName}</td>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#dc2626' }}>
                         ${Number(r.totalAmount || 0).toFixed(2)}
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td className="erp-table-cell" style={{ color: '#64748b', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.reason}
                       </td>
-                      <td style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
                         {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ textAlign: 'right', color: '#94a3b8', fontSize: '0.75rem' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', color: '#94a3b8' }}>
                         View Details
                       </td>
                     </tr>
@@ -557,10 +557,10 @@ export default function SalesReturnsView({ embedded = false }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
                   Sales Return Details
                 </span>
-                <h2 style={{ fontSize: '1.3rem', color: '#0f172a', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Package size={20} color="#2563eb" /> {selectedReturn.returnNumber}
                 </h2>
               </div>
@@ -572,62 +572,62 @@ export default function SalesReturnsView({ embedded = false }) {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: 'var(--erp-text-field)' }}>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>ORIGINAL INVOICE</div>
+                <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', fontWeight: 700 }}>ORIGINAL INVOICE</div>
                 <div style={{ fontWeight: 600, color: '#0f172a' }}>{selectedReturn.invoiceNumber}</div>
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>CREDIT NOTE #</div>
+                <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', fontWeight: 700 }}>CREDIT NOTE #</div>
                 <div style={{ fontWeight: 600, color: '#d97706' }}>{selectedReturn.creditNoteNumber || '—'}</div>
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>CUSTOMER</div>
+                <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', fontWeight: 700 }}>CUSTOMER</div>
                 <div style={{ fontWeight: 600, color: '#2563eb' }}>{selectedReturn.customerName}</div>
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>TOTAL REFUND</div>
-                <div style={{ fontWeight: 800, color: '#dc2626', fontSize: '1rem' }}>
+                <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', fontWeight: 700 }}>TOTAL REFUND</div>
+                <div style={{ fontWeight: 800, color: '#dc2626', fontSize: 'var(--erp-text-nav)' }}>
                   ${Number(selectedReturn.totalAmount || 0).toFixed(2)}
                 </div>
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px', fontSize: '0.85rem', color: '#475569' }}>
+            <div style={{ marginBottom: '16px', fontSize: 'var(--erp-text-field)', color: '#475569' }}>
               <div><span style={{ fontWeight: 600 }}>Reason:</span> {selectedReturn.reason}</div>
               {selectedReturn.remarks && (
                 <div><span style={{ fontWeight: 600 }}>Remarks:</span> {selectedReturn.remarks}</div>
               )}
             </div>
 
-            <h3 style={{ fontSize: '0.95rem', color: '#0f172a', marginBottom: '8px' }}>Returned Items</h3>
+            <h3 style={{ fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginBottom: '8px' }}>Returned Items</h3>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <table className="glass-table" style={{ margin: 0 }}>
+              <table className="glass-table erp-table" style={{ margin: 0 }}>
                 <thead>
                   <tr>
-                    <th>Product</th>
-                    <th>SKU</th>
-                    <th style={{ textAlign: 'right' }}>Qty</th>
-                    <th style={{ textAlign: 'right' }}>Unit Price</th>
-                    <th>Restocked?</th>
-                    <th style={{ textAlign: 'right' }}>Refund</th>
+                    <th className="erp-table-heading">Product</th>
+                    <th className="erp-table-heading">SKU</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Qty</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Price</th>
+                    <th className="erp-table-heading">Restocked?</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Refund</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedReturn.items?.map((it, idx) => (
                     <tr key={idx}>
-                      <td style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
-                      <td style={{ fontFamily: 'monospace', color: '#64748b' }}>{it.productSku || '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>${Number(it.unitPrice || 0).toFixed(2)}</td>
-                      <td>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
+                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#64748b' }}>{it.productSku || '—'}</td>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600 }}>{it.quantity}</td>
+                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>${Number(it.unitPrice || 0).toFixed(2)}</td>
+                      <td className="erp-table-cell">
                         {it.isRestocked ? (
                           <span className="badge badge-success">Restocked</span>
                         ) : (
                           <span className="badge badge-danger">Scrapped</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
                         ${Number(it.totalAmount || 0).toFixed(2)}
                       </td>
                     </tr>
@@ -637,7 +637,7 @@ export default function SalesReturnsView({ embedded = false }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-              <button className="btn btn-glass" onClick={() => setSelectedReturn(null)}>
+              <button className="btn btn-glass erp-button" onClick={() => setSelectedReturn(null)}>
                 Close
               </button>
             </div>

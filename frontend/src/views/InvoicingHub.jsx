@@ -940,7 +940,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   }
 
   return (
-    <div
+    <div className="erp-page"
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -957,64 +957,47 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       }}
     >
       {/* Page Header (Fixed / Sticky at Top) - Matching InventoryHub / EmployeesHub */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Sales Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+          <p className="erp-page-description">
             Create and manage commercial invoices, quotations, held bills, and sales returns.
           </p>
         </div>
 
         {/* Action Button matching current active tab - Matching InventoryHub */}
         {currentTab === 'quotations' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={() => setShowCreateQuotationModal(true)}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
-            <Plus size={17} /> Create Quotation
+            <Plus size={17} /> New Quotation
           </button>
         ) : (
-          <button
+          <button className="erp-button"
             type="button"
             onClick={() => handleTabClick('pos')}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: 'var(--erp-accent)',
               color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
@@ -1028,14 +1011,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       </div>
 
       {/* Subtabs Bar (Underline Style matching InventoryHub - Fixed / Sticky) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
-          overflowX: 'auto',
           flexShrink: 0,
         }}
       >
@@ -1044,26 +1024,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           const isActive = currentTab === tab.id;
 
           return (
-            <button
+            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 4px',
-                border: 'none',
-                borderBottom: isActive ? '2.5px solid #0284c7' : '2.5px solid transparent',
-                backgroundColor: 'transparent',
-                color: isActive ? '#0284c7' : '#64748b',
-                fontSize: '0.92rem',
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                marginBottom: '-1px',
-                transition: 'all 0.15s ease',
-              }}
+
             >
               <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
               {tab.label}
@@ -1107,7 +1072,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search invoice #, customer, reference, or payment method..."
                 value={searchQuery}
@@ -1116,9 +1081,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1159,7 +1122,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             {/* Right Controls: Status, Payment Type, Date Range, Presets, Columns, Reset, CSV, Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
               {/* Status filter */}
-              <select
+              <select className="erp-field"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 style={{
@@ -1167,10 +1130,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   padding: '0 26px 0 10px',
                   width: '120px',
                   minWidth: '110px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -1194,7 +1154,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </select>
 
               {/* Payment Type filter */}
-              <select
+              <select className="erp-field"
                 value={filterPaymentType}
                 onChange={(e) => setFilterPaymentType(e.target.value)}
                 style={{
@@ -1202,10 +1162,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   padding: '0 26px 0 10px',
                   width: '135px',
                   minWidth: '125px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -1242,39 +1199,35 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 }}
               >
                 <Calendar size={14} color="#0284c7" />
-                <input
+                <input className="erp-field"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   style={{
                     border: 'none',
                     outline: 'none',
-                    fontSize: '0.8rem',
                     color: '#334155',
                     backgroundColor: 'transparent',
-                    fontFamily: 'inherit',
                   }}
                   title="Start date"
                 />
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>-</span>
-                <input
+                <span style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>-</span>
+                <input className="erp-field"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   style={{
                     border: 'none',
                     outline: 'none',
-                    fontSize: '0.8rem',
                     color: '#334155',
                     backgroundColor: 'transparent',
-                    fontFamily: 'inherit',
                   }}
                   title="End date"
                 />
               </div>
 
               {/* Date Presets Dropdown */}
-              <select
+              <select className="erp-field"
                 onChange={(e) => {
                   if (e.target.value) {
                     handleDatePreset(e.target.value);
@@ -1286,10 +1239,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   height: '38px',
                   padding: '0 26px 0 10px',
                   width: '115px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -1314,7 +1264,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               {/* Reset Filters button */}
               {(searchQuery || filterStatus !== 'ALL' || filterPaymentType !== 'ALL' || startDate || endDate) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
@@ -1326,13 +1276,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1403,19 +1349,19 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    {visibleColumns.invoiceNumber && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>}
-                    {visibleColumns.customer && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>}
-                    {visibleColumns.date && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>}
-                    {visibleColumns.paymentType && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>}
-                    {visibleColumns.paymentMethod && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT METHOD</th>}
-                    {visibleColumns.total && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>}
-                    {visibleColumns.paid && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
-                    {visibleColumns.balance && <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
-                    {visibleColumns.delivery && <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    {visibleColumns.invoiceNumber && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>}
+                    {visibleColumns.customer && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>}
+                    {visibleColumns.date && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>}
+                    {visibleColumns.paymentType && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>}
+                    {visibleColumns.paymentMethod && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT METHOD</th>}
+                    {visibleColumns.total && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>}
+                    {visibleColumns.paid && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
+                    {visibleColumns.balance && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
+                    {visibleColumns.delivery && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1433,73 +1379,73 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     >
                       {/* Invoice # */}
                       {visibleColumns.invoiceNumber && (
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {inv.invoiceNumber}
                         </td>
                       )}
 
                       {/* Customer */}
                       {visibleColumns.customer && (
-                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                           {inv.customerName}
                         </td>
                       )}
 
                       {/* Date */}
                       {visibleColumns.date && (
-                        <td style={{ padding: '12px 16px', color: '#475569', whiteSpace: 'nowrap' }}>
+                        <td className="erp-table-cell" style={{ color: '#475569', whiteSpace: 'nowrap' }}>
                           {inv.displayDate || inv.invoiceDate}
                         </td>
                       )}
 
                       {/* Payment Type */}
                       {visibleColumns.paymentType && (
-                        <td style={{ padding: '12px 16px', color: '#334155' }}>
+                        <td className="erp-table-cell" style={{ color: '#334155' }}>
                           {inv.paymentType}
                         </td>
                       )}
 
                       {/* Payment Method */}
                       {visibleColumns.paymentMethod && (
-                        <td style={{ padding: '12px 16px', color: '#334155' }}>
+                        <td className="erp-table-cell" style={{ color: '#334155' }}>
                           {inv.paymentMethod}
                         </td>
                       )}
 
                       {/* Total */}
                       {visibleColumns.total && (
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
                           LKR {invoiceTotal(inv).toFixed(2)}
                         </td>
                       )}
 
                       {/* Paid */}
                       {visibleColumns.paid && (
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
                           LKR {Number(inv.paidAmount || 0).toFixed(2)}
                         </td>
                       )}
 
                       {/* Balance */}
                       {visibleColumns.balance && (
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: Number(inv.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: Number(inv.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
                           LKR {Number(inv.balanceAmount || 0).toFixed(2)}
                         </td>
                       )}
 
                       {/* Delivery Status */}
                       {visibleColumns.delivery && (
-                        <td style={{ padding: '12px 16px' }}>
+                        <td className="erp-table-cell">
                           {inv.deliveryStatus === 'DELIVERED' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
                               <CheckCircle size={11} /> Delivered
                             </span>
                           ) : inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 700, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
                               <Truck size={11} /> On Route {inv.deliveryNumber ? `(${inv.deliveryNumber})` : ''}
                             </span>
                           ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 600, backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}>
                               <Clock size={11} /> Pending Delivery
                             </span>
                           )}
@@ -1507,18 +1453,18 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       )}
 
                       {/* Actions */}
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'inline-flex', gap: '6px' }}>
                           {canEditSales && (
                             <button
                               type="button"
-                              className="btn btn-glass btn-sm"
+                              className="btn btn-glass btn-sm erp-button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingInvoice({ ...inv });
                               }}
                               title="Edit Invoice"
-                              style={{ padding: '4px 8px', borderRadius: '5px', color: '#0284c7' }}
+                              style={{ padding: '4px 8px', color: '#0284c7' }}
                             >
                               <Edit3 size={14} />
                             </button>
@@ -1530,7 +1476,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
                   {filteredInvoices.length === 0 && (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#64748b' }}>
                         {loadingInvoices ? 'Loading invoices...' : 'No invoices match the selected filter criteria.'}
                       </td>
                     </tr>
@@ -1577,7 +1523,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search held bills by invoice #, customer, cashier, or warehouse..."
                 value={heldSearchQuery}
@@ -1586,9 +1532,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1628,16 +1572,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
             {/* Right Controls: Status filter, Total summary badge, Reset, Export CSV, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select
+              <select className="erp-field"
                 value={heldStatusFilter}
                 onChange={(e) => setHeldStatusFilter(e.target.value)}
                 style={{
                   height: '38px',
                   padding: '0 26px 0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
-                  fontSize: '0.84rem',
                   color: '#334155',
                   cursor: 'pointer',
                   outline: 'none',
@@ -1659,7 +1601,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   borderRadius: '6px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#f8fafc',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   color: '#64748b',
                   whiteSpace: 'nowrap',
                 }}
@@ -1668,7 +1610,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </div>
 
               {(heldSearchQuery || heldStatusFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setHeldSearchQuery('');
@@ -1677,13 +1619,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1769,7 +1707,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <CheckSquare size={18} color="#2563eb" />
-                <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>
+                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#1e40af' }}>
                   {selectedHeldIds.length} Held Bill{selectedHeldIds.length > 1 ? 's' : ''} Selected
                 </span>
                 {(() => {
@@ -1779,7 +1717,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     return (
                       <span
                         style={{
-                          fontSize: '0.78rem',
+                          fontSize: 'var(--erp-text-small)',
                           color: '#b91c1c',
                           backgroundColor: '#fee2e2',
                           padding: '3px 8px',
@@ -1797,7 +1735,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   return (
                     <span
                       style={{
-                        fontSize: '0.78rem',
+                        fontSize: 'var(--erp-text-small)',
                         color: '#15803d',
                         backgroundColor: '#dcfce7',
                         padding: '3px 8px',
@@ -1811,38 +1749,28 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 })()}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setSelectedHeldIds([])}
                   style={{
                     padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     backgroundColor: '#ffffff',
                     color: '#475569',
                     cursor: 'pointer',
-                    fontWeight: 600,
                   }}
                 >
                   Clear Selection
                 </button>
-                <button
+                <button className="erp-button erp-button-primary"
                   type="button"
                   onClick={handleOpenMergeDispatchModal}
                   style={{
                     padding: '6px 16px',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
                   }}
                 >
                   <Truck size={15} /> Merge & Generate Dispatch Note
@@ -1869,10 +1797,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 14px', width: '38px', textAlign: 'center', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       <input
                         type="checkbox"
                         checked={
@@ -1888,29 +1816,29 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         }}
                       />
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>HOLD BILL #</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE & TIME</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ITEMS</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CASHIER / STAFF</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL AMOUNT</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>HOLD BILL #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE & TIME</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ITEMS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CASHIER / STAFF</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL AMOUNT</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingHeldBills ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading held bills...
                       </td>
                     </tr>
                   ) : filteredHeldBills.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <PauseCircle size={34} style={{ opacity: 0.35, marginBottom: '8px' }} />
-                        <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>No held bills found</div>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
+                        <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-button)' }}>No held bills found</div>
+                        <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8', marginTop: '3px' }}>
                           Bills placed on hold during POS billing or filtered by status will appear here.
                         </div>
                       </td>
@@ -1925,7 +1853,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         onClick={() => setSelectedHeldDetail(hb)}
                         title="Click to view hold bill details"
                       >
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedHeldIds.includes(hb.id)}
@@ -1938,78 +1866,71 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                             }}
                           />
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <span
-                            style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: '0.88rem' }}
+                            style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: 'var(--erp-text-button)' }}
                             title="Click to inspect items"
                           >
                             {hb.invoiceNumber}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
+                        <td className="erp-table-cell">
                           <div style={{ fontWeight: 600, color: '#0f172a' }}>
                             {hb.customerName || 'Walk-in Customer'}
                           </div>
                           {hb.customerPhone && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '1px' }}>
+                            <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '1px' }}>
                               {hb.customerPhone}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <td className="erp-table-cell" style={{ color: '#475569', whiteSpace: 'nowrap' }}>
                           {hb.createdAt ? new Date(hb.createdAt).toLocaleString() : (hb.invoiceDate ? new Date(hb.invoiceDate).toLocaleDateString() : '—')}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                          <span style={{ fontSize: 'var(--erp-text-caption)', padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
                             {(hb.items?.length || 1)} items
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px' }}>
-                          <span style={{ fontSize: '0.74rem', padding: '2px 8px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}>
+                        <td className="erp-table-cell">
+                          <span style={{ fontSize: 'var(--erp-text-caption)', padding: '2px 8px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}>
                             {hb.salesman || hb.salesmanName || hb.createdBy || 'Staff'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
                           Rs. {Number(hb.netTotal || hb.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                           {hb.status === 'SENT_TO_WAREHOUSE' ? (
-                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>
                               Sent to WH
                             </span>
                           ) : hb.status === 'STOCK_ADJUSTED' ? (
-                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
                               Stock Adjusted
                             </span>
                           ) : hb.status === 'DISPATCHED' ? (
-                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
                               Dispatched
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.72rem', padding: '3px 8px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
                               Held at POS
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                             {/* 1. Resume in POS (Primary Action) */}
-                            <button
+                            <button className="erp-button erp-button-primary"
                               type="button"
                               onClick={() => handleResumeHeldBill(hb)}
                               style={{
                                 padding: '5px 10px',
-                                fontSize: '0.76rem',
-                                fontWeight: 600,
-                                backgroundColor: '#0284c7',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '5px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 cursor: 'pointer',
-                                boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
                                 transition: 'background-color 0.15s ease',
                               }}
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
@@ -2020,17 +1941,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                             </button>
 
                             {/* 2. View details */}
-                            <button
+                            <button className="erp-button"
                               type="button"
                               onClick={() => setSelectedHeldDetail(hb)}
                               style={{
                                 padding: '5px 8px',
-                                fontSize: '0.76rem',
-                                fontWeight: 600,
                                 backgroundColor: '#ffffff',
                                 color: '#475569',
                                 border: '1px solid #cbd5e1',
-                                borderRadius: '5px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
@@ -2052,17 +1970,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
                             {/* Optional Warehouse helper if already in warehouse workflow */}
                             {hb.status === 'SENT_TO_WAREHOUSE' && (
-                              <button
+                              <button className="erp-button"
                                 type="button"
                                 onClick={() => handleOpenStockAdjustment(hb)}
                                 style={{
                                   padding: '5px 8px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 600,
                                   backgroundColor: '#f3e8ff',
                                   color: '#7c3aed',
                                   border: '1px solid #d8b4fe',
-                                  borderRadius: '5px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '3px',
@@ -2074,17 +1989,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                               </button>
                             )}
                             {hb.status === 'STOCK_ADJUSTED' && (
-                              <button
+                              <button className="erp-button"
                                 type="button"
                                 onClick={() => handleOpenSingleDispatchModal(hb)}
                                 style={{
                                   padding: '5px 8px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 600,
                                   backgroundColor: '#dcfce7',
                                   color: '#15803d',
                                   border: '1px solid #86efac',
-                                  borderRadius: '5px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '3px',
@@ -2155,7 +2067,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search quotations by quotation # or customer name..."
                 value={quotationSearchQuery}
@@ -2164,9 +2076,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -2206,15 +2116,13 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
             {/* Right Controls: Status filter, Reset, Export CSV */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select
+              <select className="erp-field"
                 value={quotationStatusFilter}
                 onChange={(e) => setQuotationStatusFilter(e.target.value)}
                 style={{
                   height: '38px',
                   padding: '0 26px 0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
                   color: '#334155',
                   backgroundColor: '#ffffff',
                   cursor: 'pointer',
@@ -2228,7 +2136,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </select>
 
               {(quotationSearchQuery || quotationStatusFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setQuotationSearchQuery('');
@@ -2237,12 +2145,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2297,16 +2202,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION #</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION DATE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VALID UNTIL</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION DATE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VALID UNTIL</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2317,42 +2222,39 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {qt.quotationNo}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
                         {qt.date ? new Date(qt.date).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
                         {qt.validUntil ? new Date(qt.validUntil).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {Number(qt.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span className={`badge ${qt.status === 'ACCEPTED' ? 'badge-success' : 'badge-info'}`} style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: '4px' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <span className={`badge ${qt.status === 'ACCEPTED' ? 'badge-success' : 'badge-info'}`} style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
                           {qt.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           {qt.status !== 'ACCEPTED' && (
-                            <button
+                            <button className="erp-button"
                               type="button"
                               onClick={() => handleConvertQuotationToInvoice(qt)}
                               style={{
                                 padding: '4px 8px',
-                                fontSize: '0.74rem',
                                 backgroundColor: '#16a34a',
                                 color: '#ffffff',
                                 border: 'none',
-                                borderRadius: '5px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 cursor: 'pointer',
-                                fontWeight: 600,
                               }}
                               title="Convert to commercial invoice"
                             >
@@ -2361,12 +2263,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           )}
                           <button
                             type="button"
-                            className="btn btn-glass btn-sm"
+                            className="btn btn-glass btn-sm erp-button"
                             onClick={() => {
                               addToast(`Quotation ${qt.quotationNo} printed`, 'info');
                               window.print();
                             }}
-                            style={{ padding: '4px 7px', fontSize: '0.74rem', borderRadius: '5px' }}
+                            style={{ padding: '4px 7px' }}
                             title="Print quotation"
                           >
                             <Printer size={13} />
@@ -2377,7 +2279,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   ))}
                   {filteredQuotations.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#64748b' }}>
                         No quotations found matching your search.
                       </td>
                     </tr>
@@ -2409,7 +2311,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>Customise Invoicing Columns</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>Customise Invoicing Columns</h3>
               <button
                 type="button"
                 onClick={() => setShowColumnModal(false)}
@@ -2419,7 +2321,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.86rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: 'var(--erp-text-field)' }}>
               {Object.keys(visibleColumns).map((colKey) => (
                 <label
                   key={colKey}
@@ -2453,9 +2355,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => setShowColumnModal(false)}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', padding: '6px 16px' }}
+                style={{ borderColor: '#0284c7', padding: '6px 16px' }}
               >
                 Done
               </button>
@@ -2494,8 +2396,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     <FileText size={20} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>COMMERCIAL INVOICE</h3>
-                    <div style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a' }}>COMMERCIAL INVOICE</h3>
+                    <div style={{ fontSize: 'var(--erp-text-field)', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
                       {selectedInvoice.invoiceNumber}
                     </div>
                   </div>
@@ -2504,7 +2406,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{
                   fontWeight: 800,
-                  fontSize: '0.78rem',
+                  fontSize: 'var(--erp-text-small)',
                   padding: '4px 12px',
                   borderRadius: '9999px',
                   textTransform: 'uppercase',
@@ -2526,30 +2428,30 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             {/* Invoice Meta Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '22px' }}>
               <div>
-                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Billed Customer</span>
-                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginTop: '3px' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Billed Customer</span>
+                <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginTop: '3px' }}>
                   {selectedInvoice.customerName || 'Walk-in Customer'}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '2px' }}>
                   Payment: <strong style={{ color: '#334155' }}>{selectedInvoice.paymentType || 'Full Payment'} ({selectedInvoice.paymentMethod || 'Cash'})</strong>
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Invoice Date & Time</span>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginTop: '3px' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Invoice Date & Time</span>
+                <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginTop: '3px' }}>
                   {selectedInvoice.displayDate || selectedInvoice.invoiceDate || new Date().toLocaleDateString()}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '2px' }}>
                   Salesman: <strong style={{ color: '#334155' }}>{selectedInvoice.salesman || 'Sales Executive'}</strong>
                 </div>
               </div>
               {selectedInvoice.odnNumber && (
                 <div>
-                  <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Dispatch Reference</span>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0284c7', fontFamily: 'monospace', marginTop: '3px' }}>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Dispatch Reference</span>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0284c7', fontFamily: 'monospace', marginTop: '3px' }}>
                     {selectedInvoice.odnNumber}
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
                     Dispatched & Delivered
                   </div>
                 </div>
@@ -2559,39 +2461,39 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             {/* Line Items Table */}
             <div style={{ marginBottom: '22px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.92rem', color: '#0f172a', fontWeight: 700 }}>
+                <h4 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', color: '#0f172a', fontWeight: 700 }}>
                   INVOICED LINE ITEMS ({selectedInvoiceItems.length})
                 </h4>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '8px 12px', width: '38px', textAlign: 'center' }}>#</th>
-                      <th style={{ padding: '8px 12px', width: '130px' }}>SKU / CODE</th>
-                      <th style={{ padding: '8px 12px' }}>PRODUCT / DESCRIPTION</th>
-                      <th style={{ padding: '8px 12px', width: '60px', textAlign: 'center' }}>QTY</th>
-                      <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>UNIT PRICE</th>
-                      <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>SUBTOTAL</th>
+                      <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center' }}>#</th>
+                      <th className="erp-table-heading" style={{ width: '130px' }}>SKU / CODE</th>
+                      <th className="erp-table-heading">PRODUCT / DESCRIPTION</th>
+                      <th className="erp-table-heading" style={{ width: '60px', textAlign: 'center' }}>QTY</th>
+                      <th className="erp-table-heading" style={{ width: '110px', textAlign: 'right' }}>UNIT PRICE</th>
+                      <th className="erp-table-heading" style={{ width: '120px', textAlign: 'right' }}>SUBTOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedInvoiceItems.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
+                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                           {item.code || item.productSku || item.sku || '-'}
                         </td>
-                        <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1e293b' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#1e293b' }}>
                           {item.name || item.productName || 'Product item'}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
                           {item.quantity || 1}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
                           LKR {(Number(item.unitPrice) || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
                           LKR {(Number(item.totalPrice || (item.quantity * item.unitPrice)) || 0).toFixed(2)}
                         </td>
                       </tr>
@@ -2604,19 +2506,19 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             {/* Financial Summary */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
               <div style={{ width: '100%', maxWidth: '340px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--erp-text-button)' }}>
                   <span style={{ color: '#64748b' }}>Gross Total</span>
                   <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
                     LKR {Number(selectedInvoice.totalAmount || 0).toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--erp-text-button)' }}>
                   <span style={{ color: '#16a34a', fontWeight: 600 }}>Amount Settled</span>
                   <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#16a34a' }}>
                     LKR {Number(selectedInvoice.paidAmount || 0).toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0 0', marginTop: '6px', borderTop: '1px dashed #cbd5e1', fontSize: '0.95rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0 0', marginTop: '6px', borderTop: '1px dashed #cbd5e1', fontSize: 'var(--erp-text-nav)' }}>
                   <span style={{ color: Number(selectedInvoice.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontWeight: 700 }}>
                     Balance Outstanding
                   </span>
@@ -2632,7 +2534,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => {
                     const invToEdit = { ...selectedInvoice };
                     setSelectedInvoice(null);
@@ -2646,7 +2548,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => handlePrintInvoice(selectedInvoice)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   title="Print invoice"
@@ -2656,7 +2558,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => handleDownloadInvoicePdf(selectedInvoice)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#16a34a' }}
                   title="Download invoice as PDF"
@@ -2667,9 +2569,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => setSelectedInvoice(null)}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', padding: '7px 22px' }}
+                style={{ borderColor: '#0284c7', padding: '7px 22px' }}
               >
                 Close
               </button>
@@ -2704,10 +2606,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <Edit3 size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>
                     Edit Invoice: {editingInvoice.invoiceNumber}
                   </h3>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Update invoice metadata & financial records</span>
+                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Update invoice metadata & financial records</span>
                 </div>
               </div>
               <button
@@ -2727,13 +2629,13 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                   CUSTOMER NAME
                 </label>
                 <input disabled
                   type="text"
-                  className="input-glass"
-                  style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
+                  className="input-glass erp-field"
+                  style={{ width: '100%', height: '36px' }}
                   value={editingInvoice.customerName || ''}
                   onChange={(e) => setEditingInvoice({ ...editingInvoice, customerName: e.target.value })}
                   required
@@ -2742,12 +2644,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAYMENT TYPE
                   </label>
                   <select disabled
-                    className="input-glass"
-                    style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '36px' }}
                     value={editingInvoice.paymentType || 'Full Payment'}
                     onChange={(e) => setEditingInvoice({ ...editingInvoice, paymentType: e.target.value })}
                   >
@@ -2758,12 +2660,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAYMENT METHOD
                   </label>
                   <select disabled
-                    className="input-glass"
-                    style={{ width: '100%', height: '36px', fontSize: '0.86rem' }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '36px' }}
                     value={editingInvoice.paymentMethod || 'Cash'}
                     onChange={(e) => setEditingInvoice({ ...editingInvoice, paymentMethod: e.target.value })}
                   >
@@ -2777,15 +2679,15 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     TOTAL AMOUNT (LKR)
                   </label>
                   <input disabled
                     type="number"
                     step="0.01"
                     min="0"
-                    className="input-glass"
-                    style={{ width: '100%', height: '36px', fontSize: '0.86rem', fontWeight: 700 }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
                     value={editingInvoice.totalAmount || ''}
                     onChange={(e) => {
                       const total = parseFloat(e.target.value) || 0;
@@ -2802,15 +2704,15 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     PAID AMOUNT (LKR)
                   </label>
                   <input disabled
                     type="number"
                     step="0.01"
                     min="0"
-                    className="input-glass"
-                    style={{ width: '100%', height: '36px', fontSize: '0.86rem', fontWeight: 700 }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
                     value={editingInvoice.paidAmount !== undefined ? editingInvoice.paidAmount : ''}
                     onChange={(e) => {
                       const paid = parseFloat(e.target.value) || 0;
@@ -2829,7 +2731,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     BALANCE (CALCULATED)
                   </label>
                   <div
@@ -2841,7 +2743,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       borderRadius: '6px',
                       backgroundColor: '#f8fafc',
                       border: '1px solid #cbd5e1',
-                      fontSize: '0.86rem',
+                      fontSize: 'var(--erp-text-field)',
                       fontWeight: 700,
                       color: Number(editingInvoice.balanceAmount || 0) > 0 ? '#dc2626' : '#16a34a',
                       fontFamily: 'monospace',
@@ -2852,12 +2754,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                     STATUS
                   </label>
                   <select disabled
-                    className="input-glass"
-                    style={{ width: '100%', height: '36px', fontSize: '0.86rem', fontWeight: 700 }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
                     value={editingInvoice.status || 'PENDING'}
                     onChange={(e) => setEditingInvoice({ ...editingInvoice, status: e.target.value })}
                   >
@@ -2871,15 +2773,15 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setEditingInvoice(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                  className="btn btn-primary erp-button erp-button-primary"
+                  style={{ borderColor: '#0284c7' }}
                 >
                   <Check size={16} /> Save Changes
                 </button>
@@ -2904,10 +2806,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', fontWeight: 800 }}>
                   Held Bill: {selectedHeldDetail.invoiceNumber}
                 </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                   Customer: <strong>{selectedHeldDetail.customerName || 'Walk-in'}</strong> • Salesman: <strong>{selectedHeldDetail.salesman || selectedHeldDetail.salesmanName || selectedHeldDetail.createdBy || 'Staff'}</strong>
                 </p>
               </div>
@@ -2921,32 +2823,32 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
+              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '0.74rem', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '8px 12px' }}>Code</th>
-                    <th style={{ padding: '8px 12px' }}>Product</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>Qty</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Unit Price</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Total</th>
+                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
+                    <th className="erp-table-heading">Code</th>
+                    <th className="erp-table-heading">Product</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Qty</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Price</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(selectedHeldDetail.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
                         {it.productName || it.name || '-'}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
                         {it.quantity}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                         Rs. {Number(it.unitPrice || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800 }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                         Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
                       </td>
                     </tr>
@@ -2956,8 +2858,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
-              <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
+              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
+              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
                 Rs. {Number(selectedHeldDetail.netTotal || selectedHeldDetail.totalAmount || 0).toFixed(2)}
               </span>
             </div>
@@ -2966,13 +2868,13 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass btn-sm"
+                  className="btn btn-glass btn-sm erp-button"
                   onClick={() => setSelectedHeldDetail(null)}
                   style={{ padding: '7px 16px' }}
                 >
                   Close
                 </button>
-                <button
+                <button className="erp-button erp-button-primary"
                   type="button"
                   onClick={() => {
                     const bill = selectedHeldDetail;
@@ -2981,17 +2883,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   }}
                   style={{
                     padding: '7px 18px',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
                     transition: 'background-color 0.15s ease',
                   }}
                   title="Load into POS to checkout"
@@ -3025,10 +2920,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Edit3 size={18} color="#7c3aed" /> Warehouse Stock Adjustment
                 </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                   Bill: <strong>{adjustingHeldBill.invoiceNumber}</strong> • Customer: <strong>{adjustingHeldBill.customerName || 'Walk-in'}</strong> • Warehouse: <strong>{adjustingHeldBill.warehouseCode || 'WH'}</strong>
                 </p>
               </div>
@@ -3041,33 +2936,33 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </button>
             </div>
 
-            <div style={{ marginBottom: '16px', fontSize: '0.84rem', color: '#475569' }}>
+            <div style={{ marginBottom: '16px', fontSize: 'var(--erp-text-body)', color: '#475569' }}>
               Verify actual warehouse stock physical availability. Correct the product quantities below before dispatch.
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
+              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '0.74rem', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '8px 12px' }}>Code</th>
-                    <th style={{ padding: '8px 12px' }}>Product</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center', width: '110px' }}>Adjusted Qty</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Unit Price</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Total</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center', width: '40px' }}></th>
+                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
+                    <th className="erp-table-heading">Code</th>
+                    <th className="erp-table-heading">Product</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', width: '110px' }}>Adjusted Qty</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Price</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', width: '40px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {(adjustingHeldBill.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
                         {it.productName || it.name || '-'}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        <input
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <input className="erp-field"
                           type="number"
                           min="1"
                           value={it.quantity}
@@ -3090,20 +2985,19 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           style={{
                             width: '70px',
                             padding: '4px 8px',
-                            borderRadius: '4px',
                             border: '1px solid #cbd5e1',
                             textAlign: 'center',
                             fontWeight: 700,
                           }}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                         Rs. {Number(it.unitPrice || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800 }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                         Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         {adjustingHeldBill.items.length > 1 && (
                           <button
                             type="button"
@@ -3131,8 +3025,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Adjusted Total Value:</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Adjusted Total Value:</span>
+              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace' }}>
                 Rs. {Number(adjustingHeldBill.netTotal || adjustingHeldBill.totalAmount || 0).toFixed(2)}
               </span>
             </div>
@@ -3140,14 +3034,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
                 type="button"
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setAdjustingHeldBill(null)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary btn-sm erp-button"
                 onClick={handleSaveStockAdjustment}
                 style={{ gap: '6px', backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
               >
@@ -3185,11 +3079,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Truck size={22} color="#0284c7" />
-                  <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 900 }}>
+                  <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
                     ORDER DISPATCH NOTE
                   </h2>
                 </div>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+                <p style={{ margin: '4px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
                   Official Delivery & Handover Document • Ref: <strong style={{ color: '#0284c7', fontFamily: 'monospace' }}>{dispatchNoteData.odnNumber}</strong>
                 </p>
               </div>
@@ -3201,7 +3095,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 >
                   <X size={20} />
                 </button>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '6px' }}>
+                <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '6px' }}>
                   Date: <strong>{new Date().toLocaleDateString()}</strong>
                 </div>
               </div>
@@ -3209,45 +3103,45 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
             <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.84rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: 'var(--erp-text-body)' }}>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 600 }}>Customer Name:</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.96rem' }}>{dispatchNoteData.customerName}</div>
+                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Customer Name:</div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-nav)' }}>{dispatchNoteData.customerName}</div>
                 </div>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 600 }}>Merged Held Bills ({dispatchNoteData.billIds?.length || 1}):</div>
+                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Merged Held Bills ({dispatchNoteData.billIds?.length || 1}):</div>
                   <div style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{dispatchNoteData.billNumbers?.join(', ')}</div>
                 </div>
               </div>
 
               {/* Aggregated Items Table */}
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', fontSize: '0.84rem', borderCollapse: 'collapse' }}>
+                <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: '0.74rem', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '8px 12px' }}>Code / SKU</th>
-                      <th style={{ padding: '8px 12px' }}>Product Description</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>Dispatch Qty</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Unit Rate</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Amount (LKR)</th>
+                    <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
+                      <th className="erp-table-heading">Code / SKU</th>
+                      <th className="erp-table-heading">Product Description</th>
+                      <th className="erp-table-heading" style={{ textAlign: 'center' }}>Dispatch Qty</th>
+                      <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Rate</th>
+                      <th className="erp-table-heading" style={{ textAlign: 'right' }}>Amount (LKR)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(dispatchNoteData.items || []).map((it, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {it.productSku || it.sku || '-'}
                         </td>
-                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600 }}>
                           {it.productName || it.name || '-'}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>
                           {it.quantity}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           {Number(it.unitPrice || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700 }}>
                           {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
                         </td>
                       </tr>
@@ -3258,8 +3152,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               {/* Total & Summary */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#e0f2fe', borderRadius: '8px' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0369a1' }}>Total Dispatch Order Value:</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0284c7', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0369a1' }}>Total Dispatch Order Value:</span>
+                <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#0284c7', fontFamily: 'monospace' }}>
                   Rs. {Number(dispatchNoteData.totalAmount || 0).toFixed(2)}
                 </span>
               </div>
@@ -3267,14 +3161,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               {/* Handover & Sign-off Notice */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px 0', borderTop: '1px dashed #cbd5e1', marginTop: '8px' }}>
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Dispatched By (Warehouse / Staff):</div>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Dispatched By (Warehouse / Staff):</div>
                   <div style={{ height: '36px', borderBottom: '1px solid #94a3b8', marginTop: '16px' }}></div>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>Signature & Date</div>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '4px' }}>Signature & Date</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Received by Customer:</div>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Received by Customer:</div>
                   <div style={{ height: '36px', borderBottom: '1px solid #94a3b8', marginTop: '16px' }}></div>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>Customer Signature / Seal & Date</div>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '4px' }}>Customer Signature / Seal & Date</div>
                 </div>
               </div>
             </div>
@@ -3282,7 +3176,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px', flexShrink: 0 }}>
               <button
                 type="button"
-                className="btn btn-glass"
+                className="btn btn-glass erp-button"
                 onClick={() => window.print()}
                 style={{ gap: '6px' }}
               >
@@ -3292,14 +3186,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setDispatchNoteData(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   onClick={handleConfirmDispatch}
                   style={{ gap: '6px', backgroundColor: '#16a34a', borderColor: '#16a34a' }}
                 >
@@ -3333,7 +3227,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>Create New Quotation</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>Create New Quotation</h3>
               <button
                 type="button"
                 onClick={() => setShowCreateQuotationModal(false)}
@@ -3346,84 +3240,84 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <form onSubmit={handleSaveQuotation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Quotation #</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Quotation #</label>
+                  <input className="erp-field"
                     type="text"
                     readOnly
                     value="[Auto-generated by backend]"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
+                  <input className="erp-field"
                     type="date"
                     value={quotationForm.quotationDate}
                     onChange={(e) => setQuotationForm({ ...quotationForm, quotationDate: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
-                <input
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
+                <input className="erp-field"
                   type="text"
                   required
                   placeholder="e.g. AutoCare Services"
                   value={quotationForm.customerName}
                   onChange={(e) => setQuotationForm({ ...quotationForm, customerName: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Total Amount (LKR) *</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Total Amount (LKR) *</label>
+                  <input className="erp-field"
                     type="number"
                     step="0.01"
                     required
                     placeholder="0.00"
                     value={quotationForm.totalAmount}
                     onChange={(e) => setQuotationForm({ ...quotationForm, totalAmount: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', fontWeight: 700, boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', fontWeight: 700, boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Valid Until</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Valid Until</label>
+                  <input className="erp-field"
                     type="date"
                     value={quotationForm.validUntil}
                     onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes</label>
-                <textarea
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes</label>
+                <textarea className="erp-field"
                   rows={2}
                   placeholder="Payment terms, delivery conditions..."
                   value={quotationForm.notes}
                   onChange={(e) => setQuotationForm({ ...quotationForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setShowCreateQuotationModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                  className="btn btn-primary erp-button erp-button-primary"
+                  style={{ borderColor: '#0284c7' }}
                 >
                   Create Quotation
                 </button>

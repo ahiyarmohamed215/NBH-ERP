@@ -50,14 +50,14 @@ export default function SettlementPanel() {
         <form onSubmit={submit} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
           <label>
             Source
-            <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value, source: '' })}>
+            <select className="erp-field" value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value, source: '' })}>
               <option value="advance">Advance</option>
               <option value="credit">Credit note</option>
             </select>
           </label>
           <label>
             Credit
-            <select required value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
+            <select className="erp-field" required value={form.source} onChange={e => setForm({ ...form, source: e.target.value })}>
               <option value="">Select</option>
               {(form.kind === 'advance' ? records : credits).map(r => (
                 <option key={r.id} value={r.id}>
@@ -68,13 +68,13 @@ export default function SettlementPanel() {
           </label>
           <label>
             Invoice ID
-            <input required type="number" min="1" value={form.invoice} onChange={e => setForm({ ...form, invoice: e.target.value })} />
+            <input className="erp-field" required type="number" min="1" value={form.invoice} onChange={e => setForm({ ...form, invoice: e.target.value })} />
           </label>
           <label>
             Amount
-            <input required type="number" min="0.01" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
+            <input className="erp-field" required type="number" min="0.01" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
           </label>
-          <button className="btn btn-primary" disabled={busy}>Apply credit</button>
+          <button className="btn btn-primary erp-button" disabled={busy}>Apply credit</button>
         </form>
       )}
     </section>

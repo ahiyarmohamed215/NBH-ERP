@@ -109,6 +109,17 @@ export default function App() {
   // Fullscreen & Distraction-Free States
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isCompactViewport, setIsCompactViewport] = useState(() => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(max-width: 700px)').matches));
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 700px)');
+    if (!query) return;
+    const update = () => setIsCompactViewport(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const isSidebarCompact = isSidebarCollapsed || isCompactViewport;
+
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const isSuperAdmin = Boolean(
@@ -462,10 +473,10 @@ export default function App() {
       {/* Persistent sidebar navigation */}
       {(
         <aside
-          className={`glass-sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}
+          className={`glass-sidebar ${isSidebarCompact ? 'collapsed' : ''}`}
           style={{
-            width: isSidebarCollapsed ? '56px' : '205px',
-            minWidth: isSidebarCollapsed ? '56px' : '205px',
+            width: isSidebarCompact ? '56px' : '205px',
+            minWidth: isSidebarCompact ? '56px' : '205px',
             height: '100vh',
             maxHeight: '100vh',
             position: 'sticky',
@@ -478,15 +489,15 @@ export default function App() {
             borderRight: '1px solid #e2e8f0',
           }}
         >
-          <div style={{ padding: isSidebarCollapsed ? '14px 6px' : '14px 10px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: isSidebarCompact ? '14px 6px' : '14px 10px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {/* Logo & Brand Header */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
-                padding: isSidebarCollapsed ? '0' : '2px 4px',
-                marginBottom: isSidebarCollapsed ? '12px' : '16px',
+                justifyContent: isSidebarCompact ? 'center' : 'space-between',
+                padding: isSidebarCompact ? '0' : '2px 4px',
+                marginBottom: isSidebarCompact ? '12px' : '16px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -501,15 +512,15 @@ export default function App() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    cursor: isSidebarCollapsed ? 'pointer' : 'default',
+                    cursor: isSidebarCompact ? 'pointer' : 'default',
                     transition: 'transform 0.15s ease',
                   }}
-                  onClick={isSidebarCollapsed ? toggleSidebar : undefined}
-                  title={isSidebarCollapsed ? 'Click to expand sidebar (Ctrl+B)' : 'NBH ERP'}
+                  onClick={isSidebarCompact ? toggleSidebar : undefined}
+                  title={isSidebarCompact ? 'Click to expand sidebar (Ctrl+B)' : 'NBH ERP'}
                 >
                   <Package size={17} />
                 </div>
-                {!isSidebarCollapsed && (
+                {!isSidebarCompact && (
                   <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
                     NBH ERP
                   </div>
@@ -517,7 +528,7 @@ export default function App() {
               </div>
 
               {/* Minimize button inside sidebar */}
-              {!isSidebarCollapsed && (
+              {!isSidebarCompact && (
                 <button
                   type="button"
                   onClick={toggleSidebar}
@@ -545,11 +556,11 @@ export default function App() {
             {!isPosMode && <button type="button" onClick={toggleFullscreen}
               title={isFullscreen?'Exit Full Screen (F11 or Alt+Enter)':'Enter Full Screen (F11 or Alt+Enter)'}
               aria-label={isFullscreen?'Exit full screen':'Enter full screen'}
-              style={{display:'flex',alignItems:'center',justifyContent:isSidebarCollapsed?'center':'flex-start',gap:8,width:'100%',minHeight:34,marginBottom:12,padding:isSidebarCollapsed?'7px':'7px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#475569',fontFamily:'inherit',fontSize:'.77rem',cursor:'pointer',flexShrink:0,boxShadow:'none'}}
+              style={{display:'flex',alignItems:'center',justifyContent:isSidebarCompact?'center':'flex-start',gap:8,width:'100%',minHeight:34,marginBottom:12,padding:isSidebarCompact?'7px':'7px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#475569',fontFamily:'inherit',fontSize:'.77rem',cursor:'pointer',flexShrink:0,boxShadow:'none'}}
               onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f8fafc';event.currentTarget.style.borderColor='#cbd5e1';}}
               onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#fff';event.currentTarget.style.borderColor='#e2e8f0';}}>
               {isFullscreen?<Minimize size={15}/>:<Maximize size={15}/>}
-              {!isSidebarCollapsed && (isFullscreen?'Exit full screen':'Full screen')}
+              {!isSidebarCompact && (isFullscreen?'Exit full screen':'Full screen')}
             </button>}
 
             {/* Standard Navigation Buttons */}
@@ -562,16 +573,18 @@ export default function App() {
                   <button
                     key={mod.id}
                     type="button"
-                    title={isSidebarCollapsed ? mod.label : undefined}
+                    title={isSidebarCompact ? mod.label : undefined}
+                    aria-label={mod.label}
+                    aria-current={isCurrentModule ? 'page' : undefined}
                     onClick={() => {
                       navigateTo(mod.id);
                     }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+                      justifyContent: isSidebarCompact ? 'center' : 'space-between',
                       width: '100%',
-                      padding: isSidebarCollapsed ? '8px 0' : '8px 10px',
+                      padding: isSidebarCompact ? '8px 0' : '8px 10px',
                       borderRadius: '8px',
                       border: 'none',
                       backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
@@ -595,14 +608,14 @@ export default function App() {
                         color={isCurrentModule ? '#0284c7' : '#64748b'}
                         style={{ flexShrink: 0 }}
                       />
-                      {!isSidebarCollapsed && (
+                      {!isSidebarCompact && (
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {mod.label}
                         </span>
                       )}
                     </div>
 
-                    {!isSidebarCollapsed && isCurrentModule && (
+                    {!isSidebarCompact && isCurrentModule && (
                       <span
                         style={{
                           width: '6px',
@@ -629,7 +642,7 @@ export default function App() {
 
           {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
           <SidebarProfile
-            isCollapsed={isSidebarCollapsed}
+            isCollapsed={isSidebarCompact}
             onNavigate={navigateTo}
             onOpenShortcuts={() => setShowShortcutsModal(true)}
           />
@@ -662,7 +675,7 @@ export default function App() {
         )}
 
         {/* Dynamic Workspace Rendering */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
+        <main className="erp-application" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
           {accessibleModules.length === 0 ? (
             <ErrorState
               type="access-denied"

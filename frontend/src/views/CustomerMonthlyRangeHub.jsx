@@ -535,10 +535,10 @@ export default function CustomerMonthlyRangeHub({
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Calendar size={14} color="#64748b" style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
+              <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155' }}>
                 Calculation Period:
               </span>
-              <input
+              <input className="erp-field"
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => {
@@ -548,9 +548,7 @@ export default function CustomerMonthlyRangeHub({
                 style={{
                   height: '26px',
                   padding: '0 6px',
-                  borderRadius: '4px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.82rem',
                   fontWeight: 600,
                   color: '#0f172a',
                   outline: 'none',
@@ -560,7 +558,7 @@ export default function CustomerMonthlyRangeHub({
             </div>
             <span
               style={{
-                fontSize: '0.74rem',
+                fontSize: 'var(--erp-text-caption)',
                 fontWeight: 600,
                 color: '#0284c7',
                 backgroundColor: '#e0f2fe',
@@ -586,7 +584,7 @@ export default function CustomerMonthlyRangeHub({
               backgroundColor: '#ffffff',
               borderRadius: '6px',
               border: '1px solid #e2e8f0',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               boxSizing: 'border-box',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
               overflow: 'hidden',
@@ -596,7 +594,7 @@ export default function CustomerMonthlyRangeHub({
               <span
                 style={{
                   fontFamily: 'monospace',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--erp-text-caption)',
                   fontWeight: 700,
                   padding: '2px 8px',
                   backgroundColor: '#f1f5f9',
@@ -611,7 +609,7 @@ export default function CustomerMonthlyRangeHub({
               </span>
               <span
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: 'var(--erp-text-badge)',
                   fontWeight: 600,
                   padding: '1px 6px',
                   borderRadius: '9999px',
@@ -627,7 +625,7 @@ export default function CustomerMonthlyRangeHub({
               <span
                 style={{
                   color: '#475569',
-                  fontSize: '0.78rem',
+                  fontSize: 'var(--erp-text-small)',
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',
                   overflow: 'hidden',
@@ -640,7 +638,7 @@ export default function CustomerMonthlyRangeHub({
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               <span
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--erp-text-caption)',
                   color: '#64748b',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -682,10 +680,10 @@ export default function CustomerMonthlyRangeHub({
               borderRight: '1px solid #e2e8f0',
             }}
           >
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+            <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
               Customers
             </span>
-            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
               {dashboardData?.totalActiveCustomers ?? 0}
             </span>
           </div>
@@ -702,10 +700,10 @@ export default function CustomerMonthlyRangeHub({
               borderRight: '1px solid #e2e8f0',
             }}
           >
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+            <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
               Purchasers
             </span>
-            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
               {dashboardData?.customersWithPurchases ?? 0}
             </span>
           </div>
@@ -722,10 +720,10 @@ export default function CustomerMonthlyRangeHub({
               borderRight: '1px solid #e2e8f0',
             }}
           >
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+            <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
               Promoted (1+)
             </span>
-            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#d97706', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#d97706', fontFamily: 'monospace' }}>
               {dashboardData?.promotedCustomersCount ?? 0}
             </span>
           </div>
@@ -741,10 +739,10 @@ export default function CustomerMonthlyRangeHub({
               padding: '0 6px',
             }}
           >
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+            <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
               Qualifying Sales
             </span>
-            <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
               LKR {Number(dashboardData?.totalMonthlyQualifyingSales || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
@@ -801,7 +799,7 @@ export default function CustomerMonthlyRangeHub({
                   border: 'none',
                   borderRadius: '5px',
                   padding: '4px 8px',
-                  fontSize: '0.8rem',
+                  fontSize: 'var(--erp-text-small)',
                   fontWeight: isSel ? 600 : 500,
                   color: isSel ? '#0284c7' : '#64748b',
                   cursor: 'pointer',
@@ -817,7 +815,7 @@ export default function CustomerMonthlyRangeHub({
                 {tab.count !== undefined && tab.count !== null && (
                   <span
                     style={{
-                      fontSize: '0.7rem',
+                      fontSize: 'var(--erp-text-badge)',
                       fontWeight: 600,
                       padding: '1px 5px',
                       borderRadius: '9999px',
@@ -857,7 +855,7 @@ export default function CustomerMonthlyRangeHub({
                     pointerEvents: 'none',
                   }}
                 />
-                <input
+                <input className="erp-field"
                   type="text"
                   placeholder="Search customer..."
                   value={dashSearch}
@@ -869,9 +867,7 @@ export default function CustomerMonthlyRangeHub({
                     width: '100%',
                     height: '32px',
                     padding: '0 24px 0 26px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
-                    fontSize: '0.8rem',
                     outline: 'none',
                     backgroundColor: '#ffffff',
                     color: '#0f172a',
@@ -905,7 +901,7 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               {/* Range Filter */}
-              <select
+              <select className="erp-field"
                 value={dashRangeFilter}
                 onChange={(e) => {
                   setDashRangeFilter(e.target.value);
@@ -915,10 +911,7 @@ export default function CustomerMonthlyRangeHub({
                   height: '32px',
                   padding: '0 24px 0 8px',
                   width: '120px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.8rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -944,7 +937,7 @@ export default function CustomerMonthlyRangeHub({
               </select>
 
               {/* Staff Filter */}
-              <select
+              <select className="erp-field"
                 value={dashStaffFilter}
                 onChange={(e) => {
                   setDashStaffFilter(e.target.value);
@@ -954,10 +947,7 @@ export default function CustomerMonthlyRangeHub({
                   height: '32px',
                   padding: '0 24px 0 8px',
                   width: '130px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.8rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -993,7 +983,7 @@ export default function CustomerMonthlyRangeHub({
                   border: dashNearTargetOnly ? '1px solid #0284c7' : '1px solid #e2e8f0',
                   backgroundColor: dashNearTargetOnly ? '#e0f2fe' : '#ffffff',
                   color: dashNearTargetOnly ? '#0284c7' : '#64748b',
-                  fontSize: '0.78rem',
+                  fontSize: 'var(--erp-text-small)',
                   fontWeight: 500,
                   cursor: 'pointer',
                   display: 'inline-flex',
@@ -1009,7 +999,7 @@ export default function CustomerMonthlyRangeHub({
 
               {/* Reset Button */}
               {(dashSearch || dashRangeFilter !== 'ALL' || dashStaffFilter !== 'ALL' || dashNearTargetOnly) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setDashSearch('');
@@ -1021,12 +1011,9 @@ export default function CustomerMonthlyRangeHub({
                   style={{
                     height: '32px',
                     padding: '0 8px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.78rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1093,18 +1080,15 @@ export default function CustomerMonthlyRangeHub({
           {subTab === 'setup' && (
             <>
               {/* Audit Trail Button */}
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={loadAuditLogs}
                 style={{
                   height: '32px',
                   padding: '0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  fontSize: '0.78rem',
-                  fontWeight: 500,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1141,24 +1125,17 @@ export default function CustomerMonthlyRangeHub({
 
               {/* New Range Tier Button */}
               {canEdit && (
-                <button
+                <button className="erp-button erp-button-primary"
                   type="button"
                   onClick={handleOpenCreateRange}
                   style={{
                     height: '32px',
                     padding: '0 12px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
                     whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(2, 132, 199, 0.2)',
                   }}
                 >
                   <Plus size={14} /> New Range Tier
@@ -1170,18 +1147,15 @@ export default function CustomerMonthlyRangeHub({
           {subTab === 'reports' && (
             <>
               {/* Export Staff CSV */}
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={handleExportStaffCSV}
                 style={{
                   height: '32px',
                   padding: '0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  fontSize: '0.78rem',
-                  fontWeight: 500,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1193,18 +1167,15 @@ export default function CustomerMonthlyRangeHub({
               </button>
 
               {/* Print Report */}
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => window.print()}
                 style={{
                   height: '32px',
                   padding: '0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  fontSize: '0.78rem',
-                  fontWeight: 500,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1266,29 +1237,29 @@ export default function CustomerMonthlyRangeHub({
             }}
           >
             <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '860px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '860px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>ASSIGNED STAFF</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>MONTH PURCHASES</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CURRENT RANGE</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PROGRESS TO NEXT TARGET</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>REMAINING</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                    <th className="erp-table-heading">CUSTOMER</th>
+                    <th className="erp-table-heading">ASSIGNED STAFF</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>MONTH PURCHASES</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>CURRENT RANGE</th>
+                    <th className="erp-table-heading">PROGRESS TO NEXT TARGET</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>REMAINING</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingDashboard ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
                         Loading customer monthly ranges...
                       </td>
                     </tr>
                   ) : displayedCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <Search size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                         No customers found matching the selected filters.
                       </td>
@@ -1309,15 +1280,15 @@ export default function CustomerMonthlyRangeHub({
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           {/* Customer Name & Code */}
-                          <td style={{ padding: '12px 18px' }}>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell">
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
                               {c.customerName}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                               <span
                                 style={{
                                   fontFamily: 'monospace',
-                                  fontSize: '0.72rem',
+                                  fontSize: 'var(--erp-text-caption)',
                                   fontWeight: 700,
                                   backgroundColor: '#f1f5f9',
                                   color: '#475569',
@@ -1329,7 +1300,7 @@ export default function CustomerMonthlyRangeHub({
                                 {c.customerCode || 'NO CODE'}
                               </span>
                               {c.customerPhone && (
-                                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                                   📞 {c.customerPhone}
                                 </span>
                               )}
@@ -1337,11 +1308,11 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Assigned Staff */}
-                          <td style={{ padding: '12px 14px' }}>
+                          <td className="erp-table-cell">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span
                                 style={{
-                                  fontSize: '0.82rem',
+                                  fontSize: 'var(--erp-text-body)',
                                   fontWeight: 500,
                                   color: c.assignedStaffName && c.assignedStaffName !== 'Unassigned' ? '#334155' : '#94a3b8',
                                 }}
@@ -1369,12 +1340,12 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Month Net Purchases */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: purchases > 0 ? '#0f172a' : '#94a3b8', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: purchases > 0 ? '#0f172a' : '#94a3b8' }}>
                             LKR {purchases.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* Current Range Badge */}
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <span
                               style={{
                                 display: 'inline-flex',
@@ -1382,7 +1353,7 @@ export default function CustomerMonthlyRangeHub({
                                 gap: '4px',
                                 padding: '2px 8px',
                                 borderRadius: '9999px',
-                                fontSize: '0.74rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 600,
                                 background: tierStyle.bg,
                                 color: tierStyle.text,
@@ -1395,14 +1366,14 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Progress to Next Target */}
-                          <td style={{ padding: '12px 14px', minWidth: '170px' }}>
+                          <td className="erp-table-cell" style={{ minWidth: '170px' }}>
                             {c.isHighestRange ? (
-                              <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#86198f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#86198f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                 🏆 Highest Range Tier
                               </div>
                             ) : (
                               <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '3px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--erp-text-caption)', marginBottom: '3px' }}>
                                   <span style={{ color: '#64748b', fontWeight: 500 }}>
                                     Next: <strong style={{ color: '#334155' }}>{c.nextRangeName}</strong>
                                   </span>
@@ -1429,7 +1400,7 @@ export default function CustomerMonthlyRangeHub({
                                     }}
                                   />
                                 </div>
-                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px', fontFamily: 'monospace' }}>
+                                <div style={{ fontSize: 'var(--erp-text-badge)', color: '#94a3b8', marginTop: '2px', fontFamily: 'monospace' }}>
                                   Target: LKR {nextTarget.toLocaleString()}
                                 </div>
                               </div>
@@ -1437,18 +1408,18 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Remaining Amount */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                             {c.isHighestRange ? (
-                              <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>—</span>
+                              <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8' }}>—</span>
                             ) : (
                               <div>
-                                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '0.86rem', fontFamily: 'monospace' }}>
+                                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 'var(--erp-text-field)', fontFamily: 'monospace' }}>
                                   LKR {remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                                 {c.isCloseToTarget && (
                                   <span
                                     style={{
-                                      fontSize: '0.68rem',
+                                      fontSize: 'var(--erp-text-badge)',
                                       fontWeight: 600,
                                       padding: '1px 6px',
                                       borderRadius: '9999px',
@@ -1467,24 +1438,20 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Actions: View History */}
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <button
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                            <button className="erp-button"
                               type="button"
                               onClick={() => handleViewCustomerHistory(c)}
                               style={{
                                 height: '28px',
                                 padding: '0 8px',
-                                borderRadius: '5px',
                                 border: '1px solid #e2e8f0',
                                 backgroundColor: '#ffffff',
                                 color: '#334155',
-                                fontSize: '0.76rem',
-                                fontWeight: 500,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1517,7 +1484,7 @@ export default function CustomerMonthlyRangeHub({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   background: '#fafbfc',
-                  fontSize: '0.8rem',
+                  fontSize: 'var(--erp-text-small)',
                 }}
               >
                 <div style={{ color: '#64748b' }}>
@@ -1527,40 +1494,34 @@ export default function CustomerMonthlyRangeHub({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
+                  <button className="erp-button"
                     type="button"
                     disabled={dashPage === 0}
                     onClick={() => setDashPage(dashPage - 1)}
                     style={{
                       height: '28px',
                       padding: '0 10px',
-                      borderRadius: '5px',
                       border: '1px solid #e2e8f0',
                       backgroundColor: '#ffffff',
                       color: dashPage === 0 ? '#94a3b8' : '#334155',
-                      fontSize: '0.78rem',
-                      fontWeight: 500,
                       cursor: dashPage === 0 ? 'not-allowed' : 'pointer',
                     }}
                   >
                     Previous
                   </button>
-                  <span style={{ padding: '0 6px', fontWeight: 600, color: '#334155', fontSize: '0.8rem' }}>
+                  <span style={{ padding: '0 6px', fontWeight: 600, color: '#334155', fontSize: 'var(--erp-text-small)' }}>
                     {dashPage + 1} / {dashboardData.totalPages}
                   </span>
-                  <button
+                  <button className="erp-button"
                     type="button"
                     disabled={dashPage >= dashboardData.totalPages - 1}
                     onClick={() => setDashPage(dashPage + 1)}
                     style={{
                       height: '28px',
                       padding: '0 10px',
-                      borderRadius: '5px',
                       border: '1px solid #e2e8f0',
                       backgroundColor: '#ffffff',
                       color: dashPage >= dashboardData.totalPages - 1 ? '#94a3b8' : '#334155',
-                      fontSize: '0.78rem',
-                      fontWeight: 500,
                       cursor: dashPage >= dashboardData.totalPages - 1 ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -1593,30 +1554,30 @@ export default function CustomerMonthlyRangeHub({
             }}
           >
             <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 14px', width: '60px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>ORDER</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>RANGE CODE</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>NAME</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>MONTHLY THRESHOLD</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CUSTOMERS (THIS MONTH)</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DESCRIPTION</th>
-                    {canEdit && <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>}
+                    <th className="erp-table-heading" style={{ width: '60px', textAlign: 'center' }}>ORDER</th>
+                    <th className="erp-table-heading">RANGE CODE</th>
+                    <th className="erp-table-heading">NAME</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>MONTHLY THRESHOLD</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>CUSTOMERS (THIS MONTH)</th>
+                    <th className="erp-table-heading">DESCRIPTION</th>
+                    {canEdit && <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {loadingRanges ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
                         Loading range definitions...
                       </td>
                     </tr>
                   ) : ranges.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <Sliders size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                         No range tiers defined yet. Click "New Range Tier" above to create one.
                       </td>
@@ -1638,17 +1599,17 @@ export default function CustomerMonthlyRangeHub({
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
                           {/* Display Order */}
-                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: '#64748b', fontSize: '0.84rem' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600, color: '#64748b' }}>
                             #{r.displayOrder}
                           </td>
 
                           {/* Range Code */}
-                          <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', fontSize: '0.85rem' }}>
+                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                             {r.rangeCode}
                           </td>
 
                           {/* Range Name */}
-                          <td style={{ padding: '12px 14px' }}>
+                          <td className="erp-table-cell">
                             <span
                               style={{
                                 display: 'inline-flex',
@@ -1656,7 +1617,7 @@ export default function CustomerMonthlyRangeHub({
                                 gap: '5px',
                                 padding: '2px 8px',
                                 borderRadius: '9999px',
-                                fontSize: '0.74rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 600,
                                 background: tierStyle.bg,
                                 color: tierStyle.text,
@@ -1669,22 +1630,22 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Monthly Spend Threshold */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', fontFamily: 'monospace' }}>
                               LKR {Number(r.minSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            <div style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b' }}>
                               {isBaseline ? 'Base threshold' : 'Qualifying spend'}
                             </div>
                           </td>
 
                           {/* Status */}
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <span
                               style={{
                                 padding: '2px 8px',
                                 borderRadius: '9999px',
-                                fontSize: '0.72rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 600,
                                 background: r.isActive ? '#dcfce7' : '#fee2e2',
                                 color: r.isActive ? '#15803d' : '#b91c1c',
@@ -1696,7 +1657,7 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Customer Count */}
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <span
                               style={{
                                 padding: '1px 6px',
@@ -1704,7 +1665,7 @@ export default function CustomerMonthlyRangeHub({
                                 background: '#f1f5f9',
                                 border: '1px solid #e2e8f0',
                                 fontWeight: 600,
-                                fontSize: '0.76rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 color: '#334155',
                                 fontFamily: 'monospace',
                               }}
@@ -1714,26 +1675,23 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Description */}
-                          <td style={{ padding: '12px 14px', color: '#64748b', fontSize: '0.82rem', maxWidth: '240px' }}>
+                          <td className="erp-table-cell" style={{ color: '#64748b', maxWidth: '240px' }}>
                             {r.description || '—'}
                           </td>
 
                           {/* Action Buttons */}
                           {canEdit && (
-                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                            <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                               <div style={{ display: 'inline-flex', gap: '4px' }}>
-                                <button
+                                <button className="erp-button"
                                   type="button"
                                   onClick={() => handleOpenEditRange(r)}
                                   style={{
                                     height: '28px',
                                     padding: '0 8px',
-                                    borderRadius: '5px',
                                     border: '1px solid #e2e8f0',
                                     backgroundColor: '#ffffff',
                                     color: '#334155',
-                                    fontSize: '0.76rem',
-                                    fontWeight: 500,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -1756,7 +1714,7 @@ export default function CustomerMonthlyRangeHub({
                                       borderColor: r.isActive ? '#fecaca' : '#bbf7d0',
                                       background: r.isActive ? '#fee2e2' : '#dcfce7',
                                       color: r.isActive ? '#b91c1c' : '#15803d',
-                                      fontSize: '0.76rem',
+                                      fontSize: 'var(--erp-text-caption)',
                                       fontWeight: 600,
                                       cursor: 'pointer',
                                     }}
@@ -1793,7 +1751,7 @@ export default function CustomerMonthlyRangeHub({
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
             }}
           >
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
               Customer Range Distribution ({dashboardData?.monthLabel || selectedMonth})
             </div>
 
@@ -1819,13 +1777,13 @@ export default function CustomerMonthlyRangeHub({
                       border: `1px solid ${tierStyle.border}`,
                     }}
                   >
-                    <div style={{ fontSize: '0.74rem', fontWeight: 600, color: tierStyle.text }}>
+                    <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: tierStyle.text }}>
                       {rangeName}
                     </div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 700, color: tierStyle.text, fontFamily: 'monospace', marginTop: '2px' }}>
+                    <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 700, color: tierStyle.text, fontFamily: 'monospace', marginTop: '2px' }}>
                       {count}
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: tierStyle.text, opacity: 0.85, marginTop: '1px' }}>
+                    <div style={{ fontSize: 'var(--erp-text-badge)', color: tierStyle.text, opacity: 0.85, marginTop: '1px' }}>
                       {percentage}% of customers
                     </div>
                   </div>
@@ -1850,28 +1808,28 @@ export default function CustomerMonthlyRangeHub({
             }}
           >
             <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>STAFF MEMBER</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ASSIGNED CUSTOMERS</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIVE PURCHASERS</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>PROMOTED (RANGE 1+)</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL QUALIFYING SALES</th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>CONVERSION RATE</th>
+                    <th className="erp-table-heading">STAFF MEMBER</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>ASSIGNED CUSTOMERS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIVE PURCHASERS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>PROMOTED (RANGE 1+)</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>TOTAL QUALIFYING SALES</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>CONVERSION RATE</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingReports ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={6} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <RefreshCw size={28} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#0284c7' }} />
                         Loading staff performance data...
                       </td>
                     </tr>
                   ) : staffPerformance.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={6} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <Users size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                         No staff assignments found for this month. Assign customers to sales representatives in the Customer Ranges tab.
                       </td>
@@ -1891,21 +1849,21 @@ export default function CustomerMonthlyRangeHub({
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
-                          <td style={{ padding: '12px 18px' }}>
-                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{p.staffName}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace' }}>@{p.staffUsername}</div>
+                          <td className="erp-table-cell">
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>{p.staffName}</div>
+                            <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>@{p.staffUsername}</div>
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, color: '#334155', fontFamily: 'monospace', fontSize: '0.86rem' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>
                             {totalAssigned}
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <span style={{ fontWeight: 600, color: '#16a34a', fontFamily: 'monospace', fontSize: '0.86rem' }}>{active}</span>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}> ({totalAssigned > 0 ? Math.round((active / totalAssigned) * 100) : 0}%)</span>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                            <span style={{ fontWeight: 600, color: '#16a34a', fontFamily: 'monospace', fontSize: 'var(--erp-text-field)' }}>{active}</span>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}> ({totalAssigned > 0 ? Math.round((active / totalAssigned) * 100) : 0}%)</span>
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <span
                               style={{
                                 padding: '2px 8px',
@@ -1914,19 +1872,19 @@ export default function CustomerMonthlyRangeHub({
                                 color: promoted > 0 ? '#b45309' : '#64748b',
                                 border: promoted > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0',
                                 fontWeight: 600,
-                                fontSize: '0.76rem',
+                                fontSize: 'var(--erp-text-caption)',
                               }}
                             >
                               {promoted} customers
                             </span>
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: '#0284c7', fontFamily: 'monospace', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#0284c7', fontFamily: 'monospace' }}>
                             LKR {totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <div style={{ fontWeight: 600, color: Number(conversion) >= 50 ? '#16a34a' : '#334155', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                            <div style={{ fontWeight: 600, color: Number(conversion) >= 50 ? '#16a34a' : '#334155', fontFamily: 'monospace', fontSize: 'var(--erp-text-field)' }}>
                               {conversion}%
                             </div>
                             <div style={{ height: '4px', width: '64px', background: '#e2e8f0', borderRadius: '9999px', margin: '3px auto 0', overflow: 'hidden' }}>
@@ -1997,7 +1955,7 @@ export default function CustomerMonthlyRangeHub({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Sliders size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   {editingRange ? 'Edit Range Tier' : 'New Range Tier'}
                 </h3>
               </div>
@@ -2012,20 +1970,17 @@ export default function CustomerMonthlyRangeHub({
 
             <form onSubmit={handleSaveRange} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Range Code *
                 </label>
-                <input
+                <input className="erp-field"
                   type="text"
                   style={{
                     width: '100%',
                     height: '34px',
                     padding: '0 10px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
                     textTransform: 'uppercase',
-                    fontFamily: 'monospace',
                     boxSizing: 'border-box',
                     backgroundColor: editingRange ? '#f8fafc' : '#ffffff',
                   }}
@@ -2037,18 +1992,16 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Range Display Name * (e.g. Range 1, Bronze, Silver)
                 </label>
-                <input
+                <input className="erp-field"
                   type="text"
                   style={{
                     width: '100%',
                     height: '34px',
                     padding: '0 10px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
                     boxSizing: 'border-box',
                   }}
                   value={rangeForm.name}
@@ -2059,10 +2012,10 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Monthly Purchase Threshold (LKR) *
                 </label>
-                <input
+                <input className="erp-field"
                   type="number"
                   step="0.01"
                   min="0"
@@ -2070,10 +2023,7 @@ export default function CustomerMonthlyRangeHub({
                     width: '100%',
                     height: '34px',
                     padding: '0 10px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
-                    fontFamily: 'monospace',
                     fontWeight: 600,
                     boxSizing: 'border-box',
                     backgroundColor: editingRange && editingRange.rangeCode === 'RANGE_0' ? '#f8fafc' : '#ffffff',
@@ -2085,7 +2035,7 @@ export default function CustomerMonthlyRangeHub({
                   required
                 />
                 {editingRange && editingRange.rangeCode === 'RANGE_0' && (
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px', display: 'block' }}>
                     Range 0 is the starting base tier and must always remain at LKR 0.00.
                   </span>
                 )}
@@ -2093,19 +2043,17 @@ export default function CustomerMonthlyRangeHub({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                     Display Order
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="number"
                     min="0"
                     style={{
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
-                      fontSize: '0.85rem',
                       boxSizing: 'border-box',
                     }}
                     value={rangeForm.displayOrder}
@@ -2114,17 +2062,15 @@ export default function CustomerMonthlyRangeHub({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                     Active Status
                   </label>
-                  <select
+                  <select className="erp-field"
                     style={{
                       width: '100%',
                       height: '34px',
                       padding: '0 10px',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
-                      fontSize: '0.85rem',
                       boxSizing: 'border-box',
                       backgroundColor: '#ffffff',
                     }}
@@ -2139,17 +2085,15 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                   Description (Optional)
                 </label>
-                <textarea
+                <textarea className="erp-field"
                   rows={2}
                   style={{
                     width: '100%',
                     padding: '8px 10px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.84rem',
                     boxSizing: 'border-box',
                     resize: 'none',
                   }}
@@ -2160,19 +2104,16 @@ export default function CustomerMonthlyRangeHub({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowRangeModal(false)}
                   disabled={savingRange}
                   style={{
                     height: '32px',
                     padding: '0 14px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     backgroundColor: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.8rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                   }}
                 >
@@ -2188,7 +2129,7 @@ export default function CustomerMonthlyRangeHub({
                     border: 'none',
                     backgroundColor: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.8rem',
+                    fontSize: 'var(--erp-text-small)',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -2240,7 +2181,7 @@ export default function CustomerMonthlyRangeHub({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldCheck size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   Range Configuration Audit Trail
                 </h3>
               </div>
@@ -2253,13 +2194,13 @@ export default function CustomerMonthlyRangeHub({
               </button>
             </div>
 
-            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
               Maintains an immutable record of changes to ranges, threshold edits, and tier promotions.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {auditLogs.length === 0 ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
                   No audit logs recorded yet.
                 </div>
               ) : (
@@ -2271,14 +2212,14 @@ export default function CustomerMonthlyRangeHub({
                       borderRadius: '6px',
                       background: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      fontSize: '0.82rem',
+                      fontSize: 'var(--erp-text-body)',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <span
                         style={{
                           fontWeight: 600,
-                          fontSize: '0.72rem',
+                          fontSize: 'var(--erp-text-caption)',
                           padding: '1px 6px',
                           borderRadius: '4px',
                           background: log.actionType?.includes('CREATE') ? '#dcfce7' : '#e0f2fe',
@@ -2287,12 +2228,12 @@ export default function CustomerMonthlyRangeHub({
                       >
                         {log.actionType}
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', fontFamily: 'monospace' }}>
                         {new Date(log.performedAt).toLocaleString()}
                       </span>
                     </div>
                     <div style={{ color: '#1e293b', fontWeight: 500 }}>{log.details}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '3px' }}>
+                    <div style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', marginTop: '3px' }}>
                       By: <strong>{log.performedBy || 'SYSTEM'}</strong>
                     </div>
                   </div>
@@ -2339,10 +2280,10 @@ export default function CustomerMonthlyRangeHub({
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clock size={18} color="#0284c7" />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                     Monthly Range History
                   </h3>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                     {historyCustomer.customerName} ({historyCustomer.customerCode})
                   </div>
                 </div>
@@ -2356,7 +2297,7 @@ export default function CustomerMonthlyRangeHub({
               </button>
             </div>
 
-            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
               Historical record of qualifying purchases and achieved range milestones across past calculation cycles.
             </p>
 
@@ -2366,7 +2307,7 @@ export default function CustomerMonthlyRangeHub({
                 Loading history...
               </div>
             ) : customerHistory.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+              <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
                 No past monthly range records found for this customer.
               </div>
             ) : (
@@ -2389,16 +2330,16 @@ export default function CustomerMonthlyRangeHub({
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#0f172a' }}>
+                        <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a' }}>
                           {h.monthLabel || h.yearMonth}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                           Invoices: {h.invoiceCount || 0} • Last Purchase: {h.lastPurchaseDate || 'None'}
                         </div>
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', fontFamily: 'monospace' }}>
+                        <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', fontFamily: 'monospace' }}>
                           LKR {Number(h.qualifyingPurchases || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                         <span
@@ -2408,7 +2349,7 @@ export default function CustomerMonthlyRangeHub({
                             gap: '4px',
                             padding: '1px 6px',
                             borderRadius: '9999px',
-                            fontSize: '0.7rem',
+                            fontSize: 'var(--erp-text-badge)',
                             fontWeight: 600,
                             background: tierStyle.bg,
                             color: tierStyle.text,
@@ -2462,7 +2403,7 @@ export default function CustomerMonthlyRangeHub({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UserCheck size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   Assign Customer to Staff
                 </h3>
               </div>
@@ -2476,26 +2417,24 @@ export default function CustomerMonthlyRangeHub({
             </div>
 
             <div style={{ marginBottom: '14px', padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
+              <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-button)', color: '#0f172a' }}>
                 {assigningCustomer.customerName}
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+              <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>
                 Code: <span style={{ fontFamily: 'monospace' }}>{assigningCustomer.customerCode}</span> • Current: {assigningCustomer.assignedStaffName || 'Unassigned'}
               </div>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                 Select Sales Representative:
               </label>
-              <select
+              <select className="erp-field"
                 style={{
                   width: '100%',
                   height: '35px',
                   padding: '0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
                   backgroundColor: '#ffffff',
                   boxSizing: 'border-box',
                 }}
@@ -2512,37 +2451,28 @@ export default function CustomerMonthlyRangeHub({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setAssigningCustomer(null)}
                 disabled={savingAssignStaff}
                 style={{
                   height: '32px',
                   padding: '0 14px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
                   color: '#475569',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
                   cursor: 'pointer',
                 }}
               >
                 Cancel
               </button>
-              <button
+              <button className="erp-button erp-button-primary"
                 type="button"
                 onClick={handleSaveAssignStaff}
                 disabled={savingAssignStaff}
                 style={{
                   height: '32px',
                   padding: '0 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',

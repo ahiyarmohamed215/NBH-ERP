@@ -678,7 +678,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   if(showCreateTripModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryWorkspace form={newTripForm} setForm={setNewTripForm} warehouses={warehouses} routes={routes} vehicles={vehicles} employees={employees} invoices={pendingInvoices} busy={tripBusy} onClose={()=>setShowCreateTripModal(false)} onSave={handleCreateDeliveryTrip}/></div>;
 
   return (
-    <div className="delivery-theme inventory-theme purchasing-no-shadows"
+    <div className="delivery-theme inventory-theme purchasing-no-shadows erp-page"
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -696,49 +696,34 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       }}
     >
       {/* Page Header (Fixed / Sticky to Desktop Screen - Matching CustomersHub) */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              margin: '0 0 4px 0',
-              letterSpacing: '-0.02em',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Delivery Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+          <p className="erp-page-description">
             Dispatch warehouse orders, assign delivery staff and vehicles, plan delivery routes, and track vehicle trips.
           </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {currentTab === 'deliveries' && (
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateTrip}
               style={{
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '0.88rem',
                 padding: '9px 18px',
-                borderRadius: '6px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                border: 'none',
                 cursor: 'pointer',
               }}
             >
@@ -747,21 +732,14 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           )}
 
           {currentTab === 'routes' && (
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateRouteView}
               style={{
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '0.88rem',
                 padding: '9px 18px',
-                borderRadius: '6px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                border: 'none',
                 cursor: 'pointer',
               }}
             >
@@ -770,100 +748,52 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           )}
 
           {currentTab === 'vehicles' && (
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateVehicle}
               style={{
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                fontWeight: 600,
-                fontSize: '0.88rem',
                 padding: '9px 18px',
-                borderRadius: '6px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                border: 'none',
                 cursor: 'pointer',
               }}
             >
-              <Plus size={17} /> Add Vehicle
+              <Plus size={17} /> New Vehicle
             </button>
           )}
         </div>
       </div>
 
       {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
-        <button
+        <button data-active={currentTab === 'deliveries'} aria-pressed={currentTab === 'deliveries'} className="erp-tab"
           type="button"
           onClick={() => setCurrentTab('deliveries')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: currentTab === 'deliveries' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: currentTab === 'deliveries' ? 700 : 500,
-            color: currentTab === 'deliveries' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Truck size={16} /> Delivery Trips ({deliveries.length})
         </button>
 
-        <button
+        <button data-active={currentTab === 'routes'} aria-pressed={currentTab === 'routes'} className="erp-tab"
           type="button"
           onClick={() => setCurrentTab('routes')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: currentTab === 'routes' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: currentTab === 'routes' ? 700 : 500,
-            color: currentTab === 'routes' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Navigation size={16} /> Delivery Routes ({routes.length})
         </button>
 
-        <button
+        <button data-active={currentTab === 'vehicles'} aria-pressed={currentTab === 'vehicles'} className="erp-tab"
           type="button"
           onClick={() => setCurrentTab('vehicles')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: currentTab === 'vehicles' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: currentTab === 'vehicles' ? 700 : 500,
-            color: currentTab === 'vehicles' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Gauge size={16} /> Fleet Vehicles ({vehicles.length})
         </button>
@@ -919,12 +849,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   {isCreatingRoute ? 'New Delivery Route' : `Manage Delivery Route: ${routeEditForm.name}`}
                 </h3>
                 <span
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: 'var(--erp-text-caption)',
                     fontWeight: 600,
                     backgroundColor: '#f0f9ff',
                     color: '#0284c7',
@@ -977,16 +907,16 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 }}
               >
                 <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', marginBottom: '14px' }}>
                     Delivery Route Details
                   </div>
 
                   {/* Route Code Input */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Route Code
                     </label>
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="e.g. DR-001"
                       value={routeEditForm.routeCode}
@@ -995,9 +925,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         width: '100%',
                         height: '38px',
                         padding: '0 12px',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                       }}
@@ -1006,10 +934,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
                   {/* Route Name Input */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Route Name *
                     </label>
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="e.g. Colombo Western Corridor"
                       value={routeEditForm.name}
@@ -1018,9 +946,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         width: '100%',
                         height: '38px',
                         padding: '0 12px',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                       }}
@@ -1029,7 +955,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
                   {/* Responsible Staff Dropdown */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Assigned Staff Member / Driver
                     </label>
                     <FilterSelect variant="field"
@@ -1041,7 +967,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         padding: '0 28px 0 12px',
                         borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
+                        fontSize: 'var(--erp-text-button)',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                         appearance: 'none',
@@ -1061,10 +987,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
                   {/* Area / Territory */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Territory / Area
                     </label>
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="e.g. Western Province / Colombo 01-15"
                       value={routeEditForm.area}
@@ -1073,9 +999,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         width: '100%',
                         height: '38px',
                         padding: '0 12px',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                       }}
@@ -1084,10 +1008,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
                   {/* Delivery Days */}
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Delivery Days
                     </label>
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="e.g. Monday, Wednesday, Friday"
                       value={routeEditForm.deliveryDays}
@@ -1096,9 +1020,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         width: '100%',
                         height: '38px',
                         padding: '0 12px',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.88rem',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                       }}
@@ -1107,10 +1029,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
                   {/* Description Input */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Route Description / Notes
                     </label>
-                    <textarea
+                    <textarea className="erp-field"
                       rows="3"
                       placeholder="e.g. Daily wholesale distribution to supermarkets and convenience stores"
                       value={routeEditForm.description}
@@ -1118,13 +1040,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                       style={{
                         width: '100%',
                         padding: '8px 12px',
-                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.86rem',
                         backgroundColor: '#ffffff',
                         boxSizing: 'border-box',
                         resize: 'vertical',
-                        fontFamily: 'inherit',
                       }}
                     />
                   </div>
@@ -1145,12 +1064,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                   {/* Small Route Summary */}
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                    <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155' }}>
                       Route Summary:
                     </span>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         backgroundColor: '#f0f9ff',
                         color: '#0284c7',
@@ -1164,7 +1083,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                   </div>
 
                   {/* Assign Customer Button (Opens Small Popup) */}
-                  <button
+                  <button className="erp-button erp-button-primary"
                     type="button"
                     onClick={() => {
                       setShowAssignCustomerModal(true);
@@ -1176,14 +1095,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                       gap: '6px',
                       padding: '0 14px',
                       height: '34px',
-                      borderRadius: '6px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
                       cursor: 'pointer',
-                      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
                       transition: 'background-color 0.15s ease',
                       whiteSpace: 'nowrap',
                     }}
@@ -1206,7 +1118,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                       pointerEvents: 'none',
                     }}
                   />
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="Search assigned customers..."
                     value={customerSearchInRoute}
@@ -1215,9 +1127,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                       width: '100%',
                       height: '34px',
                       padding: '0 28px 0 30px',
-                      borderRadius: '6px',
                       border: '1px solid #cbd5e1',
-                      fontSize: '0.82rem',
                       backgroundColor: '#ffffff',
                       boxSizing: 'border-box',
                     }}
@@ -1256,25 +1166,25 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                   }}
                 >
                   <div style={{ flex: 1, overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                    <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                         <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
-                          <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
+                          <th className="erp-table-heading">Customer</th>
+                          <th className="erp-table-heading">Contact / Phone</th>
+                          <th className="erp-table-heading">Status</th>
+                          <th className="erp-table-heading" style={{ textAlign: 'right' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {assignedCustomerList.length === 0 ? (
                           <tr>
-                            <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                            <td className="erp-table-cell" colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                                 <Users size={28} color="#cbd5e1" />
-                                <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-field)' }}>
                                   {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
                                 </div>
-                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>
                                   {customerSearchInRoute
                                     ? 'Try adjusting your search query above.'
                                     : 'Click the "Assign Customer" button above to search and add customers to this route.'}
@@ -1290,7 +1200,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                             >
-                              <td style={{ padding: '8px 12px' }}>
+                              <td className="erp-table-cell">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <div
                                     style={{
@@ -1304,27 +1214,27 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       fontWeight: 600,
-                                      fontSize: '0.74rem',
+                                      fontSize: 'var(--erp-text-caption)',
                                     }}
                                   >
                                     {(c.name || 'C').slice(0, 1).toUpperCase()}
                                   </div>
                                   <div>
                                     <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
-                                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                                       {c.code || c.customerCode}
                                     </div>
                                   </div>
                                 </div>
                               </td>
-                              <td style={{ padding: '8px 12px', color: '#334155' }}>
+                              <td className="erp-table-cell" style={{ color: '#334155' }}>
                                 <div>{c.contactPerson || '—'}</div>
-                                {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                                {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                               </td>
-                              <td style={{ padding: '8px 12px' }}>
+                              <td className="erp-table-cell">
                                 <span
                                   style={{
-                                    fontSize: '0.72rem',
+                                    fontSize: 'var(--erp-text-caption)',
                                     fontWeight: 600,
                                     padding: '2px 7px',
                                     borderRadius: '9999px',
@@ -1335,8 +1245,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                                   {isCustomerActive(c) ? 'Active' : 'Inactive'}
                                 </span>
                               </td>
-                              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                                <button
+                              <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                                <button className="erp-button"
                                   type="button"
                                   onClick={() => {
                                     setRouteEditForm({
@@ -1349,10 +1259,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                                     backgroundColor: 'transparent',
                                     color: '#dc2626',
                                     cursor: 'pointer',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
                                     padding: '3px 6px',
-                                    borderRadius: '4px',
                                   }}
                                   title="Remove customer from route"
                                 >
@@ -1381,17 +1288,14 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 flexShrink: 0,
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={handleCloseRouteView}
                 style={{
                   padding: '8px 18px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
                   color: '#475569',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -1411,7 +1315,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                   border: 'none',
                   backgroundColor: !isCreatingRoute && !canEditDelivery ? '#94a3b8' : '#0284c7',
                   color: '#ffffff',
-                  fontSize: '0.86rem',
+                  fontSize: 'var(--erp-text-field)',
                   fontWeight: 600,
                   cursor: !isCreatingRoute && !canEditDelivery ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
@@ -1467,10 +1371,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               }}
             >
               <div>
-                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                <h4 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a' }}>
                   Assign Customers to Route
                 </h4>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                   Search and add customers to {routeEditForm.name || 'this delivery route'}.
                 </p>
               </div>
@@ -1503,7 +1407,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     pointerEvents: 'none',
                   }}
                 />
-                <input
+                <input className="erp-field"
                   type="text"
                   placeholder="Search by name, code, phone, address..."
                   value={assignCustomerSearch}
@@ -1513,9 +1417,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     width: '100%',
                     height: '34px',
                     padding: '0 28px 0 32px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.84rem',
                     backgroundColor: '#ffffff',
                     boxSizing: 'border-box',
                   }}
@@ -1544,7 +1446,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
             {/* Customers List */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px 12px', maxHeight: '360px' }}>
               {availableCustomersToAssign.length === 0 ? (
-                <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
                   No matching customers found.
                 </div>
               ) : (
@@ -1581,21 +1483,21 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 600,
-                            fontSize: '0.74rem',
+                            fontSize: 'var(--erp-text-caption)',
                             flexShrink: 0,
                           }}
                         >
                           {(c.name || 'C').slice(0, 1).toUpperCase()}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-body)', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {c.name}
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{c.code || c.customerCode}</span>
                             {c.phone && <span>• {c.phone}</span>}
                             {otherRoutes.length > 0 && (
-                              <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 500 }}>
+                              <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: 'var(--erp-text-caption)', fontWeight: 500 }}>
                                 Also in: {otherRoutes.map((r) => r.routeName || r.name).join(', ')}
                               </span>
                             )}
@@ -1625,7 +1527,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                           gap: '4px',
                           padding: '4px 10px',
                           borderRadius: '5px',
-                          fontSize: '0.76rem',
+                          fontSize: 'var(--erp-text-caption)',
                           fontWeight: 600,
                           cursor: 'pointer',
                           border: isAssigned ? '1px solid #bbf7d0' : 'none',
@@ -1662,22 +1564,15 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 backgroundColor: '#ffffff',
               }}
             >
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                 <strong style={{ color: '#0f172a' }}>{routeEditForm.selectedCustomerIds.length}</strong> customer{routeEditForm.selectedCustomerIds.length === 1 ? '' : 's'} in route
               </span>
-              <button
+              <button className="erp-button erp-button-primary"
                 type="button"
                 onClick={() => setShowAssignCustomerModal(false)}
                 style={{
                   padding: '6px 18px',
-                  borderRadius: '6px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.82rem',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}

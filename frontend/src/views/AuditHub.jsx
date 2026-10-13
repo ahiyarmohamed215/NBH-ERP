@@ -237,16 +237,13 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
       }}
     >
       {/* TOP HEADER */}
-      <div
+      <div className="erp-page-header"
         style={{
           padding: '16px 24px',
           backgroundColor: '#ffffff',
           borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '14px',
           flexShrink: 0,
         }}
       >
@@ -267,10 +264,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <ShieldCheck size={22} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+            <h1 className="erp-page-title">
               Day Summary & Audit Ledger
             </h1>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+            <p className="erp-page-description">
               Permanent, tamper-proof record of all operations and staff actions in NBH ERP
             </p>
           </div>
@@ -280,36 +277,28 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Quick Date Pills */}
           <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setQuickDate(0)}
               style={{
                 border: 'none',
                 padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                borderRadius: '6px',
                 cursor: 'pointer',
                 backgroundColor: selectedDate === getTodayStr() ? '#ffffff' : 'transparent',
                 color: selectedDate === getTodayStr() ? '#0f172a' : '#64748b',
-                boxShadow: selectedDate === getTodayStr() ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
               }}
             >
               Today
             </button>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setQuickDate(-1)}
               style={{
                 border: 'none',
                 padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                borderRadius: '6px',
                 cursor: 'pointer',
                 backgroundColor: selectedDate !== getTodayStr() ? '#ffffff' : 'transparent',
                 color: selectedDate !== getTodayStr() ? '#0f172a' : '#64748b',
-                boxShadow: selectedDate !== getTodayStr() ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
               }}
             >
               Yesterday
@@ -319,16 +308,14 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           {/* Date Picker Input */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
             <Calendar size={15} style={{ position: 'absolute', left: '10px', color: '#64748b', pointerEvents: 'none' }} />
-            <input
+            <input className="erp-field"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               max={getTodayStr()}
               style={{
                 padding: '7px 12px 7px 32px',
-                fontSize: '0.84rem',
                 fontWeight: 600,
-                borderRadius: '8px',
                 border: '1px solid #cbd5e1',
                 backgroundColor: '#ffffff',
                 color: '#1e293b',
@@ -338,22 +325,19 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           </div>
 
           {/* Refresh Button */}
-          <button
+          <button className="erp-button"
             type="button"
             onClick={() => fetchDaySummary(selectedDate, true)}
             disabled={loading || refreshing}
             title="Refresh day's audit entries"
             style={{
               padding: '7px 12px',
-              borderRadius: '8px',
               border: '1px solid #cbd5e1',
               backgroundColor: '#ffffff',
               color: '#334155',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              fontSize: '0.82rem',
-              fontWeight: 600,
               cursor: loading || refreshing ? 'not-allowed' : 'pointer',
             }}
           >
@@ -362,23 +346,16 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           </button>
 
           {/* Export CSV Button */}
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleExportCsv}
             disabled={loading || !filteredLogs.length}
             style={{
               padding: '7px 14px',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              fontSize: '0.82rem',
-              fontWeight: 600,
               cursor: loading || !filteredLogs.length ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 3px rgba(2, 132, 199, 0.3)',
             }}
           >
             <Download size={14} /> Export CSV
@@ -424,10 +401,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <Activity size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Total Operations
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>
+            <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a' }}>
               {loading ? '...' : (daySummary?.totalActions || 0)}
             </div>
           </div>
@@ -461,10 +438,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <CheckCircle2 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Records Created
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#059669' }}>
+            <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#059669' }}>
               {loading ? '...' : (daySummary?.totalCreates || 0)}
             </div>
           </div>
@@ -498,10 +475,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <Edit3 size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Modifications / Edits
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#2563eb' }}>
+            <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#2563eb' }}>
               {loading ? '...' : (daySummary?.totalUpdates || 0)}
             </div>
           </div>
@@ -535,10 +512,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <SlidersHorizontal size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Status / Approvals
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#7c3aed' }}>
+            <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#7c3aed' }}>
               {loading ? '...' : (daySummary?.totalStatusChanges || 0)}
             </div>
           </div>
@@ -572,10 +549,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             <Users size={22} />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Active Staff Today
             </div>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#ea580c' }}>
+            <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#ea580c' }}>
               {loading ? '...' : (staffActivityList.length || 0)}
             </div>
           </div>
@@ -608,7 +585,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           {/* Search Box */}
           <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '380px' }}>
             <Search size={15} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
-            <input
+            <input className="erp-field"
               type="text"
               placeholder="Search staff, reference, action, detail..."
               value={searchTerm}
@@ -616,8 +593,6 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
               style={{
                 width: '100%',
                 padding: '7px 10px 7px 32px',
-                fontSize: '0.84rem',
-                borderRadius: '6px',
                 border: '1px solid #cbd5e1',
                 outline: 'none',
               }}
@@ -643,7 +618,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
 
           {/* Module Filter Chips */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Module:</span>
+            <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Module:</span>
             {['ALL', ...availableModules].map((mod) => (
               <button
                 key={mod}
@@ -652,7 +627,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                 style={{
                   padding: '4px 10px',
                   borderRadius: '20px',
-                  fontSize: '0.76rem',
+                  fontSize: 'var(--erp-text-caption)',
                   fontWeight: 600,
                   border: '1px solid',
                   borderColor: selectedModule === mod ? '#0284c7' : '#e2e8f0',
@@ -669,7 +644,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
 
           {/* Action Type Filter Pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Action:</span>
+            <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Action:</span>
             {[
               { id: 'ALL', label: 'All' },
               { id: 'CREATE', label: 'Creates' },
@@ -683,7 +658,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                 style={{
                   padding: '4px 10px',
                   borderRadius: '6px',
-                  fontSize: '0.76rem',
+                  fontSize: 'var(--erp-text-caption)',
                   fontWeight: 600,
                   border: '1px solid',
                   borderColor: selectedActionType === act.id ? '#0f172a' : '#e2e8f0',
@@ -701,17 +676,14 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
         {/* Staff Members Activity Bar (if multiple staff active) */}
         {staffActivityList.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               Staff Filter:
             </span>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => setSelectedStaff('ALL')}
               style={{
                 padding: '3px 10px',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
                 border: '1px solid',
                 borderColor: selectedStaff === 'ALL' ? '#0284c7' : '#e2e8f0',
                 backgroundColor: selectedStaff === 'ALL' ? '#eff6ff' : '#ffffff',
@@ -730,7 +702,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                 style={{
                   padding: '3px 10px',
                   borderRadius: '6px',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--erp-text-caption)',
                   fontWeight: 600,
                   border: '1px solid',
                   borderColor: selectedStaff === st.name ? '#0284c7' : '#e2e8f0',
@@ -751,7 +723,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                     color: selectedStaff === st.name ? '#ffffff' : '#64748b',
                     padding: '1px 5px',
                     borderRadius: '10px',
-                    fontSize: '0.68rem',
+                    fontSize: 'var(--erp-text-badge)',
                     fontWeight: 700,
                   }}
                 >
@@ -790,7 +762,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+            <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 700, color: '#1e293b' }}>
               Audit Entries for {selectedDate}
             </span>
             <span
@@ -799,7 +771,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                 color: '#475569',
                 padding: '2px 8px',
                 borderRadius: '12px',
-                fontSize: '0.72rem',
+                fontSize: 'var(--erp-text-caption)',
                 fontWeight: 700,
               }}
             >
@@ -807,7 +779,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
             </span>
           </div>
 
-          <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+          <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
             Permanent record • Deletion prohibited by policy
           </div>
         </div>
@@ -817,29 +789,29 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
           {loading ? (
             <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
               <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px auto', display: 'block', color: '#0284c7' }} />
-              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Loading system audit trail...</div>
+              <div style={{ fontSize: 'var(--erp-text-button)', fontWeight: 600 }}>Loading system audit trail...</div>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
               <ShieldCheck size={40} style={{ margin: '0 auto 12px auto', display: 'block', color: '#cbd5e1' }} />
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+              <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                 No audit entries recorded for this selection
               </div>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: 'var(--erp-text-body)', color: '#94a3b8' }}>
                 Try selecting a different date or clearing your filter criteria.
               </p>
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-body)' }}>
               <thead style={{ position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '12px 18px', fontWeight: 700, width: '120px' }}>TIME</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 700, width: '180px' }}>STAFF / OPERATOR</th>
-                  <th style={{ padding: '12px 14px', fontWeight: 700, width: '110px' }}>MODULE</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 700, width: '140px' }}>ACTION</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 700, width: '180px' }}>ENTITY / REF</th>
-                  <th style={{ padding: '12px 18px', fontWeight: 700 }}>OPERATION DETAILS</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 700, width: '60px', textAlign: 'center' }}>VIEW</th>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th className="erp-table-heading" style={{ width: '120px' }}>TIME</th>
+                  <th className="erp-table-heading" style={{ width: '180px' }}>STAFF / OPERATOR</th>
+                  <th className="erp-table-heading" style={{ width: '110px' }}>MODULE</th>
+                  <th className="erp-table-heading" style={{ width: '140px' }}>ACTION</th>
+                  <th className="erp-table-heading" style={{ width: '180px' }}>ENTITY / REF</th>
+                  <th className="erp-table-heading">OPERATION DETAILS</th>
+                  <th className="erp-table-heading" style={{ width: '60px', textAlign: 'center' }}>VIEW</th>
                 </tr>
               </thead>
               <tbody>
@@ -870,7 +842,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#fbfcfd')}
                     >
                       {/* Time */}
-                      <td style={{ padding: '12px 18px', whiteSpace: 'nowrap', color: '#64748b', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                      <td className="erp-table-cell" style={{ whiteSpace: 'nowrap', color: '#64748b', fontFamily: 'monospace' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <Clock size={13} style={{ color: '#94a3b8' }} />
                           {timeStr}
@@ -878,24 +850,24 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* Staff / Operator */}
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="erp-table-cell">
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontWeight: 700, color: '#0f172a' }}>
                             {log.userFullName || log.username || 'System'}
                           </span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                          <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                             @{log.username || 'system'} {log.userRole ? `• ${log.userRole}` : ''}
                           </span>
                         </div>
                       </td>
 
                       {/* Module */}
-                      <td style={{ padding: '12px 14px' }}>
+                      <td className="erp-table-cell">
                         <span
                           style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                             backgroundColor: moduleStyle.bg,
                             color: moduleStyle.color,
@@ -907,12 +879,12 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* Action */}
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="erp-table-cell">
                         <span
                           style={{
                             padding: '3px 8px',
                             borderRadius: '5px',
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                             backgroundColor: actionStyle.bg,
                             color: actionStyle.color,
@@ -927,13 +899,13 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* Entity / Reference */}
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className="erp-table-cell">
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontWeight: 600, color: '#1e293b' }}>
                             {log.entityName || '-'}
                           </span>
                           {log.entityId && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                               ID: #{log.entityId}
                             </span>
                           )}
@@ -941,7 +913,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* Details */}
-                      <td style={{ padding: '12px 18px', color: '#334155' }}>
+                      <td className="erp-table-cell" style={{ color: '#334155' }}>
                         <div
                           style={{
                             maxWidth: '480px',
@@ -956,7 +928,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* View Action */}
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <button
                           type="button"
                           onClick={() => setViewingLog(log)}
@@ -1052,10 +1024,10 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                   <ShieldCheck size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a' }}>
                     Audit Event #{viewingLog.id || 'N/A'}
                   </h3>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                     Recorded at {viewingLog.createdAt}
                   </div>
                 </div>
@@ -1074,44 +1046,44 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
               {/* Event Attributes Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>STAFF MEMBER</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>STAFF MEMBER</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                     {viewingLog.userFullName || viewingLog.username || 'System'}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>@{viewingLog.username || 'system'}</div>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>@{viewingLog.username || 'system'}</div>
                 </div>
 
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>USER ROLE & PERMISSION</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0284c7', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>USER ROLE & PERMISSION</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0284c7', marginTop: '2px' }}>
                     {viewingLog.userRole || 'AUTHORIZED_STAFF'}
                   </div>
                 </div>
 
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>SYSTEM MODULE</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>SYSTEM MODULE</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                     {viewingLog.module || 'SYSTEM'}
                   </div>
                 </div>
 
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>ACTION TRIGGERED</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>ACTION TRIGGERED</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
                     {viewingLog.action}
                   </div>
                 </div>
 
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>TARGET ENTITY</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>TARGET ENTITY</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                     {viewingLog.entityName || 'N/A'} (ID: {viewingLog.entityId || 'N/A'})
                   </div>
                 </div>
 
                 <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>CLIENT IP ADDRESS</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#334155', marginTop: '2px', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>CLIENT IP ADDRESS</div>
+                  <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#334155', marginTop: '2px', fontFamily: 'monospace' }}>
                     {viewingLog.ipAddress || 'Internal / Local'}
                   </div>
                 </div>
@@ -1119,7 +1091,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
 
               {/* Operation Details */}
               <div>
-                <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>
                   Operation Audit Note & Payload
                 </div>
                 <div
@@ -1128,7 +1100,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                     borderRadius: '8px',
                     backgroundColor: '#0f172a',
                     color: '#e2e8f0',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontFamily: 'monospace',
                     lineHeight: '1.6',
                     whiteSpace: 'pre-wrap',
@@ -1149,7 +1121,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  fontSize: '0.78rem',
+                  fontSize: 'var(--erp-text-small)',
                   color: '#92400e',
                 }}
               >
@@ -1170,17 +1142,14 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                 justifyContent: 'flex-end',
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setViewingLog(null)}
                 style={{
                   padding: '8px 18px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
-                  fontWeight: 600,
-                  fontSize: '0.84rem',
                   cursor: 'pointer',
                 }}
               >

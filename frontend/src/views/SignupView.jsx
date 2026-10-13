@@ -90,19 +90,19 @@ export default function SignupView({ onSwitchToLogin }) {
             <CheckCircle2 size={32} />
           </div>
 
-          <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '8px' }}>
+          <h2 className="erp-dialog-title" style={{ color: '#0f172a', marginBottom: '8px' }}>
             Registration Submitted!
           </h2>
 
-          <p style={{ color: '#64748b', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '24px' }}>
-            Thank you for registering. Your account for <strong>{formData.username}</strong> is currently 
-            <span style={{ color: '#d97706', fontWeight: 600 }}> pending administrator approval</span>. 
+          <p style={{ color: '#64748b', fontSize: 'var(--erp-text-nav)', lineHeight: '1.6', marginBottom: '24px' }}>
+            Thank you for registering. Your account for <strong>{formData.username}</strong> is currently
+            <span style={{ color: '#d97706', fontWeight: 600 }}> pending administrator approval</span>.
             An administrator will review your account and assign your role before you can log in.
           </p>
 
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary erp-button"
             style={{ width: '100%', padding: '10px 16px' }}
             onClick={onSwitchToLogin}
           >
@@ -147,14 +147,14 @@ export default function SignupView({ onSwitchToLogin }) {
           >
             <Package size={26} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>Create an Account</h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Register to request access to NBH ERP</p>
+          <h2 className="erp-dialog-title" style={{ color: '#0f172a', marginBottom: '4px' }}>Create an Account</h2>
+          <p style={{ color: '#64748b', fontSize: 'var(--erp-text-button)' }}>Register to request access to NBH ERP</p>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 USERNAME *
               </label>
               <div style={{ position: 'relative' }}>
@@ -162,7 +162,7 @@ export default function SignupView({ onSwitchToLogin }) {
                 <input
                   type="text"
                   name="username"
-                  className="input-glass"
+                  className="input-glass erp-field"
                   style={{ paddingLeft: '34px' }}
                   placeholder="e.g. john"
                   value={formData.username}
@@ -173,13 +173,13 @@ export default function SignupView({ onSwitchToLogin }) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 FULL NAME *
               </label>
               <input
                 type="text"
                 name="fullName"
-                className="input-glass"
+                className="input-glass erp-field"
                 placeholder="e.g. John Perera"
                 value={formData.fullName}
                 onChange={handleChange}
@@ -190,7 +190,7 @@ export default function SignupView({ onSwitchToLogin }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 EMAIL ADDRESS *
               </label>
               <div style={{ position: 'relative' }}>
@@ -198,7 +198,7 @@ export default function SignupView({ onSwitchToLogin }) {
                 <input
                   type="email"
                   name="email"
-                  className="input-glass"
+                  className="input-glass erp-field"
                   style={{ paddingLeft: '34px' }}
                   placeholder="john@example.com"
                   value={formData.email}
@@ -209,7 +209,7 @@ export default function SignupView({ onSwitchToLogin }) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 PHONE NUMBER
               </label>
               <div style={{ position: 'relative' }}>
@@ -217,7 +217,7 @@ export default function SignupView({ onSwitchToLogin }) {
                 <input
                   type="text"
                   name="phone"
-                  className="input-glass"
+                  className="input-glass erp-field"
                   style={{ paddingLeft: '34px' }}
                   placeholder="+94 77 123 4567"
                   value={formData.phone}
@@ -229,7 +229,7 @@ export default function SignupView({ onSwitchToLogin }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 PASSWORD *
               </label>
               <div style={{ position: 'relative' }}>
@@ -237,7 +237,7 @@ export default function SignupView({ onSwitchToLogin }) {
                 <input
                   type="password"
                   name="password"
-                  className="input-glass"
+                  className="input-glass erp-field"
                   style={{ paddingLeft: '34px' }}
                   placeholder="Min 6 characters"
                   value={formData.password}
@@ -248,7 +248,7 @@ export default function SignupView({ onSwitchToLogin }) {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                 CONFIRM PASSWORD *
               </label>
               <div style={{ position: 'relative' }}>
@@ -256,7 +256,7 @@ export default function SignupView({ onSwitchToLogin }) {
                 <input
                   type="password"
                   name="confirmPassword"
-                  className="input-glass"
+                  className="input-glass erp-field"
                   style={{ paddingLeft: '34px' }}
                   placeholder="Re-type password"
                   value={formData.confirmPassword}
@@ -269,8 +269,8 @@ export default function SignupView({ onSwitchToLogin }) {
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '11px', fontSize: '0.95rem' }}
+            className="btn btn-primary erp-button"
+            style={{ width: '100%', padding: '11px' }}
             disabled={loading}
           >
             {loading ? 'Submitting Registration...' : (
@@ -281,16 +281,15 @@ export default function SignupView({ onSwitchToLogin }) {
           </button>
         </form>
 
-        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '0.88rem', color: '#64748b' }}>
+        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: 'var(--erp-text-button)', color: '#64748b' }}>
           Already have an approved account?{' '}
-          <button
+          <button className="erp-button"
             type="button"
             onClick={onSwitchToLogin}
             style={{
               background: 'none',
               border: 'none',
               color: '#2563eb',
-              fontWeight: 600,
               cursor: 'pointer',
               textDecoration: 'underline',
               padding: 0,

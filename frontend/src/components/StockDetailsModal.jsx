@@ -37,7 +37,7 @@ export default function StockDetailsModal({item,canSeeCost,onClose}) {
   return <PurchaseInspectionModal type="Inventory" number={item.productName} tableToolbar headerPrint
     status={item.isOutOfStock?'OUT_OF_STOCK':item.isLowStock?'LOW_STOCK':'IN_STOCK'}
     rows={[item]} columns={columns} onClose={onClose}
-    footer={<footer className="inventory-stock-summary-footer"><button type="button" className="btn btn-glass" onClick={onClose}>Close</button></footer>}
+    footer={<footer className="inventory-stock-summary-footer"><button type="button" className="btn btn-glass erp-button" onClick={onClose}>Close</button></footer>}
     content={<div className="inventory-stock-summary">
       <section aria-label="Stock quantities"><div className="inventory-stock-section-title"><Boxes size={17}/><div><h3>Stock quantities</h3><p className="inventory-stock-summary-caption">Physical stock and availability in this warehouse</p></div></div>
         <dl className="inventory-stock-summary-quantities">

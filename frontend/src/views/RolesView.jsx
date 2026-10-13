@@ -266,29 +266,22 @@ export default function RolesView({ onRoleChange }) {
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
+          <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: '0 0 4px 0' }}>
             Employee Roles
           </h2>
-          <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
+          <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', margin: 0 }}>
             Configure company roles and manage fine-grained access permissions for staff.
           </p>
         </div>
-        <button
+        <button className="erp-button erp-button-primary"
           type="button"
           onClick={openCreateModal}
           style={{
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
             padding: '9px 18px',
-            fontWeight: 600,
-            fontSize: '0.88rem',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
             transition: 'background-color 0.15s ease',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
@@ -316,15 +309,13 @@ export default function RolesView({ onRoleChange }) {
       >
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8' }} />
-          <input
+          <input className="erp-field"
             type="text"
             style={{
               width: '100%',
               height: '38px',
               padding: '0 32px 0 36px',
-              borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.88rem',
               outline: 'none',
               backgroundColor: '#ffffff',
               color: '#0f172a',
@@ -364,7 +355,7 @@ export default function RolesView({ onRoleChange }) {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+          <div style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', fontWeight: 500, whiteSpace: 'nowrap' }}>
             {filteredRoles.length} Role{filteredRoles.length === 1 ? '' : 's'} Configured
           </div>
           <ToolbarActions
@@ -391,7 +382,7 @@ export default function RolesView({ onRoleChange }) {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading roles...</div>
         ) : filteredRoles.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: '0.9rem' }}>
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: 'var(--erp-text-button)' }}>
             No roles found matching "{searchQuery}".
           </div>
         ) : (
@@ -447,7 +438,7 @@ export default function RolesView({ onRoleChange }) {
                         <span
                           style={{
                             fontWeight: 700,
-                            fontSize: '0.92rem',
+                            fontSize: 'var(--erp-text-nav)',
                             color: '#0f172a',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -461,7 +452,7 @@ export default function RolesView({ onRoleChange }) {
 
                     <p
                       style={{
-                        fontSize: '0.78rem',
+                        fontSize: 'var(--erp-text-small)',
                         color: '#64748b',
                         margin: '0 0 10px 0',
                         lineHeight: '1.35',
@@ -496,7 +487,7 @@ export default function RolesView({ onRoleChange }) {
                           border: '1px solid #bae6fd',
                           borderRadius: '5px',
                           padding: '2px 8px',
-                          fontSize: '0.74rem',
+                          fontSize: 'var(--erp-text-caption)',
                           fontWeight: 600,
                         }}
                       >
@@ -504,7 +495,7 @@ export default function RolesView({ onRoleChange }) {
                         {role.permissions?.length || 0} Permission{role.permissions?.length === 1 ? '' : 's'}
                       </span>
 
-                      <span style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      <span style={{ fontSize: 'var(--erp-text-caption)', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                         View <ChevronRight size={12} />
                       </span>
                     </div>
@@ -520,7 +511,7 @@ export default function RolesView({ onRoleChange }) {
                       borderTop: '1px solid #f1f5f9',
                     }}
                   >
-                    <span style={{ fontSize: '0.80rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: 'var(--erp-text-small)', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       <Eye size={13} /> View Permissions →
                     </span>
 
@@ -694,13 +685,13 @@ export default function RolesView({ onRoleChange }) {
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
                       {viewingRole.name}
                     </h2>
                     {viewingRole.name === 'ROLE_ADMIN' && (
                       <span
                         style={{
-                          fontSize: '0.7rem',
+                          fontSize: 'var(--erp-text-badge)',
                           fontWeight: 600,
                           padding: '2px 7px',
                           borderRadius: '4px',
@@ -713,7 +704,7 @@ export default function RolesView({ onRoleChange }) {
                       </span>
                     )}
                   </div>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
                     {viewingRole.description || 'No description provided'}
                   </p>
                 </div>
@@ -721,7 +712,7 @@ export default function RolesView({ onRoleChange }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {viewingRole.name !== 'ROLE_SUPER_ADMIN' && viewingRole.name !== 'SUPER_ADMIN' && (
-                  <button
+                  <button className="erp-button"
                     type="button"
                     onClick={() => {
                       const r = viewingRole;
@@ -731,10 +722,7 @@ export default function RolesView({ onRoleChange }) {
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
                     padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#334155',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -775,7 +763,7 @@ export default function RolesView({ onRoleChange }) {
                 flexShrink: 0,
               }}
             >
-              <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
+              <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155' }}>
                 Assigned Access Permissions
               </span>
               <span
@@ -785,7 +773,7 @@ export default function RolesView({ onRoleChange }) {
                   border: '1px solid #bae6fd',
                   borderRadius: '9999px',
                   padding: '2px 10px',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--erp-text-caption)',
                   fontWeight: 700,
                 }}
               >
@@ -828,10 +816,10 @@ export default function RolesView({ onRoleChange }) {
                         paddingBottom: '6px',
                       }}
                     >
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase' }}>
                         {mod.replace('_', ' ')}
                       </span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                      <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontWeight: 600 }}>
                         {assignedInMod.length} of {perms.length} active
                       </span>
                     </div>
@@ -848,7 +836,7 @@ export default function RolesView({ onRoleChange }) {
                             backgroundColor: '#f0fdf4',
                             border: '1px solid #bbf7d0',
                             borderRadius: '6px',
-                            fontSize: '0.76rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 500,
                             color: '#166534',
                           }}
@@ -863,7 +851,7 @@ export default function RolesView({ onRoleChange }) {
               })}
 
               {(!viewingRole.permissions || viewingRole.permissions.length === 0) && (
-                <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', fontSize: '0.88rem' }}>
+                <div style={{ textAlign: 'center', padding: '36px', color: '#94a3b8', fontSize: 'var(--erp-text-button)' }}>
                   No permissions have been assigned to this role yet. Click "Edit Permissions" to add some.
                 </div>
               )}
@@ -881,17 +869,14 @@ export default function RolesView({ onRoleChange }) {
                 flexShrink: 0,
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setViewingRole(null)}
                 style={{
                   backgroundColor: '#f1f5f9',
                   color: '#475569',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
                   padding: '7px 18px',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -927,7 +912,7 @@ export default function RolesView({ onRoleChange }) {
               padding: '18px 24px',
               borderBottom: '1px solid #e2e8f0',
             }}>
-              <h3 style={{ fontSize: '1.2rem', color: '#0f172a' }}>
+              <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a' }}>
                 {editingRole ? `Edit Role: ${editingRole.name}` : 'Create Custom Role'}
               </h3>
               <button
@@ -942,12 +927,12 @@ export default function RolesView({ onRoleChange }) {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="role-edit-body" style={{ padding: '18px 22px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                     ROLE NAME {!editingRole && '*'}
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     placeholder="e.g. INVENTORY_CLERK or Warehouse Operator"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -955,19 +940,19 @@ export default function RolesView({ onRoleChange }) {
                     required={!editingRole}
                   />
                   {!editingRole && (
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '3px', display: 'block' }}>
+                    <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '3px', display: 'block' }}>
                       Name will be prefixed with ROLE_ if not provided (e.g. ROLE_INVENTORY_CLERK).
                     </span>
                   )}
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
                     DESCRIPTION
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     placeholder="Brief description of this role's duties and access scope"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -977,10 +962,10 @@ export default function RolesView({ onRoleChange }) {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
-                      <label style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>
+                      <label style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0f172a' }}>
                         ASSIGN SYSTEM MODULES & PERMISSIONS
                       </label>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                         {formData.permissions.length} of {permissions.length} permissions enabled for this role
                       </div>
                     </div>
@@ -988,16 +973,16 @@ export default function RolesView({ onRoleChange }) {
                       <button
                         type="button"
                         onClick={() => setFormData((prev) => ({ ...prev, permissions: permissions.map((p) => p.name) }))}
-                        className="btn btn-glass btn-sm"
-                        style={{ fontSize: '0.75rem' }}
+                        className="btn btn-glass btn-sm erp-button"
+
                       >
                         Select All
                       </button>
                       <button
                         type="button"
                         onClick={() => setFormData((prev) => ({ ...prev, permissions: [] }))}
-                        className="btn btn-glass btn-sm"
-                        style={{ fontSize: '0.75rem' }}
+                        className="btn btn-glass btn-sm erp-button"
+
                       >
                         Clear All
                       </button>
@@ -1047,10 +1032,10 @@ export default function RolesView({ onRoleChange }) {
                             borderBottom: '1px solid #e2e8f0',
                           }}>
                             <div>
-                              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e293b' }}>
+                              <span style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#1e293b' }}>
                                 {info.label}
                               </span>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                              <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                                 {info.desc}
                               </div>
                             </div>
@@ -1061,7 +1046,7 @@ export default function RolesView({ onRoleChange }) {
                                 background: 'none',
                                 border: 'none',
                                 color: '#2563eb',
-                                fontSize: '0.78rem',
+                                fontSize: 'var(--erp-text-small)',
                                 fontWeight: 600,
                                 cursor: 'pointer',
                               }}
@@ -1095,10 +1080,10 @@ export default function RolesView({ onRoleChange }) {
                                     style={{ marginTop: '3px' }}
                                   />
                                   <div>
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e293b' }}>
+                                    <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#1e293b' }}>
                                       {perm.name}
                                     </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                                       {perm.description}
                                     </div>
                                   </div>
@@ -1126,14 +1111,14 @@ export default function RolesView({ onRoleChange }) {
               }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setShowModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   disabled={saving}
                 >
                   {saving ? 'Saving...' : editingRole ? 'Update Role' : 'Create Role'}

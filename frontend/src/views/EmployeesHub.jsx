@@ -648,7 +648,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
 
   return (
-    <div
+    <div className="erp-page"
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -665,20 +665,18 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       }}
     >
       {/* Page Header (Fixed / Sticky at Top) */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
+          <h1 className="erp-page-title">
             Employee Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+          <p className="erp-page-description">
             Manage employee records, role assignments, and registration approvals.
           </p>
         </div>
@@ -686,96 +684,48 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="btn btn-primary"
+          className="btn btn-primary erp-button erp-button-primary"
           style={{
-            backgroundColor: '#0284c7',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '0.88rem',
             padding: '9px 18px',
-            borderRadius: '8px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-            border: 'none',
             cursor: 'pointer',
           }}
         >
-          <Plus size={17} /> Add Employee
+          <Plus size={17} /> New Employee
         </button>
       </div>
 
       {/* Subtabs Bar (Underline Style - Fixed / Sticky at Top) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
-        <button
+        <button data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('list')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'list' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'list' ? 700 : 500,
-            color: activeTab === 'list' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <ListFilter size={16} /> Employee List
         </button>
 
-        <button
+        <button data-active={activeTab === 'roles' || activeTab === 'groups'} aria-pressed={activeTab === 'roles' || activeTab === 'groups'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('roles')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'roles' || activeTab === 'groups' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'roles' || activeTab === 'groups' ? 700 : 500,
-            color: activeTab === 'roles' || activeTab === 'groups' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Shield size={16} /> Employee Roles
         </button>
 
-        <button
+        <button data-active={activeTab === 'pending-approvals'} aria-pressed={activeTab === 'pending-approvals'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('pending-approvals')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'pending-approvals' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'pending-approvals' ? 700 : 500,
-            color: activeTab === 'pending-approvals' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <UserCheck size={16} /> Pending Approvals
           {pendingApprovals.length > 0 && (
@@ -783,7 +733,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               style={{
                 backgroundColor: activeTab === 'pending-approvals' ? '#0284c7' : '#f59e0b',
                 color: '#ffffff',
-                fontSize: '0.72rem',
+                fontSize: 'var(--erp-text-caption)',
                 fontWeight: 700,
                 padding: '1px 7px',
                 borderRadius: '9999px',
@@ -824,28 +774,21 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem', color: '#854d0e' }}>
-                <span style={{ backgroundColor: '#f59e0b', color: '#ffffff', borderRadius: '9999px', padding: '1px 8px', fontWeight: 700, fontSize: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: 'var(--erp-text-button)', color: '#854d0e' }}>
+                <span style={{ backgroundColor: '#f59e0b', color: '#ffffff', borderRadius: '9999px', padding: '1px 8px', fontWeight: 700, fontSize: 'var(--erp-text-caption)' }}>
                   {pendingApprovals.length}
                 </span>
                 <span>You have <strong>{pendingApprovals.length} pending employee registration{pendingApprovals.length > 1 ? 's' : ''}</strong> waiting for role assignment and approval.</span>
               </div>
-              <button
+              <button className="erp-button erp-button-primary"
                 type="button"
                 onClick={() => handleTabChange('pending-approvals')}
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
                   padding: '6px 14px',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 1px 3px rgba(2, 132, 199, 0.2)',
                 }}
               >
                 Review & Assign Roles &rarr;
@@ -883,7 +826,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search employees by name, staff code, email, phone or role..."
                 value={searchQuery}
@@ -892,9 +835,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -935,7 +876,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Right Controls: Status Filter, Reset, & Global Toolbar Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Status Filter Dropdown */}
-              <select
+              <select className="erp-field"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
@@ -943,10 +884,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   padding: '0 30px 0 12px',
                   width: '135px',
                   minWidth: '115px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -980,7 +918,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
               {/* Reset Filters button */}
               {(statusFilter !== 'ALL' || searchQuery) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setStatusFilter('ALL');
@@ -989,13 +927,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   style={{
                     height: '34px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1040,28 +974,28 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       EMPLOYEE
                     </th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ROLE
                     </th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       TYPE
                     </th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CONTACT
                     </th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       JOINED
                     </th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th style={{ padding: '12px 20px', fontSize: '0.74rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1069,13 +1003,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading employee records...
                       </td>
                     </tr>
                   ) : filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         No employees found matching criteria.
                       </td>
                     </tr>
@@ -1095,7 +1029,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                           title="Click row to view employee profile"
                         >
-                          <td style={{ padding: '14px 20px' }}>
+                          <td className="erp-table-cell">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div
                                 style={{
@@ -1108,7 +1042,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   fontWeight: 700,
-                                  fontSize: '0.82rem',
+                                  fontSize: 'var(--erp-text-body)',
                                   border: '1px solid #bbf7d0',
                                   flexShrink: 0,
                                 }}
@@ -1116,41 +1050,41 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                 {(emp.fullName || emp.username).slice(0, 1).toUpperCase()}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.92rem' }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-nav)' }}>
                                   {emp.fullName || emp.username}
                                 </div>
-                                <div style={{fontSize:'.72rem',color:'#2563eb',marginTop:'3px',fontWeight:500}}>Staff code: {staffCode(emp)}</div>
+                                <div style={{ fontSize: 'var(--erp-text-caption)', color:'#2563eb', marginTop:'3px', fontWeight:500 }}>Staff code: {staffCode(emp)}</div>
                                 {emp.fullName && (
-                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>@{emp.username}</div>
+                                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8' }}>@{emp.username}</div>
                                 )}
                               </div>
                             </div>
                           </td>
 
-                          <td style={{ padding: '14px 16px', color: '#334155', fontWeight: 500, fontSize: '0.9rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
                             {primaryRole}
                           </td>
 
-                          <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#64748b' }}>
                             Full-time
                           </td>
 
-                          <td style={{ padding: '14px 16px', color: '#334155', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155' }}>
                             {emp.phone || emp.email || '—'}
                           </td>
 
-                          <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.85rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#64748b' }}>
                             {formatJoinedDate(emp.createdAt)}
                           </td>
 
-                          <td style={{ padding: '14px 16px' }}>
+                          <td className="erp-table-cell">
                             {isSuperAdminUser(emp) ? (
                               <span
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  fontSize: '0.82rem',
+                                  fontSize: 'var(--erp-text-body)',
                                   fontWeight: 600,
                                   color: '#16a34a',
                                   whiteSpace: 'nowrap',
@@ -1183,7 +1117,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '6px',
-                                  fontSize: '0.82rem',
+                                  fontSize: 'var(--erp-text-body)',
                                   fontWeight: 600,
                                   color: emp.isActive ? '#16a34a' : '#dc2626',
                                   whiteSpace: 'nowrap',
@@ -1204,7 +1138,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                             )}
                           </td>
 
-                          <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                             <TableRowActions
                               onPrint={() => handlePrintEmployee(emp)}
                               onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
@@ -1249,10 +1183,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShieldCheck size={18} />
               </div>
-              <h3 style={{ margin: 0, fontSize: '0.98rem', color: '#0f172a', fontWeight: 700 }}>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', color: '#0f172a', fontWeight: 700 }}>
                 Pending Employee Registrations
               </h3>
-              <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 8px', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 700 }}>
+              <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 700 }}>
                 {filteredPendingList.length} Pending
               </span>
             </div>
@@ -1260,7 +1194,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ position: 'relative', width: '240px' }}>
                 <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94a3b8' }} />
-                <input
+                <input className="erp-field"
                   type="text"
                   placeholder="Search pending users..."
                   value={pendingSearchQuery}
@@ -1269,9 +1203,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     width: '100%',
                     height: '34px',
                     padding: '0 10px 0 30px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.85rem',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -1309,10 +1241,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <CheckCircle size={26} />
                 </div>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a', fontWeight: 700 }}>
+                <h4 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 700 }}>
                   {pendingSearchQuery ? 'No matching pending registrations' : 'All registrations are up to date!'}
                 </h4>
-                <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', maxWidth: '420px' }}>
+                <p style={{ margin: 0, fontSize: 'var(--erp-text-body)', color: '#64748b', maxWidth: '420px' }}>
                   {pendingSearchQuery
                     ? 'Try searching by a different name, username, or email.'
                     : 'There are currently no new employee registrations awaiting approval.'}
@@ -1360,7 +1292,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                         color: '#ffffff',
                         fontWeight: 800,
-                        fontSize: '1.25rem',
+                        fontSize: 'var(--erp-text-dialog)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1376,16 +1308,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
                       {/* Name, Handle, Employee Code & Status Badge */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 800, fontSize: '1.02rem', color: '#0f172a' }}>
+                        <span style={{ fontWeight: 800, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>
                           {pUser.fullName || pUser.username}
                         </span>
-                        <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 500 }}>
+                        <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>
                           @{pUser.username}
                         </span>
                         {pUser.id != null && (
                           <span
                             style={{
-                              fontSize: '0.72rem',
+                              fontSize: 'var(--erp-text-caption)',
                               fontWeight: 700,
                               padding: '2px 7px',
                               borderRadius: '5px',
@@ -1400,7 +1332,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         )}
                         <span
                           style={{
-                            fontSize: '0.72rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                             padding: '2px 9px',
                             borderRadius: '9999px',
@@ -1423,7 +1355,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           alignItems: 'center',
                           gap: '16px',
                           flexWrap: 'wrap',
-                          fontSize: '0.82rem',
+                          fontSize: 'var(--erp-text-body)',
                           color: '#475569',
                         }}
                       >
@@ -1452,7 +1384,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                   border: '1px solid #bae6fd',
                                   borderRadius: '5px',
                                   padding: '1px 8px',
-                                  fontSize: '0.76rem',
+                                  fontSize: 'var(--erp-text-caption)',
                                 }}
                               >
                                 {pUser.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')}
@@ -1478,7 +1410,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         backgroundColor: '#f0fdf4',
                         color: '#15803d',
                         fontWeight: 600,
-                        fontSize: '0.82rem',
+                        fontSize: 'var(--erp-text-body)',
                         padding: '8px 14px',
                         borderRadius: '7px',
                         border: '1px solid #bbf7d0',
@@ -1516,7 +1448,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         backgroundColor: '#0284c7',
                         color: '#ffffff',
                         fontWeight: 600,
-                        fontSize: '0.82rem',
+                        fontSize: 'var(--erp-text-body)',
                         padding: '8px 16px',
                         borderRadius: '7px',
                         border: 'none',
@@ -1538,7 +1470,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     </button>
 
                     {/* Reject */}
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1548,11 +1480,8 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       style={{
                         backgroundColor: '#ffffff',
                         color: '#dc2626',
-                        fontWeight: 600,
-                        fontSize: '0.82rem',
                         padding: '8px 12px',
                         border: '1px solid #fecaca',
-                        borderRadius: '7px',
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1641,16 +1570,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '1.1rem',
+                    fontSize: 'var(--erp-text-section)',
                   }}
                 >
                   <Plus size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     Add New Employee
                   </h2>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px' }}>
                     Register a new staff member and assign system permissions
                   </div>
                 </div>
@@ -1691,7 +1620,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     minHeight: 0,
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                     Employee Information
                   </div>
 
@@ -1700,7 +1629,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <label className="label">Full Name *</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         required
                         placeholder="e.g. Abdul Rahman"
                         value={formData.fullName}
@@ -1713,7 +1642,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Username (Login ID) *</label>
                         <input
                           type="text"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           required
                           placeholder="e.g. abdul"
                           value={formData.username}
@@ -1724,7 +1653,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Temporary Password *</label>
                         <input
                           type="password"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           required
                           placeholder="Min 6 characters"
                           value={formData.password}
@@ -1738,7 +1667,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Email Address</label>
                         <input
                           type="email"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           placeholder="abdul@company.com"
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -1748,7 +1677,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Phone / Contact</label>
                         <input
                           type="text"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           placeholder="077xxxxxxx"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -1759,7 +1688,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     <div>
                       <label className="label">Employee Type</label>
                       <select
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={formData.employeeType}
                         onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
                       >
@@ -1788,16 +1717,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                         Assign Roles & Permissions
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '1px' }}>
                         Select roles below to grant module permissions to this employee
                       </div>
                     </div>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         backgroundColor: '#eff6ff',
                         color: '#0284c7',
@@ -1835,14 +1764,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               >
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setModalMode(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   disabled={submitting}
                 >
                   {submitting ? 'Creating...' : 'Create Employee'}
@@ -1896,16 +1825,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '1.1rem',
+                    fontSize: 'var(--erp-text-section)',
                   }}
                 >
                   {(formData.fullName || selectedEmployee.username || 'E').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     Edit Employee: {selectedEmployee.fullName || selectedEmployee.username}
                   </h2>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px' }}>
                     @{selectedEmployee.username} • Update personal information and access roles
                   </div>
                 </div>
@@ -1947,21 +1876,21 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
+                    <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                       Employee Profile
                     </div>
-                    <span style={{ fontSize: '0.72rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    <span style={{ fontSize: 'var(--erp-text-caption)', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
                       ID: #{selectedEmployee.id || '—'}
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><label className="label">Staff code</label><input type="text" className="input-glass" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
+                    <div><label className="label">Staff code</label><input type="text" className="input-glass erp-field" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
                     <div>
                       <label className="label">Full Name *</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                         required
@@ -1973,12 +1902,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <label className="label">Username</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         disabled
                         value={formData.username}
                         style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
                       />
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
+                      <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
                         System username cannot be modified
                       </span>
                     </div>
@@ -1988,7 +1917,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Email Address *</label>
                         <input
                           type="email"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           required
@@ -1999,7 +1928,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Phone Number</label>
                         <input
                           type="text"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           placeholder="077xxxxxxx"
@@ -2012,7 +1941,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Reset Password</label>
                         <input
                           type="password"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           placeholder="Leave blank to keep"
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -2021,7 +1950,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <div>
                         <label className="label">Employee Type</label>
                         <select
-                          className="input-glass"
+                          className="input-glass erp-field"
                           value={formData.employeeType}
                           onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
                         >
@@ -2051,16 +1980,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                         Assign Roles & Permissions
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '1px' }}>
                         Select roles below to grant module permissions to this employee
                       </div>
                     </div>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         backgroundColor: '#eff6ff',
                         color: '#0284c7',
@@ -2105,14 +2034,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               >
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setModalMode(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   disabled={submitting}
                 >
                   {submitting ? 'Saving...' : 'Save Changes'}
@@ -2169,16 +2098,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '1.1rem',
+                    fontSize: 'var(--erp-text-section)',
                   }}
                 >
                   <ShieldCheck size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     Complete & Approve Employee: {selectedEmployee.fullName || selectedEmployee.username}
                   </h2>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px' }}>
                     @{selectedEmployee.username} • Assign system roles and approve access to ERP
                   </div>
                 </div>
@@ -2221,21 +2150,21 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
+                    <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                       Registration Details
                     </div>
-                    <span style={{ fontSize: '0.72rem', backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    <span style={{ fontSize: 'var(--erp-text-caption)', backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
                       Awaiting Approval
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><label className="label">Staff code</label><input type="text" className="input-glass" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
+                    <div><label className="label">Staff code</label><input type="text" className="input-glass erp-field" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
                     <div>
                       <label className="label">Full Name</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                         required
@@ -2246,7 +2175,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <label className="label">Username</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         disabled
                         value={formData.username}
                         style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
@@ -2258,7 +2187,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Email Address</label>
                         <input
                           type="email"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           value={formData.email}
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         />
@@ -2267,7 +2196,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <label className="label">Phone Number</label>
                         <input
                           type="text"
-                          className="input-glass"
+                          className="input-glass erp-field"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         />
@@ -2277,7 +2206,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     <div>
                       <label className="label">Employee Type</label>
                       <select
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={formData.employeeType}
                         onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
                       >
@@ -2306,16 +2235,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                         Assign Roles & Permissions
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '1px' }}>
                         Select roles below to grant module permissions upon approval
                       </div>
                     </div>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         backgroundColor: '#eff6ff',
                         color: '#0284c7',
@@ -2353,14 +2282,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               >
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setModalMode(null)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   disabled={submitting}
                 >
                   {submitting ? 'Approving...' : 'Complete & Approve'}
@@ -2408,7 +2337,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '1.2rem',
+                    fontSize: 'var(--erp-text-dialog)',
                     flexShrink: 0,
                   }}
                 >
@@ -2416,12 +2345,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize: '1.15rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                    <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                       {viewingPendingEmployee.fullName || viewingPendingEmployee.username}
                     </h2>
                     <span
                       style={{
-                        fontSize: '0.72rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         padding: '2px 8px',
                         borderRadius: '9999px',
@@ -2436,7 +2365,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       <Clock size={11} /> Awaiting Approval
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '2px' }}>
                     @{viewingPendingEmployee.username}
                     {` • ${staffCode(viewingPendingEmployee)}`}
                   </div>
@@ -2462,23 +2391,23 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, 1fr)',
                 gap: '12px',
-                fontSize: '0.85rem',
+                fontSize: 'var(--erp-text-field)',
               }}
             >
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Email Address</span>
+                <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Email Address</span>
                 <strong style={{ color: '#0f172a' }}>{viewingPendingEmployee.email || '—'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Phone Number</span>
+                <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Phone Number</span>
                 <strong style={{ color: '#0f172a' }}>{viewingPendingEmployee.phone || '—'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Registered On</span>
+                <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Registered On</span>
                 <strong style={{ color: '#0f172a' }}>{formatJoinedDate(viewingPendingEmployee.createdAt)}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'block' }}>Requested Role</span>
+                <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Requested Role</span>
                 <strong style={{ color: '#0284c7' }}>
                   {viewingPendingEmployee.roles && viewingPendingEmployee.roles.length > 0
                     ? viewingPendingEmployee.roles.map((r) => formatRoleName(typeof r === 'string' ? r : r.name)).join(', ')
@@ -2496,16 +2425,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   setViewingPendingEmployee(null);
                   handleRequestReject(u);
                 }}
-                className="btn"
+                className="btn erp-button"
                 style={{
                   backgroundColor: '#ffffff',
                   color: '#dc2626',
                   border: '1px solid #fecaca',
-                  fontSize: '0.82rem',
                   padding: '7px 14px',
-                  borderRadius: '6px',
                   cursor: 'pointer',
-                  fontWeight: 600,
                 }}
               >
                 Reject
@@ -2517,16 +2443,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   setViewingPendingEmployee(null);
                   handleOpenApprove(u);
                 }}
-                className="btn"
+                className="btn erp-button erp-button-primary"
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.82rem',
                   padding: '7px 16px',
-                  borderRadius: '6px',
                   cursor: 'pointer',
-                  fontWeight: 600,
                 }}
               >
                 Assign Roles & Details
@@ -2538,16 +2458,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   setViewingPendingEmployee(null);
                   handleRequestApprove(u);
                 }}
-                className="btn"
+                className="btn erp-button"
                 style={{
                   backgroundColor: '#16a34a',
                   color: '#ffffff',
                   border: 'none',
-                  fontSize: '0.82rem',
                   padding: '7px 16px',
-                  borderRadius: '6px',
                   cursor: 'pointer',
-                  fontWeight: 600,
                 }}
               >
                 Quick Approve
@@ -2597,10 +2514,10 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 {confirmAction.type === 'approve' ? <UserCheck size={22} /> : <UserX size={22} />}
               </div>
               <div style={{ flex: 1 }}>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   {confirmAction.type === 'approve' ? 'Approve Registration?' : 'Reject Registration?'}
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: 'var(--erp-text-field)', color: '#475569', lineHeight: 1.5 }}>
                   {confirmAction.type === 'approve' ? (
                     <>
                       Confirm approval for <strong>{confirmAction.user.fullName || confirmAction.user.username}</strong> (@{confirmAction.user.username}).
@@ -2628,7 +2545,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
               <button
                 type="button"
-                className="btn btn-glass"
+                className="btn btn-glass erp-button"
                 onClick={() => setConfirmAction(null)}
                 disabled={submitting}
               >
@@ -2642,7 +2559,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   backgroundColor: confirmAction.type === 'approve' ? '#16a34a' : '#dc2626',
                   color: '#ffffff',
                   fontWeight: 600,
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   padding: '8px 18px',
                   borderRadius: '6px',
                   border: 'none',
@@ -2709,7 +2626,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: '1.15rem',
+                    fontSize: 'var(--erp-text-section)',
                     flexShrink: 0,
                   }}
                 >
@@ -2717,14 +2634,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
                       {viewingEmployee.fullName || viewingEmployee.username}
                     </h2>
                     <span
                       style={{
                         fontFamily: 'monospace',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: 'var(--erp-text-small)',
                         backgroundColor: '#f8fafc',
                         color: '#475569',
                         padding: '2px 8px',
@@ -2736,7 +2653,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     </span>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                         padding: '2px 8px',
                         borderRadius: '9999px',
@@ -2747,7 +2664,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                       {viewingEmployee.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '3px' }}>
                     Role: <strong style={{ color: '#0284c7' }}>{getPrimaryRole(viewingEmployee)}</strong>
                     {viewingEmployee.email && <span> • {viewingEmployee.email}</span>}
                   </div>
@@ -2756,7 +2673,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
               {/* Action Buttons in Modal Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     const emp = viewingEmployee;
@@ -2766,10 +2683,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
                     padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#334155',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2802,65 +2716,65 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             {/* Profile Details Cards in Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Contact Information
                 </div>
-                <div style={{display:'flex',justifyContent:'space-between',gap:'12px',marginBottom:'10px',fontSize:'.82rem'}}><span style={{color:'#64748b'}}>Staff code</span><strong style={{color:'#2563eb',fontWeight:500}}>{staffCode(viewingEmployee)}</strong></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:'12px', marginBottom:'10px', fontSize: 'var(--erp-text-body)' }}><span style={{color:'#64748b'}}>Staff code</span><strong style={{color:'#2563eb',fontWeight:500}}>{staffCode(viewingEmployee)}</strong></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Full Name</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Full Name</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingEmployee.fullName || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Username</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Username</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>@{viewingEmployee.username}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Phone Number</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Phone Number</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingEmployee.phone || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Email Address</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Email Address</span>
                     <span style={{ color: '#334155' }}>{viewingEmployee.email || '—'}</span>
                   </div>
                 </div>
               </div>
 
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Employment Details
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Employment Type</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Employment Type</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>Full-time</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Account Status</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Account Status</span>
                     <span style={{ fontWeight: 600, color: viewingEmployee.isActive ? '#16a34a' : '#dc2626' }}>
                       {viewingEmployee.isActive ? 'Active (Operational)' : 'Inactive / Disabled'}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Approval Status</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Approval Status</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>
                       {viewingEmployee.approvalStatus || 'APPROVED'}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Joined Date</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Joined Date</span>
                     <span style={{ color: '#334155' }}>{formatJoinedDate(viewingEmployee.createdAt)}</span>
                   </div>
                 </div>
               </div>
 
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Roles & Permissions
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block', marginBottom: '4px' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '4px' }}>
                       Primary Designation
                     </span>
                     <span
@@ -2871,7 +2785,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         border: '1px solid #dbeafe',
                         borderRadius: '5px',
                         padding: '2px 8px',
-                        fontSize: '0.76rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                       }}
                     >
@@ -2879,7 +2793,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block', marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '6px' }}>
                       Assigned System Roles ({viewingEmployee.roles?.length || 0})
                     </span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
@@ -2896,7 +2810,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                               border: '1px solid #e2e8f0',
                               borderRadius: '4px',
                               padding: '2px 7px',
-                              fontSize: '0.72rem',
+                              fontSize: 'var(--erp-text-caption)',
                               fontWeight: 500,
                             }}
                           >
@@ -2904,13 +2818,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           </span>
                         ))
                       ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>No explicit roles</span>
+                        <span style={{ color: '#94a3b8', fontSize: 'var(--erp-text-small)' }}>No explicit roles</span>
                       )}
                     </div>
                   </div>
                   <div style={{ marginTop: '4px' }}>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>User ID</span>
-                    <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: '0.78rem' }}>#{viewingEmployee.id}</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>User ID</span>
+                    <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 'var(--erp-text-small)' }}>#{viewingEmployee.id}</span>
                   </div>
                 </div>
               </div>
@@ -2933,7 +2847,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     alignItems: 'center',
                     gap: '6px',
                     color: '#0284c7',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontWeight: 700,
                     backgroundColor: '#f0f9ff',
                     padding: '7px 14px',
@@ -2956,7 +2870,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     border: `1px solid ${viewingEmployee.isActive ? '#fecdd3' : '#bbf7d0'}`,
                     borderRadius: '6px',
                     padding: '7px 14px',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -2969,17 +2883,14 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </button>
               )}
 
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setViewingEmployee(null)}
                 style={{
                   backgroundColor: '#f1f5f9',
                   color: '#475569',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
                   padding: '7px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >

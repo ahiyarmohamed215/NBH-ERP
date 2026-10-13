@@ -155,10 +155,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
         >
           {/* User Details Header */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc' }}>
-            <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#0f172a' }}>
+            <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
               {user?.fullName || user?.username}
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px', wordBreak: 'break-all' }}>
+            <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px', wordBreak: 'break-all' }}>
               {user?.email}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
@@ -168,7 +168,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                     key={r}
                     className="badge"
                     style={{
-                      fontSize: '0.74rem',
+                      fontSize: 'var(--erp-text-caption)',
                       backgroundColor: '#eff6ff',
                       color: '#1d4ed8',
                       border: '1px solid #bfdbfe',
@@ -184,7 +184,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
 
           {/* Quick Action Items */}
           <div style={{ padding: '6px 0' }}>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={openEditProfile}
               style={{
@@ -193,8 +193,6 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 alignItems: 'center',
                 gap: '10px',
                 padding: '9px 16px',
-                fontSize: '0.88rem',
-                fontWeight: 500,
                 color: '#334155',
                 background: 'none',
                 border: 'none',
@@ -208,7 +206,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               Profile Settings & Password
             </button>
 
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setMenuOpen(false);
@@ -221,8 +219,6 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 alignItems: 'center',
                 gap: '10px',
                 padding: '10px 16px',
-                fontSize: '0.88rem',
-                fontWeight: 500,
                 color: '#334155',
                 background: 'none',
                 border: 'none',
@@ -239,7 +235,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
 
           {/* Sign Out Action */}
           <div style={{ borderTop: '1px solid #f1f5f9', padding: '6px 0' }}>
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setMenuOpen(false);
@@ -251,13 +247,11 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 alignItems: 'center',
                 gap: '10px',
                 padding: '9px 16px',
-                fontSize: '0.86rem',
                 color: '#ef4444',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
-                fontWeight: 600,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
@@ -313,7 +307,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 700,
-                fontSize: '0.88rem',
+                fontSize: 'var(--erp-text-button)',
                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
               }}
             >
@@ -354,7 +348,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 <div
                   style={{
                     fontWeight: 600,
-                    fontSize: '0.86rem',
+                    fontSize: 'var(--erp-text-field)',
                     color: '#0f172a',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -414,7 +408,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                     style={{
                       color: '#047857',
                       fontWeight: 600,
-                      fontSize: '0.7rem',
+                      fontSize: 'var(--erp-text-badge)',
                       letterSpacing: '0.01em',
                     }}
                   >
@@ -423,7 +417,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </div>
                 <span
                   style={{
-                    fontSize: '0.68rem',
+                    fontSize: 'var(--erp-text-badge)',
                     color: '#64748b',
                     fontWeight: 600,
                     padding: '1px 5px',
@@ -465,7 +459,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 borderBottom: '1px solid #e2e8f0',
               }}
             >
-              <h3 style={{ fontSize: '1.15rem', color: '#0f172a' }}>Update Profile</h3>
+              <h3 style={{ fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>Update Profile</h3>
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
@@ -478,12 +472,12 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
             <form onSubmit={handleSaveProfile}>
               <div style={{ padding: '18px 20px' }}>
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                     FULL NAME *
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     value={editForm.fullName}
                     onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
                     required
@@ -491,12 +485,12 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                     EMAIL ADDRESS *
                   </label>
                   <input
                     type="email"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                     required
@@ -504,12 +498,12 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </div>
 
                 <div style={{ marginBottom: '18px' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                     PHONE NUMBER
                   </label>
                   <input
                     type="text"
-                    className="input-glass"
+                    className="input-glass erp-field"
                     value={editForm.phone}
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                     placeholder="+94 77 123 4567"
@@ -517,20 +511,20 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </div>
 
                 <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', marginBottom: '14px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '4px' }}>
+                  <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#0f172a', display: 'block', marginBottom: '4px' }}>
                     Change Password (Optional)
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '10px' }}>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'block', marginBottom: '10px' }}>
                     Leave blank if you do not want to change your password.
                   </span>
 
                   <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                       CURRENT PASSWORD
                     </label>
                     <input
                       type="password"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       value={editForm.currentPassword}
                       onChange={(e) => setEditForm({ ...editForm, currentPassword: e.target.value })}
                       placeholder="Current password"
@@ -539,24 +533,24 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                         NEW PASSWORD
                       </label>
                       <input
                         type="password"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={editForm.newPassword}
                         onChange={(e) => setEditForm({ ...editForm, newPassword: e.target.value })}
                         placeholder="Min 6 characters"
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
                         CONFIRM NEW
                       </label>
                       <input
                         type="password"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         value={editForm.confirmPassword}
                         onChange={(e) => setEditForm({ ...editForm, confirmPassword: e.target.value })}
                         placeholder="Repeat new password"
@@ -580,7 +574,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               >
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setShowEditModal(false)}
                   disabled={saving}
                 >
@@ -588,7 +582,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="btn btn-primary erp-button"
                   disabled={saving}
                 >
                   {saving ? 'Saving...' : 'Save Profile Changes'}
@@ -639,10 +633,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                   <HelpCircle size={20} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0 }}>
+                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0 }}>
                     Help & Enterprise Support
                   </h3>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                     NBH ERP System Assistance, Shortcuts & Documentation
                   </span>
                 </div>
@@ -666,17 +660,14 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 paddingBottom: '8px',
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setHelpTab('shortcuts')}
                 style={{
                   padding: '7px 14px',
-                  borderRadius: '6px',
                   border: 'none',
                   backgroundColor: helpTab === 'shortcuts' ? '#eff6ff' : 'transparent',
                   color: helpTab === 'shortcuts' ? '#2563eb' : '#64748b',
-                  fontWeight: helpTab === 'shortcuts' ? 700 : 500,
-                  fontSize: '0.86rem',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -686,17 +677,14 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 <Keyboard size={15} /> Keyboard Shortcuts (F1)
               </button>
 
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setHelpTab('support')}
                 style={{
                   padding: '7px 14px',
-                  borderRadius: '6px',
                   border: 'none',
                   backgroundColor: helpTab === 'support' ? '#eff6ff' : 'transparent',
                   color: helpTab === 'support' ? '#2563eb' : '#64748b',
-                  fontWeight: helpTab === 'support' ? 700 : 500,
-                  fontSize: '0.86rem',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -711,10 +699,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
             {helpTab === 'shortcuts' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
                 <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-field)', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Module Navigation (Alt + Number)
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.84rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: '#475569' }}>Dashboard</span>
                       <span className="erp-kbd">Alt + 1</span>
@@ -747,10 +735,10 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 </div>
 
                 <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.86rem', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-field)', color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Quick Actions & Controls
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '0.84rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: '#475569' }}>Focus Search Box</span>
                       <span className="erp-kbd">F2</span>
@@ -792,32 +780,32 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
             {helpTab === 'support' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
                 <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#1e293b', marginBottom: '6px' }}>
                     <PhoneCall size={16} color="#2563eb" /> IT Operations Hotline
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569' }}>
                     Direct Phone: <strong>+94 11 234 5678</strong> (Mon - Sat, 8:00 AM - 6:00 PM)
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', marginTop: '2px' }}>
                     Internal Extension: <strong>Ext. 104 / 105</strong>
                   </div>
                 </div>
 
                 <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#1e293b', marginBottom: '6px' }}>
                     <Mail size={16} color="#2563eb" /> Email & Support Desk
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: '#475569' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569' }}>
                     Technical Support: <strong>support@nbh-erp.com</strong>
                   </div>
-                  <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '2px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', marginTop: '2px' }}>
                     Administrator: <strong>admin@nbh-erp.com</strong>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#065f46', fontWeight: 600 }}>System Status: Operational & Connected</span>
-                  <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 700 }}>v1.2</span>
+                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#065f46', fontWeight: 600 }}>System Status: Operational & Connected</span>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#047857', fontWeight: 700 }}>v1.2</span>
                 </div>
               </div>
             )}
@@ -826,7 +814,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               {helpTab === 'shortcuts' && onOpenShortcuts ? (
                 <button
                   type="button"
-                  className="btn btn-glass btn-sm"
+                  className="btn btn-glass btn-sm erp-button"
                   onClick={() => {
                     setShowHelpModal(false);
                     onOpenShortcuts();
@@ -839,7 +827,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button"
                 onClick={() => setShowHelpModal(false)}
               >
                 Close Support

@@ -221,7 +221,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               pointerEvents: 'none',
             }}
           />
-          <input
+          <input className="erp-field"
             type="text"
             placeholder="Search Purchase Orders by #, supplier, warehouse, notes..."
             value={searchTerm}
@@ -230,9 +230,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               width: '100%',
               height: '38px',
               padding: '0 32px 0 38px',
-              borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.88rem',
               outline: 'none',
               backgroundColor: '#ffffff',
               color: '#0f172a',
@@ -285,7 +283,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           </FilterSelect>
 
           {(statusFilter !== 'ALL' || searchTerm || fromDate || toDate) && (
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setStatusFilter('ALL');
@@ -294,12 +292,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
               style={{
                 height: '38px',
                 padding: '0 12px',
-                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
                 backgroundColor: '#f1f5f9',
                 color: '#64748b',
-                fontSize: '0.85rem',
-                fontWeight: 500,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -321,12 +316,14 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             onClick={handlePrintList}
             style={{
               height: '38px',
-              padding: '0', width: '38px', justifyContent: 'center',
+              padding: '0',
+              width: '38px',
+              justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               color: '#334155',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
@@ -358,12 +355,14 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
             onClick={() => loadData({force:true})} disabled={loading} aria-busy={loading}
             style={{
               height: '38px',
-              padding: '0', width: '38px', justifyContent: 'center',
+              padding: '0',
+              width: '38px',
+              justifyContent: 'center',
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: '6px',
               color: '#334155',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
@@ -410,12 +409,12 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         }}
       >
         <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-          <table aria-busy={loading} style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{position:'sticky',top:0,zIndex:10}}><tr>{['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS'].map(label=><th key={label} style={{padding:'12px 14px',fontSize:'.74rem',fontWeight:600,color:'#475569',background:'#fafbfc',borderBottom:'1px solid #e2e8f0'}}>{label}</th>)}</tr></thead>
+          <table className="erp-table" aria-busy={loading} style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{position:'sticky',top:0,zIndex:10}}><tr>{['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS'].map(label=><th className="erp-table-heading" key={label} style={{ background:'#fafbfc', borderBottom:'1px solid #e2e8f0' }}>{label}</th>)}</tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan="8" style={{textAlign:'center',padding:'48px 20px',color:'#64748b'}}><span role="status">Loading purchase orders...</span></td></tr> : filteredOrders.length === 0 ? (
+              {loading ? <tr><td className="erp-table-cell" colSpan="8" style={{ textAlign:'center', color:'#64748b' }}><span role="status">Loading purchase orders...</span></td></tr> : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                  <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                     No purchase orders found. Click <strong>+ New Purchase Order</strong> to issue a new order.
                   </td>
                 </tr>
@@ -433,22 +432,22 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     title="Click row to inspect order details"
                   >
-                    <td style={{ padding: '12px 18px' }}>
+                    <td className="erp-table-cell">
                       <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                         {po.poNumber}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                    <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                       {po.supplierName}
                     </td>
-                    <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                    <td className="erp-table-cell" style={{ color: '#334155' }}>
                       {po.warehouseName}
                     </td>
-                    <td style={{padding:'12px 14px'}}>{new Set((po.items || []).map(item=>item.productId)).size}</td>
-                    <td style={{padding:'12px 14px',fontSize:'.82rem',color:'#64748b'}}>{purchaseOrderDate(po)}</td>
-                    <td style={{padding:'12px 14px'}}><StatusBadge status={po.status}/></td>
-                    <td style={{padding:'12px 14px',fontSize:'.82rem',color:'#475569',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={po.notes || ''}>{po.notes || '—'}</td>
-                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                    <td className="erp-table-cell">{new Set((po.items || []).map(item=>item.productId)).size}</td>
+                    <td className="erp-table-cell" style={{ color:'#64748b' }}>{purchaseOrderDate(po)}</td>
+                    <td className="erp-table-cell"><StatusBadge status={po.status}/></td>
+                    <td className="erp-table-cell" style={{ color:'#475569', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={po.notes || ''}>{po.notes || '—'}</td>
+                    <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                         {['DRAFT','INFORM_TO_ORDER'].includes(po.status) && (<button
                           type="button"
@@ -542,10 +541,10 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                   <ShoppingBag size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                     {editingPoId ? 'Edit Purchase Order (PO)' : 'New Purchase Order (PO)'}
                   </h2>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                  <p style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', margin: '2px 0 0 0' }}>
                     Save a draft, or create an order to print and hand over
                   </p>
                 </div>
@@ -585,19 +584,16 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 addHint={intakeProduct && !canOrderProduct(intakeProduct) ? 'Ordering needs an active product with a delivery warehouse set in Inventory.' : undefined}
                 buildItemData={()=>({warehouseName:productWarehouseName(intakeProduct),supplierId:Number(formData.supplierId),supplierName:suppliers.find(supplier=>String(supplier.id)===String(formData.supplierId))?.name})} onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,supplierId:''}));}}
                 extraColumns={[{label:'Supplier name',value:item=>item.supplierName || '—'}]}
-                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / notes<textarea maxLength={5000} rows={3} value={formData.notes || ''} onChange={event=>setFormData(previous=>({...previous,notes:event.target.value}))}/></label></div>}
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / notes<textarea className="erp-field" maxLength={5000} rows={3} value={formData.notes || ''} onChange={event=>setFormData(previous=>({...previous,notes:event.target.value}))}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowCreateForm(false)}
                   style={{
                     padding: '8px 16px',
-                    borderRadius: '6px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
@@ -613,7 +609,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     border: '1px solid #cbd5e1',
                     background: '#f8fafc',
                     color: '#0f172a',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
@@ -630,7 +626,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     border: 'none',
                     background: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.88rem',
+                    fontSize: 'var(--erp-text-button)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     boxShadow: 'none',

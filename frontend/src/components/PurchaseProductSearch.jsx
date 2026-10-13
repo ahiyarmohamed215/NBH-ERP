@@ -8,7 +8,7 @@ export default function PurchaseProductSearch({query,onQueryChange,results,onSel
   return <>
     <div className="purchase-search-heading"><h3><Search size={15}/>{editing ? 'Edit item' : 'Product search & intake'}</h3>{selected && <span><CheckCircle size={13}/> Product selected</span>}</div>
     <div className="purchase-product-search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))onOpenChange(false);}}>
-      <div className="purchase-search-input"><Search size={16}/><input type="text" aria-label="Search products" placeholder="Search product by SKU, name or barcode..."
+      <div className="purchase-search-input"><Search size={16}/><input className="erp-field" type="text" aria-label="Search products" placeholder="Search product by SKU, name or barcode..."
         role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={id} aria-activedescendant={open && results[active] ? `${id}-${active}` : undefined}
         value={query} onFocus={()=>{onOpenChange(true);setActive(0);}} onChange={event=>{onQueryChange(event.target.value);onOpenChange(true);setActive(0);}}
         onKeyDown={event=>{

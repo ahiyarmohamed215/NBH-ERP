@@ -21,7 +21,7 @@ export default function SupplierEditorModal({form,setForm,editing,saving,onClose
   const blur=field=>setErrors(previous=>({...previous,[field]:supplierErrors(form,{draft:isDraft})[field] || ''}));
   const field=(name,label,{hint,wide,...props}={})=><label className={`supplier-editor-field${wide?' supplier-editor-wide':''}`} htmlFor={`supplier-${name}`}>
     <span>{label}{props.required ? <span className="supplier-required"> *</span> : null}</span>
-    <input id={`supplier-${name}`} name={name} value={form[name] || ''} aria-invalid={Boolean(errors[name])} aria-describedby={errors[name]?`supplier-error-${name}`:hint?`supplier-hint-${name}`:undefined} onChange={event=>change(name,event.target.value)} onBlur={()=>blur(name)} {...props}/>
+    <input className="erp-field" id={`supplier-${name}`} name={name} value={form[name] || ''} aria-invalid={Boolean(errors[name])} aria-describedby={errors[name]?`supplier-error-${name}`:hint?`supplier-hint-${name}`:undefined} onChange={event=>change(name,event.target.value)} onBlur={()=>blur(name)} {...props}/>
     {errors[name] ? <small id={`supplier-error-${name}`} className="supplier-field-error">{errors[name]}</small> : hint && <small id={`supplier-hint-${name}`} className="supplier-field-hint">{hint}</small>}
   </label>;
   const hasInput=['name','contactPerson','phone','email','address'].some(field=>String(form[field] || '').trim());
@@ -38,7 +38,7 @@ export default function SupplierEditorModal({form,setForm,editing,saving,onClose
     if(event.key==='Escape' && !event.defaultPrevented && !saving){event.stopPropagation();onClose();}
   }}>
     <header className="allocation-workspace-header">
-      <div className="allocation-workspace-title"><span className="allocation-title-icon"><Truck size={23}/></span><div><span className="allocation-eyebrow">Purchasing</span><h2 id="supplier-editor-title">{editing?'Edit Supplier':'New Supplier'}</h2><p>Enter supplier and contact details, or save a draft to finish later.</p></div></div>
+      <div className="allocation-workspace-title"><span className="allocation-title-icon"><Truck size={23}/></span><div><span className="allocation-eyebrow">Purchasing</span><h2 className="erp-dialog-title" id="supplier-editor-title">{editing?'Edit Supplier':'New Supplier'}</h2><p>Enter supplier and contact details, or save a draft to finish later.</p></div></div>
       <button type="button" className="purchase-inspection-close allocation-header-close" aria-label="Close supplier editor" disabled={saving} onClick={onClose}><X size={18}/></button>
     </header>
     <form ref={formRef} noValidate onSubmit={event=>submit(event)} aria-busy={saving}>
@@ -53,7 +53,7 @@ export default function SupplierEditorModal({form,setForm,editing,saving,onClose
           setErrors(previous=>({...previous,phone:supplierErrors({...form,phoneCountry:value}).phone || ''}));
         }}/></div>
         <label className="supplier-editor-field supplier-editor-wide" htmlFor="supplier-address"><span>Address</span>
-          <textarea id="supplier-address" name="address" value={form.address || ''} autoComplete="street-address" maxLength={MAX_NOTES} rows={2} aria-invalid={Boolean(errors.address)} aria-describedby={errors.address?'supplier-error-address':undefined} onChange={event=>change('address',event.target.value)} onBlur={()=>blur('address')} placeholder="Street, town and country"/>
+          <textarea className="erp-field" id="supplier-address" name="address" value={form.address || ''} autoComplete="street-address" maxLength={MAX_NOTES} rows={2} aria-invalid={Boolean(errors.address)} aria-describedby={errors.address?'supplier-error-address':undefined} onChange={event=>change('address',event.target.value)} onBlur={()=>blur('address')} placeholder="Street, town and country"/>
           {errors.address && <small id="supplier-error-address" className="supplier-field-error">{errors.address}</small>}
         </label>
       </fieldset>

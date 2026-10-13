@@ -434,7 +434,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   }, [selectedInvoice]);
 
   return (
-    <div
+    <div className="erp-page"
       style={{
         display: 'flex',
         flex: 1,
@@ -448,55 +448,41 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
       }}
     >
       {/* Page Header (Sticky at top) */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Payment Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+          <p className="erp-page-description">
             Track customer payments, advance deposits, outstanding balances, and receipt settlements.
           </p>
         </div>
 
         {/* Action Button matching current tab */}
         {currentTab === 'advance-payments' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={() => setShowRecordAdvanceModal(true)}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
             <Plus size={17} /> Record Advance
           </button>
         ) : (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={() => {
               setPaymentForm({
@@ -510,16 +496,10 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               setShowRecordPaymentModal(true);
             }}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
@@ -529,13 +509,11 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
       </div>
 
       {/* Sub-Tabs Navigation Bar */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
@@ -543,25 +521,11 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           const isActive = currentTab === tab.id;
           const IconComponent = tab.icon;
           return (
-            <button
+            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                fontSize: '0.88rem',
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? '#0284c7' : '#64748b',
-                backgroundColor: 'transparent',
-                border: 'none',
-                borderBottom: isActive ? '2px solid #0284c7' : '2px solid transparent',
-                borderRadius: 0,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
+
               onMouseEnter={(e) => {
                 if (!isActive) e.currentTarget.style.color = '#0f172a';
               }}
@@ -611,7 +575,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search payments by receipt #, invoice #, or customer name..."
                 value={paymentSearchQuery}
@@ -620,9 +584,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -659,15 +621,13 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
 
             {/* Right Controls: Method filter, Reset, Export CSV */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select
+              <select className="erp-field"
                 value={paymentMethodFilter}
                 onChange={(e) => setPaymentMethodFilter(e.target.value)}
                 style={{
                   height: '38px',
                   padding: '0 26px 0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
                   color: '#334155',
                   backgroundColor: '#ffffff',
                   cursor: 'pointer',
@@ -682,7 +642,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               </select>
 
               {(paymentSearchQuery || paymentMethodFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setPaymentSearchQuery('');
@@ -691,12 +651,9 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -749,17 +706,17 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECEIPT #</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE REFERENCE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AMOUNT PAID</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECEIPT #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE REFERENCE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AMOUNT PAID</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -770,44 +727,44 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {p.receiptNo}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>
                         {p.invoiceNo}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{p.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{p.customerName}</td>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
                         {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#334155' }}>{p.paymentMethod}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ color: '#334155' }}>{p.paymentMethod}</td>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
                         LKR {Number(p.amount || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span className="badge badge-success" style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: '4px' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <span className="badge badge-success" style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
                           {p.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                           <button
                             type="button"
-                            className="btn btn-glass btn-sm"
+                            className="btn btn-glass btn-sm erp-button"
                             onClick={() => {
                               addToast(`Payment receipt ${p.receiptNo} preview printed`, 'info');
                               window.print();
                             }}
-                            style={{ padding: '4px 8px', fontSize: '0.74rem', borderRadius: '5px' }}
+                            style={{ padding: '4px 8px' }}
                             title="Print Receipt"
                           >
                             <Printer size={13} /> Print
                           </button>
                           <button
                             type="button"
-                            className="btn btn-glass btn-sm"
+                            className="btn btn-glass btn-sm erp-button"
                             onClick={() => handleVoidPayment(p)}
-                            style={{ padding: '4px 8px', fontSize: '0.74rem', borderRadius: '5px', color: '#dc2626' }}
+                            style={{ padding: '4px 8px', color: '#dc2626' }}
                             title="Void Payment"
                             disabled={p.status === 'VOIDED'}
                           >
@@ -819,7 +776,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   ))}
                   {filteredPayments.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#64748b' }}>
                         No payments found matching your search.
                       </td>
                     </tr>
@@ -869,7 +826,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search advances by voucher #, customer, or payment method..."
                 value={advanceSearchQuery}
@@ -878,9 +835,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -918,18 +873,15 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             {/* Right Controls: Reset, Export CSV */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
               {advanceSearchQuery && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setAdvanceSearchQuery('')}
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -982,17 +934,17 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VOUCHER #</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL ADVANCE</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AVAILABLE CREDIT</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VOUCHER #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL ADVANCE</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AVAILABLE CREDIT</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1003,34 +955,34 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {a.voucherNo}
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{a.customerName}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{a.customerName}</td>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
                         {a.date ? new Date(a.date).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'monospace' }}>
                         LKR {Number(a.amount || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>
                         LKR {Number(a.balance || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#334155' }}>{a.paymentMethod}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span className="badge badge-success" style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: '4px' }}>
+                      <td className="erp-table-cell" style={{ color: '#334155' }}>{a.paymentMethod}</td>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <span className="badge badge-success" style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
                           {a.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <button
                           type="button"
-                          className="btn btn-glass btn-sm"
+                          className="btn btn-glass btn-sm erp-button"
                           onClick={() => {
                             addToast(`Advance deposit voucher ${a.voucherNo} preview printed`, 'info');
                             window.print();
                           }}
-                          style={{ padding: '4px 8px', fontSize: '0.74rem', borderRadius: '5px' }}
+                          style={{ padding: '4px 8px' }}
                           title="Print Advance Voucher"
                         >
                           <Printer size={13} /> Print
@@ -1040,7 +992,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   ))}
                   {filteredAdvances.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#64748b' }}>
                         No advance records found matching your search.
                       </td>
                     </tr>
@@ -1060,26 +1012,26 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           {/* KPI Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', flexShrink: 0 }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Total Outstanding Balance
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626', marginTop: '4px', fontFamily: 'monospace' }}>
+              <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#dc2626', marginTop: '4px', fontFamily: 'monospace' }}>
                 Rs. {totalOutstandingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Pending / Partial Invoices
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+              <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
                 {outstandingInvoices.length}
               </div>
             </div>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Quick Settlement
               </div>
-              <div style={{ fontSize: '0.86rem', color: '#475569', marginTop: '6px' }}>
+              <div style={{ fontSize: 'var(--erp-text-field)', color: '#475569', marginTop: '6px' }}>
                 Click <strong>"Pay"</strong> on any row below to instantly record a payment receipt against that bill.
               </div>
             </div>
@@ -1109,7 +1061,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                 size={17}
                 style={{ position: 'absolute', left: '12px', top: '11px', color: '#94a3b8', pointerEvents: 'none' }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search outstanding invoices by #, customer, or payment method..."
                 value={outstandingSearchQuery}
@@ -1118,9 +1070,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   width: '100%',
                   height: '38px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1140,16 +1090,14 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
 
             {/* Right Controls: Status filter, Reset, Export CSV */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select
+              <select className="erp-field"
                 value={outstandingStatusFilter}
                 onChange={(e) => setOutstandingStatusFilter(e.target.value)}
                 style={{
                   height: '38px',
                   padding: '0 26px 0 10px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
-                  fontSize: '0.84rem',
                   color: '#334155',
                   cursor: 'pointer',
                   outline: 'none',
@@ -1161,7 +1109,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               </select>
 
               {(outstandingSearchQuery || outstandingStatusFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setOutstandingSearchQuery('');
@@ -1170,12 +1118,9 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   style={{
                     height: '38px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1225,27 +1170,27 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {outstandingInvoices.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 20px', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#94a3b8' }}>
                         <CheckCircle size={34} style={{ opacity: 0.35, marginBottom: '8px', color: '#16a34a' }} />
-                        <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.9rem' }}>No outstanding invoices!</div>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '3px' }}>
+                        <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-button)' }}>No outstanding invoices!</div>
+                        <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8', marginTop: '3px' }}>
                           All invoices have been settled in full.
                         </div>
                       </td>
@@ -1258,33 +1203,33 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {inv.invoiceNumber}
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                           {inv.customerName}
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.82rem' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {inv.displayDate || inv.invoiceDate}
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#475569' }}>
+                        <td className="erp-table-cell" style={{ color: '#475569' }}>
                           {inv.paymentType}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#0f172a', fontFamily: 'monospace' }}>
                           Rs. {invoiceTotal(inv).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
                           Rs. {Number(inv.paidAmount || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace' }}>
                           Rs. {Number(inv.balanceAmount || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                           <span
                             style={{
                               padding: '3px 8px',
                               borderRadius: '4px',
-                              fontSize: '0.72rem',
+                              fontSize: 'var(--erp-text-caption)',
                               fontWeight: 700,
                               backgroundColor: inv.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
                               color: inv.status === 'PARTIAL' ? '#b45309' : '#b91c1c',
@@ -1293,9 +1238,9 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                             {inv.status}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <button
+                            <button className="erp-button erp-button-primary"
                               type="button"
                               onClick={() => {
                                 setPaymentForm({
@@ -1310,16 +1255,10 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                               }}
                               style={{
                                 padding: '4px 10px',
-                                fontSize: '0.74rem',
-                                backgroundColor: '#0284c7',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '5px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
                                 cursor: 'pointer',
-                                fontWeight: 600,
                               }}
                               title="Record payment against this invoice"
                             >
@@ -1327,9 +1266,9 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                             </button>
                             <button
                               type="button"
-                              className="btn btn-glass btn-sm"
+                              className="btn btn-glass btn-sm erp-button"
                               onClick={() => setSelectedInvoice(inv)}
-                              style={{ padding: '4px 7px', fontSize: '0.74rem', borderRadius: '5px' }}
+                              style={{ padding: '4px 7px' }}
                               title="View invoice details"
                             >
                               <Eye size={13} />
@@ -1366,7 +1305,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>Record Payment Receipt</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>Record Payment Receipt</h3>
               <button
                 type="button"
                 onClick={() => setShowRecordPaymentModal(false)}
@@ -1378,58 +1317,58 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
 
             <form onSubmit={handleSavePayment} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
-                <input
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
+                <input className="erp-field"
                   type="text"
                   required
                   placeholder="e.g. Negombo Motors"
                   value={paymentForm.customerName}
                   onChange={(e) => setPaymentForm({ ...paymentForm, customerName: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Invoice # (Optional)</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Invoice # (Optional)</label>
+                  <input className="erp-field"
                     type="text"
                     placeholder="e.g. INV-2026-000001"
                     value={paymentForm.invoiceNo}
                     onChange={(e) => setPaymentForm({ ...paymentForm, invoiceNo: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Date</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Date</label>
+                  <input className="erp-field"
                     type="date"
                     value={paymentForm.paymentDate}
                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Amount (LKR) *</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Amount (LKR) *</label>
+                  <input className="erp-field"
                     type="number"
                     step="0.01"
                     required
                     placeholder="0.00"
                     value={paymentForm.amount}
                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', fontWeight: 700, boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', fontWeight: 700, boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Method</label>
-                  <select
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Method</label>
+                  <select className="erp-field"
                     value={paymentForm.paymentMethod}
                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   >
                     <option value="Cash">Cash</option>
                     <option value="Bank Transfer">Bank Transfer</option>
@@ -1440,28 +1379,28 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes</label>
-                <textarea
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes</label>
+                <textarea className="erp-field"
                   rows={2}
                   placeholder="Payment notes or cheque details..."
                   value={paymentForm.notes}
                   onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setShowRecordPaymentModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                  className="btn btn-primary erp-button erp-button-primary"
+                  style={{ borderColor: '#0284c7' }}
                 >
                   Save Payment Receipt
                 </button>
@@ -1491,7 +1430,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>Record Advance Payment</h3>
+              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>Record Advance Payment</h3>
               <button
                 type="button"
                 onClick={() => setShowRecordAdvanceModal(false)}
@@ -1504,56 +1443,56 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             <form onSubmit={handleSaveAdvance} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Voucher #</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Voucher #</label>
+                  <input className="erp-field"
                     type="text"
                     readOnly
                     value="[Auto-generated by backend]"
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', fontSize: '0.86rem', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
+                  <input className="erp-field"
                     type="date"
                     value={advanceForm.paymentDate}
                     onChange={(e) => setAdvanceForm({ ...advanceForm, paymentDate: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
-                <input
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
+                <input className="erp-field"
                   type="text"
                   required
                   placeholder="e.g. Apex Engineering Ltd"
                   value={advanceForm.customerName}
                   onChange={(e) => setAdvanceForm({ ...advanceForm, customerName: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Advance Amount (LKR) *</label>
-                  <input
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Advance Amount (LKR) *</label>
+                  <input className="erp-field"
                     type="number"
                     step="0.01"
                     required
                     placeholder="0.00"
                     value={advanceForm.amount}
                     onChange={(e) => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', fontWeight: 700, boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', fontWeight: 700, boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Method</label>
-                  <select
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Payment Method</label>
+                  <select className="erp-field"
                     value={advanceForm.paymentMethod}
                     onChange={(e) => setAdvanceForm({ ...advanceForm, paymentMethod: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                   >
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cash">Cash</option>
@@ -1564,28 +1503,28 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes / Remarks</label>
-                <textarea
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes / Remarks</label>
+                <textarea className="erp-field"
                   rows={2}
                   placeholder="Deposit notes / project reference..."
                   value={advanceForm.notes}
                   onChange={(e) => setAdvanceForm({ ...advanceForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   type="button"
-                  className="btn btn-glass"
+                  className="btn btn-glass erp-button"
                   onClick={() => setShowRecordAdvanceModal(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary"
-                  style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                  className="btn btn-primary erp-button erp-button-primary"
+                  style={{ borderColor: '#0284c7' }}
                 >
                   Save Advance Voucher
                 </button>
@@ -1624,8 +1563,8 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     <FileText size={20} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>COMMERCIAL INVOICE</h3>
-                    <div style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a' }}>COMMERCIAL INVOICE</h3>
+                    <div style={{ fontSize: 'var(--erp-text-field)', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
                       {selectedInvoice.invoiceNumber}
                     </div>
                   </div>
@@ -1635,7 +1574,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                 <span
                   style={{
                     fontWeight: 800,
-                    fontSize: '0.78rem',
+                    fontSize: 'var(--erp-text-small)',
                     padding: '4px 12px',
                     borderRadius: '9999px',
                     textTransform: 'uppercase',
@@ -1658,20 +1597,20 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             {/* Invoice Meta Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '22px' }}>
               <div>
-                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Billed Customer</span>
-                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginTop: '3px' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Billed Customer</span>
+                <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginTop: '3px' }}>
                   {selectedInvoice.customerName || 'Walk-in Customer'}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '2px' }}>
                   Payment: <strong style={{ color: '#334155' }}>{selectedInvoice.paymentType || 'Full Payment'} ({selectedInvoice.paymentMethod || 'Cash'})</strong>
                 </div>
               </div>
               <div>
-                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Invoice Date & Time</span>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginTop: '3px' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.5px' }}>Invoice Date & Time</span>
+                <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginTop: '3px' }}>
                   {selectedInvoice.displayDate || selectedInvoice.invoiceDate || new Date().toLocaleDateString()}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '2px' }}>
                   Salesman: <strong style={{ color: '#334155' }}>{selectedInvoice.salesman || 'Sales Executive'}</strong>
                 </div>
               </div>
@@ -1680,46 +1619,46 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             {/* Line Items Table */}
             <div style={{ marginBottom: '22px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '0.92rem', color: '#0f172a', fontWeight: 700 }}>
+                <h4 style={{ margin: 0, fontSize: 'var(--erp-text-nav)', color: '#0f172a', fontWeight: 700 }}>
                   INVOICED LINE ITEMS ({selectedInvoiceItems.length})
                 </h4>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '8px 12px', width: '38px', textAlign: 'center' }}>#</th>
-                      <th style={{ padding: '8px 12px', width: '130px' }}>SKU / CODE</th>
-                      <th style={{ padding: '8px 12px' }}>PRODUCT / DESCRIPTION</th>
-                      <th style={{ padding: '8px 12px', width: '60px', textAlign: 'center' }}>QTY</th>
-                      <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>UNIT PRICE</th>
-                      <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>SUBTOTAL</th>
+                      <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center' }}>#</th>
+                      <th className="erp-table-heading" style={{ width: '130px' }}>SKU / CODE</th>
+                      <th className="erp-table-heading">PRODUCT / DESCRIPTION</th>
+                      <th className="erp-table-heading" style={{ width: '60px', textAlign: 'center' }}>QTY</th>
+                      <th className="erp-table-heading" style={{ width: '110px', textAlign: 'right' }}>UNIT PRICE</th>
+                      <th className="erp-table-heading" style={{ width: '120px', textAlign: 'right' }}>SUBTOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selectedInvoiceItems.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
-                        <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
+                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                           {item.code || item.productSku || item.sku || '-'}
                         </td>
-                        <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1e293b' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#1e293b' }}>
                           {item.name || item.productName || 'Product item'}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
                           {item.quantity || 1}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', color: '#475569' }}>
                           LKR {(Number(item.unitPrice) || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
                           LKR {(Number(item.totalPrice || (item.quantity * item.unitPrice)) || 0).toFixed(2)}
                         </td>
                       </tr>
                     ))}
                     {selectedInvoiceItems.length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+                        <td className="erp-table-cell" colSpan={6} style={{ textAlign: 'center', color: '#94a3b8' }}>
                           No line items recorded for this invoice.
                         </td>
                       </tr>
@@ -1732,19 +1671,19 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             {/* Financial Summary */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
               <div style={{ width: '100%', maxWidth: '340px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--erp-text-button)' }}>
                   <span style={{ color: '#64748b' }}>Gross Total</span>
                   <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>
                     LKR {Number(selectedInvoice.totalAmount || 0).toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 'var(--erp-text-button)' }}>
                   <span style={{ color: '#16a34a', fontWeight: 600 }}>Amount Settled</span>
                   <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#16a34a' }}>
                     LKR {Number(selectedInvoice.paidAmount || 0).toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0 0', marginTop: '6px', borderTop: '1px dashed #cbd5e1', fontSize: '0.95rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0 0', marginTop: '6px', borderTop: '1px dashed #cbd5e1', fontSize: 'var(--erp-text-nav)' }}>
                   <span style={{ color: Number(selectedInvoice.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontWeight: 700 }}>
                     Balance Outstanding
                   </span>
@@ -1759,14 +1698,14 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '18px' }}>
               <button
                 type="button"
-                className="btn btn-glass"
+                className="btn btn-glass erp-button"
                 onClick={() => setSelectedInvoice(null)}
               >
                 Close
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => {
                   const inv = selectedInvoice;
                   setSelectedInvoice(null);
@@ -1780,7 +1719,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   });
                   setShowRecordPaymentModal(true);
                 }}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7' }}
+                style={{ borderColor: '#0284c7' }}
               >
                 <Plus size={15} /> Record Payment Against Invoice
               </button>

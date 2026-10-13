@@ -20,7 +20,7 @@ test('inventory New stock transfer opens GTN creation directly, including repeat
   const button=(scope,text)=>[...scope.querySelectorAll('button')].find(button=>button.textContent.trim()===text);
   const open=async()=>{
    const inventory=host.querySelector('[data-workspace="inventory"]');
-   const shortcut=button(inventory,'New stock transfer (GTN)');assert.ok(shortcut);
+   const shortcut=button(inventory,'New Stock Transfer');assert.ok(shortcut);
    await act(async()=>shortcut.click());
    const purchasing=host.querySelector('[data-workspace="purchasing"]');
    assert.ok(purchasing && !purchasing.hidden);

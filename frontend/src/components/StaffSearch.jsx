@@ -13,7 +13,7 @@ export default function StaffSearch({ staff, value, onChange, disabled = false, 
   return <div className="purchase-product-search gtn-staff-search" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
     <label>{label}</label>
     <div className="purchase-search-input"><Search size={16}/>
-      <input aria-label={ariaLabel} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={resultsId}
+      <input className="erp-field" aria-label={ariaLabel} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={resultsId}
         aria-activedescendant={open && results[active] ? `${resultsId}-${active}` : undefined}
         placeholder="Search staff by name, role, phone or code..." disabled={disabled} value={selected?.fullName || query}
         onFocus={()=>{setOpen(true);setActive(0);}}

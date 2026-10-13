@@ -1243,7 +1243,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   return (
-    <div
+    <div className="erp-page"
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -1261,147 +1261,78 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       }}
     >
       {/* Page Header (Fixed / Sticky to Desktop Screen) */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              margin: '0 0 4px 0',
-              letterSpacing: '-0.02em',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Customer Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+          <p className="erp-page-description">
             Create and manage customer records, credit limits, customer groups, and transaction history.
           </p>
         </div>
 
         {activeTab !== 'history' && (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleOpenAddCustomer}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
-            <Plus size={17} /> Add Customer
+            <Plus size={17} /> New Customer
           </button>
         )}
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
-        <button
+        <button data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('list')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'list' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'list' ? 700 : 500,
-            color: activeTab === 'list' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <ListFilter size={16} /> Customer List
         </button>
 
-        <button
+        <button data-active={activeTab === 'groups'} aria-pressed={activeTab === 'groups'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('groups')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'groups' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'groups' ? 700 : 500,
-            color: activeTab === 'groups' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Users size={16} /> Customer Groups
         </button>
 
-        <button
+        <button data-active={activeTab === 'history'} aria-pressed={activeTab === 'history'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('history')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'history' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'history' ? 700 : 500,
-            color: activeTab === 'history' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <History size={16} /> Customer History
         </button>
 
-        <button
+        <button data-active={activeTab === 'targets'} aria-pressed={activeTab === 'targets'} className="erp-tab"
           type="button"
           onClick={() => handleTabChange('targets')}
-          style={{
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'targets' ? '2.5px solid #0284c7' : '2.5px solid transparent',
-            padding: '10px 4px',
-            fontSize: '0.92rem',
-            fontWeight: activeTab === 'targets' ? 700 : 500,
-            color: activeTab === 'targets' ? '#0284c7' : '#64748b',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '-1px',
-          }}
+
         >
           <Target size={16} /> Range & Targets
         </button>
@@ -1456,7 +1387,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search customers by code, name, phone..."
                 value={searchTerm}
@@ -1465,9 +1396,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   width: '100%',
                   height: '34px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1508,7 +1437,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             {/* Right Controls: Filters (to the left of Export CSV), Export CSV (icon only), & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
               {/* Customer Group Filter Dropdown */}
-              <select
+              <select className="erp-field"
                 value={groupFilter}
                 onChange={(e) => setGroupFilter(e.target.value)}
                 style={{
@@ -1516,10 +1445,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   padding: '0 30px 0 12px',
                   width: '145px',
                   minWidth: '120px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -1555,7 +1481,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               </select>
 
               {/* Status Filter Dropdown */}
-              <select
+              <select className="erp-field"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
@@ -1563,10 +1489,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   padding: '0 30px 0 12px',
                   width: '135px',
                   minWidth: '115px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -1600,19 +1523,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
               {/* Reset Filters button */}
               {isFiltered && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={handleResetFilters}
                   style={{
                     height: '34px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1717,32 +1636,32 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CUSTOMER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CUSTOMER GROUP
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CONTACT PERSON
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       PHONE NUMBER
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ADDRESS
                     </th>
-                    <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CREDIT LIMIT
                     </th>
 
-                    <th style={{ padding: '12px 12px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1750,13 +1669,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b', fontSize: '0.875rem' }}>
+                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading customer records...
                       </td>
                     </tr>
                   ) : filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b', fontSize: '0.875rem' }}>
+                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                         No customers found matching criteria.
                       </td>
                     </tr>
@@ -1778,7 +1697,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                           title="Click row to view customer profile"
                         >
-                          <td style={{ padding: '12px 18px' }}>
+                          <td className="erp-table-cell">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div
                                 style={{
@@ -1791,7 +1710,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   fontWeight: 600,
-                                  fontSize: '0.8125rem',
+                                  fontSize: 'var(--erp-text-body)',
                                   border: '1px solid #bae6fd',
                                   flexShrink: 0,
                                 }}
@@ -1799,17 +1718,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 {(c.name || 'C').slice(0, 1).toUpperCase()}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem', lineHeight: '1.25' }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-field)', lineHeight: '1.25' }}>
                                   {c.name}
                                 </div>
-                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 500, marginTop: '2px' }}>
+                                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace', fontWeight: 500, marginTop: '2px' }}>
                                   {code || 'NO CODE'}
                                 </div>
                               </div>
                             </div>
                           </td>
 
-                          <td style={{ padding: '12px 14px', color: '#334155', fontWeight: 500, fontSize: '0.84rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
                             {assignedRoutes.length > 0 ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {assignedRoutes.map((r) => (
@@ -1824,7 +1743,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       border: '1px solid #dbeafe',
                                       borderRadius: '5px',
                                       padding: '2px 8px',
-                                      fontSize: '0.74rem',
+                                      fontSize: 'var(--erp-text-caption)',
                                       fontWeight: 500,
                                       whiteSpace: 'nowrap',
                                     }}
@@ -1834,20 +1753,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 ))}
                               </div>
                             ) : (
-                              <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Unassigned</span>
+                              <span style={{ color: '#94a3b8', fontSize: 'var(--erp-text-small)' }}>Unassigned</span>
                             )}
                           </td>
 
-                          <td style={{ padding: '12px 14px', color: '#1e293b', fontWeight: 500, fontSize: '0.84rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#1e293b', fontWeight: 500 }}>
                             {c.contactPerson || '—'}
                           </td>
 
-                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155' }}>
                             <div>{c.phone || '—'}</div>
-                            {c.email && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>{c.email}</div>}
+                            {c.email && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>{c.email}</div>}
                           </td>
 
-                          <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.address || ''}>
+                          <td className="erp-table-cell" style={{ color: '#475569', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.address || ''}>
                             {c.address ? (
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                 <MapPin size={12} color="#64748b" style={{ flexShrink: 0 }} /> {c.address}
@@ -1857,12 +1776,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             )}
                           </td>
 
-                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.84rem', fontWeight: 500, textAlign: 'right' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500, textAlign: 'right' }}>
                             LKR {Number(c.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
 
-                          <td style={{ padding: '12px 12px' }}>
+                          <td className="erp-table-cell">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1877,7 +1796,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                fontSize: '0.8rem',
+                                fontSize: 'var(--erp-text-small)',
                                 fontWeight: 500,
                                 color: active ? '#16a34a' : '#dc2626',
                                 whiteSpace: 'nowrap',
@@ -1897,7 +1816,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </button>
                           </td>
 
-                          <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                               {/* Print Customer Profile A4 */}
                               <button
@@ -2026,30 +1945,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             }}
           >
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
+              <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: '0 0 4px 0' }}>
                 Customer Groups
               </h2>
-              <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
+              <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', margin: 0 }}>
                 Organize customers into groups and assign a dedicated staff member to manage each customer group.
               </p>
             </div>
 
-            <button
+            <button className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateRouteView}
               style={{
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
                 padding: '9px 18px',
-                fontWeight: 600,
-                fontSize: '0.88rem',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
                 cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                 transition: 'background-color 0.15s ease',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
@@ -2090,7 +2002,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search customer groups by name, assigned staff, description..."
                 value={routeSearchTerm}
@@ -2099,9 +2011,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   width: '100%',
                   height: '34px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -2141,7 +2051,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
             {/* Right Controls: Group Status Filter & Icon Buttons (Export CSV, Print, Download PDF, Refresh) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              <select
+              <select className="erp-field"
                 value={groupStatusFilter}
                 onChange={(e) => setGroupStatusFilter(e.target.value)}
                 style={{
@@ -2149,10 +2059,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   padding: '0 30px 0 12px',
                   width: '135px',
                   minWidth: '115px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
-                  fontFamily: 'inherit',
                   fontWeight: 500,
                   color: '#334155',
                   backgroundColor: '#ffffff',
@@ -2284,7 +2191,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     backgroundColor: '#ffffff',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
-                    fontSize: '0.875rem',
+                    fontSize: 'var(--erp-text-description)',
                   }}
                 >
                   No customer groups found matching current search.
@@ -2334,11 +2241,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           }}
                         >
                           <div>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 3px 0' }}>
+                            <h3 style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', margin: '0 0 3px 0' }}>
                               {route.name}
                             </h3>
                             {(route.groupCode || route.routeCode) && (
-                              <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                              <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
                                 {route.groupCode || route.routeCode}
                               </span>
                             )}
@@ -2355,7 +2262,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 gap: '5px',
                                 padding: '3px 10px',
                                 borderRadius: '9999px',
-                                fontSize: '0.74rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 700,
                                 backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
                                 color: isGroupActive ? '#15803d' : '#b91c1c',
@@ -2397,7 +2304,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 border: '1px solid #bae6fd',
                                 borderRadius: '9999px',
                                 padding: '2px 8px',
-                                fontSize: '0.72rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 600,
                               }}
                             >
@@ -2408,7 +2315,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </div>
 
                         {/* Description */}
-                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                        <p style={{ color: '#64748b', fontSize: 'var(--erp-text-body)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
                           {route.description || 'No description added'}
                         </p>
 
@@ -2416,7 +2323,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         <p
                           style={{
                             color: repName ? '#0369a1' : '#64748b',
-                            fontSize: '0.8rem',
+                            fontSize: 'var(--erp-text-small)',
                             fontWeight: 500,
                             margin: '0 0 12px 0',
                             display: 'flex',
@@ -2439,7 +2346,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           borderTop: '1px solid #f1f5f9',
                         }}
                       >
-                        <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: 'var(--erp-text-body)', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <Eye size={13} /> View Group Details →
                         </span>
 
@@ -2532,13 +2439,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                       {selectedRoute?.name}
                     </h3>
                     {(selectedRoute?.groupCode || selectedRoute?.routeCode) && (
                       <span
                         style={{
-                          fontSize: '0.74rem',
+                          fontSize: 'var(--erp-text-caption)',
                           fontFamily: 'monospace',
                           backgroundColor: '#f1f5f9',
                           color: '#475569',
@@ -2556,7 +2463,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       type="button"
                       onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 700,
                         padding: '3px 11px',
                         borderRadius: '9999px',
@@ -2595,7 +2502,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     {/* Count */}
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                         backgroundColor: '#f0f9ff',
                         color: '#0284c7',
@@ -2653,30 +2560,30 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     }}
                   >
                     <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', marginBottom: '14px' }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', marginBottom: '14px' }}>
                         Customer Group Details
                       </div>
 
                       <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Group Name
                         </div>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
+                        <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
                           {selectedRoute?.name}
                         </div>
                       </div>
 
                       <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Group Code
                         </div>
-                        <div style={{ fontSize: '0.86rem', color: '#334155', fontFamily: 'monospace', marginTop: '2px' }}>
+                        <div style={{ fontSize: 'var(--erp-text-field)', color: '#334155', fontFamily: 'monospace', marginTop: '2px' }}>
                           {selectedRoute?.groupCode || selectedRoute?.routeCode || 'Auto-generated'}
                         </div>
                       </div>
 
                       <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Status
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
@@ -2684,7 +2591,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             type="button"
                             onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
                             style={{
-                              fontSize: '0.76rem',
+                              fontSize: 'var(--erp-text-caption)',
                               fontWeight: 700,
                               padding: '3px 10px',
                               borderRadius: '9999px',
@@ -2714,20 +2621,20 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </div>
 
                       <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Assigned Staff Member
                         </div>
-                        <div style={{ fontSize: '0.86rem', color: '#0369a1', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ fontSize: 'var(--erp-text-field)', color: '#0369a1', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <UserCheck size={13} />
                           {selectedRoute?.assignedStaffName || selectedRoute?.salesmanName || 'No staff assigned'}
                         </div>
                       </div>
 
                       <div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Description / Notes
                         </div>
-                        <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '3px', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                        <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', marginTop: '3px', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
                           {selectedRoute?.description || 'No description added.'}
                         </div>
                       </div>
@@ -2745,7 +2652,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                      <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 700, color: '#0f172a' }}>
                         Assigned Customers ({assignedCustomerList.length})
                       </span>
                     </div>
@@ -2762,7 +2669,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           pointerEvents: 'none',
                         }}
                       />
-                      <input
+                      <input className="erp-field"
                         type="text"
                         placeholder="Search assigned customers..."
                         value={customerSearchInRoute}
@@ -2771,9 +2678,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           width: '100%',
                           height: '34px',
                           padding: '0 28px 0 30px',
-                          borderRadius: '6px',
                           border: '1px solid #e2e8f0',
-                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           boxSizing: 'border-box',
                         }}
@@ -2812,24 +2717,24 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                     >
                       <div style={{ flex: 1, overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                        <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                           <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
+                              <th className="erp-table-heading">Customer</th>
+                              <th className="erp-table-heading">Contact / Phone</th>
+                              <th className="erp-table-heading">Status</th>
                             </tr>
                           </thead>
                           <tbody>
                             {assignedCustomerList.length === 0 ? (
                               <tr>
-                                <td colSpan="3" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                <td className="erp-table-cell" colSpan="3" style={{ textAlign: 'center', color: '#94a3b8' }}>
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                                     <Users size={28} color="#cbd5e1" />
-                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-field)' }}>
                                       {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
                                     </div>
-                                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                    <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>
                                       {customerSearchInRoute
                                         ? 'Try adjusting your search query.'
                                         : 'Click the "Update Group" button below to add customers to this group.'}
@@ -2845,7 +2750,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                 >
-                                  <td style={{ padding: '8px 12px' }}>
+                                  <td className="erp-table-cell">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <div
                                         style={{
@@ -2859,27 +2764,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           fontWeight: 600,
-                                          fontSize: '0.74rem',
+                                          fontSize: 'var(--erp-text-caption)',
                                         }}
                                       >
                                         {(c.name || 'C').slice(0, 1).toUpperCase()}
                                       </div>
                                       <div>
                                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                                           {c.code || c.customerCode}
                                         </div>
                                       </div>
                                     </div>
                                   </td>
-                                  <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                  <td className="erp-table-cell" style={{ color: '#334155' }}>
                                     <div>{c.contactPerson || '—'}</div>
-                                    {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                                    {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                                   </td>
-                                  <td style={{ padding: '8px 12px' }}>
+                                  <td className="erp-table-cell">
                                     <span
                                       style={{
-                                        fontSize: '0.72rem',
+                                        fontSize: 'var(--erp-text-caption)',
                                         fontWeight: 600,
                                         padding: '2px 7px',
                                         borderRadius: '9999px',
@@ -2914,17 +2819,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => handlePrintCustomerGroup(selectedRoute)}
                       style={{
                         padding: '8px 18px',
-                        borderRadius: '6px',
                         border: '1px solid #bae6fd',
                         backgroundColor: '#ffffff',
                         color: '#0284c7',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -2944,17 +2846,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       <Printer size={14} /> Print
                     </button>
 
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={handleCloseRouteView}
                       style={{
                         padding: '8px 18px',
-                        borderRadius: '6px',
                         border: '1px solid #e2e8f0',
                         backgroundColor: '#ffffff',
                         color: '#475569',
-                        fontSize: '0.84rem',
-                        fontWeight: 600,
                         cursor: 'pointer',
                       }}
                     >
@@ -2962,7 +2861,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </button>
                   {/* Update Group Action in Footer */}
                   {canEditCustomer && (
-                    <button
+                    <button className="erp-button erp-button-primary"
                       type="button"
                       onClick={() => {
                         const staffId = routeEditForm.salesmanId || selectedRoute?.assignedStaffId || selectedRoute?.salesmanId || '';
@@ -2978,14 +2877,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         alignItems: 'center',
                         gap: '6px',
                         padding: '8px 20px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        fontSize: '0.86rem',
-                        fontWeight: 600,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
                         transition: 'background-color 0.15s ease',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
@@ -3015,12 +2907,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                       {isCreatingRoute ? 'Create Customer Group' : `Update Customer Group: ${routeEditForm.name || selectedRoute?.name}`}
                     </h3>
                     <span
                       style={{
-                        fontSize: '0.75rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                         backgroundColor: '#f0f9ff',
                         color: '#0284c7',
@@ -3035,7 +2927,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {selectedRoute && (
-                      <button
+                      <button className="erp-button"
                         type="button"
                         onClick={() => setRouteModalMode('view')}
                         style={{
@@ -3043,12 +2935,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           alignItems: 'center',
                           gap: '5px',
                           padding: '5px 12px',
-                          borderRadius: '6px',
                           border: '1px solid #e2e8f0',
                           backgroundColor: '#ffffff',
                           color: '#475569',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
                           cursor: 'pointer',
                         }}
                       >
@@ -3097,16 +2986,16 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     }}
                   >
                     <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: '14px' }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', marginBottom: '14px' }}>
                         Customer Group Details
                       </div>
 
                       {/* Route Name Input */}
                       <div style={{ marginBottom: '14px' }}>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                           Customer Group Name *
                         </label>
-                        <input
+                        <input className="erp-field"
                           type="text"
                           placeholder="e.g. Wholesale Tier A, Corporate Accounts"
                           value={routeEditForm.name}
@@ -3115,9 +3004,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             width: '100%',
                             height: '34px',
                             padding: '0 12px',
-                            borderRadius: '6px',
                             border: '1px solid #e2e8f0',
-                            fontSize: '0.88rem',
                             backgroundColor: '#ffffff',
                             boxSizing: 'border-box',
                           }}
@@ -3126,7 +3013,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                       {/* Responsible Staff Search Box with Autocomplete Dropdown */}
                       <div ref={staffSearchRef} style={{ marginBottom: '14px', position: 'relative' }}>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                           Assigned Staff Member
                         </label>
                         <div style={{ position: 'relative' }}>
@@ -3140,7 +3027,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               pointerEvents: 'none',
                             }}
                           />
-                          <input
+                          <input className="erp-field"
                             type="text"
                             placeholder="Search staff by name, code, role..."
                             value={
@@ -3160,9 +3047,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               width: '100%',
                               height: '34px',
                               padding: '0 30px 0 32px',
-                              borderRadius: '6px',
                               border: isStaffSearchOpen ? '1px solid #0284c7' : '1px solid #e2e8f0',
-                              fontSize: '0.86rem',
                               backgroundColor: '#ffffff',
                               boxSizing: 'border-box',
                               outline: 'none',
@@ -3220,7 +3105,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               }}
                               style={{
                                 padding: '8px 12px',
-                                fontSize: '0.82rem',
+                                fontSize: 'var(--erp-text-body)',
                                 color: '#64748b',
                                 cursor: 'pointer',
                                 borderBottom: '1px solid #f1f5f9',
@@ -3234,7 +3119,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             </div>
 
                             {filteredStaffList.length === 0 ? (
-                              <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                              <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-small)' }}>
                                 No staff members found matching "{staffSearchQuery}"
                               </div>
                             ) : (
@@ -3267,17 +3152,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     }}
                                   >
                                     <div style={{ minWidth: 0 }}>
-                                      <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#0f172a' }}>
+                                      <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-body)', color: '#0f172a' }}>
                                         {s.name}
                                       </div>
-                                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'flex', gap: '6px', alignItems: 'center' }}>
                                         <span style={{ fontFamily: 'monospace' }}>{s.salesmanCode}</span>
                                         {s.phone && <span>• {s.phone}</span>}
                                       </div>
                                     </div>
                                     <span
                                       style={{
-                                        fontSize: '0.7rem',
+                                        fontSize: 'var(--erp-text-badge)',
                                         fontWeight: 600,
                                         padding: '1px 6px',
                                         borderRadius: '4px',
@@ -3298,10 +3183,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                       {/* Description Input */}
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                           Group Description / Notes
                         </label>
-                        <textarea
+                        <textarea className="erp-field"
                           rows="3"
                           placeholder="e.g. Group of wholesale and corporate client accounts"
                           value={routeEditForm.description}
@@ -3309,13 +3194,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           style={{
                             width: '100%',
                             padding: '8px 12px',
-                            borderRadius: '6px',
                             border: '1px solid #e2e8f0',
-                            fontSize: '0.86rem',
                             backgroundColor: '#ffffff',
                             boxSizing: 'border-box',
                             resize: 'vertical',
-                            fontFamily: 'inherit',
                           }}
                         />
                       </div>
@@ -3334,12 +3216,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                        <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155' }}>
                           Customer Members:
                         </span>
                         <span
                           style={{
-                            fontSize: '0.74rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                             backgroundColor: '#f0f9ff',
                             color: '#0284c7',
@@ -3365,7 +3247,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           pointerEvents: 'none',
                         }}
                       />
-                      <input
+                      <input className="erp-field"
                         type="text"
                         placeholder="Search customer by name, code, phone to add to group..."
                         value={inlineCustomerSearch}
@@ -3378,9 +3260,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           width: '100%',
                           height: '34px',
                           padding: '0 30px 0 32px',
-                          borderRadius: '6px',
                           border: isInlineCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                          fontSize: '0.84rem',
                           backgroundColor: '#ffffff',
                           boxSizing: 'border-box',
                           outline: 'none',
@@ -3429,7 +3309,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           }}
                         >
                           {inlineCustomerSearchResults.length === 0 ? (
-                            <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                            <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
                               {inlineCustomerSearch ? `No active customers found matching "${inlineCustomerSearch}"` : 'Type customer name, code, phone or address to search'}
                             </div>
                           ) : (
@@ -3482,17 +3362,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         fontWeight: 600,
-                                        fontSize: '0.74rem',
+                                        fontSize: 'var(--erp-text-caption)',
                                         flexShrink: 0,
                                       }}
                                     >
                                       {(c.name || 'C').slice(0, 1).toUpperCase()}
                                     </div>
                                     <div style={{ minWidth: 0, flex: 1 }}>
-                                      <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.84rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {c.name}
                                       </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#64748b' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                                         <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
                                           {c.code || c.customerCode || 'NO CODE'}
                                         </span>
@@ -3506,7 +3386,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     {isAlreadyAssigned ? (
                                       <span
                                         style={{
-                                          fontSize: '0.7rem',
+                                          fontSize: 'var(--erp-text-badge)',
                                           fontWeight: 600,
                                           color: '#15803d',
                                           backgroundColor: '#dcfce7',
@@ -3520,7 +3400,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     ) : (
                                       <span
                                         style={{
-                                          fontSize: '0.74rem',
+                                          fontSize: 'var(--erp-text-caption)',
                                           fontWeight: 600,
                                           color: '#0284c7',
                                           backgroundColor: '#e0f2fe',
@@ -3556,7 +3436,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           pointerEvents: 'none',
                         }}
                       />
-                      <input
+                      <input className="erp-field"
                         type="text"
                         placeholder="Filter assigned members below..."
                         value={customerSearchInRoute}
@@ -3565,9 +3445,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           width: '100%',
                           height: '32px',
                           padding: '0 28px 0 30px',
-                          borderRadius: '6px',
                           border: '1px solid #e2e8f0',
-                          fontSize: '0.8rem',
                           backgroundColor: '#f8fafc',
                           boxSizing: 'border-box',
                         }}
@@ -3606,25 +3484,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       }}
                     >
                       <div style={{ flex: 1, overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                        <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                           <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Customer</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Contact / Phone</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600 }}>Status</th>
-                              <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'right' }}>Action</th>
+                              <th className="erp-table-heading">Customer</th>
+                              <th className="erp-table-heading">Contact / Phone</th>
+                              <th className="erp-table-heading">Status</th>
+                              <th className="erp-table-heading" style={{ textAlign: 'right' }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
                             {assignedCustomerList.length === 0 ? (
                               <tr>
-                                <td colSpan="4" style={{ padding: '36px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                <td className="erp-table-cell" colSpan="4" style={{ textAlign: 'center', color: '#94a3b8' }}>
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                                     <Users size={28} color="#cbd5e1" />
-                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: '0.86rem' }}>
+                                    <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-field)' }}>
                                       {customerSearchInRoute ? 'No matching assigned customers found' : 'No customers assigned yet'}
                                     </div>
-                                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                    <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>
                                       {customerSearchInRoute
                                         ? 'Try adjusting your search query above.'
                                         : 'Click the "Assign Customer" button above to search and assign customers.'}
@@ -3640,7 +3518,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                 >
-                                  <td style={{ padding: '8px 12px' }}>
+                                  <td className="erp-table-cell">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <div
                                         style={{
@@ -3654,27 +3532,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           fontWeight: 600,
-                                          fontSize: '0.74rem',
+                                          fontSize: 'var(--erp-text-caption)',
                                         }}
                                       >
                                         {(c.name || 'C').slice(0, 1).toUpperCase()}
                                       </div>
                                       <div>
                                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>
                                           {c.code || c.customerCode}
                                         </div>
                                       </div>
                                     </div>
                                   </td>
-                                  <td style={{ padding: '8px 12px', color: '#334155' }}>
+                                  <td className="erp-table-cell" style={{ color: '#334155' }}>
                                     <div>{c.contactPerson || '—'}</div>
-                                    {c.phone && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{c.phone}</div>}
+                                    {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                                   </td>
-                                  <td style={{ padding: '8px 12px' }}>
+                                  <td className="erp-table-cell">
                                     <span
                                       style={{
-                                        fontSize: '0.72rem',
+                                        fontSize: 'var(--erp-text-caption)',
                                         fontWeight: 600,
                                         padding: '2px 7px',
                                         borderRadius: '9999px',
@@ -3685,8 +3563,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       {isCustomerActive(c) ? 'Active' : 'Inactive'}
                                     </span>
                                   </td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                                    <button
+                                  <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                                    <button className="erp-button"
                                       type="button"
                                       onClick={() => {
                                         setRouteEditForm({
@@ -3699,10 +3577,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         backgroundColor: 'transparent',
                                         color: '#dc2626',
                                         cursor: 'pointer',
-                                        fontSize: '0.78rem',
-                                        fontWeight: 600,
                                         padding: '3px 6px',
-                                        borderRadius: '4px',
                                       }}
                                       title="Remove customer from group"
                                     >
@@ -3731,7 +3606,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     flexShrink: 0,
                   }}
                 >
-                  <button
+                  <button className="erp-button"
                     type="button"
                     onClick={() => {
                       if (selectedRoute) {
@@ -3742,12 +3617,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     }}
                     style={{
                       padding: '8px 18px',
-                      borderRadius: '6px',
                       border: '1px solid #e2e8f0',
                       backgroundColor: '#ffffff',
                       color: '#475569',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
                       cursor: 'pointer',
                     }}
                   >
@@ -3765,7 +3637,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       border: 'none',
                       backgroundColor: '#0284c7',
                       color: '#ffffff',
-                      fontSize: '0.86rem',
+                      fontSize: 'var(--erp-text-field)',
                       fontWeight: 600,
                       cursor: 'pointer',
                       boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
@@ -3814,7 +3686,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               }}
             >
               <Users size={48} color="#94a3b8" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-              <p style={{ color: '#64748b', fontSize: '0.95rem', margin: 0, fontWeight: 500 }}>
+              <p style={{ color: '#64748b', fontSize: 'var(--erp-text-nav)', margin: 0, fontWeight: 500 }}>
                 Loading customer records...
               </p>
             </div>
@@ -3829,22 +3701,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               }}
             >
               <Users size={48} color="#94a3b8" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
                 No Customers in System
               </h3>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '16px' }}>
+              <p style={{ color: '#64748b', fontSize: 'var(--erp-text-button)', marginBottom: '16px' }}>
                 Create customer accounts first to access their financial history and transactions.
               </p>
-              <button
+              <button className="erp-button erp-button-primary"
                 type="button"
                 onClick={handleOpenAddCustomer}
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
                   padding: '9px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -3897,7 +3764,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         pointerEvents: 'none',
                       }}
                     />
-                    <input
+                    <input className="erp-field"
                       type="text"
                       placeholder="Search customer by code, name, phone, or route to view history..."
                       value={customerSearchInput}
@@ -3910,9 +3777,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         width: '100%',
                         height: '35px',
                         padding: '0 32px 0 36px',
-                        borderRadius: '6px',
                         border: isCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                        fontSize: '0.86rem',
                         outline: 'none',
                         backgroundColor: '#ffffff',
                         color: '#0f172a',
@@ -3963,7 +3828,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         }}
                       >
                         {filteredHistoryCustomerOptions.length === 0 ? (
-                          <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                          <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
                             No matching customers found for "{customerSearchInput}"
                           </div>
                         ) : (
@@ -3993,13 +3858,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                                  <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                                  <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
                                     {c.name}
                                   </span>
                                   <span
                                     style={{
                                       fontFamily: 'monospace',
-                                      fontSize: '0.72rem',
+                                      fontSize: 'var(--erp-text-caption)',
                                       fontWeight: 700,
                                       backgroundColor: '#f1f5f9',
                                       color: '#475569',
@@ -4011,14 +3876,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     {c.code || c.customerCode || 'NO CODE'}
                                   </span>
                                   {c.phone && (
-                                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                                    <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                                       📞 {c.phone}
                                     </span>
                                   )}
                                   {route?.name && (
                                     <span
                                       style={{
-                                        fontSize: '0.74rem',
+                                        fontSize: 'var(--erp-text-caption)',
                                         color: '#0284c7',
                                         backgroundColor: '#e0f2fe',
                                         padding: '1px 6px',
@@ -4033,7 +3898,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                   <span
                                     style={{
-                                      fontSize: '0.7rem',
+                                      fontSize: 'var(--erp-text-badge)',
                                       fontWeight: 600,
                                       padding: '1px 6px',
                                       borderRadius: '9999px',
@@ -4067,7 +3932,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         backgroundColor: '#ffffff',
                         borderRadius: '6px',
                         border: '1px solid #e2e8f0',
-                        fontSize: '0.84rem',
+                        fontSize: 'var(--erp-text-body)',
                         boxSizing: 'border-box',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                         overflow: 'hidden',
@@ -4077,7 +3942,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         <span
                           style={{
                             fontFamily: 'monospace',
-                            fontSize: '0.75rem',
+                            fontSize: 'var(--erp-text-caption)',
                             fontWeight: 700,
                             padding: '2px 8px',
                             backgroundColor: '#f1f5f9',
@@ -4092,7 +3957,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </span>
                         <span
                           style={{
-                            fontSize: '0.7rem',
+                            fontSize: 'var(--erp-text-badge)',
                             fontWeight: 600,
                             padding: '1px 6px',
                             borderRadius: '9999px',
@@ -4108,7 +3973,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         <span
                           style={{
                             color: '#475569',
-                            fontSize: '0.78rem',
+                            fontSize: 'var(--erp-text-small)',
                             whiteSpace: 'nowrap',
                             textOverflow: 'ellipsis',
                             overflow: 'hidden',
@@ -4125,14 +3990,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                         {selectedHistoryCustomer.phone && (
-                          <span style={{ color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#64748b', fontSize: 'var(--erp-text-small)', whiteSpace: 'nowrap' }}>
                             📞 {selectedHistoryCustomer.phone}
                           </span>
                         )}
                         {getCustomerRoute(selectedHistoryCustomer.id)?.name && (
                           <span
                             style={{
-                              fontSize: '0.74rem',
+                              fontSize: 'var(--erp-text-caption)',
                               fontWeight: 600,
                               color: '#0284c7',
                               backgroundColor: '#e0f2fe',
@@ -4179,10 +4044,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         borderRight: '1px solid #e2e8f0',
                       }}
                     >
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                      <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
                         Total Invoiced
                       </span>
-                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {customerHistoryMetrics.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -4199,10 +4064,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         borderRight: '1px solid #e2e8f0',
                       }}
                     >
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                      <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
                         Outstanding
                       </span>
-                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>
                         LKR {customerHistoryMetrics.outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -4218,10 +4083,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         padding: '0 8px',
                       }}
                     >
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
+                      <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>
                         Credit Limit
                       </span>
-                      <span style={{ fontSize: '0.94rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
                         LKR {Number(selectedHistoryCustomer.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -4242,10 +4107,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   }}
                 >
                   <Search size={36} color="#94a3b8" style={{ margin: '0 auto 12px auto', display: 'block' }} />
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 600, color: '#0f172a' }}>
+                  <h3 style={{ margin: '0 0 6px 0', fontSize: 'var(--erp-text-section)', fontWeight: 600, color: '#0f172a' }}>
                     Select a Customer to View History
                   </h3>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--erp-text-field)', color: '#64748b' }}>
                     Type a customer name, code, phone, or route in the search bar above and click to view their transactions, invoices, and financial statement.
                   </p>
                 </div>
@@ -4368,7 +4233,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   border: 'none',
                                   borderRadius: '5px',
                                   padding: '4px 8px',
-                                  fontSize: '0.8rem',
+                                  fontSize: 'var(--erp-text-small)',
                                   fontWeight: isSel ? 600 : 500,
                                   color: isSel ? '#0284c7' : '#64748b',
                                   cursor: 'pointer',
@@ -4383,7 +4248,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <span>{tab.label}</span>
                                 <span
                                   style={{
-                                    fontSize: '0.7rem',
+                                    fontSize: 'var(--erp-text-badge)',
                                     fontWeight: 600,
                                     padding: '1px 5px',
                                     borderRadius: '9999px',
@@ -4420,7 +4285,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 pointerEvents: 'none',
                               }}
                             />
-                            <input
+                            <input className="erp-field"
                               type="text"
                               placeholder={currentSearchPlaceholder}
                               value={currentSearchVal}
@@ -4429,9 +4294,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 width: '100%',
                                 height: '32px',
                                 padding: '0 24px 0 26px',
-                                borderRadius: '6px',
                                 border: '1px solid #e2e8f0',
-                                fontSize: '0.8rem',
                                 outline: 'none',
                                 backgroundColor: '#ffffff',
                                 color: '#0f172a',
@@ -4462,7 +4325,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           </div>
 
                           {/* Filter Select */}
-                          <select
+                          <select className="erp-field"
                             value={currentStatusVal}
                             onChange={(e) => currentStatusSetter(e.target.value)}
                             style={{
@@ -4470,10 +4333,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               padding: '0 24px 0 8px',
                               width: '105px',
                               minWidth: '95px',
-                              borderRadius: '6px',
                               border: '1px solid #e2e8f0',
-                              fontSize: '0.8rem',
-                              fontFamily: 'inherit',
                               fontWeight: 500,
                               color: '#334155',
                               backgroundColor: '#ffffff',
@@ -4498,7 +4358,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                           {/* Reset Button */}
                           {hasActiveFilter && (
-                            <button
+                            <button className="erp-button"
                               type="button"
                               onClick={() => {
                                 currentSearchSetter('');
@@ -4507,12 +4367,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               style={{
                                 height: '32px',
                                 padding: '0 8px',
-                                borderRadius: '6px',
                                 border: '1px solid #e2e8f0',
                                 backgroundColor: '#f1f5f9',
                                 color: '#64748b',
-                                fontSize: '0.78rem',
-                                fontWeight: 500,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -4625,23 +4482,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         }}
                       >
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>BALANCE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>TAGS</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                                <th className="erp-table-heading">INVOICE #</th>
+                                <th className="erp-table-heading">DATE</th>
+                                <th className="erp-table-heading">PAYMENT TYPE</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>TOTAL AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>PAID AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>BALANCE</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>TAGS</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredCustomerInvoices.length === 0 ? (
                                 <tr>
-                                  <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#94a3b8' }}>
                                     <FileText size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                     No invoices found for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
@@ -4662,30 +4519,30 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                      <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                         {inv.displayDate || inv.invoiceDate}
                                       </td>
-                                      <td style={{ padding: '12px 14px' }}>
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
+                                      <td className="erp-table-cell">
+                                        <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
                                           {inv.paymentType || 'standard'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
                                         LKR {Number(inv.totalAmount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
                                         LKR {Number(inv.paidAmount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: bal > 0 ? '#0f172a' : '#64748b' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: bal > 0 ? '#0f172a' : '#64748b' }}>
                                         LKR {bal.toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <span
                                           style={{
-                                            fontSize: '0.74rem',
+                                            fontSize: 'var(--erp-text-caption)',
                                             fontWeight: 600,
                                             padding: '2px 8px',
                                             borderRadius: '9999px',
@@ -4698,7 +4555,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Invoice', inv); }}
@@ -4734,22 +4591,22 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>VOUCHER #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>DEPOSIT AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AVAILABLE BALANCE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                                <th className="erp-table-heading">VOUCHER #</th>
+                                <th className="erp-table-heading">DATE</th>
+                                <th className="erp-table-heading">PAYMENT METHOD</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>DEPOSIT AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>AVAILABLE BALANCE</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredCustomerAdvances.length === 0 ? (
                                 <tr>
-                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                                     <DollarSign size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                     No advance payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
@@ -4768,25 +4625,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {adv.voucherNo || adv.id}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                      <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                         {adv.displayDate || adv.date}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
+                                      <td className="erp-table-cell" style={{ color: '#475569' }}>
                                         {adv.paymentMethod || 'Bank Transfer'}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
                                         LKR {Number(adv.amount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: Number(adv.balance || 0) > 0 ? '#16a34a' : '#64748b' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: Number(adv.balance || 0) > 0 ? '#16a34a' : '#64748b' }}>
                                         LKR {Number(adv.balance || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <span
                                           style={{
-                                            fontSize: '0.74rem',
+                                            fontSize: 'var(--erp-text-caption)',
                                             fontWeight: 600,
                                             padding: '2px 8px',
                                             borderRadius: '9999px',
@@ -4799,7 +4656,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {adv.status ? adv.status.toLowerCase() : 'active'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Advance Payment', adv); }}
@@ -4825,22 +4682,22 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>RECEIPT #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT METHOD</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT PAID</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                                <th className="erp-table-heading">RECEIPT #</th>
+                                <th className="erp-table-heading">DATE</th>
+                                <th className="erp-table-heading">INVOICE #</th>
+                                <th className="erp-table-heading">PAYMENT METHOD</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>AMOUNT PAID</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredCustomerPayments.length === 0 ? (
                                 <tr>
-                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                                     <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                     No payments recorded for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
@@ -4857,25 +4714,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                   >
-                                    <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                    <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                       {pmt.receiptNo || pmt.id}
                                     </td>
-                                    <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                    <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                       {pmt.displayDate || pmt.paymentDate}
                                     </td>
-                                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
+                                    <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
                                       {pmt.invoiceNo || '—'}
                                     </td>
-                                    <td style={{ padding: '12px 14px', color: '#475569', fontSize: '0.85rem' }}>
+                                    <td className="erp-table-cell" style={{ color: '#475569' }}>
                                       {pmt.paymentMethod || 'Cash'}
                                     </td>
-                                    <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#16a34a' }}>
+                                    <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#16a34a' }}>
                                       LKR {Number(pmt.amount || 0).toFixed(2)}
                                     </td>
-                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                    <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                       <span
                                         style={{
-                                          fontSize: '0.74rem',
+                                          fontSize: 'var(--erp-text-caption)',
                                           fontWeight: 600,
                                           padding: '2px 8px',
                                           borderRadius: '9999px',
@@ -4888,7 +4745,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         {pmt.status ? pmt.status.toLowerCase() : 'cleared'}
                                       </span>
                                     </td>
-                                    <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                    <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                       <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); printHistoryDocument('Payment Receipt', pmt); }}
@@ -4913,22 +4770,22 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>CHEQUE DATE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>BANK NAME</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE / REF #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                                <th className="erp-table-heading">CHEQUE #</th>
+                                <th className="erp-table-heading">CHEQUE DATE</th>
+                                <th className="erp-table-heading">BANK NAME</th>
+                                <th className="erp-table-heading">INVOICE / REF #</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredCustomerCheques.length === 0 ? (
                                 <tr>
-                                  <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                                  <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>
                                     <CreditCard size={36} color="#cbd5e1" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                     No cheques recorded for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
@@ -4950,25 +4807,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {chq.chequeNo || chq.referenceNumber || chq.paymentNumber || chq.id}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                      <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                         {chq.displayDate || chq.chequeDate || chq.paymentDate || '—'}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#0f172a', fontWeight: 500 }}>
+                                      <td className="erp-table-cell" style={{ color: '#0f172a', fontWeight: 500 }}>
                                         {chq.bankName || '—'}
                                       </td>
-                                      <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#475569', fontSize: '0.85rem' }}>
+                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
                                         {chq.invoiceNo || '—'}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
                                         LKR {Number(chq.amount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <span
                                           style={{
-                                            fontSize: '0.74rem',
+                                            fontSize: 'var(--erp-text-caption)',
                                             fontWeight: 600,
                                             padding: '2px 8px',
                                             borderRadius: '9999px',
@@ -4981,7 +4838,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {chq.status ? chq.status.toLowerCase() : 'pending'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Cheque', chq); }}
@@ -5007,23 +4864,23 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>INVOICE #</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>DATE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', backgroundColor: '#fafbfc' }}>PAYMENT TYPE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>TOTAL AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>PAID AMOUNT</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', backgroundColor: '#fafbfc' }}>OUTSTANDING BALANCE</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>STATUS</th>
-                                <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', backgroundColor: '#fafbfc' }}>ACTIONS</th>
+                                <th className="erp-table-heading">INVOICE #</th>
+                                <th className="erp-table-heading">DATE</th>
+                                <th className="erp-table-heading">PAYMENT TYPE</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>TOTAL AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>PAID AMOUNT</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>OUTSTANDING BALANCE</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
+                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
                               {filteredCustomerOutstanding.length === 0 ? (
                                 <tr>
-                                  <td colSpan={8} style={{ padding: '48px 16px', textAlign: 'center', color: '#16a34a' }}>
+                                  <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#16a34a' }}>
                                     <CheckCircle size={36} color="#86efac" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                     All clear! No outstanding payments pending for {selectedHistoryCustomer?.name || 'this customer'}.
                                   </td>
@@ -5042,30 +4899,30 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
-                                      <td style={{ padding: '12px 14px', color: '#334155', fontSize: '0.86rem', whiteSpace: 'nowrap' }}>
+                                      <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                         {inv.displayDate || inv.invoiceDate}
                                       </td>
-                                      <td style={{ padding: '12px 14px' }}>
-                                        <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
+                                      <td className="erp-table-cell">
+                                        <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
                                           {inv.paymentType || 'installment'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
                                         LKR {Number(inv.totalAmount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
                                         LKR {Number(inv.paidAmount || 0).toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>
                                         LKR {bal.toFixed(2)}
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <span
                                           style={{
-                                            fontSize: '0.74rem',
+                                            fontSize: 'var(--erp-text-caption)',
                                             fontWeight: 600,
                                             padding: '2px 8px',
                                             borderRadius: '9999px',
@@ -5078,7 +4935,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {Number(inv.paidAmount || 0) > 0 ? 'partial' : 'unpaid'}
                                         </span>
                                       </td>
-                                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Outstanding Invoice', inv); }}
@@ -5167,7 +5024,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 700,
-                    fontSize: '1.1rem',
+                    fontSize: 'var(--erp-text-section)',
                     flexShrink: 0,
                   }}
                 >
@@ -5175,14 +5032,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
                       {viewingCustomer.name}
                     </h2>
                     <span
                       style={{
                         fontFamily: 'monospace',
                         fontWeight: 600,
-                        fontSize: '0.8rem',
+                        fontSize: 'var(--erp-text-small)',
                         backgroundColor: '#f8fafc',
                         color: '#475569',
                         padding: '2px 8px',
@@ -5194,7 +5051,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </span>
                     <span
                       style={{
-                        fontSize: '0.74rem',
+                        fontSize: 'var(--erp-text-caption)',
                         fontWeight: 600,
                         padding: '2px 8px',
                         borderRadius: '9999px',
@@ -5205,7 +5062,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       {isCustomerActive(viewingCustomer) ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '3px' }}>
+                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '3px' }}>
                     {(() => {
                       const cRoutes = getCustomerRoutes(viewingCustomer.id);
                       if (cRoutes.length === 0) {
@@ -5223,7 +5080,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
               {/* Action Buttons in Modal Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     const c = viewingCustomer;
@@ -5233,10 +5090,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
                     padding: '6px 12px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#334155',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -5270,48 +5124,48 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             {/* Profile Details Cards in Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Contact Information
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Contact Person</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Contact Person</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.contactPerson || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Phone Number</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Phone Number</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.phone || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Email Address</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Email Address</span>
                     <span style={{ color: '#334155' }}>{viewingCustomer.email || '—'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Physical Address</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Physical Address</span>
                     <span style={{ color: '#334155' }}>{viewingCustomer.address || '—'}</span>
                   </div>
                 </div>
               </div>
 
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Financial & Credit Terms
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Credit Limit</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Credit Limit</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-nav)', fontFamily: 'monospace' }}>
                       LKR {Number(viewingCustomer.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Current Balance</span>
-                    <span style={{ fontWeight: 700, color: Number(viewingCustomer.currentBalance || 0) > 0 ? '#dc2626' : '#0f172a', fontSize: '0.92rem', fontFamily: 'monospace' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Current Balance</span>
+                    <span style={{ fontWeight: 700, color: Number(viewingCustomer.currentBalance || 0) > 0 ? '#dc2626' : '#0f172a', fontSize: 'var(--erp-text-nav)', fontFamily: 'monospace' }}>
                       LKR {Number(viewingCustomer.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Credit Status</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Credit Status</span>
                     <span style={{ fontWeight: 600, color: Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? '#dc2626' : '#15803d' }}>
                       {Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? 'Exceeded Limit' : 'Within Limit'}
                     </span>
@@ -5320,18 +5174,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               </div>
 
               <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
                   Customer Group & Assigned Staff
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block', marginBottom: '4px' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '4px' }}>
                       Assigned Customer Group(s)
                     </span>
                     {(() => {
                       const cRoutes = getCustomerRoutes(viewingCustomer.id);
                       if (cRoutes.length === 0) {
-                        return <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Unassigned</span>;
+                        return <span style={{ color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>Unassigned</span>;
                       }
                       return (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -5347,7 +5201,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 border: '1px solid #dbeafe',
                                 borderRadius: '4px',
                                 padding: '2px 8px',
-                                fontSize: '0.74rem',
+                                fontSize: 'var(--erp-text-caption)',
                                 fontWeight: 500,
                               }}
                             >
@@ -5359,7 +5213,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     })()}
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Assigned Staff Member</span>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Assigned Staff Member</span>
                     <span style={{ fontWeight: 500, color: '#0f172a' }}>
                       {(() => {
                         const cRoutes = getCustomerRoutes(viewingCustomer.id);
@@ -5369,8 +5223,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Customer ID</span>
-                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: '0.74rem' }}>
+                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Customer ID</span>
+                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: 'var(--erp-text-caption)' }}>
                       {viewingCustomer.id}
                     </span>
                   </div>
@@ -5379,7 +5233,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-              <button
+              <button className="erp-button erp-button-primary"
                 type="button"
                 onClick={() => {
                   const cust = viewingCustomer;
@@ -5387,35 +5241,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   handleViewCustomerHistory(cust);
                 }}
                 style={{
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
                   padding: '7px 16px',
-                  fontWeight: 600,
-                  fontSize: '0.84rem',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
                 }}
               >
                 <History size={13} /> View Financial History
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => handlePrintSingleCustomer(viewingCustomer)}
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#0284c7',
                     border: '1px solid #bae6fd',
-                    borderRadius: '6px',
                     padding: '7px 16px',
-                    fontWeight: 600,
-                    fontSize: '0.84rem',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -5435,17 +5279,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   <Printer size={13} /> Print
                 </button>
 
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setViewingCustomer(null)}
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#475569',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
                     padding: '7px 16px',
-                    fontWeight: 600,
-                    fontSize: '0.84rem',
                     cursor: 'pointer',
                   }}
                 >
@@ -5471,11 +5312,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             {previewModalDoc.loading && <p role="status">Loading full details…</p>}
             {previewModalDoc.error && <p role="alert">{previewModalDoc.error}</p>}
             {!previewModalDoc.loading && !previewModalDoc.error && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
                 {historyDetailRows(previewModalDoc.data).map((field) => (
                   <tr key={field.label} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '9px', textAlign: 'left', width: '40%', color: '#64748b' }}>{field.label}</th>
-                    <td style={{ padding: '9px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{field.value}</td>
+                    <th className="erp-table-heading" style={{ textAlign: 'left', width: '40%' }}>{field.label}</th>
+                    <td className="erp-table-cell" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{field.value}</td>
                   </tr>
                 ))}
               </tbody></table>
@@ -5515,10 +5356,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   <Users size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#0f172a' }}>
                     {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
                     Enter customer directory details and contact information
                   </p>
                 </div>
@@ -5535,27 +5376,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             <form onSubmit={handleSaveCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Customer Code
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="Auto (e.g. CUST-001)"
                     value={customerForm.code}
                     onChange={(e) => setCustomerForm({ ...customerForm, code: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Customer Name *
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="e.g. Apex Supermarket"
                     value={customerForm.name}
                     onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                     required
                   />
                 </div>
@@ -5564,27 +5405,27 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               {/* Contact Person & Phone */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Contact Person
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="e.g. John Doe"
                     value={customerForm.contactPerson}
                     onChange={(e) => setCustomerForm({ ...customerForm, contactPerson: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Phone Number
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="text"
                     placeholder="e.g. 077 123 4567"
                     value={customerForm.phone}
                     onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -5592,57 +5433,54 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               {/* Email & Credit Limit */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Email Address
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="email"
                     placeholder="e.g. info@apex.com"
                     value={customerForm.email}
                     onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                     Approved Credit Limit (LKR)
                   </label>
-                  <input
+                  <input className="erp-field"
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={customerForm.creditLimit}
                     onChange={(e) => setCustomerForm({ ...customerForm, creditLimit: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
 
               {/* Address (Full Width) */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                   Physical Address
                 </label>
-                <input
+                <input className="erp-field"
                   type="text"
                   placeholder="e.g. 123 Main Street, Colombo 03"
                   value={customerForm.address}
                   onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowCustomerModal(false)}
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
                     padding: '8px 16px',
-                    fontSize: '0.86rem',
-                    fontWeight: 600,
                     color: '#475569',
                     cursor: 'pointer',
                   }}
@@ -5659,7 +5497,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     border: 'none',
                     borderRadius: '6px',
                     padding: '8px 20px',
-                    fontSize: '0.86rem',
+                    fontSize: 'var(--erp-text-field)',
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -5721,12 +5559,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   {isCustomerActive(confirmStatusModal.customer)
                     ? 'Deactivate Customer?'
                     : 'Activate Customer?'}
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.86rem', color: '#475569', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: 'var(--erp-text-field)', color: '#475569', lineHeight: 1.5 }}>
                   Are you sure you want to change the status of customer{' '}
                   <strong style={{ color: '#0f172a' }}>
                     {confirmStatusModal.customer.name}
@@ -5748,7 +5586,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     borderRadius: '6px',
                     backgroundColor: '#f8fafc',
                     border: '1px solid #e2e8f0',
-                    fontSize: '0.78rem',
+                    fontSize: 'var(--erp-text-small)',
                     color: '#64748b',
                     lineHeight: 1.4,
                   }}
@@ -5769,16 +5607,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 paddingTop: '14px',
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setConfirmStatusModal({ isOpen: false, customer: null })}
                 style={{
                   backgroundColor: '#ffffff',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
                   padding: '8px 16px',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
                   color: '#475569',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
@@ -5801,7 +5636,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   border: 'none',
                   borderRadius: '6px',
                   padding: '8px 18px',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--erp-text-body)',
                   fontWeight: 600,
                   cursor: 'pointer',
                   boxShadow: isCustomerActive(confirmStatusModal.customer)

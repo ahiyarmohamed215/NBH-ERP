@@ -1,14 +1,14 @@
 .purchase-remove-backdrop{z-index:1500;padding:16px;box-sizing:border-box}
 .purchase-remove-dialog{width:min(420px,100%);max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;padding:20px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;font-family:inherit}
 .purchase-remove-dialog header{display:flex;align-items:center;gap:10px}
-.purchase-remove-dialog h2{margin:0;font-size:1rem;font-weight:600;color:#0f172a}
+.purchase-remove-dialog h2{margin:0;font-size:var(--erp-text-nav);font-weight:600;color:#0f172a}
 .purchase-remove-symbol{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:6px;background:#fff1f2;color:#e11d48;flex-shrink:0}
 .purchase-remove-dialog .purchase-remove-close{margin-left:auto;padding:4px;border:0;background:transparent;color:#64748b;display:flex;align-items:center;cursor:pointer}
-.purchase-remove-dialog p{margin:14px 0;font-size:.84rem;line-height:1.5;color:#64748b}
+.purchase-remove-dialog p{margin:14px 0;font-size:var(--erp-text-body);line-height:1.5;color:#64748b}
 .purchase-remove-product{display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;overflow-wrap:anywhere}
-.purchase-remove-product small{font-size:.73rem;color:#2563eb;font-weight:600}
-.purchase-remove-product strong{font-size:.85rem;font-weight:600;color:#334155}
+.purchase-remove-product small{font-size:var(--erp-text-caption);color:var(--erp-accent);font-weight:600}
+.purchase-remove-product strong{font-size:var(--erp-text-field);font-weight:600;color:#334155}
 .purchase-remove-dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
-.purchase-remove-dialog footer button{min-height:36px;padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer}
+.purchase-remove-dialog footer button{min-height:36px;padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-family:inherit;font-size:var(--erp-text-body);font-weight:500;cursor:pointer}
 .purchase-remove-dialog footer .purchase-remove-confirm{background:#e11d48;border-color:#e11d48;color:#fff}
 .purchase-remove-dialog button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}

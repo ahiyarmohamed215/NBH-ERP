@@ -131,7 +131,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
   };
 
   return (
-    <div className="purchasing-no-shadows"
+    <div className="purchasing-no-shadows erp-page" data-focused={focusedDocument}
       style={{
         padding: focusedDocument ? '12px' : '24px 32px',
         flex: 1,
@@ -150,49 +150,34 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
     >
       {!focusedDocument && <>
       {/* Page Header (Fixed / Sticky to Desktop Screen - Exact CustomerHub Look) */}
-      <div
+      <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Purchasing Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+          <p className="erp-page-description">
             Manage registered procurement vendors, purchase orders, goods receipts (GRN), and stock transfers (GTN).
           </p>
         </div>
 
         {/* Dynamic Action Button (CustomerHub Styled Button) */}
         {currentTab === 'suppliers' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
             }}
@@ -202,21 +187,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <Plus size={17} /> New Supplier
           </button>
         ) : currentTab === 'grn' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
             }}
@@ -226,21 +204,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <Plus size={17} /> New Goods Received
           </button>
         ) : currentTab === 'gtn' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
             }}
@@ -250,21 +221,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
         ) : currentTab === 'prn' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
             }}
@@ -274,21 +238,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <RotateCcw size={16} /> New Purchase Return
           </button>
         ) : currentTab === 'purchase-orders' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '6px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
               transition: 'background-color 0.15s ease',
             }}
@@ -301,14 +258,11 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
       </div>
 
       {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
-      <div
+      <div className="erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
-          overflowX: 'auto',
           flexShrink: 0,
         }}
       >
@@ -316,26 +270,11 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
           return (
-            <button
+            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              style={{
-                background: 'none',
-                border: 'none',
-                borderBottom: isActive ? '2.5px solid #0284c7' : '2.5px solid transparent',
-                padding: '10px 4px',
-                fontSize: '0.92rem',
-                fontWeight: isActive ? 700 : 500,
-                color: isActive ? '#0284c7' : '#64748b',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '-1px',
-                whiteSpace: 'nowrap',
-                transition: 'color 0.15s ease, border-color 0.15s ease',
-              }}
+
             >
               <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
               {tab.label}

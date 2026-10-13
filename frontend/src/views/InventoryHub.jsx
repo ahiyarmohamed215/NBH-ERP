@@ -487,7 +487,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       if (prodRes.status === 'fulfilled') setProductsList(fetchedProducts);
       if (catRes.status === 'fulfilled') setCategoriesList(fetchedCategories);
 
-      
+
 
       let items = [];
 
@@ -749,7 +749,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   };
 
   return (
-    <div ref={directoryRef} className={`inventory-theme purchasing-no-shadows${showQuotaModal || masterFormOpen ? ' inventory-allocation-focus' : ''}`}
+    <div ref={directoryRef} className={(`inventory-theme purchasing-no-shadows${showQuotaModal || masterFormOpen ? ' inventory-allocation-focus' : ''}`) + ' erp-page'}
       style={{
         flex: 1,
         height: '100%',
@@ -763,112 +763,76 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }}
     >
       {/* Page Header (Fixed / Sticky at Top) - Matching EmployeesHub / CustomersHub */}
-      <div className="inventory-page-header"
+      <div className="inventory-page-header erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '16px',
           flexShrink: 0,
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: '1.65rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
-              margin: '0 0 4px 0',
-            }}
+          <h1 className="erp-page-title"
+
           >
             Inventory Management
           </h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+          <p className="erp-page-description">
             Create and manage inventory records, warehouse locations, categories, and stock adjustments.
           </p>
         </div>
 
         {/* Action Button matching current active tab */}
         {currentTab === 'pos-quotas' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={() => handleOpenQuotaModal()}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
             <Plus size={17} /> New Allocation
           </button>
         ) : currentTab === 'adjustments' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleOpenCreateRecord}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
-            <Plus size={17} /> Create Record
+            <Plus size={17} /> New Adjustment
           </button>
         ) : currentTab === 'inventory-list' ? (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleNavigateGTN}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
-            <ArrowRightLeft size={16} /> New stock transfer (GTN)
+            <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
         ) : (
-          <button
+          <button className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAdd}
             style={{
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 600,
-              fontSize: '0.88rem',
               padding: '9px 18px',
-              borderRadius: '8px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              boxShadow: 'none',
-              border: 'none',
               cursor: 'pointer',
             }}
           >
@@ -878,14 +842,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <div className="inventory-tabs"
+      <div className="inventory-tabs erp-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '24px',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '16px',
-          overflowX: 'auto',
           flexShrink: 0,
         }}
       >
@@ -894,26 +855,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           const isActive = currentTab === tab.id;
 
           return (
-            <button
+            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 4px',
-                border: 'none',
-                borderBottom: isActive ? '2.5px solid #0284c7' : '2.5px solid transparent',
-                backgroundColor: 'transparent',
-                color: isActive ? '#0284c7' : '#64748b',
-                fontSize: '0.88rem',
-                fontWeight: isActive ? 600 : 500,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                marginBottom: '-1px',
-                transition: 'all 0.15s ease',
-              }}
+
             >
               <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
               {tab.label}
@@ -958,7 +904,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search inventory by SKU, product name, brand, warehouse..."
                 value={invSearchQuery}
@@ -967,9 +913,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   width: '100%',
                   height: '34px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1039,19 +983,15 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
               {/* Reset Filters button */}
               {(invSearchQuery || invStatusFilter !== 'ALL' || invWarehouseFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={handleClearInvFilters}
                   style={{
                     height: '34px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1158,32 +1098,32 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUANTITY</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUANTITY</th>
                     {canSeeCost && (
-                      <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>COST PRICE</th>
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>COST PRICE</th>
                     )}
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {inventoryLoading ? (
                     <tr>
-                      <td colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading live inventory balances...
                       </td>
                     </tr>
                   ) : filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', color: '#64748b' }}>
                         No inventory records found matching current criteria.
                       </td>
                     </tr>
@@ -1201,20 +1141,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view full stock details"
                       >
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                           {item.sku}
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                           {item.productName}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td className="erp-table-cell">
                           <span
                             style={{
                               backgroundColor: '#f8fafc',
                               color: '#334155',
                               padding: '2px 8px',
                               borderRadius: '4px',
-                              fontSize: '0.78rem',
+                              fontSize: 'var(--erp-text-small)',
                               fontWeight: 600,
                               border: '1px solid #e2e8f0',
                               display: 'inline-block',
@@ -1224,35 +1164,35 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             {item.brandName || 'General'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 500 }}>
+                        <td className="erp-table-cell" style={{ color: '#475569', fontWeight: 500 }}>
                           {item.warehouseName}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td className="erp-table-cell">
                           <span
                             style={{
                               backgroundColor: '#e0f2fe',
                               color: '#0369a1',
                               padding: '2px 8px',
                               borderRadius: '4px',
-                              fontSize: '0.78rem',
+                              fontSize: 'var(--erp-text-small)',
                               fontWeight: 600,
                             }}
                           >
                             {item.categoryName}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: item.quantity > 0 ? '#0f172a' : '#dc2626' }}>
-                          {item.quantity.toLocaleString()} <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>{item.unitOfMeasure}</span>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: item.quantity > 0 ? '#0f172a' : '#dc2626' }}>
+                          {item.quantity.toLocaleString()} <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', fontWeight: 500 }}>{item.unitOfMeasure}</span>
                         </td>
                         {canSeeCost && (
-                          <td style={{ padding: '12px 16px', color: '#475569', fontWeight: 600 }}>
+                          <td className="erp-table-cell" style={{ color: '#475569', fontWeight: 600 }}>
                             Rs. {Number(item.costPrice || 0).toFixed(2)}
                           </td>
                         )}
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a' }}>
                           Rs. {Number(item.sellingPrice || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td className="erp-table-cell">
                           <StatusBadge status={item.isOutOfStock ? 'OUT_OF_STOCK' : item.isLowStock ? 'LOW_STOCK' : 'IN_STOCK'} />
                         </td>
                       </tr>
@@ -1369,7 +1309,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search adjustments by #, product, SKU, batch, warehouse, reason..."
                 value={searchQuery}
@@ -1378,9 +1318,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   width: '100%',
                   height: '34px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.86rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1450,19 +1388,15 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
               {/* Reset Filters button */}
               {(filterType !== 'ALL' || filterWarehouse !== 'ALL' || adjustmentFrom || adjustmentTo || searchQuery) && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={handleClearFilters}
                   style={{
                     height: '34px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1571,25 +1505,25 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECORD #</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TYPE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SKU</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BATCH</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>QUANTITY</th>
-                    <th style={{ padding: '12px 16px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REASON</th>
-                    <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>ACTIONS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECORD #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TYPE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SKU</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BATCH</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>QUANTITY</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REASON</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAdjustments.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan={10} style={{ textAlign: 'center', color: '#64748b' }}>
                         No adjustment records found matching selected filters.
                       </td>
                     </tr>
@@ -1610,42 +1544,42 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                           title="Click row to view record details"
                         >
-                          <td style={{ padding: '12px 18px', fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                             {rec.recordNo}
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#475569', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#475569' }}>
                             {rec.date}
                           </td>
-                          <td style={{ padding: '12px 16px' }}>
+                          <td className="erp-table-cell">
                             <span
                               style={{
                                 color: isAddition ? '#16a34a' : '#dc2626',
                                 fontWeight: 700,
-                                fontSize: '0.84rem',
+                                fontSize: 'var(--erp-text-body)',
                               }}
                             >
                               {rec.type}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#334155', fontWeight: 500, fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
                             {rec.warehouse}
                           </td>
-                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#64748b', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#64748b' }}>
                             {rec.sku}
                           </td>
-                          <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a', fontSize: '0.9rem' }}>
+                          <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                             {rec.productName}
                           </td>
-                          <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '0.82rem', color: '#475569' }}>
+                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
                             {rec.batch}
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
                             {rec.quantity > 0 ? `+${rec.quantity}` : rec.quantity}
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#475569', fontSize: '0.88rem' }}>
+                          <td className="erp-table-cell" style={{ color: '#475569' }}>
                             {rec.reason}
                           </td>
-                          <td style={{ padding: '12px 18px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
                               <button
                                 type="button"
@@ -1696,7 +1630,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {currentTab === 'pos-quotas' && !showQuotaModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-          
+
           {/* Search Bar & Filter Controls */}          <div className="inventory-toolbar"
             style={{
               backgroundColor: '#ffffff',
@@ -1727,7 +1661,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   pointerEvents: 'none',
                 }}
               />
-              <input
+              <input className="erp-field"
                 type="text"
                 placeholder="Search allocation by product SKU, name, or staff member..."
                 value={quotaSearch}
@@ -1736,9 +1670,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   width: '100%',
                   height: '34px',
                   padding: '0 32px 0 38px',
-                  borderRadius: '6px',
                   border: '1px solid #e2e8f0',
-                  fontSize: '0.88rem',
                   outline: 'none',
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
@@ -1793,7 +1725,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
               {/* Reset Filters button */}
               {(quotaSearch || quotaStatusFilter !== 'ALL') && (
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setQuotaSearch('');
@@ -1802,13 +1734,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   style={{
                     height: '34px',
                     padding: '0 12px',
-                    borderRadius: '6px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
                     color: '#64748b',
-                    fontSize: '0.85rem',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -1971,10 +1899,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   <ShieldCheck size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 700, color: '#0f172a' }}>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                     Inventory Allocation Details
                   </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                     Staff product limit and available inventory
                   </p>
                 </div>
@@ -2010,21 +1938,21 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     gap: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Total Stock Available
                   </span>
                   {Number(viewingQuota.totalStockAvailable ?? viewingQuota.currentStockInWarehouse ?? 0) <= 0 ? (
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <AlertCircle size={18} color="#ef4444" />
                       0 (Out of Stock)
                     </div>
                   ) : (
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#15803d' }}>
+                    <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#15803d' }}>
                       {Number(viewingQuota.totalStockAvailable ?? viewingQuota.currentStockInWarehouse ?? 0).toLocaleString()}{' '}
-                      <span style={{ fontSize: '0.82rem', color: '#166534', fontWeight: 500 }}>{viewingQuota.productUnit || 'Units'}</span>
+                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#166534', fontWeight: 500 }}>{viewingQuota.productUnit || 'Units'}</span>
                     </div>
                   )}
-                  <span style={{ fontSize: '0.73rem', color: '#94a3b8' }}>Total enterprise inventory</span>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8' }}>Total enterprise inventory</span>
                 </div>
 
                 <div
@@ -2038,14 +1966,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     gap: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '0.73rem', fontWeight: 600, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Given to Staff
                   </span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0284c7' }}>
+                  <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#0284c7' }}>
                     {Number(viewingQuota.allocatedQuantity || 0).toLocaleString()}{' '}
-                    <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600 }}>{viewingQuota.productUnit || 'Units'}</span>
+                    <span style={{ fontSize: 'var(--erp-text-body)', color: '#0284c7', fontWeight: 600 }}>{viewingQuota.productUnit || 'Units'}</span>
                   </div>
-                  <span style={{ fontSize: '0.73rem', color: '#0284c7' }}>Allocated selling limit</span>
+                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#0284c7' }}>Allocated selling limit</span>
                 </div>
               </div>
 
@@ -2063,10 +1991,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               >
                 {/* Product */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Product</span>
+                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Product</span>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>{viewingQuota.productName || 'Product not selected'}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>SKU: {viewingQuota.productSku || '—'}</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>{viewingQuota.productName || 'Product not selected'}</div>
+                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>SKU: {viewingQuota.productSku || '—'}</div>
                   </div>
                 </div>
 
@@ -2074,12 +2002,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
                 {/* Staff Member */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Staff Member</span>
+                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Staff Member</span>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
                       {viewingQuota.userFullName || viewingQuota.username || 'Staff not selected'}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                       @{viewingQuota.username} {viewingQuota.userEmployeeCode ? `• ${viewingQuota.userEmployeeCode}` : ''}
                     </div>
                   </div>
@@ -2089,7 +2017,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
                 {/* Status with Toggle */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Status</span>
+                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Status</span>
                   <StatusBadge status={quotaStatus(viewingQuota)}/>
 
                 </div>
@@ -2098,8 +2026,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   <>
                     <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>Notes</span>
-                      <span style={{ fontSize: '0.82rem', color: '#334155', maxWidth: '65%', textAlign: 'right' }}>
+                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Notes</span>
+                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#334155', maxWidth: '65%', textAlign: 'right' }}>
                         {viewingQuota.notes}
                       </span>
                     </div>
@@ -2120,17 +2048,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 backgroundColor: '#f8fafc',
               }}
             >
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setShowViewQuotaModal(false)}
                 style={{
                   padding: '8px 16px',
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   backgroundColor: '#ffffff',
                   color: '#475569',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
                   cursor: 'pointer',
                 }}
               >
@@ -2154,7 +2079,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     border: 'none',
                     backgroundColor: '#0284c7',
                     color: '#ffffff',
-                    fontSize: '0.85rem',
+                    fontSize: 'var(--erp-text-field)',
                     fontWeight: 600,
                     cursor: 'pointer',
                     display: 'inline-flex',
@@ -2197,10 +2122,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.12rem', fontWeight: 800, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a' }}>
                   {editingRecord ? `Edit Stock Adjustment (${editingRecord.recordNo})` : 'New Stock Adjustment'}
                 </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                   Adjust warehouse inventory quantities and record reason for audit compliance.
                 </p>
               </div>
@@ -2218,11 +2143,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               {/* Action Selector */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                  <label style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#334155' }}>
                     Adjustment Action *
                   </label>
                   {createForm.type && (
-                    <span style={{ fontSize: '0.74rem', color: createForm.type === 'Addition' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                    <span style={{ fontSize: 'var(--erp-text-caption)', color: createForm.type === 'Addition' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
                       {createForm.type === 'Addition' ? '✓ Adds new units to available inventory' : '✓ Deducts units from existing inventory'}
                     </span>
                   )}
@@ -2265,10 +2190,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       <Plus size={13} strokeWidth={2.5} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
+                      <div style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
                         Add Stock
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                         Increase physical on-hand units
                       </div>
                     </div>
@@ -2311,10 +2236,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                       <Minus size={13} strokeWidth={2.5} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
+                      <div style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
                         Reduce Stock
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                         Deduct damage, variance, or losses
                       </div>
                     </div>
@@ -2334,7 +2259,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     alignItems: 'center',
                     gap: '8px',
                     color: '#92400e',
-                    fontSize: '0.78rem',
+                    fontSize: 'var(--erp-text-small)',
                   }}
                 >
                   <AlertTriangle size={14} color="#d97706" style={{ flexShrink: 0 }} />
@@ -2348,19 +2273,17 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   {/* Row 1: Warehouse, Product, Quantity */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr 0.8fr', gap: '10px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Warehouse *
                       </label>
-                      <select
+                      <select className="erp-field"
                         value={createForm.warehouseId}
                         onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
                         style={{
                           width: '100%',
                           height: '34px',
                           padding: '0 8px',
-                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.warehouseId ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2377,10 +2300,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Product *
                       </label>
-                      <select
+                      <select className="erp-field"
                         value={createForm.productId}
                         onChange={(e) => {
                           const prod = productsList.find((p) => String(p.id) === e.target.value);
@@ -2394,9 +2317,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           width: '100%',
                           height: '34px',
                           padding: '0 8px',
-                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.productId ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2413,10 +2334,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Quantity *
                       </label>
-                      <input
+                      <input className="erp-field"
                         type="number"
                         min="1"
                         step="1"
@@ -2427,9 +2348,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           width: '100%',
                           height: '34px',
                           padding: '0 8px',
-                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.82rem',
                           boxSizing: 'border-box',
                           outline: 'none',
                         }}
@@ -2441,19 +2360,17 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   {/* Row 2: Reason & Cost price per unit */}
                   <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? '1.4fr 1fr' : '1fr', gap: '10px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                         Reason *
                       </label>
-                      <select
+                      <select className="erp-field"
                         value={createForm.reason}
                         onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
                         style={{
                           width: '100%',
                           height: '34px',
                           padding: '0 8px',
-                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.82rem',
                           backgroundColor: '#ffffff',
                           color: createForm.reason ? '#0f172a' : '#94a3b8',
                           outline: 'none',
@@ -2484,10 +2401,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
                     {canSeeCost ? (
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
+                        <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
                           Cost price per unit *
                         </label>
-                        <input
+                        <input className="erp-field"
                           type="number"
                           step="0.01"
                           min="0"
@@ -2498,9 +2415,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             width: '100%',
                             height: '34px',
                             padding: '0 8px',
-                            borderRadius: '6px',
                             border: '1px solid #cbd5e1',
-                            fontSize: '0.82rem',
                             boxSizing: 'border-box',
                             outline: 'none',
                           }}
@@ -2532,7 +2447,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '8px',
-                          fontSize: '0.78rem',
+                          fontSize: 'var(--erp-text-small)',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
@@ -2540,7 +2455,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                             style={{
                               backgroundColor: isAddition ? '#dcfce7' : '#fee2e2',
                               color: isAddition ? '#15803d' : '#dc2626',
-                              fontSize: '0.7rem',
+                              fontSize: 'var(--erp-text-badge)',
                               fontWeight: 700,
                               padding: '2px 6px',
                               borderRadius: '4px',
@@ -2579,17 +2494,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
               {/* Actions Footer */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
                     padding: '0 14px',
                     height: '34px',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
                     color: '#64748b',
                     cursor: 'pointer',
                   }}
@@ -2597,63 +2509,52 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   Cancel
                 </button>
                 {!createForm.type ? (
-                  <button
+                  <button className="erp-button"
                     type="button"
                     disabled
                     style={{
                       backgroundColor: '#f1f5f9',
                       color: '#94a3b8',
                       border: 'none',
-                      borderRadius: '6px',
                       padding: '0 16px',
                       height: '34px',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
                       cursor: 'not-allowed',
                     }}
                   >
                     Select Action First
                   </button>
                 ) : createForm.type === 'Addition' ? (
-                  <button
+                  <button className="erp-button"
                     type="submit"
                     disabled={submittingRecord}
                     style={{
                       backgroundColor: '#16a34a',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '6px',
                       padding: '0 18px',
                       height: '34px',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      boxShadow: 'none',
                     }}
                   >
                     <Plus size={15} /> Add Stock
                   </button>
                 ) : (
-                  <button
+                  <button className="erp-button"
                     type="submit"
                     disabled={submittingRecord}
                     style={{
                       backgroundColor: '#dc2626',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '6px',
                       padding: '0 18px',
                       height: '34px',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      boxShadow: 'none',
                     }}
                   >
                     <Minus size={15} /> Reduce Stock
@@ -2690,8 +2591,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   <SlidersHorizontal size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>{viewingRecord.recordNo}</h3>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Date: {viewingRecord.date}</span>
+                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>{viewingRecord.recordNo}</h3>
+                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Date: {viewingRecord.date}</span>
                 </div>
               </div>
               <button
@@ -2703,7 +2604,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.88rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: 'var(--erp-text-button)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b' }}>Adjustment Type</span>
                 <span style={{ fontWeight: 700, color: viewingRecord.type === 'Addition' ? '#16a34a' : '#dc2626' }}>
@@ -2728,7 +2629,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b' }}>Quantity Adjusted</span>
-                <span style={{ fontWeight: 800, fontSize: '1rem', color: viewingRecord.quantity > 0 ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
+                <span style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: viewingRecord.quantity > 0 ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
                   {viewingRecord.quantity > 0 ? `+${viewingRecord.quantity}` : viewingRecord.quantity}
                 </span>
               </div>
@@ -2741,9 +2642,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 onClick={() => setViewingRecord(null)}
-                style={{ backgroundColor: '#0284c7', borderColor: '#0284c7', padding: '7px 20px' }}
+                style={{ borderColor: '#0284c7', padding: '7px 20px' }}
               >
                 Close
               </button>

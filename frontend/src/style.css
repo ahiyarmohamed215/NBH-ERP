@@ -9,12 +9,12 @@
   --font-heading: 'Inter', var(--font-sans);
 
   /* Primary Brand Colors */
-  --primary-50: #eff6ff;
-  --primary-100: #dbeafe;
-  --primary-200: #bfdbfe;
-  --primary-500: #3b82f6;
-  --primary-600: #2563eb;
-  --primary-700: #1d4ed8;
+  --primary-50: #f0f9ff;
+  --primary-100: #e0f2fe;
+  --primary-200: #bae6fd;
+  --primary-500: #0ea5e9;
+  --primary-600: #0284c7;
+  --primary-700: #0369a1;
 
   /* Standard Solid App Canvas */
   --bg-app: #f8fafc;
@@ -69,7 +69,7 @@ body {
   background: var(--bg-app);
   color: var(--slate-800);
   min-height: 100vh;
-  font-size: 0.95rem;
+  font-size: var(--erp-text-nav);
   /* ~15.2px standard readable base size */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -90,19 +90,19 @@ h6 {
 }
 
 h1 {
-  font-size: 1.7rem;
+  font-size: var(--erp-text-title);
 }
 
 h2 {
-  font-size: 1.35rem;
+  font-size: var(--erp-text-dialog);
 }
 
 h3 {
-  font-size: 1.15rem;
+  font-size: var(--erp-text-section);
 }
 
 h4 {
-  font-size: 1.02rem;
+  font-size: var(--erp-text-section);
 }
 
 /* Standard Surfaces (No blurry glass, clean solid borders) */
@@ -147,7 +147,7 @@ h4 {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: var(--erp-text-nav);
   font-weight: 500;
   color: var(--slate-700);
   background: transparent;
@@ -229,7 +229,7 @@ h4 {
   border: 1px solid transparent;
   background: transparent;
   color: var(--slate-600);
-  font-size: 0.9rem;
+  font-size: var(--erp-text-button);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -255,7 +255,7 @@ h4 {
   justify-content: center;
   gap: 8px;
   padding: 8px 16px;
-  font-size: 0.9rem;
+  font-size: var(--erp-text-button);
   font-weight: 600;
   font-family: var(--font-sans);
   border-radius: var(--radius-sm);
@@ -313,14 +313,14 @@ h4 {
 
 .btn-sm {
   padding: 5px 12px;
-  font-size: 0.84rem;
+  font-size: var(--erp-text-body);
   border-radius: 4px;
 }
 
 /* Standard Form Inputs & Controls */
 label {
   display: block;
-  font-size: 0.86rem;
+  font-size: var(--erp-text-field);
   font-weight: 600;
   color: var(--slate-700);
   margin-bottom: 5px;
@@ -336,7 +336,7 @@ textarea {
   border: 1px solid var(--slate-300);
   border-radius: var(--radius-sm);
   font-family: var(--font-sans);
-  font-size: 0.92rem;
+  font-size: var(--erp-text-nav);
   color: var(--slate-900);
 }
 
@@ -344,7 +344,7 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: var(--slate-400);
-  font-size: 0.9rem;
+  font-size: var(--erp-text-button);
 }
 
 .input-glass:focus,
@@ -372,7 +372,7 @@ textarea:disabled {
   gap: 5px;
   padding: 3px 9px;
   border-radius: var(--radius-sm);
-  font-size: 0.78rem;
+  font-size: var(--erp-text-small);
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -421,7 +421,7 @@ textarea:disabled {
   background: var(--slate-50);
   color: var(--slate-600);
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: var(--erp-text-body);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 11px 14px;
@@ -431,7 +431,7 @@ textarea:disabled {
 
 .glass-table td {
   padding: 12px 14px;
-  font-size: 0.92rem;
+  font-size: var(--erp-text-nav);
   color: var(--slate-800);
   border-bottom: 1px solid var(--slate-200);
   vertical-align: middle;
@@ -473,7 +473,7 @@ textarea:disabled {
 /* Tabs */
 .nav-tab {
   padding: 9px 16px;
-  font-size: 0.9rem;
+  font-size: var(--erp-text-button);
   font-weight: 600;
   color: var(--slate-600);
   background: transparent;
@@ -521,7 +521,7 @@ textarea:disabled {
   align-items: center;
   justify-content: center;
   padding: 2px 7px;
-  font-size: 0.72rem;
+  font-size: var(--erp-text-caption);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-weight: 700;
   color: var(--slate-700);
@@ -578,10 +578,10 @@ textarea:disabled {
   gap: 6px;
   padding: 3px 10px;
   background: #eff6ff;
-  color: #1d4ed8;
+  color: var(--erp-accent-hover);
   border: 1px solid #bfdbfe;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: var(--erp-text-caption);
   font-weight: 700;
   letter-spacing: 0.02em;
 }

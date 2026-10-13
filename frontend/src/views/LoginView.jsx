@@ -71,8 +71,8 @@ export default function LoginView({ onSwitchToSignup }) {
           >
             <Package size={26} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', color: '#0f172a', marginBottom: '4px' }}>NBH ERP</h2>
-          <p style={{ color: '#64748b', fontSize: '0.88rem' }}>Sign in to your enterprise account</p>
+          <h2 className="erp-dialog-title" style={{ color: '#0f172a', marginBottom: '4px' }}>NBH ERP</h2>
+          <p style={{ color: '#64748b', fontSize: 'var(--erp-text-button)' }}>Sign in to your enterprise account</p>
         </div>
 
         {sessionExpiredNotice && (
@@ -86,7 +86,7 @@ export default function LoginView({ onSwitchToSignup }) {
               border: '1px solid #fde68a',
               borderRadius: '8px',
               color: '#92400e',
-              fontSize: '0.84rem',
+              fontSize: 'var(--erp-text-body)',
               marginBottom: '20px',
               lineHeight: 1.4,
             }}
@@ -118,14 +118,14 @@ export default function LoginView({ onSwitchToSignup }) {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
               USERNAME OR EMAIL
             </label>
             <div style={{ position: 'relative' }}>
               <User size={16} style={{ position: 'absolute', left: '10px', top: '11px', color: '#94a3b8' }} />
               <input
                 type="text"
-                className="input-glass"
+                className="input-glass erp-field"
                 style={{ paddingLeft: '34px' }}
                 placeholder="Enter your username or email"
                 value={username}
@@ -137,14 +137,14 @@ export default function LoginView({ onSwitchToSignup }) {
           </div>
 
           <div style={{ marginBottom: '22px' }}>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+            <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
               PASSWORD
             </label>
             <div style={{ position: 'relative' }}>
               <Lock size={16} style={{ position: 'absolute', left: '10px', top: '11px', color: '#94a3b8' }} />
               <input
                 type="password"
-                className="input-glass"
+                className="input-glass erp-field"
                 style={{ paddingLeft: '34px' }}
                 placeholder="Enter your password"
                 value={password}
@@ -157,8 +157,8 @@ export default function LoginView({ onSwitchToSignup }) {
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '11px', fontSize: '0.95rem' }}
+            className="btn btn-primary erp-button"
+            style={{ width: '100%', padding: '11px' }}
             disabled={loading}
           >
             {loading ? 'Authenticating...' : (
@@ -174,18 +174,17 @@ export default function LoginView({ onSwitchToSignup }) {
           paddingTop: '20px',
           borderTop: '1px solid #e2e8f0',
           textAlign: 'center',
-          fontSize: '0.88rem',
-          color: '#64748b'
+          fontSize: 'var(--erp-text-button)',
+          color: '#64748b',
         }}>
           Need access?{' '}
-          <button
+          <button className="erp-button"
             type="button"
             onClick={onSwitchToSignup}
             style={{
               background: 'none',
               border: 'none',
               color: '#2563eb',
-              fontWeight: 600,
               cursor: 'pointer',
               textDecoration: 'underline',
               padding: 0,

@@ -1,26 +1,26 @@
 .inventory-theme{font-family:var(--font-sans,'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);color:#334155;min-width:0}
 .inventory-theme .inventory-toolbar,.inventory-theme .master-toolbar{border:1px solid #e2e8f0!important;border-radius:8px!important;background:#fff!important;padding:10px 16px!important;max-width:100%;min-width:0}
-.inventory-theme :is(.inventory-toolbar,.master-toolbar) input{height:38px!important;border-color:#cbd5e1!important;border-radius:6px!important;font-family:inherit;font-size:.88rem!important;color:#0f172a!important}
-.inventory-theme :is(.inventory-toolbar,.master-toolbar) select{height:38px!important;border-color:#cbd5e1!important;border-radius:6px!important;font-family:inherit;font-size:.86rem!important;font-weight:500!important;color:#334155!important}
-.inventory-theme :is(.inventory-toolbar,.master-toolbar) option{font-family:inherit;font-size:.86rem;font-weight:500;color:#334155}
+.inventory-theme :is(.inventory-toolbar,.master-toolbar) input{height:38px!important;border-color:#cbd5e1!important;border-radius:6px!important;font-family:inherit;font-size:var(--erp-text-button)!important;color:#0f172a!important}
+.inventory-theme :is(.inventory-toolbar,.master-toolbar) select{height:38px!important;border-color:#cbd5e1!important;border-radius:6px!important;font-family:inherit;font-size:var(--erp-text-field)!important;font-weight:500!important;color:#334155!important}
+.inventory-theme :is(.inventory-toolbar,.master-toolbar) option{font-family:inherit;font-size:var(--erp-text-field);font-weight:500;color:#334155}
 .inventory-theme :is(.inventory-toolbar,.master-toolbar) button:not([title^="Clear search"]){height:38px!important;border-radius:6px!important;font-family:inherit}
 .inventory-theme :is(.inventory-toolbar,.master-toolbar) button:is([title^="Export"],[title^="Print"],[title^="Refresh"]){width:38px!important;padding:0!important;border:1px solid #cbd5e1!important;background:#fff!important;color:#334155!important;display:inline-flex;align-items:center;justify-content:center}
 .inventory-theme :is(.inventory-toolbar,.master-toolbar) button:is([title^="Export"],[title^="Print"],[title^="Refresh"]):hover{background:#f8fafc!important;border-color:#94a3b8!important;color:#0f172a!important}
 .inventory-theme :is(.inventory-toolbar,.master-toolbar) button:is([title^="Export"],[title^="Print"],[title^="Refresh"]) svg{width:15px!important;height:15px!important}
 .inventory-theme .inventory-toolbar [title^="Clear search"]{top:10px!important}
-.inventory-theme table{width:100%;border-collapse:collapse;font-size:.84rem}
-.inventory-theme table thead th{padding:12px 14px!important;font-size:.74rem!important;font-weight:600!important;letter-spacing:.04em;text-transform:uppercase;color:#475569!important;background:#fafbfc!important;border-bottom:1px solid #e2e8f0!important}
+.inventory-theme table{width:100%;border-collapse:collapse;font-size:var(--erp-text-body)}
+.inventory-theme table thead th{padding:12px 14px!important;font-size:var(--erp-text-caption)!important;font-weight:600!important;letter-spacing:.04em;text-transform:uppercase;color:#475569!important;background:#fafbfc!important;border-bottom:1px solid #e2e8f0!important}
 .inventory-theme table tbody td{padding:12px 14px!important;border-bottom:1px solid #f1f5f9}
 .inventory-theme table tbody tr:hover{background:#f8fafc!important}
 .inventory-theme table button:is([title^="Edit"],[title="View Details"],[title^="View Only"]){width:30px!important;height:30px!important;padding:0!important;border:1px solid #bae6fd!important;border-radius:6px!important;background:#fff!important;color:#0284c7!important;display:inline-flex;align-items:center;justify-content:center}
 .inventory-theme table button:is([title^="Edit"],[title="View Details"],[title^="View Only"]):hover{background:#f0f9ff!important;border-color:#bae6fd!important;color:#0284c7!important}
 .inventory-theme table button:is([title^="Edit"],[title="View Details"],[title^="View Only"]) svg{width:13px!important;height:13px!important}
-.inventory-theme button[title^="Status:"]{display:inline-flex!important;align-items:center;gap:6px!important;padding:6px 10px!important;border:0!important;border-radius:5px!important;font-family:inherit;font-size:.67rem!important;font-weight:600!important;letter-spacing:.035em;line-height:1.4;text-transform:uppercase;white-space:nowrap}
+.inventory-theme button[title^="Status:"]{display:inline-flex!important;align-items:center;gap:6px!important;padding:6px 10px!important;border:0!important;border-radius:5px!important;font-family:inherit;font-size:var(--erp-text-badge)!important;font-weight:600!important;letter-spacing:.035em;line-height:1.4;text-transform:uppercase;white-space:nowrap}
 .inventory-theme button[title^="Status: Active"]{background:#dcfce7!important;color:#15803d!important}
 .inventory-theme button[title^="Status: Inactive"]{background:#fff1f2!important;color:#be123c!important}
 .inventory-theme button[title^="Status:"]>span{width:5px!important;height:5px!important;background:currentColor!important;flex-shrink:0}
 .inventory-theme .badge{border-radius:5px!important}
-.inventory-theme .btn{border-radius:6px;font-family:inherit;font-size:.84rem}
+.inventory-theme .btn{border-radius:6px;font-family:inherit;font-size:var(--erp-text-body)}
 .inventory-theme .btn-primary{background:#0284c7;color:#fff}
 .inventory-theme .modal-backdrop{padding:12px!important}
 .inventory-theme .modal-backdrop>div{border:1px solid #e2e8f0;border-radius:16px!important;max-height:calc(100dvh - 24px)!important}
@@ -36,12 +36,12 @@
 .allocation-list-scroll{flex:1;min-height:0;overflow:auto}
 .allocation-list-table table{min-width:740px;text-align:left}
 .allocation-list-table th{position:sticky;top:0;z-index:1;white-space:nowrap}
-.allocation-list-table td{color:#334155;font-size:.84rem}
+.allocation-list-table td{color:#334155;font-size:var(--erp-text-body)}
 .allocation-list-table tbody tr{cursor:pointer;background:#fff;transition:background-color .1s ease}
 .allocation-list-code{display:block;font-family:monospace;font-weight:700;color:#0284c7;margin-bottom:3px}
-.allocation-list-name{display:block;font-size:.85rem;font-weight:600;color:#0f172a;overflow-wrap:anywhere}
-.allocation-list-secondary{display:block;margin-top:3px;font-size:.74rem;color:#64748b}
-.allocation-list-quantity{font-variant-numeric:tabular-nums;white-space:nowrap}.allocation-list-quantity small{font-size:.75rem;color:#64748b}
+.allocation-list-name{display:block;font-size:var(--erp-text-field);font-weight:600;color:#0f172a;overflow-wrap:anywhere}
+.allocation-list-secondary{display:block;margin-top:3px;font-size:var(--erp-text-caption);color:#64748b}
+.allocation-list-quantity{font-variant-numeric:tabular-nums;white-space:nowrap}.allocation-list-quantity small{font-size:var(--erp-text-caption);color:#64748b}
 .allocation-list-stock-empty{color:#be123c}
 .allocation-list-actions{text-align:right}.allocation-list-row-actions{display:inline-flex;gap:6px;justify-content:flex-end}
 .allocation-list-row-actions button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #bae6fd;border-radius:6px;background:#fff;color:#0284c7;cursor:pointer}
@@ -50,6 +50,6 @@
 
 .master-directory-table{text-align:left;min-width:650px}.master-directory-products{min-width:1100px}
 .master-directory-table th{position:sticky;top:0;z-index:1;white-space:nowrap}
-.master-directory-table td{font-size:.84rem;color:#334155;max-width:260px;overflow-wrap:anywhere}
+.master-directory-table td{font-size:var(--erp-text-body);color:#334155;max-width:260px;overflow-wrap:anywhere}
 .master-directory-table tbody tr{cursor:pointer;transition:background-color .1s ease}
 .inventory-theme .master-directory-empty{text-align:center;padding:48px 20px!important;color:#64748b;cursor:default}

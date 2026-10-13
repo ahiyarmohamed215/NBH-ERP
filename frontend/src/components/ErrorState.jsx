@@ -117,10 +117,8 @@ export default function ErrorState({
         <Icon size={isCompact ? 24 : 32} />
       </div>
 
-      <h2
+      <h2 className="erp-dialog-title"
         style={{
-          fontSize: isCompact ? '1.1rem' : '1.35rem',
-          fontWeight: 700,
           color: '#0f172a',
           margin: '0 0 8px 0',
         }}
@@ -155,7 +153,7 @@ export default function ErrorState({
               color: '#ffffff',
               border: 'none',
               borderRadius: '7px',
-              fontSize: '0.88rem',
+              fontSize: 'var(--erp-text-button)',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'background-color 0.15s',
@@ -182,7 +180,7 @@ export default function ErrorState({
               color: '#ffffff',
               border: 'none',
               borderRadius: '7px',
-              fontSize: '0.88rem',
+              fontSize: 'var(--erp-text-button)',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'background-color 0.15s',
@@ -197,7 +195,7 @@ export default function ErrorState({
 
         {/* Return to Dashboard fallback button */}
         {onNavigateHome && type !== 'session-expired' && (
-          <button
+          <button className="erp-button"
             type="button"
             onClick={onNavigateHome}
             style={{
@@ -208,9 +206,6 @@ export default function ErrorState({
               backgroundColor: '#ffffff',
               color: '#475569',
               border: '1px solid #cbd5e1',
-              borderRadius: '7px',
-              fontSize: '0.88rem',
-              fontWeight: 500,
               cursor: 'pointer',
               transition: 'background-color 0.15s, border-color 0.15s',
             }}

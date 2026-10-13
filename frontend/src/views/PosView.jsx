@@ -809,7 +809,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   return (
     <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '100vh', boxSizing: 'border-box' }}>
-      
+
       {/* ─────────────────────────────────────────────────────────────
           TOP BAR: "POS" Brand + 3 Motivation Circles in Right Above Corner + Exit
          ───────────────────────────────────────────────────────────── */}
@@ -842,17 +842,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           >
             <ShoppingCart size={17} />
           </div>
-          <span style={{ fontWeight: 900, fontSize: '1.25rem', color: '#0f172a', letterSpacing: '0.04em' }}>
+          <span style={{ fontWeight: 900, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', letterSpacing: '0.04em' }}>
             POS
           </span>
         </div>
 
         {/* Right Above Corner: 3 Staff Motivation Circles + ONLY ONE Exit Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          
+
           {/* Motivation Circles Group - Minimalist & Displays Names */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            
+
             {/* CIRCLE 1: Staff Name / My Total */}
             <div
               onClick={() => setActiveCircleModal('my')}
@@ -890,17 +890,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--erp-text-caption)',
                   flexShrink: 0,
                 }}
               >
                 {((user?.fullName || user?.username || 'M').charAt(0)).toUpperCase()}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569' }}>
                   {user?.fullName || user?.username || 'Cashier'}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
                   {myBillsCount} bills • Rs. {myTotalAmount >= 1000 ? `${(myTotalAmount / 1000).toFixed(1)}k` : myTotalAmount.toFixed(0)}
                 </span>
               </div>
@@ -943,17 +943,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--erp-text-caption)',
                   flexShrink: 0,
                 }}
               >
                 <Trophy size={13} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#92400e' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#92400e' }}>
                   {topCashierName} (Max)
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
                   {maxBillsCount} bills • Rs. {maxSalesAmount >= 1000 ? `${(maxSalesAmount / 1000).toFixed(1)}k` : maxSalesAmount.toFixed(0)}
                 </span>
               </div>
@@ -999,17 +999,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: '0.72rem',
+                  fontSize: 'var(--erp-text-caption)',
                   flexShrink: 0,
                 }}
               >
                 <Users size={13} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#5b21b6' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#5b21b6' }}>
                   All Staff ({staffCount})
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>
+                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
                   {totalTeamBills} bills • Rs. {totalTeamAmount >= 1000 ? `${(totalTeamAmount / 1000).toFixed(1)}k` : totalTeamAmount.toFixed(0)}
                 </span>
               </div>
@@ -1023,7 +1023,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           {onExitPos && (
             <button
               type="button"
-              className="btn btn-glass btn-sm"
+              className="btn btn-glass btn-sm erp-button"
               onClick={onExitPos}
               style={{
                 height: '32px',
@@ -1031,8 +1031,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 gap: '5px',
                 color: '#dc2626',
                 borderColor: '#fca5a5',
-                fontWeight: 800,
-                fontSize: '0.8rem',
               }}
               title="Exit POS Mode (Esc)"
             >
@@ -1064,7 +1062,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               <User size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#2563eb' }} />
               <input
                 type="text"
-                className="input-glass"
+                className="input-glass erp-field"
                 placeholder="Search customer by name, code or phone..."
                 value={
                   showCustomerSearch
@@ -1086,7 +1084,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   fontWeight: 600,
                   width: '100%',
                   height: '34px',
-                  fontSize: '0.84rem',
                 }}
               />
             </div>
@@ -1094,7 +1091,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             {showCustomerSearch ? (
               <button
                 type="button"
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setShowCustomerSearch(false)}
                 style={{ height: '34px', padding: '0 8px' }}
                 title="Cancel search"
@@ -1104,13 +1101,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             ) : (
               <button
                 type="button"
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => {
                   setShowCustomerSearch(true);
                   setCustomerSearchQuery('');
                 }}
                 title="Change customer"
-                style={{ height: '34px', padding: '0 10px', gap: '4px', fontSize: '0.76rem' }}
+                style={{ height: '34px', padding: '0 10px', gap: '4px' }}
               >
                 <RefreshCw size={11} /> Change
               </button>
@@ -1136,7 +1133,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 }}
               >
                 {filteredCustomers.length === 0 ? (
-                  <div style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                  <div style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
                     No matching customer found
                   </div>
                 ) : (
@@ -1157,7 +1154,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         cursor: 'pointer',
                         borderBottom: '1px solid rgba(226, 232, 240, 0.6)',
                         background: c.id === selectedCustomerId ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                        fontSize: '0.82rem',
+                        fontSize: 'var(--erp-text-body)',
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
                       onMouseLeave={(e) =>
@@ -1166,12 +1163,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     >
                       <div>
                         <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name}</div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                           {c.customerCode || c.code} • {c.phone || '-'}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, color: Number(c.currentBalance) > 0 ? '#ef4444' : '#10b981', fontSize: '0.8rem' }}>
+                        <div style={{ fontWeight: 700, color: Number(c.currentBalance) > 0 ? '#ef4444' : '#10b981', fontSize: 'var(--erp-text-small)' }}>
                           Rs. {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </div>
@@ -1183,7 +1180,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           </div>
 
           {selectedCustomer && (
-            <div style={{ fontSize: '0.78rem', color: '#64748b', display: 'flex', gap: '12px' }}>
+            <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', display: 'flex', gap: '12px' }}>
               <span>Phone: <strong style={{ color: '#334155' }}>{selectedCustomer.phone || '-'}</strong></span>
               {selectedCustomer.city && <span>City: <strong style={{ color: '#334155' }}>{selectedCustomer.city}</strong></span>}
             </div>
@@ -1204,7 +1201,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               borderRadius: '8px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
               <span style={{ color: '#64748b', fontWeight: 600 }}>Outstanding Amount:</span>
               <strong style={{ color: custOutstanding > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
                 Rs. {custOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1213,7 +1210,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <span style={{ color: '#cbd5e1' }}>•</span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
               <span style={{ color: '#64748b', fontWeight: 600 }}>Credit Limit:</span>
               <strong style={{ color: '#334155', fontWeight: 700 }}>
                 Rs. {custCreditLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1222,7 +1219,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <span style={{ color: '#cbd5e1' }}>•</span>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
               <span style={{ color: '#64748b', fontWeight: 600 }}>Available Credit:</span>
               <strong style={{ color: '#2563eb', fontWeight: 700 }}>
                 Rs. {custAvailableCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1233,7 +1230,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <span
               style={{
-                fontSize: '0.68rem',
+                fontSize: 'var(--erp-text-badge)',
                 padding: '2px 7px',
                 borderRadius: '4px',
                 fontWeight: 700,
@@ -1306,7 +1303,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span
                         style={{
-                          fontSize: '0.78rem',
+                          fontSize: 'var(--erp-text-small)',
                           fontWeight: 800,
                           padding: '2px 8px',
                           borderRadius: '6px',
@@ -1316,32 +1313,29 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       >
                         {m.currentRangeName}
                       </span>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                      <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 700, color: '#0f172a' }}>
                         {m.customerName}
                       </span>
                       {m.assignedStaffName && m.assignedStaffName !== 'Unassigned' && (
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b' }}>
                           (Rep: {m.assignedStaffName})
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
+                    <div style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', marginTop: '1px' }}>
                       {m.monthLabel} qualifying net spend • Resets monthly on 1st
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
+                  <button className="erp-button"
                     type="button"
                     onClick={handleOpenMonthlyRangeModal}
                     style={{
                       padding: '4px 9px',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
                       background: '#ffffff',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
                       color: '#334155',
                       cursor: 'pointer',
                       display: 'inline-flex',
@@ -1354,7 +1348,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   </button>
 
                   {discPct > 0 && (
-                    <button
+                    <button className="erp-button"
                       type="button"
                       onClick={() => {
                         const cartSubtotal = subtotal || 0;
@@ -1368,17 +1362,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       }}
                       style={{
                         padding: '4px 10px',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
                         background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                         border: 'none',
-                        borderRadius: '6px',
                         color: '#ffffff',
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px',
-                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)',
                       }}
                       title="Click to apply promotional target discount to this bill"
                     >
@@ -1390,7 +1380,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* Progress & Milestone Row */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: '0.76rem', color: '#334155' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#334155' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Monthly Purchases: </span>
                   <strong style={{ fontWeight: 800, color: '#0f172a' }}>
                     Rs. {qualifyingPurchases.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1406,7 +1396,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 </div>
 
                 {!isHighest ? (
-                  <div style={{ fontSize: '0.74rem', color: '#475569' }}>
+                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#475569' }}>
                     Remaining to <strong>{m.nextRangeName}</strong>:{' '}
                     <strong style={{ color: '#dc2626' }}>
                       Rs. {remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1415,7 +1405,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 ) : (
                   <div
                     style={{
-                      fontSize: '0.72rem',
+                      fontSize: 'var(--erp-text-caption)',
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: '6px',
@@ -1476,7 +1466,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               {cartAmt > 0 && !isHighest && (
                 <div
                   style={{
-                    fontSize: '0.72rem',
+                    fontSize: 'var(--erp-text-caption)',
                     color: willPromote ? '#0e7490' : '#0369a1',
                     background: willPromote ? '#ecfeff' : '#f0f9ff',
                     padding: '6px 10px',
@@ -1523,8 +1513,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             <input
               ref={searchInputRef}
               type="text"
-              className="input-glass"
-              style={{ paddingLeft: '38px', width: '100%', height: '36px', fontSize: '0.9rem' }}
+              className="input-glass erp-field"
+              style={{ paddingLeft: '38px', width: '100%', height: '36px' }}
               placeholder="Search product code (SKU) or product name... (Press F2 to focus)"
               value={searchQuery}
               onChange={(e) => handleProductSearch(e.target.value)}
@@ -1588,38 +1578,38 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: isOutOfStock ? '#94a3b8' : '#0f172a', fontSize: '0.86rem' }}>
+                        <span style={{ fontWeight: 700, color: isOutOfStock ? '#94a3b8' : '#0f172a', fontSize: 'var(--erp-text-field)' }}>
                           {p.name}
                         </span>
                         {isOutOfStock ? (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
+                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
                             Out of Stock (0)
                           </span>
                         ) : isLowStock ? (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
                             Low Stock ({totalStock})
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
                             In Stock ({totalStock})
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'flex', gap: '8px', marginTop: '2px' }}>
                         <span>Code: <strong>{p.sku}</strong></span>
                         <span>Unit: <strong>{p.unitOfMeasure || 'PCS'}</strong></span>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, color: isOutOfStock ? '#94a3b8' : '#2563eb', fontSize: '0.92rem' }}>
+                      <div style={{ fontWeight: 800, color: isOutOfStock ? '#94a3b8' : '#2563eb', fontSize: 'var(--erp-text-nav)' }}>
                         Rs. {Number(p.sellingPrice || 0).toFixed(2)}
                       </div>
                       {isOutOfStock ? (
-                        <span style={{ fontSize: '0.66rem', color: '#dc2626', fontWeight: 700 }}>
+                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#dc2626', fontWeight: 700 }}>
                           Not Selectable (No Stock)
                         </span>
                       ) : (
-                        <span className={`badge ${isLowStock ? 'badge-warning' : 'badge-primary'}`} style={{ fontSize: '0.66rem', padding: '2px 6px' }}>
+                        <span className={`badge ${isLowStock ? 'badge-warning' : 'badge-primary'}`} style={{ fontSize: 'var(--erp-text-badge)', padding: '2px 6px' }}>
                           Configure & Add +
                         </span>
                       )}
@@ -1645,17 +1635,17 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Package size={17} color="#2563eb" />
-                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 800, color: '#0f172a' }}>
                   {stagedItem.product.name}
                 </span>
-                <span className="badge badge-outline" style={{ fontSize: '0.7rem' }}>
+                <span className="badge badge-outline" style={{ fontSize: 'var(--erp-text-badge)' }}>
                   Code: {stagedItem.product.sku}
                 </span>
               </div>
 
               <button
                 type="button"
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setStagedItem(null)}
                 style={{ color: '#64748b', padding: '2px 7px' }}
               >
@@ -1686,7 +1676,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                     fontWeight: 800,
                     color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#991b1b' : '#166534',
                   }}>
@@ -1695,7 +1685,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       : 'Inventory Allocation Active'}
                   </div>
                   <div style={{
-                    fontSize: '0.74rem',
+                    fontSize: 'var(--erp-text-caption)',
                     color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#b91c1c' : '#15803d',
                     marginTop: '1px',
                   }}>
@@ -1708,7 +1698,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   padding: '4px 10px',
                   borderRadius: '6px',
                   fontWeight: 800,
-                  fontSize: '0.78rem',
+                  fontSize: 'var(--erp-text-small)',
                   background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fee2e2' : '#dcfce7',
                   color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#dc2626' : '#15803d',
                   border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#f87171' : '#4ade80'}`,
@@ -1729,12 +1719,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             >
               {/* 1. Auto-Selected Assigned/Stocked Warehouse */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
                   WAREHOUSE (ASSIGNED / IN STOCK)
                 </label>
                 <select
-                  className="input-glass"
-                  style={{ width: '100%', height: '34px', fontWeight: 600, fontSize: '0.8rem' }}
+                  className="input-glass erp-field"
+                  style={{ width: '100%', height: '34px', fontWeight: 600 }}
                   value={stagedItem.warehouseId || ''}
                   onChange={(e) => handleStagedWarehouseChange(e.target.value)}
                 >
@@ -1754,7 +1744,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* 2. Real Quantity */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
                   REAL QUANTITY (IN STOCK)
                 </label>
                 <div
@@ -1768,7 +1758,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     borderRadius: '6px',
                     fontWeight: 800,
                     color: stagedItem.realQuantity > 0 ? '#15803d' : '#b91c1c',
-                    fontSize: '0.82rem',
+                    fontSize: 'var(--erp-text-body)',
                   }}
                 >
                   {stagedItem.quotaInfo?.quotaRestricted
@@ -1779,7 +1769,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* 3. Non-Editable Sales Price (Fixed from Inventory / GRN) */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
                   SALES PRICE (LOCKED - INVENTORY)
                 </label>
                 <div
@@ -1794,12 +1784,12 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     borderRadius: '6px',
                     fontWeight: 800,
                     color: '#0f172a',
-                    fontSize: '0.86rem',
+                    fontSize: 'var(--erp-text-field)',
                   }}
                   title="Sales price is fixed from Inventory / GRN and cannot be edited"
                 >
                   <span>Rs. {Number(stagedItem.salesPrice || 0).toFixed(2)}</span>
-                  <span style={{ fontSize: '0.65rem', color: '#475569', fontWeight: 700, background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: 'var(--erp-text-badge)', color: '#475569', fontWeight: 700, background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
                     Fixed
                   </span>
                 </div>
@@ -1807,13 +1797,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* 4. Sales Quantity */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
                   SALES QTY
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                   <button
                     type="button"
-                    className="btn btn-glass btn-sm"
+                    className="btn btn-glass btn-sm erp-button"
                     style={{ height: '34px', width: '32px', padding: 0 }}
                     onClick={() => handleStagedQtyChange(stagedItem.salesQty - 1)}
                   >
@@ -1822,14 +1812,14 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   <input
                     type="number"
                     min="1"
-                    className="input-glass"
-                    style={{ width: '100%', height: '34px', textAlign: 'center', fontWeight: 700, fontSize: '0.86rem' }}
+                    className="input-glass erp-field"
+                    style={{ width: '100%', height: '34px', textAlign: 'center', fontWeight: 700 }}
                     value={stagedItem.salesQty}
                     onChange={(e) => handleStagedQtyChange(e.target.value)}
                   />
                   <button
                     type="button"
-                    className="btn btn-glass btn-sm"
+                    className="btn btn-glass btn-sm erp-button"
                     style={{ height: '34px', width: '32px', padding: 0 }}
                     onClick={() => handleStagedQtyChange(stagedItem.salesQty + 1)}
                   >
@@ -1840,7 +1830,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* 5. Discount in % or Amount */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
                   DISCOUNT (% OR RS.)
                 </label>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -1850,13 +1840,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       step="0.5"
                       min="0"
                       max="100"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       placeholder="%"
-                      style={{ width: '100%', height: '34px', paddingRight: '18px', fontSize: '0.8rem' }}
+                      style={{ width: '100%', height: '34px', paddingRight: '18px' }}
                       value={stagedItem.discountRate || ''}
                       onChange={(e) => handleStagedDiscountRateChange(e.target.value)}
                     />
-                    <span style={{ position: 'absolute', right: '5px', top: '7px', fontSize: '0.7rem', color: '#94a3b8' }}>
+                    <span style={{ position: 'absolute', right: '5px', top: '7px', fontSize: 'var(--erp-text-badge)', color: '#94a3b8' }}>
                       %
                     </span>
                   </div>
@@ -1865,9 +1855,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       type="number"
                       step="0.01"
                       min="0"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       placeholder="Rs."
-                      style={{ width: '100%', height: '34px', fontSize: '0.8rem' }}
+                      style={{ width: '100%', height: '34px' }}
                       value={stagedItem.discountAmount || ''}
                       onChange={(e) => handleStagedDiscountAmountChange(e.target.value)}
                     />
@@ -1877,10 +1867,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               {/* 6. Product Sub Total & Add to Table */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>
+                <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 800, color: '#64748b' }}>
                   SUB TOTAL
                 </div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
                   Rs. {stagedItem.subtotal.toFixed(2)}
                 </div>
                 <button
@@ -1888,7 +1878,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   className={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? "btn btn-secondary" : "btn btn-primary"}
                   onClick={handleAddStagedToTable}
                   disabled={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0}
-                  style={{ height: '34px', width: '100%', gap: '5px', fontWeight: 700, fontSize: '0.82rem' }}
+                  style={{ height: '34px', width: '100%', gap: '5px', fontWeight: 700, fontSize: 'var(--erp-text-body)' }}
                 >
                   {stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
                     <>
@@ -1910,18 +1900,18 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           SECTION 4: SALES ITEMS TABLE & SINGLE ACTION (HOLD BILL)
          ───────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-start', flex: 1 }}>
-        
+
         {/* Left Side: Main Sales Table */}
         <div className="glass-card" style={{ flex: '1 1 680px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h3 style={{ fontSize: '1rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+              <h3 style={{ fontSize: 'var(--erp-text-nav)', color: '#0f172a', margin: 0, fontWeight: 700 }}>
                 Sales Order Items ({cart.length})
               </h3>
               {uniqueWarehouseIds.length > 1 && (
                 <span
                   style={{
-                    fontSize: '0.7rem',
+                    fontSize: 'var(--erp-text-badge)',
                     fontWeight: 700,
                     padding: '2px 8px',
                     borderRadius: '20px',
@@ -1938,38 +1928,38 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
           {/* Sales Items Table Styled Exactly Like Customer Table */}
           <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-            <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
+                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0', width: '110px' }}>
                     WAREHOUSE
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0', width: '120px' }}>
+                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0', width: '120px' }}>
                     PRODUCT CODE
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #e2e8f0' }}>
+                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0' }}>
                     PRODUCT NAME
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
                     PRICE
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
+                  <th className="erp-table-heading" style={{ textAlign: 'center', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
                     QTY
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
                     DISCOUNT
                   </th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
                     AMOUNT
                   </th>
-                  <th style={{ padding: '12px 12px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center', width: '40px', borderBottom: '1px solid #e2e8f0' }}>
+                  <th className="erp-table-heading" style={{ textAlign: 'center', width: '40px', borderBottom: '1px solid #e2e8f0' }}>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {cart.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', color: '#64748b', padding: '48px 20px', fontSize: '0.875rem' }}>
+                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                       <ShoppingCart size={32} style={{ opacity: 0.3, marginBottom: '6px' }} />
                       <br />
                       No products added yet. Search and configure products above to populate the sales table.
@@ -1983,22 +1973,22 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td style={{ padding: '12px 14px' }}>
+                      <td className="erp-table-cell">
                         <span
                           className="badge badge-primary"
-                          style={{ fontSize: '0.72rem', padding: '3px 8px', fontWeight: 700, letterSpacing: '0.04em' }}
+                          style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', fontWeight: 700, letterSpacing: '0.04em' }}
                         >
                           {item.warehouseCode}
                         </span>
                       </td>
 
-                      <td style={{ padding: '12px 14px', fontWeight: 600, color: '#2563eb', fontSize: '0.84rem' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#2563eb' }}>
                         {item.sku}
                       </td>
 
-                      <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem', lineHeight: '1.25' }}>{item.name}</div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <td className="erp-table-cell">
+                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-field)', lineHeight: '1.25' }}>{item.name}</div>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>Unit: {item.unitOfMeasure || 'PCS'}</span>
                           {item.quotaInfo?.quotaRestricted && (
                             <span
@@ -2008,7 +1998,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                                 border: '1px solid #a7f3d0',
                                 borderRadius: '4px',
                                 padding: '1px 5px',
-                                fontSize: '0.68rem',
+                                fontSize: 'var(--erp-text-badge)',
                                 fontWeight: 700,
                               }}
                               title={`Allocation: ${item.quotaInfo.remainingQuantity} left of ${item.quotaInfo.allocatedQuantity} allocated`}
@@ -2019,15 +2009,15 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: '#334155', fontSize: '0.84rem' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#334155' }}>
                         Rs. {item.unitPrice.toFixed(2)}
                       </td>
 
-                      <td style={{ padding: '12px 14px' }}>
+                      <td className="erp-table-cell">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                           <button
                             type="button"
-                            className="btn btn-glass btn-sm"
+                            className="btn btn-glass btn-sm erp-button"
                             style={{ padding: '2px 5px', height: '24px', width: '24px' }}
                             onClick={() => updateTableItemQty(item.id, -1)}
                           >
@@ -2035,14 +2025,14 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           </button>
                           <input
                             type="number"
-                            className="input-glass"
-                            style={{ width: '44px', height: '24px', textAlign: 'center', padding: '2px', fontSize: '0.82rem', fontWeight: 700 }}
+                            className="input-glass erp-field"
+                            style={{ width: '44px', height: '24px', textAlign: 'center', padding: '2px', fontWeight: 700 }}
                             value={item.quantity}
                             onChange={(e) => setTableItemQtyDirect(item.id, e.target.value)}
                           />
                           <button
                             type="button"
-                            className="btn btn-glass btn-sm"
+                            className="btn btn-glass btn-sm erp-button"
                             style={{ padding: '2px 5px', height: '24px', width: '24px' }}
                             onClick={() => updateTableItemQty(item.id, 1)}
                           >
@@ -2051,22 +2041,22 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 14px', textAlign: 'right', color: item.discountAmount > 0 ? '#ef4444' : '#64748b', fontSize: '0.84rem' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', color: item.discountAmount > 0 ? '#ef4444' : '#64748b' }}>
                         {item.discountAmount > 0 ? (
                           <>
                             -Rs. {item.discountAmount.toFixed(2)}
-                            {item.discountRate > 0 && <span style={{ fontSize: '0.68rem', display: 'block', color: '#dc2626' }}>({item.discountRate}%)</span>}
+                            {item.discountRate > 0 && <span style={{ fontSize: 'var(--erp-text-badge)', display: 'block', color: '#dc2626' }}>({item.discountRate}%)</span>}
                           </>
                         ) : (
                           '-'
                         )}
                       </td>
 
-                      <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                         Rs. {item.total.toFixed(2)}
                       </td>
 
-                      <td style={{ padding: '12px 12px', textAlign: 'center' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <button
                           type="button"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -2087,22 +2077,22 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
         {/* Right Side: Bill Summary & ONLY ONE BUTTON: "Hold Bill" */}
         <div style={{ flex: '1 1 290px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="glass-card" style={{ padding: '18px' }}>
-            <h3 style={{ fontSize: '1.05rem', color: '#0f172a', margin: '0 0 12px 0', fontWeight: 700 }}>
+            <h3 style={{ fontSize: 'var(--erp-text-section)', color: '#0f172a', margin: '0 0 12px 0', fontWeight: 700 }}>
               Order Summary
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: '0.84rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: 'var(--erp-text-body)' }}>
                 <span>Subtotal ({cart.length} items):</span>
                 <span style={{ fontWeight: 700 }}>Rs. {subtotal.toFixed(2)}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#475569', fontSize: '0.82rem' }}>Bill Discount (Rs.):</span>
+                <span style={{ color: '#475569', fontSize: 'var(--erp-text-body)' }}>Bill Discount (Rs.):</span>
                 <input
                   type="number"
-                  className="input-glass"
-                  style={{ width: '85px', textAlign: 'right', padding: '3px 6px', fontWeight: 600, fontSize: '0.82rem' }}
+                  className="input-glass erp-field"
+                  style={{ width: '85px', textAlign: 'right', padding: '3px 6px', fontWeight: 600 }}
                   value={discountAmount}
                   onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
                 />
@@ -2111,8 +2101,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               <div style={{ height: '1px', background: 'rgba(226, 232, 240, 0.8)', margin: '2px 0' }} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>NET TOTAL:</span>
-                <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
+                <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 800, color: '#0f172a' }}>NET TOTAL:</span>
+                <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
                   Rs. {netTotal.toFixed(2)}
                 </span>
               </div>
@@ -2127,7 +2117,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
                   marginBottom: '14px',
-                  fontSize: '0.76rem',
+                  fontSize: 'var(--erp-text-caption)',
                 }}
               >
                 <div style={{ fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
@@ -2145,17 +2135,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             {/* ONLY ONE ACTION BUTTON: "Hold Bill" (No create invoice button needed) */}
             <div>
               <button
-                className="btn btn-primary"
+                className="btn btn-primary erp-button erp-button-primary"
                 style={{
                   width: '100%',
                   padding: '13px',
-                  fontSize: '1rem',
-                  borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  fontWeight: 800,
-                  backgroundColor: '#2563eb',
                 }}
                 disabled={cart.length === 0}
                 onClick={handleHoldCart}
@@ -2176,7 +2162,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       {/* ─────────────────────────────────────────────────────────────
           STAFF MOTIVATION POPUPS (3 CIRCLES MODALS)
          ───────────────────────────────────────────────────────────── */}
-      
+
       {/* POPUP 1: My Billing Details Modal */}
       {activeCircleModal === 'my' && (
         <div
@@ -2205,10 +2191,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   <UserCheck size={20} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0, fontWeight: 800 }}>
+                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
                     My Billing Performance
                   </h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                     Cashier: <strong>{user?.fullName || user?.username}</strong>
                   </p>
                 </div>
@@ -2225,82 +2211,82 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             {/* KPI Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '18px' }}>
               <div style={{ padding: '14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e40af' }}>BILLS COMPLETED</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#1d4ed8', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#1e40af' }}>BILLS COMPLETED</div>
+                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#1d4ed8', fontFamily: 'var(--font-heading)' }}>
                   {myBillsCount}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#60a5fa' }}>Transactions settled</div>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#60a5fa' }}>Transactions settled</div>
               </div>
 
               <div style={{ padding: '14px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#166534' }}>TOTAL AMOUNT BILLED</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#15803d', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#166534' }}>TOTAL AMOUNT BILLED</div>
+                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#15803d', fontFamily: 'var(--font-heading)' }}>
                   Rs. {myTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#4ade80' }}>Revenue generated</div>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#4ade80' }}>Revenue generated</div>
               </div>
 
               <div style={{ padding: '14px', background: '#faf5ff', borderRadius: '10px', border: '1px solid #e9d5ff' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6b21a8' }}>AVERAGE BILL VALUE</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#7e22ce', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#6b21a8' }}>AVERAGE BILL VALUE</div>
+                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#7e22ce', fontFamily: 'var(--font-heading)' }}>
                   Rs. {myAvgBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#c084fc' }}>Per sale transaction</div>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#c084fc' }}>Per sale transaction</div>
               </div>
             </div>
 
             {/* My Bills List */}
             <div style={{ marginBottom: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#334155' }}>
+                <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 800, color: '#334155' }}>
                   My Bills ({myInvoices.length})
                 </span>
-                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                   Click any bill to inspect product details
                 </span>
               </div>
 
               <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                 {myInvoices.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
                     No completed bills recorded in this session yet.
                   </div>
                 ) : (
-                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                  <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '8px 10px' }}>Invoice #</th>
-                        <th style={{ padding: '8px 10px' }}>Customer</th>
-                        <th style={{ padding: '8px 10px' }}>Date</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Items</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center' }}>Action</th>
+                        <th className="erp-table-heading">Invoice #</th>
+                        <th className="erp-table-heading">Customer</th>
+                        <th className="erp-table-heading">Date</th>
+                        <th className="erp-table-heading" style={{ textAlign: 'center' }}>Items</th>
+                        <th className="erp-table-heading" style={{ textAlign: 'right' }}>Amount</th>
+                        <th className="erp-table-heading" style={{ textAlign: 'center' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {myInvoices.map((inv) => (
                         <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
+                          <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
                             {inv.invoiceNumber}
                           </td>
-                          <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
+                          <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
                             {inv.customerName || 'Walk-in'}
                           </td>
-                          <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                          <td className="erp-table-cell" style={{ color: '#64748b' }}>
                             {inv.invoiceDate || 'Today'}
                           </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600 }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600 }}>
                             {inv.items?.length || 1}
                           </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                             Rs. {Number(inv.netTotal || 0).toFixed(2)}
                           </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                             <button
                               type="button"
-                              className="btn btn-glass btn-sm"
+                              className="btn btn-glass btn-sm erp-button"
                               onClick={() => setSelectedInvoiceDetail(inv)}
-                              style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
+                              style={{ padding: '3px 8px', gap: '4px' }}
                             >
                               <Eye size={12} /> View
                             </button>
@@ -2315,7 +2301,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <div style={{ textAlign: 'right' }}>
               <button
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setActiveCircleModal(null)}
               >
                 Close
@@ -2353,10 +2339,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   <Trophy size={20} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0, fontWeight: 800 }}>
+                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
                     Top Performance Record
                   </h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                     Benchmark Record Leader: <strong>{topCashierName}</strong>
                   </p>
                 </div>
@@ -2372,29 +2358,29 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '18px' }}>
               <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e' }}>MAX BILLS RECORD</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#92400e' }}>MAX BILLS RECORD</div>
+                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
                   {maxBillsCount} Bills
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#d97706' }}>Highest billing volume</div>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#d97706' }}>Highest billing volume</div>
               </div>
 
               <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '10px', border: '1px solid #fcd34d' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#92400e' }}>MAX SALES AMOUNT</div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
+                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#92400e' }}>MAX SALES AMOUNT</div>
+                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
                   Rs. {maxSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#d97706' }}>Highest revenue benchmark</div>
+                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#d97706' }}>Highest revenue benchmark</div>
               </div>
             </div>
 
             {/* Motivation Progress & Comparison */}
             <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>
+                <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 800, color: '#334155' }}>
                   Your Progress Toward Record ({myTotalAmount >= maxSalesAmount ? '100%' : `${Math.min(100, Math.round((myTotalAmount / (maxSalesAmount || 1)) * 100))}%`})
                 </span>
-                <span style={{ fontSize: '0.74rem', color: '#2563eb', fontWeight: 700 }}>
+                <span style={{ fontSize: 'var(--erp-text-caption)', color: '#2563eb', fontWeight: 700 }}>
                   You: Rs. {myTotalAmount.toFixed(0)} / Max: Rs. {maxSalesAmount.toFixed(0)}
                 </span>
               </div>
@@ -2411,7 +2397,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 />
               </div>
 
-              <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>
+              <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', fontWeight: 600 }}>
                 {myTotalAmount >= maxSalesAmount
                   ? '🏆 Outstanding! You are currently the #1 Top Cashier Record Holder!'
                   : `🔥 Keep billing! You are Rs. ${(maxSalesAmount - myTotalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} away from setting the new record!`}
@@ -2420,7 +2406,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <div style={{ textAlign: 'right' }}>
               <button
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setActiveCircleModal(null)}
               >
                 Close
@@ -2458,10 +2444,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   <Users size={20} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0, fontWeight: 800 }}>
+                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
                     All Staff Billing Performance
                   </h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                     Overview of active cashiers and bills created
                   </p>
                 </div>
@@ -2477,20 +2463,20 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             {/* Staff Overview Table */}
             <div style={{ marginBottom: '18px', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
+              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '10px 14px' }}>Staff Name</th>
-                    <th style={{ padding: '10px 14px' }}>Username</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center' }}>Completed Bills</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Total Amount</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center' }}>Action</th>
+                    <th className="erp-table-heading">Staff Name</th>
+                    <th className="erp-table-heading">Username</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Completed Bills</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total Amount</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashierStats.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>
+                      <td className="erp-table-cell" colSpan="5" style={{ textAlign: 'center', color: '#94a3b8' }}>
                         No staff records found
                       </td>
                     </tr>
@@ -2503,29 +2489,29 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           background: selectedStaffForBills === c.username ? '#eff6ff' : 'transparent',
                         }}
                       >
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0f172a' }}>
+                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a' }}>
                           {c.fullName || c.username}
                           {c.username === user?.username && (
-                            <span className="badge badge-primary" style={{ marginLeft: '6px', fontSize: '0.66rem' }}>
+                            <span className="badge badge-primary" style={{ marginLeft: '6px', fontSize: 'var(--erp-text-badge)' }}>
                               You
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '10px 14px', color: '#64748b' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {c.username}
                         </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 700 }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
                           {c.completedInvoicesCount || 0}
                         </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
                           Rs. {Number(c.totalSalesAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
-                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                           <button
                             type="button"
-                            className={`btn ${selectedStaffForBills === c.username ? 'btn-primary' : 'btn-glass'} btn-sm`}
+                            className={(`btn ${selectedStaffForBills === c.username ? 'btn-primary' : 'btn-glass'} btn-sm`) + ' erp-button'}
                             onClick={() => setSelectedStaffForBills(c.username)}
-                            style={{ padding: '4px 10px', fontSize: '0.74rem', gap: '4px' }}
+                            style={{ padding: '4px 10px', gap: '4px' }}
                           >
                             <FileText size={12} /> View Bills
                           </button>
@@ -2541,13 +2527,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             {selectedStaffForBills && (
               <div style={{ border: '2px solid #3b82f6', borderRadius: '10px', padding: '16px', background: '#f8fafc' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                  <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                     Bills created by <strong>{selectedStaffForBills}</strong>
                   </div>
                   <button
-                    className="btn btn-glass btn-sm"
+                    className="btn btn-glass btn-sm erp-button"
                     onClick={() => setSelectedStaffForBills(null)}
-                    style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                    style={{ padding: '2px 8px' }}
                   >
                     Close Staff Bills
                   </button>
@@ -2555,19 +2541,19 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
                 <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
                   {allInvoices.filter((inv) => inv.createdBy === selectedStaffForBills).length === 0 ? (
-                    <div style={{ padding: '18px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                    <div style={{ padding: '18px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
                       No bills recorded for this staff member in this period.
                     </div>
                   ) : (
-                    <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', background: '#ffffff', borderRadius: '6px' }}>
+                    <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse', background: '#ffffff', borderRadius: '6px' }}>
                       <thead>
                         <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>
-                          <th style={{ padding: '8px 10px' }}>Invoice #</th>
-                          <th style={{ padding: '8px 10px' }}>Customer</th>
-                          <th style={{ padding: '8px 10px' }}>Date</th>
-                          <th style={{ padding: '8px 10px', textAlign: 'center' }}>Items</th>
-                          <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total</th>
-                          <th style={{ padding: '8px 10px', textAlign: 'center' }}>Detail</th>
+                          <th className="erp-table-heading">Invoice #</th>
+                          <th className="erp-table-heading">Customer</th>
+                          <th className="erp-table-heading">Date</th>
+                          <th className="erp-table-heading" style={{ textAlign: 'center' }}>Items</th>
+                          <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
+                          <th className="erp-table-heading" style={{ textAlign: 'center' }}>Detail</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2575,27 +2561,27 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           .filter((inv) => inv.createdBy === selectedStaffForBills)
                           .map((inv) => (
                             <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
+                              <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
                                 {inv.invoiceNumber}
                               </td>
-                              <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                              <td className="erp-table-cell" style={{ fontWeight: 600 }}>
                                 {inv.customerName || 'Walk-in'}
                               </td>
-                              <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                              <td className="erp-table-cell" style={{ color: '#64748b' }}>
                                 {inv.invoiceDate || 'Today'}
                               </td>
-                              <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 600 }}>
+                              <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600 }}>
                                 {inv.items?.length || 1}
                               </td>
-                              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800 }}>
+                              <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                                 Rs. {Number(inv.netTotal || 0).toFixed(2)}
                               </td>
-                              <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                              <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                                 <button
                                   type="button"
-                                  className="btn btn-glass btn-sm"
+                                  className="btn btn-glass btn-sm erp-button"
                                   onClick={() => setSelectedInvoiceDetail(inv)}
-                                  style={{ padding: '2px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                  style={{ padding: '2px 8px', gap: '3px' }}
                                 >
                                   <Eye size={12} /> Inspect
                                 </button>
@@ -2611,7 +2597,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             <div style={{ textAlign: 'right', marginTop: '14px' }}>
               <button
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setActiveCircleModal(null)}
               >
                 Close
@@ -2634,10 +2620,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div>
-                <h3 style={{ fontSize: '1.2rem', color: '#0f172a', margin: 0, fontWeight: 800 }}>
+                <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
                   Bill Details: {selectedInvoiceDetail.invoiceNumber}
                 </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                   Customer: <strong>{selectedInvoiceDetail.customerName || 'Walk-in'}</strong> • Cashier: <strong>{selectedInvoiceDetail.createdBy}</strong>
                 </p>
               </div>
@@ -2650,32 +2636,32 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
-              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '8px 10px' }}>Code</th>
-                    <th style={{ padding: '8px 10px' }}>Product</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Qty</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Price</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total</th>
+                    <th className="erp-table-heading">Code</th>
+                    <th className="erp-table-heading">Product</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Qty</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Price</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(selectedInvoiceDetail.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
-                      <td style={{ padding: '8px 10px', fontWeight: 600 }}>
+                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
                         {it.productName || it.name || '-'}
                       </td>
-                      <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
                         {it.quantity}
                       </td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                         Rs. {Number(it.unitPrice || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800 }}>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                         Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
                       </td>
                     </tr>
@@ -2685,15 +2671,15 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
+              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
+              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
                 Rs. {Number(selectedInvoiceDetail.netTotal || 0).toFixed(2)}
               </span>
             </div>
 
             <div style={{ textAlign: 'right', marginTop: '14px' }}>
               <button
-                className="btn btn-glass btn-sm"
+                className="btn btn-glass btn-sm erp-button"
                 onClick={() => setSelectedInvoiceDetail(null)}
               >
                 Close
@@ -2718,10 +2704,10 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', color: '#0f172a', margin: 0, fontWeight: 700 }}>
+                <h3 style={{ fontSize: 'var(--erp-text-section)', color: '#0f172a', margin: 0, fontWeight: 700 }}>
                   {isSupervisor ? 'Suspended / Held Carts' : 'My Suspended Bills'}
                 </h3>
-                <p style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
+                <p style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>
                   {isSupervisor
                     ? 'Supervise and resume carts across active cashier sessions'
                     : 'Your personal held transactions waiting to be completed'}
@@ -2737,37 +2723,31 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             {isSupervisor && (
               <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setHeldTab('mine')}
                   style={{
                     flex: 1,
                     padding: '6px 10px',
-                    borderRadius: '6px',
                     border: '1px solid',
                     borderColor: heldTab === 'mine' ? '#2563eb' : '#e2e8f0',
                     background: heldTab === 'mine' ? '#eff6ff' : '#ffffff',
                     color: heldTab === 'mine' ? '#1d4ed8' : '#64748b',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
                     cursor: 'pointer',
                   }}
                 >
                   My Held Carts ({heldInvoices.filter((h) => h.createdBy === user?.username).length})
                 </button>
-                <button
+                <button className="erp-button"
                   type="button"
                   onClick={() => setHeldTab('all')}
                   style={{
                     flex: 1,
                     padding: '6px 10px',
-                    borderRadius: '6px',
                     border: '1px solid',
                     borderColor: heldTab === 'all' ? '#2563eb' : '#e2e8f0',
                     background: heldTab === 'all' ? '#eff6ff' : '#ffffff',
                     color: heldTab === 'all' ? '#1d4ed8' : '#64748b',
-                    fontWeight: 600,
-                    fontSize: '0.8rem',
                     cursor: 'pointer',
                   }}
                 >
@@ -2784,7 +2764,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
               if (displayed.length === 0) {
                 return (
-                  <p style={{ textAlign: 'center', color: '#94a3b8', padding: '30px 0', fontSize: '0.85rem' }}>
+                  <p style={{ textAlign: 'center', color: '#94a3b8', padding: '30px 0', fontSize: 'var(--erp-text-field)' }}>
                     No suspended bills found.
                   </p>
                 );
@@ -2810,7 +2790,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           {held.createdBy && (
                             <span
                               style={{
-                                fontSize: '0.68rem',
+                                fontSize: 'var(--erp-text-badge)',
                                 color: '#4338ca',
                                 background: '#e0e7ff',
                                 padding: '1px 5px',
@@ -2822,19 +2802,19 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                           Customer: {held.customerName} | {held.items?.length || 0} items
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
                           Rs. {Number(held.netTotal).toFixed(2)}
                         </span>
                         <button
-                          className="btn btn-primary btn-sm"
+                          className="btn btn-primary btn-sm erp-button"
                           onClick={() => handleResumeInvoice(held)}
-                          style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                          style={{ padding: '4px 8px' }}
                         >
                           <PlayCircle size={12} /> Resume
                         </button>
@@ -2878,7 +2858,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Target size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
                   {activeTargetForModal.targetName} Slabs
                 </h3>
               </div>
@@ -2891,7 +2871,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
               Purchasing within each slab unlocks the reward discount for this customer during the promotion period.
             </p>
 
@@ -2910,18 +2890,18 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   }}
                 >
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.84rem', color: tier.isAchieved ? '#15803d' : '#1e293b' }}>
+                    <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-body)', color: tier.isAchieved ? '#15803d' : '#1e293b' }}>
                       {tier.tierName}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                       Spend: Rs. {Number(tier.minAmount).toLocaleString()} - {tier.maxAmount ? `Rs. ${Number(tier.maxAmount).toLocaleString()}` : 'Unlimited'}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: tier.isAchieved ? '#16a34a' : '#0284c7' }}>
+                    <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-button)', color: tier.isAchieved ? '#16a34a' : '#0284c7' }}>
                       {tier.discountPercentage}% Discount
                     </div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: tier.isAchieved ? '#16a34a' : '#94a3b8' }}>
+                    <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: tier.isAchieved ? '#16a34a' : '#94a3b8' }}>
                       {tier.isAchieved ? '✓ REACHED' : 'NOT REACHED'}
                     </div>
                   </div>
@@ -2930,14 +2910,11 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <button
+              <button className="erp-button"
                 type="button"
                 onClick={() => setShowTargetRangesModal(false)}
                 style={{
                   padding: '7px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  borderRadius: '6px',
                   border: '1px solid #cbd5e1',
                   background: '#ffffff',
                   cursor: 'pointer',
@@ -2980,7 +2957,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Award size={19} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a' }}>
                   Customer Monthly Spend Range Tiers
                 </h3>
               </div>
@@ -2993,7 +2970,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               </button>
             </div>
 
-            <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 14px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
               Customer purchases accumulate each calendar month. Reaching the threshold automatically promotes the customer. Every month starts at Range 0.
             </p>
 
@@ -3030,13 +3007,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                       <div
                         style={{
                           fontWeight: 700,
-                          fontSize: '0.86rem',
+                          fontSize: 'var(--erp-text-field)',
                           color: isCurrentlyAchieved ? '#15803d' : willAchieveWithCart ? '#0891b2' : '#1e293b',
                         }}
                       >
                         {tier.name}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
                         Monthly Spend Threshold: <strong>Rs. {threshold.toLocaleString()}</strong>
                       </div>
                     </div>
@@ -3044,7 +3021,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     <div style={{ textAlign: 'right' }}>
                       <span
                         style={{
-                          fontSize: '0.72rem',
+                          fontSize: 'var(--erp-text-caption)',
                           fontWeight: 800,
                           padding: '2px 8px',
                           borderRadius: '6px',
@@ -3068,8 +3045,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               <button
                 type="button"
                 onClick={() => setShowMonthlyRangesModal(false)}
-                className="btn-secondary"
-                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                className="btn-secondary erp-button"
+                style={{ padding: '6px 14px' }}
               >
                 Close
               </button>

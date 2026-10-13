@@ -5,6 +5,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import './style.css';
+import './components/ErpDesignSystem.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

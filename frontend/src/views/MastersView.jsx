@@ -669,7 +669,7 @@ const MastersView = React.forwardRef(function MastersView({
   if(showModal && activeTab==='suppliers')return <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>;
 
   return (
-    <div ref={directoryRef} className={activeTab === 'suppliers' ? 'purchasing-no-shadows' : ['products','brands','warehouses','categories'].includes(activeTab) ? 'inventory-theme purchasing-no-shadows' : undefined}
+    <div ref={directoryRef} className={(activeTab === 'suppliers' ? 'purchasing-no-shadows' : ['products','brands','warehouses','categories'].includes(activeTab) ? 'inventory-theme purchasing-no-shadows' : '') + (isStandalone || hideHeader ? '' : ' erp-page')}
       style={{
         flex: 1,
         height: '100%',
@@ -684,28 +684,20 @@ const MastersView = React.forwardRef(function MastersView({
     >
       {/* Header (Fixed / Sticky at Top) */}
       {!hideHeader && (
-        <div
+        <div className="erp-page-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '16px',
             flexShrink: 0,
           }}
         >
           <div>
-            <h1
-              style={{
-                fontSize: '1.65rem',
-                fontWeight: 800,
-                color: '#0f172a',
-                letterSpacing: '-0.02em',
-                margin: '0 0 4px 0',
-              }}
+            <h1 className="erp-page-title"
+
             >
               {displayTitle}
             </h1>
-            <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>
+            <p className="erp-page-description">
               {displaySubtitle}
             </p>
           </div>
@@ -717,7 +709,7 @@ const MastersView = React.forwardRef(function MastersView({
               backgroundColor: '#0284c7',
               color: '#ffffff',
               fontWeight: 600,
-              fontSize: '0.88rem',
+              fontSize: 'var(--erp-text-button)',
               padding: '9px 18px',
               borderRadius: '8px',
               display: 'inline-flex',
@@ -785,7 +777,7 @@ const MastersView = React.forwardRef(function MastersView({
               pointerEvents: 'none',
             }}
           />
-          <input
+          <input className="erp-field"
             type="text"
             placeholder={
               activeTab === 'products'
@@ -802,9 +794,7 @@ const MastersView = React.forwardRef(function MastersView({
               width: '100%',
               height: '38px',
               padding: '0 32px 0 38px',
-              borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.88rem',
               outline: 'none',
               backgroundColor: '#ffffff',
               color: '#0f172a',
@@ -855,7 +845,7 @@ const MastersView = React.forwardRef(function MastersView({
               minWidth: '120px',
               borderRadius: '6px',
               border: '1px solid #cbd5e1',
-              fontSize: '0.86rem',
+              fontSize: 'var(--erp-text-field)',
               fontFamily: 'inherit',
               fontWeight: 500,
               color: '#334155',
@@ -890,7 +880,7 @@ const MastersView = React.forwardRef(function MastersView({
 
           {/* Reset Filters button */}
           {(statusFilter !== 'ALL' || searchTerm) && (
-            <button
+            <button className="erp-button"
               type="button"
               onClick={() => {
                 setStatusFilter('ALL');
@@ -899,13 +889,9 @@ const MastersView = React.forwardRef(function MastersView({
               style={{
                 height: '38px',
                 padding: '0 12px',
-                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
                 backgroundColor: '#f1f5f9',
                 color: '#64748b',
-                fontSize: '0.85rem',
-                fontFamily: 'inherit',
-                fontWeight: 500,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1020,23 +1006,23 @@ const MastersView = React.forwardRef(function MastersView({
           {!loading && ['products','brands','warehouses','categories'].includes(activeTab) && <MasterDirectoryTable type={activeTab} rows={activeTab==='products'?filteredProducts:activeTab==='brands'?filteredBrands:activeTab==='warehouses'?filteredWarehouses:filteredCategories} warehouses={warehouses} getBrand={getBrandForProduct} canEdit={canEditCurrentTab} isActive={isItemActive} onView={item=>setViewingItem({...item,type:activeTab})} onEdit={handleOpenEdit}/>}
 
           {!loading && activeTab === 'customers' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CREDIT LIMIT</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CURRENT BALANCE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER NAME</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CREDIT LIMIT</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CURRENT BALANCE</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                       No customers found matching current criteria.
                     </td>
                   </tr>
@@ -1057,15 +1043,15 @@ const MastersView = React.forwardRef(function MastersView({
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view customer details"
                       >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>{c.contactPerson || '—'}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>{c.phone || c.email || '—'}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#334155' }}>Rs. {Number(c.creditLimit || 0).toFixed(2)}</td>
-                        <td style={{ padding: '12px 18px', color: (c.currentBalance || c.currentCredit) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
+                        <td className="erp-table-cell" style={{ color: '#475569' }}>{c.contactPerson || '—'}</td>
+                        <td className="erp-table-cell" style={{ color: '#475569' }}>{c.phone || c.email || '—'}</td>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#334155' }}>Rs. {Number(c.creditLimit || 0).toFixed(2)}</td>
+                        <td className="erp-table-cell" style={{ color: (c.currentBalance || c.currentCredit) > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                           Rs. {Number(c.currentBalance || c.currentCredit || 0).toFixed(2)}
                         </td>
-                        <td style={{ padding: '12px 18px' }}>
+                        <td className="erp-table-cell">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1080,7 +1066,7 @@ const MastersView = React.forwardRef(function MastersView({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              fontSize: '0.82rem',
+                              fontSize: 'var(--erp-text-body)',
                               fontWeight: 600,
                               color: active ? '#16a34a' : '#dc2626',
                               whiteSpace: 'nowrap',
@@ -1099,7 +1085,7 @@ const MastersView = React.forwardRef(function MastersView({
                             {active ? 'Active' : 'Inactive'}
                           </button>
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button
                               type="button"
@@ -1145,22 +1131,22 @@ const MastersView = React.forwardRef(function MastersView({
           )}
 
           {!loading && activeTab === 'suppliers' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER CODE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER CODE</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SUPPLIER NAME</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT PERSON</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
+                  <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
+                    <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                       No suppliers found matching current criteria.
                     </td>
                   </tr>
@@ -1181,21 +1167,21 @@ const MastersView = React.forwardRef(function MastersView({
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view supplier details"
                       >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{s.name || 'Supplier name not entered'}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>{s.contactPerson || '—'}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>
+                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{s.name || 'Supplier name not entered'}</td>
+                        <td className="erp-table-cell" style={{ color: '#475569' }}>{s.contactPerson || '—'}</td>
+                        <td className="erp-table-cell" style={{ color: '#475569' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '250px' }}>
-                            {s.phone && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.82rem', fontWeight: 500 }}><Phone size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} />{s.phone}</span>}
-                            {s.email && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.78rem', color: '#64748b' }}><Mail size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} /><span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{s.email}</span></span>}
+                            {s.phone && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: 'var(--erp-text-body)', fontWeight: 500 }}><Phone size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} />{s.phone}</span>}
+                            {s.email && <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}><Mail size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} /><span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{s.email}</span></span>}
                             {!s.phone && !s.email && '—'}
                           </div>
                         </td>
-                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{s.address || '—'}</td>
-                        <td style={{ padding: '12px 18px' }}>
+                        <td className="erp-table-cell" style={{ color: '#64748b' }}>{s.address || '—'}</td>
+                        <td className="erp-table-cell">
                           <StatusBadge status={supplierStatus(s)} title={`Status: ${supplierStatus(s)}`} />
                         </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button type="button" title="Edit Supplier" aria-label="Edit Supplier"
                               onClick={event=>{event.stopPropagation();handleOpenEdit({...s,code});}}
@@ -1239,10 +1225,10 @@ const MastersView = React.forwardRef(function MastersView({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
               <div>
-                <span style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', letterSpacing: '0.05em' }}>
+                <span style={{ textTransform: 'uppercase', fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#2563eb', letterSpacing: '0.05em' }}>
                   {viewingItem.type?.slice(0, -1)} Master Details
                 </span>
-                <h2 style={{ fontSize: '1.45rem', color: '#0f172a', margin: '4px 0 0 0' }}>
+                <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: '4px 0 0 0' }}>
                   {viewingItem.name || viewingItem.code}
                 </h2>
               </div>
@@ -1250,8 +1236,8 @@ const MastersView = React.forwardRef(function MastersView({
                 {viewingItem.type === 'suppliers' && (
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    style={{ background: '#2563eb', color: '#fff', border: '1px solid #2563eb', borderRadius: '8px', boxShadow: 'none' }}
+                    className="btn btn-primary erp-button erp-button-primary"
+
                     title="Print Supplier Details (A4)"
                     onClick={() => handlePrintSuppliers(viewingItem)}
                   >
@@ -1272,7 +1258,7 @@ const MastersView = React.forwardRef(function MastersView({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '24px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Status</span>
+                <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>Status</span>
                 <div>
                   {viewingItem.type === 'suppliers' ? <StatusBadge status={isItemActive(viewingItem) ? 'ACTIVE' : 'INACTIVE'}
                     title={`Status: ${isItemActive(viewingItem) ? 'Active' : 'Inactive'} (Click to toggle)`}
@@ -1303,46 +1289,46 @@ const MastersView = React.forwardRef(function MastersView({
 
               {(viewingItem.code || viewingItem.sku || viewingItem.customerCode || viewingItem.supplierCode) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Code / Identifier</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8', fontSize: '0.95rem' }}>
+                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>Code / Identifier</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8', fontSize: 'var(--erp-text-nav)' }}>
                     {viewingItem.code || viewingItem.sku || viewingItem.customerCode || viewingItem.supplierCode}
                   </span>
                 </div>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '8px', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>Name</span>
+                <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>Name</span>
                 <span style={{ fontWeight: 700, color: '#0f172a' }}>{viewingItem.name}</span>
               </div>
 
               {viewingItem.type === 'products' && (
                 <>
                   <div style={{ display:'grid',gridTemplateColumns:'140px 1fr',gap:8,padding:'10px 14px',background:'#f8fafc',borderRadius:8,border:'1px solid #e2e8f0' }}>
-                    <span style={{fontSize:'.85rem',color:'#64748b',fontWeight:600}}>Selling price</span>
-                    <span style={{fontWeight:600}}>LKR {Number(viewingItem.sellingPrice || 0).toFixed(2)}<small style={{display:'block',marginTop:4,fontSize:'.73rem',fontWeight:400,color:'#64748b'}}>{viewingItem.useBrandMarkup ? `Cost + brand MP% (${Number(viewingItem.brandMarkupPercent || 0).toFixed(2)}%)` : 'Manual price'}</small></span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color:'#64748b', fontWeight:600 }}>Selling price</span>
+                    <span style={{fontWeight:600}}>LKR {Number(viewingItem.sellingPrice || 0).toFixed(2)}<small style={{ display:'block', marginTop:4, fontSize: 'var(--erp-text-caption)', fontWeight:400, color:'#64748b' }}>{viewingItem.useBrandMarkup ? `Cost + brand MP% (${Number(viewingItem.brandMarkupPercent || 0).toFixed(2)}%)` : 'Manual price'}</small></span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Category</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Category</span>
                     <span style={{ fontWeight: 600 }}>{viewingItem.categoryName || 'General / Uncategorized'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Unit of Measure</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Unit of Measure</span>
                     <span style={{ fontWeight: 600 }}>{viewingItem.unitOfMeasure || 'PCS'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Default Warehouse</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Default Warehouse</span>
                     <span style={{ fontWeight: 600, color: '#15803d' }}>
                       {viewingItem.warehouseName || viewingItem.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(viewingItem.warehouseId || viewingItem.defaultWarehouseId))?.name) || 'Main Warehouse'}
                     </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Min Stock Alert</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Min Stock Alert</span>
                     <span style={{ fontWeight: 700, color: viewingItem.minStockLevel > 10 ? '#059669' : '#d97706' }}>
                       {viewingItem.minStockLevel || 0} {viewingItem.unitOfMeasure || 'PCS'}
                     </span>
                   </div>
                   <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Description</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Description</span>
                     <span>{viewingItem.description || 'No description provided.'}</span>
                   </div>
                 </>
@@ -1351,11 +1337,11 @@ const MastersView = React.forwardRef(function MastersView({
               {viewingItem.type === 'warehouses' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Contact Number</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Contact Number</span>
                     <span style={{ fontWeight: 500 }}>{viewingItem.contactNumber || viewingItem.phone || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Address</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Address</span>
                     <span>{viewingItem.address || '—'}</span>
                   </div>
                 </>
@@ -1363,14 +1349,14 @@ const MastersView = React.forwardRef(function MastersView({
 
               {viewingItem.type === 'brands' && (
                 <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>MP% (Markup on cost)</span>
+                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>MP% (Markup on cost)</span>
                   <div style={{ marginTop: '6px', fontWeight: 700 }}>{Number(viewingItem.markupPercent || 0).toFixed(2)}%</div>
                 </div>
               )}
 
               {viewingItem.type === 'categories' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Description</span>
+                  <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Description</span>
                   <span>{viewingItem.description || 'No description provided.'}</span>
                 </div>
               )}
@@ -1378,27 +1364,27 @@ const MastersView = React.forwardRef(function MastersView({
               {viewingItem.type === 'customers' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Contact Person</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Contact Person</span>
                     <span>{viewingItem.contactPerson || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Phone</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Phone</span>
                     <span>{viewingItem.phone || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Email</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Email</span>
                     <span>{viewingItem.email || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Address</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Address</span>
                     <span>{viewingItem.address || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Credit Limit</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Credit Limit</span>
                     <span style={{ fontWeight: 600 }}>${Number(viewingItem.creditLimit || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Current Balance</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Current Balance</span>
                     <span style={{ fontWeight: 600, color: (viewingItem.currentBalance || viewingItem.currentCredit) > 0 ? '#dc2626' : '#059669' }}>
                       ${Number(viewingItem.currentBalance || viewingItem.currentCredit || 0).toFixed(2)}
                     </span>
@@ -1409,19 +1395,19 @@ const MastersView = React.forwardRef(function MastersView({
               {viewingItem.type === 'suppliers' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Contact Person</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Contact Person</span>
                     <span>{viewingItem.contactPerson || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Phone</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Phone</span>
                     <span>{viewingItem.phone || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Email</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Email</span>
                     <span>{viewingItem.email || '—'}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Address</span>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Address</span>
                     <span>{viewingItem.address || '—'}</span>
                   </div>
                 </>
@@ -1429,12 +1415,12 @@ const MastersView = React.forwardRef(function MastersView({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button type="button" className="btn btn-glass" onClick={() => setViewingItem(null)}>
+              <button type="button" className="btn btn-glass erp-button" onClick={() => setViewingItem(null)}>
                 Close
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary erp-button"
                 onClick={() => {
                   const item = viewingItem;
                   setViewingItem(null);
@@ -1460,7 +1446,7 @@ const MastersView = React.forwardRef(function MastersView({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-              <h2 style={{ fontSize: '1.35rem', color: '#0f172a', margin: 0 }}>
+              <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
                 {editingItem ? 'Edit' : 'Create New'} {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab.slice(0, -1)}
               </h2>
               <button
@@ -1476,20 +1462,20 @@ const MastersView = React.forwardRef(function MastersView({
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CODE</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CODE</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. CUST-0001"
                         value={modalForm.code || modalForm.customerCode || ''}
                         onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CUSTOMER NAME *</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CUSTOMER NAME *</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. Apex Engineering Ltd"
                         value={modalForm.name || ''}
                         onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
@@ -1499,20 +1485,20 @@ const MastersView = React.forwardRef(function MastersView({
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CONTACT PERSON</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CONTACT PERSON</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. John Doe"
                         value={modalForm.contactPerson || ''}
                         onChange={(e) => setModalForm({ ...modalForm, contactPerson: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>PHONE</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>PHONE</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. +94 77 123 4567"
                         value={modalForm.phone || ''}
                         onChange={(e) => setModalForm({ ...modalForm, phone: e.target.value })}
@@ -1521,21 +1507,21 @@ const MastersView = React.forwardRef(function MastersView({
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>EMAIL</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>EMAIL</label>
                       <input
                         type="email"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. billing@apex.com"
                         value={modalForm.email || ''}
                         onChange={(e) => setModalForm({ ...modalForm, email: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CREDIT LIMIT ($)</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CREDIT LIMIT ($)</label>
                       <input
                         type="number"
                         step="0.01"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="0.00"
                         value={modalForm.creditLimit ?? ''}
                         onChange={(e) => setModalForm({ ...modalForm, creditLimit: e.target.value })}
@@ -1543,10 +1529,10 @@ const MastersView = React.forwardRef(function MastersView({
                     </div>
                   </div>
                   <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>BILLING ADDRESS</label>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>BILLING ADDRESS</label>
                     <input
                       type="text"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       placeholder="e.g. 45 Galle Road, Colombo"
                       value={modalForm.address || ''}
                       onChange={(e) => setModalForm({ ...modalForm, address: e.target.value })}
@@ -1559,20 +1545,20 @@ const MastersView = React.forwardRef(function MastersView({
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER CODE</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER CODE</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. SUPP-0001"
                         value={modalForm.code || modalForm.supplierCode || ''}
                         onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER NAME *</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER NAME *</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. Global Steels Corp"
                         value={modalForm.name || ''}
                         onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
@@ -1582,20 +1568,20 @@ const MastersView = React.forwardRef(function MastersView({
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CONTACT PERSON</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>CONTACT PERSON</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. Robert Smith"
                         value={modalForm.contactPerson || ''}
                         onChange={(e) => setModalForm({ ...modalForm, contactPerson: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>PHONE</label>
+                      <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>PHONE</label>
                       <input
                         type="text"
-                        className="input-glass"
+                        className="input-glass erp-field"
                         placeholder="e.g. +94 11 234 5678"
                         value={modalForm.phone || ''}
                         onChange={(e) => setModalForm({ ...modalForm, phone: e.target.value })}
@@ -1603,20 +1589,20 @@ const MastersView = React.forwardRef(function MastersView({
                     </div>
                   </div>
                   <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>EMAIL</label>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>EMAIL</label>
                     <input
                       type="email"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       placeholder="e.g. orders@globalsteels.com"
                       value={modalForm.email || ''}
                       onChange={(e) => setModalForm({ ...modalForm, email: e.target.value })}
                     />
                   </div>
                   <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER ADDRESS</label>
+                    <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>SUPPLIER ADDRESS</label>
                     <input
                       type="text"
-                      className="input-glass"
+                      className="input-glass erp-field"
                       placeholder="e.g. 12 Industrial Zone, Kandy"
                       value={modalForm.address || ''}
                       onChange={(e) => setModalForm({ ...modalForm, address: e.target.value })}
@@ -1626,10 +1612,10 @@ const MastersView = React.forwardRef(function MastersView({
               )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button type="button" className="btn btn-glass" onClick={() => setShowModal(false)} disabled={saving}>
+                <button type="button" className="btn btn-glass erp-button" onClick={() => setShowModal(false)} disabled={saving}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
+                <button type="submit" className="btn btn-primary erp-button" disabled={saving}>
                   {saving ? 'Saving...' : 'Save Record'}
                 </button>
               </div>

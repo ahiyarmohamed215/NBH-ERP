@@ -11,7 +11,7 @@
 .purchase-date-controls > select,
 .purchase-date-controls > select option {
   font-family: inherit;
-  font-size: .86rem;
+  font-size: var(--erp-text-field);
   font-weight: 500;
   color: #334155;
 }
