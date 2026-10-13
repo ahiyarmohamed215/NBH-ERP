@@ -80,6 +80,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   // Flow Step 4: Sales Order Table
   const [cart, setCart] = useState([]);
+  const subtotal = cart.reduce((sum,item)=>sum+Number(item.total || 0),0);
   const [discountAmount, setDiscountAmount] = useState(0);
 
   // Held Bills
@@ -648,7 +649,6 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     setCart((prev) => prev.filter((item) => item.id !== lineId));
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const discountVal = Math.min(subtotal, Number(discountAmount) || 0);
   const netTotal = Math.max(0, subtotal - discountVal);
 
@@ -1560,6 +1560,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 return (
                   <div
                     key={p.id}
+                    role="button" tabIndex={isOutOfStock?-1:0} aria-label={`Select ${p.name}`} aria-disabled={isOutOfStock}
+                    onKeyDown={event=>{if(!isOutOfStock && ['Enter',' '].includes(event.key)){event.preventDefault();handleSelectProductForStaging(p);}}}
                     onClick={() => {
                       if (!isOutOfStock) {
                         handleSelectProductForStaging(p);

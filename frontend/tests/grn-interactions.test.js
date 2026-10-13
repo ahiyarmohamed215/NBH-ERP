@@ -141,6 +141,17 @@ test('GRN directory prints and intake accepts products with different destinatio
     assert.equal(saved.items[0].useBrandMarkup, false);
     assert.equal(saved.items[0].markupPercent, 40.63);
     assert.equal(saved.warehouseId, undefined);
+    await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('Upload Sheet')).click());
+    const fileInput=host.querySelector('input[type="file"]');
+    const content='Product name,Product code,Received qty,Unit cost,MP%,Selling price,Supplier,Remarks\nFirst product,P-1,1.5,8,25,10,Test supplier,Sheet delivery\nSecond product,P-2,2,6,50,9,Test supplier,Sheet delivery';
+    Object.defineProperty(fileInput,'files',{configurable:true,value:[{name:'receipt.csv',text:async()=>content}]});
+    await act(async()=>{fileInput.dispatchEvent(new window.Event('change',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,100));});
+    assert.equal(host.querySelectorAll('tbody tr').length,2);
+    assert.equal(host.querySelector('[aria-label="GRN number"]'),null);
+    assert.equal(host.querySelector('[name="remarks"]').value,'Sheet delivery');
+    await act(async()=>[...host.querySelectorAll('button')].find(button=>/Save (as )?Draft/.test(button.textContent)).click());
+    assert.equal(saved.grnNumber,undefined);assert.equal(saved.supplierId,3);assert.equal(saved.notes,'Sheet delivery');
+    assert.deepEqual(saved.items.map(item=>[item.productId,item.quantityReceived,item.unitCost,item.markupPercent,item.sellingPrice]),[[1,1.5,8,25,10],[2,2,6,50,9]]);
   } finally {
     // Allow native toast expiry timers to complete before removing the browser globals.
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5500)); });

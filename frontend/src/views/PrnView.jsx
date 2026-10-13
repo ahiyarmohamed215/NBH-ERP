@@ -1,3 +1,6 @@
+import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
+import {newestFirst} from '../utils/recordOrder';
+import {documentErrors,numberError} from '../utils/purchasingValidation';
 import FilterSelect from '../components/FilterSelect';
 import '../components/PurchasingAppearance.css';
 import DateRangePicker, {matchesDateRange} from '../components/DateRangePicker';
@@ -163,6 +166,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
   };
 
   const handleSavePrn = async (processImmediately = true, statusReason) => {
+    const validationErrors=documentErrors('PRN',formData);if(validationErrors.length){addToast(validationErrors[0],'error');return;}
     if (formData.items.length === 0) {
       addToast('Add at least one item to return', 'error');
       return;
@@ -293,7 +297,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     finally { setSaving(false); }
   };
 
-  const filteredPrns = prns.filter((p) => {
+  const filteredPrns = newestFirst(prns).filter((p) => {
     if(!matchesDateRange(p.returnDate || p.createdAt,fromDate,toDate)) return false;
     const q = searchTerm.toLowerCase();
     const matchSearch =
@@ -762,7 +766,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
 
             <div className="purchase-body">
               <PurchaseLines key={editingPrnId || 'new'} products={products} items={formData.items} quantityField="quantityReturned" withCost={true}
-                costReadOnly showCostField={false} initialQuantity="" intakeLayout="gtn" quantityLabel="Return quantity"
+                costReadOnly showCostField={false} initialQuantity="" intakeLayout="gtn" searchPriceField="sellingPrice" showSellingPrice quantityLabel="Return quantity"
                 quantityDetails={(product,editing)=><div className="prn-return-card">
                   <h4 title={product && intakeProduct?.warehouseName || undefined}>{product && intakeProduct?.warehouseName || 'Stocked warehouse'}</h4>
                   <div className="prn-return-card-reference">
@@ -771,10 +775,11 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                   </div>
                   <div className="prn-return-card-metrics">
                     <div><span>Available to return</span><strong>{product && intakeProduct ? returnAvailable(intakeProduct,editing) : '—'}</strong></div>
-                    <div><span>Unit price</span><b>{product && intakeProduct ? `LKR ${Number(intakeProduct.unitCost ?? intakeProduct.costPrice ?? 0).toFixed(2)}` : '—'}</b></div>
+                    <div><span>Selling price</span><b>{product && intakeProduct ? `LKR ${purchaseSellingPrice(intakeProduct,products).toFixed(2)}` : '—'}</b></div>
                   </div>
                 </div>}
-                resultDetails={product=>product.sourceGrnId ? `Supplier: ${product.supplierName} · GRN: ${product.originalGrnNumber}` : 'No eligible original GRN'}
+                searchShowWarehouse={false}
+                resultDetails={product=><span className="purchase-result-reference-line" title={`Warehouse: ${product.warehouseName || '—'} · GRN: ${product.originalGrnNumber || 'No eligible original GRN'}`}><span>Warehouse: <b>{product.warehouseName || '—'}</b></span><span>GRN: <b>{product.originalGrnNumber || 'No eligible original GRN'}</b></span></span>}
                 extraColumns={[
                   {label:'Original GRN',value:item=>item.originalGrnNumber || '—'},
                   {label:'Reason',value:item=>item.reason || '—'},
@@ -789,7 +794,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                 onProductSelect={selectReturnProduct} validateItem={validateReturnItem} searchEmptyMessage="No matching inventory items with available stock."
                 onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields">
                   <label className="purchase-remarks">Return reason *<input type="text" maxLength={255} value={formData.reason} placeholder="Enter the reason for this return" onChange={event=>setFormData(previous=>({...previous,reason:event.target.value}))}/></label>
-                  <label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.remarks || ''} onChange={event=>setFormData(previous=>({...previous,remarks:event.target.value}))}/></label>
+                  <label className="purchase-remarks">Remarks / notes<textarea maxLength={5000} rows={3} value={formData.remarks || ''} onChange={event=>setFormData(previous=>({...previous,remarks:event.target.value}))}/></label>
                 </div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
@@ -857,7 +862,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
           { label: 'Supplier name', value: selectedPrn.supplierName },
           { label: 'Return date', value: selectedPrn.returnDate || selectedPrn.createdAt?.slice(0, 10) },
           { label: 'Dispatch warehouse', value: selectedPrn.warehouseName },
-          { label: 'Total value', value: 'LKR ' + Number(selectedPrn.totalAmount || 0).toFixed(2) },
+          { label: 'Total value', value: 'LKR ' + (selectedPrn.items || []).reduce((sum,item)=>sum+Number(item.quantityReturned || 0)*purchaseSellingPrice(item,products),0).toFixed(2) },
           { label: 'Remarks', value: selectedPrn.notes || selectedPrn.remarks, wide: true },
         ]}
         onClose={() => setSelectedPrn(null)}
@@ -873,7 +878,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
           { label: 'Warehouse', value: item => item.warehouseName || selectedPrn.warehouseName },
           { label: 'Original GRN', value: item => item.originalGrnNumber || selectedPrn.originalGrnNumber || '—' },
           { label: 'Qty returned', numeric: true, value: item => item.quantityReturned },
-          { label: 'Unit cost', numeric: true, value: item => 'LKR ' + Number(item.unitCost || 0).toFixed(2) },
+          { label: 'Selling price', numeric: true, value: item => 'LKR ' + purchaseSellingPrice(item,products).toFixed(2) },
           { label: 'Reason', value: item => item.reason || selectedPrn.reason },
           { label: 'Remarks', value: item => item.remarks || '—' },
         ]} />}

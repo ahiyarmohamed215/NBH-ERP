@@ -1,3 +1,4 @@
+import {purchaseSellingPrice} from './purchaseSellingPrice';
 import { executeA4Print } from './printReport';
 
 const escapeText = value => String(value ?? '—').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -20,8 +21,8 @@ export function buildPrnPrintHtml(prn) {
   const sheets = groups.map((group,index)=>`<section class="prn-sheet" data-print-group="${index+1}">
     <header><div><strong>NBH ENTERPRISE</strong><p>Purchase return note</p></div><div><h1>${escapeText(prn.prnNumber)}</h1><p>Copy ${index+1} of ${groups.length} · ${escapeText(prn.status)}</p></div></header>
     <div class="details"><div><span>Supplier</span><b>${escapeText(group.supplierName)}</b></div><div><span>Dispatch warehouse</span><b>${escapeText(group.warehouseName)}</b></div><div><span>Return date</span><b>${escapeText(prn.returnDate || prn.createdAt?.slice(0,10))}</b></div></div>
-    <table><thead><tr><th>Product code</th><th>Product name</th><th>Original GRN</th><th>Qty</th><th>Unit cost (LKR)</th><th>Reason</th><th>Remarks / notes</th></tr></thead><tbody>
-    ${group.items.map(item=>`<tr><td>${escapeText(item.productSku || item.sku)}</td><td>${escapeText(item.productName)}</td><td>${escapeText(item.originalGrnNumber || prn.originalGrnNumber)}</td><td class="number">${escapeText(item.quantityReturned)}</td><td class="number">${Number(item.unitCost || 0).toFixed(2)}</td><td>${escapeText(item.reason || prn.reason)}</td><td>${escapeText(item.remarks || prn.remarks)}</td></tr>`).join('')}
+    <table><thead><tr><th>Product code</th><th>Product name</th><th>Original GRN</th><th>Qty</th><th>Selling price (LKR)</th><th>Reason</th><th>Remarks / notes</th></tr></thead><tbody>
+    ${group.items.map(item=>`<tr><td>${escapeText(item.productSku || item.sku)}</td><td>${escapeText(item.productName)}</td><td>${escapeText(item.originalGrnNumber || prn.originalGrnNumber)}</td><td class="number">${escapeText(item.quantityReturned)}</td><td class="number">${purchaseSellingPrice(item).toFixed(2)}</td><td>${escapeText(item.reason || prn.reason)}</td><td>${escapeText(item.remarks || prn.remarks)}</td></tr>`).join('')}
     </tbody></table><div class="signatures"><div>Issued by warehouse<br><br>Name / signature: ___________________<br>Date: ___________________</div><div>Accepted by supplier<br><br>Name / signature: ___________________<br>Date: ___________________</div></div>
     <footer>${escapeText(prn.prnNumber)} · Supplier / warehouse copy ${index+1}</footer>
   </section>`).join('');

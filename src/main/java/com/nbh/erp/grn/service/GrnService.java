@@ -366,6 +366,7 @@ public class GrnService {
             );
         }
 
+        publishProductPrices(grn.getItems());
         updateOrderReceipt(grn,false);
         grn.setStatus("PROCESSED");
         if (restoring) {
@@ -446,6 +447,17 @@ public class GrnService {
                 updated.get(key).product().setCostPrice(updated.get(key).unitCost());
                 productRepository.save(updated.get(key).product());
             }
+        }
+        publishProductPrices(updatedItems);
+    }
+
+    private void publishProductPrices(java.util.List<GrnItem> items) {
+        for (var item : items) {
+            var product = item.getProduct();
+            if (Boolean.TRUE.equals(item.getUseBrandMarkup())) product.setUseBrandMarkup(true);
+            else if (item.getSellingPrice() != null) product.setUseBrandMarkup(false);
+            if (item.getSellingPrice() != null) product.setSellingPrice(item.getSellingPrice());
+            productRepository.save(product);
         }
     }
 

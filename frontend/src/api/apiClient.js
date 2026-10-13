@@ -136,9 +136,10 @@ api.interceptors.response.use(
       // Invalidate relevant caches
       if (url.includes('/warehouses')) clearApiCache('/warehouses');
       if (url.includes('/categories')) clearApiCache('/categories');
-      if (url.includes('/brands')) clearApiCache('/brands');
+      if (url.includes('/brands')) {clearApiCache('/brands');clearApiCache('/products');clearApiCache('/inventory');}
       if (url.includes('/roles')) clearApiCache('/roles');
-      if (url.includes('/products')) clearApiCache('/products');
+      if (url.includes('/products')) {clearApiCache('/products');clearApiCache('/inventory');}
+      if (url.includes('/grns') || url.includes('/stock-adjustments')) {clearApiCache('/products');clearApiCache('/inventory');}
       if (url.includes('/customers')) clearApiCache('/customers');
 
       if (typeof window !== 'undefined') {

@@ -24,7 +24,8 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     const row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes('SUP-1'));assert.ok(row);
     assert.equal(row.querySelector('[title^="Status:"]').tagName,'SPAN','Supplier table status is display only');
     await act(async()=>row.click());const viewing=host.querySelector('.glass-modal');assert.ok(viewing);
-    assert.equal(viewing.querySelector('.erp-status-badge'),null,'Supplier popup uses only an Activate/Deactivate status button');
+    assert.equal(viewing.querySelector('.erp-status-badge').tagName,'SPAN','Supplier status is displayed without changing it');
+    await act(async()=>viewing.querySelector('.erp-status-badge').click());assert.equal(host.querySelector('[aria-label="Change Supplier status"]'),null);
     const supplierAction=text=>[...viewing.querySelectorAll('.purchase-inspection-detail-actions button')].find(button=>button.textContent.trim()===text);
     await act(async()=>supplierAction('Deactivate').click());let dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-deactivate'));assert.equal(toggleCalls,0);assert.equal(confirmButton(dialog).disabled,true);
     await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent==='Close').click());assert.equal(toggleCalls,0);assert.equal(supplier.isActive,true);

@@ -74,6 +74,7 @@ public class PurchaseReturnDto {
         private String unitOfMeasure;
         private BigDecimal quantityReturned;
         private BigDecimal unitCost;
+        private BigDecimal sellingPrice;
         private BigDecimal totalCost;
         private String reason;
         private String remarks;
@@ -93,6 +94,7 @@ public class PurchaseReturnDto {
                     .unitOfMeasure(item.getProduct().getUnitOfMeasure())
                     .quantityReturned(item.getQuantityReturned())
                     .unitCost(item.getUnitCost())
+                    .sellingPrice(item.getProduct().getSellingPrice())
                     .totalCost(item.getTotalCost())
                     .reason(item.getReason())
                     .remarks(item.getRemarks())

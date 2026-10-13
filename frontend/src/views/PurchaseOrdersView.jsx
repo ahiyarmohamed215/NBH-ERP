@@ -1,3 +1,6 @@
+import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
+import {newestFirst} from '../utils/recordOrder';
+import {documentErrors,numberError} from '../utils/purchasingValidation';
 import FilterSelect from '../components/FilterSelect';
 import '../components/PurchasingAppearance.css';
 import { availableStock, loadPurchaseInventory } from '../utils/purchaseInventory';
@@ -154,6 +157,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   };
 
   const handleSavePurchaseOrder = async (status = 'DRAFT', statusReason) => {
+    const validationErrors=documentErrors('PO',formData);if(validationErrors.length){addToast(validationErrors[0],'error');return;}
     if(!formData.items.length || formData.items.some(item=>!item.supplierId)) { addToast('Choose a supplier for each product and add order lines', 'error'); return; }
     if(formData.items.some(item=>!item.warehouseId)) {addToast('Every product needs its configured delivery warehouse.','error');return;}
     if(editingPoId && status!==editingPoStatus && !statusReason) {requestStatusChange({type:'PO',number:purchaseOrders.find(document=>document.id===editingPoId)?.poNumber || `PO ${editingPoId}`,current:editingPoStatus,target:status,onConfirm:reason=>handleSavePurchaseOrder(status,reason)});return;}
@@ -169,7 +173,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
   const handlePrintList = () => {if(!filteredOrders.length) {addToast('No purchase orders match these filters.','info');return;}printPurchaseOrders(filteredOrders);};
 
-  const filteredOrders = purchaseOrders.filter((po) => {
+  const filteredOrders = newestFirst(purchaseOrders).filter((po) => {
     const date=purchaseOrderDate(po);
     if(fromDate && (!date || date<fromDate)) return false;
     if(toDate && (!date || date>toDate)) return false;
@@ -568,12 +572,12 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
 
             <div className="purchase-body">
               <PurchaseLines products={products} items={formData.items} quantityField="quantity" withCost={true}
-                costReadOnly showCostField={false} initialQuantity="" intakeLayout="gtn" inlineIntakeFields quantityLabel="Qty"
+                costReadOnly showCostField={false} initialQuantity="" intakeLayout="gtn" searchPriceField="sellingPrice" showSellingPrice inlineIntakeFields quantityLabel="Qty"
                 searchProducts={orderSearchProducts} searchResultLimit={Infinity} resultQuantity={inventoryLoaded ? stockQuantity : undefined}
                 resultDetails={product=>product.isActive===false || product.active===false ? 'Inactive product' : !productWarehouse(product) ? 'No delivery warehouse' : null}
                 quantityDetails={product=><div className="prn-return-card po-product-card">
                   <small className="po-card-caption">Delivery warehouse</small><h4 title={product && intakeProduct ? productWarehouseName(intakeProduct) : undefined}>{product && intakeProduct ? productWarehouseName(intakeProduct) || 'Not configured' : 'Select a product'}</h4>
-                  <div className="prn-return-card-metrics"><div><span>Unit cost</span><b>{product && intakeProduct ? `LKR ${Number(intakeProduct.unitCost ?? intakeProduct.costPrice ?? 0).toFixed(2)}` : '—'}</b></div>
+                  <div className="prn-return-card-metrics"><div><span>Selling price</span><b>{product && intakeProduct ? `LKR ${purchaseSellingPrice(intakeProduct,products).toFixed(2)}` : '—'}</b></div>
                     <div><span>Stock in system</span><b>{product && intakeProduct && inventoryLoaded ? stockQuantity(intakeProduct) : '—'}</b></div></div>
                 </div>}
                 intakeFields={<label className="po-supplier-field">Supplier *<FilterSelect variant="field" aria-label="Supplier" value={formData.supplierId} onChange={event=>setFormData(previous=>({...previous,supplierId:event.target.value}))}><option value="">Choose supplier</option>{suppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</FilterSelect></label>}
@@ -581,7 +585,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                 addHint={intakeProduct && !canOrderProduct(intakeProduct) ? 'Ordering needs an active product with a delivery warehouse set in Inventory.' : undefined}
                 buildItemData={()=>({warehouseName:productWarehouseName(intakeProduct),supplierId:Number(formData.supplierId),supplierName:suppliers.find(supplier=>String(supplier.id)===String(formData.supplierId))?.name})} onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,supplierId:''}));}}
                 extraColumns={[{label:'Supplier name',value:item=>item.supplierName || '—'}]}
-                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / notes<textarea rows={3} value={formData.notes || ''} onChange={event=>setFormData(previous=>({...previous,notes:event.target.value}))}/></label></div>}
+                onChange={items=>setFormData(previous=>({...previous,items}))} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / notes<textarea maxLength={5000} rows={3} value={formData.notes || ''} onChange={event=>setFormData(previous=>({...previous,notes:event.target.value}))}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
@@ -662,8 +666,8 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           { label: 'Supplier name', value:item=>item.supplierName || selectedPo.supplierName },
           { label: 'Delivery warehouse', value:item=>item.warehouseName || selectedPo.warehouseName },
           { label: 'Qty', numeric: true, value: item => item.quantity },
-          { label: 'Unit cost', numeric: true, value: item => 'LKR ' + Number(item.unitCost || 0).toFixed(2) },
-          { label: 'Line total', numeric: true, value: item => 'LKR ' + Number(item.totalCost || 0).toFixed(2) },
+          { label: 'Selling price', numeric: true, value: item => 'LKR ' + purchaseSellingPrice(item,products).toFixed(2) },
+          { label: 'Line total', numeric: true, value: item => 'LKR ' + (Number(item.quantity || 0)*purchaseSellingPrice(item,products)).toFixed(2) },
         ]} />}
 
       {statusChangeDialog}

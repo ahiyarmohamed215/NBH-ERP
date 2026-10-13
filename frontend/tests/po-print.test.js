@@ -8,11 +8,11 @@ test('PO printing starts a separate supplier sheet with its own products, destin
  const window=new Window();
  try {
   const {groupPoItems,buildPoPrintHtml}=await server.ssrLoadModule('/src/utils/poPrint.js');
-  const line=(supplierId,code,warehouse)=>({supplierId,supplierName:`Supplier ${supplierId}`,sku:code,productName:code,warehouseName:warehouse,quantity:2,unitCost:4});
+  const line=(supplierId,code,warehouse)=>({supplierId,supplierName:`Supplier ${supplierId}`,sku:code,productName:code,warehouseName:warehouse,quantity:2,unitCost:4,sellingPrice:125});
   const order={poNumber:'PO-TEST',status:'INFORM_TO_ORDER',orderDate:'2026-09-01',createdAt:'2026-10-12T09:00:00',notes:'Restock',items:[line(1,'A','North'),line(2,'B','South'),line(3,'C','East'),line(1,'D','South')]};
   assert.equal(groupPoItems(order).length,3);
-  window.document.write(buildPoPrintHtml(order));const sheets=window.document.querySelectorAll('.po-sheet');assert.equal(sheets.length,3);
-  assert.ok(sheets[0].textContent.includes('2026-10-12'));assert.ok(!sheets[0].textContent.includes('2026-09-01'));assert.equal(sheets[0].querySelectorAll('tbody tr').length,2);assert.ok(sheets[0].textContent.includes('North') && sheets[0].textContent.includes('South'));assert.ok(sheets[0].textContent.includes('LKR 16.00'));
+  window.document.write(buildPoPrintHtml(order));assert.ok(window.document.body.textContent.includes('Selling price (LKR)'));assert.ok(!window.document.body.textContent.includes('Unit cost'));const sheets=window.document.querySelectorAll('.po-sheet');assert.equal(sheets.length,3);
+  assert.ok(sheets[0].textContent.includes('2026-10-12'));assert.ok(!sheets[0].textContent.includes('2026-09-01'));assert.equal(sheets[0].querySelectorAll('tbody tr').length,2);assert.ok(sheets[0].textContent.includes('North') && sheets[0].textContent.includes('South'));assert.ok(sheets[0].textContent.includes('LKR 500.00'));
   assert.equal(sheets[1].querySelectorAll('tbody tr').length,1);assert.ok(sheets[1].textContent.includes('Supplier 2'));assert.ok(!sheets[1].textContent.includes('Supplier 1'));
   for(const sheet of sheets) assert.ok(sheet.textContent.includes('PO-TEST') && sheet.textContent.includes('INFORM TO ORDER'));
   assert.ok(window.document.querySelector('style').textContent.includes('page-break-before:always'));

@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SUPPLIER_MANAGE')")
 public class PurchaseOrderController {
  private final PurchaseOrderService service;
- @GetMapping public ApiResponse<PagedResponse<PurchaseOrderDto>> list(@RequestParam(required=false) String status,@RequestParam(required=false) String query,Pageable page) { return ApiResponse.ok(service.search(status,query,page)); }
+ @GetMapping public ApiResponse<PagedResponse<PurchaseOrderDto>> list(@RequestParam(required=false) String status,@RequestParam(required=false) String query,@org.springframework.data.web.PageableDefault(size=20,sort={"createdAt","id"},direction=org.springframework.data.domain.Sort.Direction.DESC) Pageable page) { return ApiResponse.ok(service.search(status,query,page)); }
  @GetMapping("/{id}") public ApiResponse<PurchaseOrderDto> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
  @PostMapping public ApiResponse<PurchaseOrderDto> create(@Valid @RequestBody PurchaseOrderRequest req) { return ApiResponse.ok(service.save(null,req)); }
  @PutMapping("/{id}") public ApiResponse<PurchaseOrderDto> update(@PathVariable Long id,@Valid @RequestBody PurchaseOrderRequest req) { return ApiResponse.ok(service.save(id,req)); }

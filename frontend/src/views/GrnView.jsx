@@ -1,3 +1,7 @@
+import {newestFirst} from '../utils/recordOrder';
+import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
+import {GRN_SHEET_HEADERS,parseCsvRows,importGrnRows,readGrnWorkbook,createGrnTemplate} from '../utils/grnSpreadsheet';
+import {documentErrors,numberError} from '../utils/purchasingValidation';
 import {usePurchaseItemRemoval} from '../hooks/usePurchaseItemRemoval';
 import PurchaseProductSearch from '../components/PurchaseProductSearch';
 import FilterSelect from '../components/FilterSelect';
@@ -36,7 +40,6 @@ import {
   History,
   Info,
   Edit2,
-  AlertTriangle,
   Trash2,
 } from 'lucide-react';
 
@@ -161,7 +164,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
 
   // Excel / CSV Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [csvRawText, setCsvRawText] = useState('');
+  const [spreadsheetBusy,setSpreadsheetBusy]=useState(false);
   const fileInputRef = useRef(null);
 
   // Inspection modal state for viewing a clicked GRN record
@@ -358,18 +361,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       addToast('Please select a product first', 'error');
       return;
     }
-    if (stagingItem.quantity === '' || stagingItem.costPrice === '' || stagingItem.salePrice === '') {
-      addToast('Enter received quantity, unit cost, and selling price before adding the product.', 'error');
-      return;
-    }
-    if (stagingItem.quantity <= 0 && stagingItem.freeQuantity <= 0) {
-      addToast('Enter a valid received or free quantity', 'error');
-      return;
-    }
-    if (stagingItem.costPrice < 0) {
-      addToast('Cost price cannot be negative', 'error');
-      return;
-    }
+    const fieldErrors=[numberError(stagingItem.quantity,'Received quantity',{positive:true}),numberError(stagingItem.costPrice,'Unit cost'),numberError(stagingItem.salePrice,'Selling price')].filter(Boolean);
+    if(!Number.isFinite(Number(stagingItem.markupPercent)) || Number(stagingItem.markupPercent)<-100 || Number(stagingItem.markupPercent)>99999)fieldErrors.push('MP% must be between -100 and 99999.');
+    if(fieldErrors.length){addToast(fieldErrors[0],'error');return;}
 
     const newItem = {
       productId: stagingItem.productId,
@@ -475,6 +469,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const handleSaveGrn = async (processImmediately = true, statusReason) => {
+    const validationErrors=documentErrors('GRN',formData);if(validationErrors.length){addToast(validationErrors[0],'error');return;}
     if (!formData.supplierId) {
       addToast('Please select a supplier', 'error');
       return;
@@ -646,127 +641,37 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     }
   };
 
-  // CSV / Excel parse and import
-  const handleParseCsv = (content) => {
+  const spreadsheetProducts = async () => {
+    const response=await brandApi.getAll();
+    const brands=response.data?.content || response.data || [];
+    return products.map(product=>({...product,brandMarkupPercent:brands.find(brand=>String(brand.id)===String(product.brandId))?.markupPercent ?? product.brandMarkupPercent ?? 0}));
+  };
+  const handleFileUpload = async (event) => {
+    const file=event.target.files?.[0];if(!file)return;
+    event.target.value='';setSpreadsheetBusy(true);
     try {
-      const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (lines.length <= 1) {
-        addToast('CSV file is empty or missing data rows', 'warning');
-        return;
-      }
-
-      // Expected headers: SKU/Code, Name, Qty, FreeQty, CostPrice, SalePrice, Discount%
-      const parsedItems = [];
-      let headerSkipped = false;
-
-      for (const line of lines) {
-        if (!headerSkipped) {
-          headerSkipped = true;
-          continue;
-        }
-
-        const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
-        if (cols.length < 3) continue;
-
-        const codeOrSku = cols[0];
-        const qty = parseInt(cols[2], 10) || 1;
-        const freeQty = parseInt(cols[3], 10) || 0;
-        const costPrice = parseFloat(cols[4]) || 0;
-        const salePrice = parseFloat(cols[5]) || 0;
-        const discountPct = parseFloat(cols[6]) || 0;
-
-        // Match product by SKU or Name
-        const matched = products.find(
-          (p) =>
-            p.sku?.toLowerCase() === codeOrSku.toLowerCase() ||
-            p.name?.toLowerCase() === codeOrSku.toLowerCase() ||
-            (cols[1] && p.name?.toLowerCase() === cols[1].toLowerCase())
-        );
-
-        if (matched) {
-          const grossVal = qty * (costPrice || matched.costPrice || 0);
-          const discAmt = (grossVal * discountPct) / 100;
-          const netAmt = grossVal - discAmt;
-          const finalCost = costPrice || matched.costPrice || 0;
-          const markupPercent = Number(matched.brandMarkupPercent || 0);
-          const finalSale = salePrice || Number((finalCost * (1 + markupPercent / 100)).toFixed(2));
-          const gp = finalSale > 0 ? ((finalSale - finalCost) / finalSale) * 100 : 0;
-          const totalUnits = qty + freeQty;
-          const freeCost = totalUnits > 0 ? netAmt / totalUnits : finalCost;
-
-          parsedItems.push({
-            productId: matched.id,
-            productCode: matched.sku,
-            tradeName: matched.name,
-            unitOfMeasure: matched.unitOfMeasure || 'PCS',
-            quantityReceived: qty,
-            freeQuantity: freeQty,
-            packQty: 1,
-            packSize: 1,
-            unitCost: finalCost,
-            salePrice: finalSale,
-            markupPercent: salePrice && finalCost ? Number(((finalSale / finalCost - 1) * 100).toFixed(2)) : markupPercent,
-            brandMarkupPercent: markupPercent,
-            useBrandMarkup: !salePrice,
-            creditPrice: finalSale * 1.05,
-            wholesalePrice: finalSale * 0.9,
-            purchaseValue: grossVal,
-            discountPercent: discountPct,
-            discountAmount: discAmt,
-            amount: netAmt,
-            gpPercent: Number(gp.toFixed(1)),
-            freeCostPrice: Number(freeCost.toFixed(2)),
-            priceCode: 'CSV-IMPORT',
-            notes: `Imported via Spreadsheet | Free: ${freeQty} | Disc: ${discountPct}% | Sale: LKR ${finalSale}`,
-          });
-        }
-      }
-
-      if (parsedItems.length === 0) {
-        addToast('No products matched from the uploaded spreadsheet. Verify Product Codes / SKUs.', 'error');
-        return;
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        items: mergeGrnItems([...prev.items, ...parsedItems]),
-      }));
-
-      addToast(`Successfully imported ${parsedItems.length} items from spreadsheet!`, 'success');
+      const extension=file.name.split('.').pop().toLowerCase();
+      if(!['xlsx','csv'].includes(extension))throw new Error('Choose an .xlsx or .csv file.');
+      const rows=extension==='xlsx'?await readGrnWorkbook(await file.arrayBuffer()):parseCsvRows(await file.text());
+      const imported=importGrnRows(rows,await spreadsheetProducts(),suppliers);
+      if(formData.items.length && String(formData.supplierId)!==String(imported.supplierId))throw new Error('The sheet supplier differs from the current GRN. Start a new GRN to import it.');
+      setFormData(previous=>({...previous,supplierId:String(imported.supplierId),remarks:imported.remarks || previous.remarks,items:mergeGrnItems([...previous.items,...imported.items])}));
+      setEditingLineIndex(null);setStagingItem({...INITIAL_STAGING_ITEM});setProductQuery('');
+      setShowGrnForm(true);
+      addToast(`Imported ${imported.items.length} products and GRN details. Review them before saving.`,'success');
       setShowUploadModal(false);
-      setCsvRawText('');
-    } catch (err) {
-      addToast('Failed to parse spreadsheet: ' + err.message, 'error');
-    }
+    } catch(error){addToast('Spreadsheet import: '+error.message,'error');}
+    finally{setSpreadsheetBusy(false);}
   };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target.result;
-      setCsvRawText(text);
-      handleParseCsv(text);
-    };
-    reader.readAsText(file);
-  };
-
-  const downloadSampleCsv = () => {
-    const sampleHeaders = 'ProductCode,TradeName,Quantity,FreeQuantity,CostPrice,SalePrice,DiscountPercent\n';
-    const sampleRows = products.slice(0, 3).map((p) =>
-      `${p.sku},"${p.name}",10,2,${p.costPrice || 10},${p.sellingPrice || 15},5`
-    ).join('\n') || 'SKU-001,"Sample Product",10,1,25.00,35.00,5';
-
-    const blob = new Blob([sampleHeaders + sampleRows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'sample_grn_intake.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadGrnTemplate = async () => {
+    setSpreadsheetBusy(true);
+    try {
+      const supplier=suppliers.find(item=>String(item.id)===String(formData.supplierId));
+      const buffer=await createGrnTemplate(await spreadsheetProducts(),{supplier:supplier?.name || '',remarks:formData.remarks});
+      const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      const link=document.createElement('a');link.href=url;link.download='grn_intake_template.xlsx';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(error){addToast('Could not download GRN template: '+error.message,'error');}
+    finally{setSpreadsheetBusy(false);}
   };
 
   const filteredProducts = products.filter((p) => {
@@ -778,7 +683,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     );
   });
 
-  const filteredGrns = grns.filter((g) => {
+  const filteredGrns = newestFirst(grns).filter((g) => {
     if(!matchesDateRange(g.receivedDate || g.createdAt,fromDate,toDate)) return false;
     const q = searchTerm.toLowerCase();
     const matchSearch =
@@ -1389,7 +1294,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </FilterSelect></label>
             <label>GRN date *<input className="input-glass" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
-            <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass" name="remarks" rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
+            <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass" name="remarks" maxLength={5000} rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
           </div>
           </div>
 
@@ -1543,7 +1448,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </div>
 
             <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '18px', lineHeight: 1.5 }}>
-              Upload your Excel (.xlsx / .csv) sheet or paste comma-separated product data to automatically import all line items into the GRN intake form.
+              Upload an Excel (.xlsx) or CSV sheet to fill product rows, supplier and remarks. Use one supplier per sheet. Enter quantities only for products being received; blank quantity rows are skipped. The GRN number is generated automatically when saving. Leave selling price blank to calculate cost + MP%. Prices are in LKR.
             </p>
 
             <div
@@ -1563,12 +1468,13 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 Click to Select Spreadsheet File (.csv / .xlsx)
               </div>
               <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '6px' }}>
-                File columns: ProductCode, TradeName, Quantity, FreeQty, CostPrice, SalePrice, Discount%
+                Columns: {GRN_SHEET_HEADERS.join(', ')}
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.txt,.xlsx,.xls"
+                accept=".csv,.xlsx"
+                disabled={spreadsheetBusy}
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
@@ -1579,10 +1485,11 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               <button
                 type="button"
                 className="btn btn-glass btn-sm"
-                onClick={downloadSampleCsv}
+                onClick={downloadGrnTemplate}
+                disabled={spreadsheetBusy}
                 style={{ fontSize: '0.82rem', padding: '6px 14px' }}
               >
-                Download Sample CSV Template
+                {spreadsheetBusy?'Please wait...':'Download Excel Template'}
               </button>
             </div>
 
@@ -1604,104 +1511,11 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           onEdit={() => { const grn = selectedGrn; setSelectedGrn(null); handleEditGrn(grn); }} />
       )}
 
-      {/* CANCEL GRN MODAL DIALOG */}
-      {cancellingGrn && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1250, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: 'min(520px, 96vw)',
-              maxWidth: '520px',
-              maxHeight: 'calc(100vh - 24px)',
-              overflowY: 'auto',
-              padding: '24px',
-              background: '#ffffff',
-              borderRadius: '12px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#e11d48', marginBottom: '14px' }}>
-              <AlertTriangle size={24} />
-              <h3 style={{ margin: 0, fontSize: '1.22rem', fontWeight: 800, color: '#0f172a' }}>
-                Cancel GRN {cancellingGrn.grnNumber}
-              </h3>
-            </div>
-
-            <div style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '16px', lineHeight: 1.5 }}>
-              {cancellingGrn.status === 'PROCESSED' ? (
-                <div style={{ padding: '10px 14px', background: '#fff1f2', borderRadius: '6px', border: '1px solid #fecdd3', color: '#be123c' }}>
-                  Cancelling this processed GRN will reverse the received quantities from inventory.
-                  If any product has insufficient available stock, the cancellation will be rejected.
-                </div>
-              ) : (
-                <div>
-                  Are you sure you want to cancel draft GRN <strong>{cancellingGrn.grnNumber}</strong>?
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: '18px' }}>
-              <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                Reason for Cancellation <span style={{ color: '#e11d48' }}>*</span>
-              </label>
-              <textarea
-                rows={3}
-                value={cancelReason}
-                maxLength={1000}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Enter cancellation reason (e.g., incorrect supplier delivery, wrong pricing, damaged goods returned)..."
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                  outline: 'none',
-                }}
-                onFocus={(e) => (e.target.style.borderColor = '#0284c7')}
-                onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                className="btn btn-glass"
-                disabled={cancelLoading}
-                onClick={() => setCancellingGrn(null)}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                disabled={cancelLoading || !cancelReason.trim()}
-                onClick={handleConfirmCancelGrn}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: '#e11d48',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
-                  cursor: cancelLoading || !cancelReason.trim() ? 'not-allowed' : 'pointer',
-                  opacity: cancelLoading || !cancelReason.trim() ? 0.6 : 1,
-                }}
-              >
-                {cancelLoading ? 'Cancelling...' : 'Confirm Cancellation'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {cancellingGrn && <PurchasingStatusDialog
+        pending={{type:'GRN',number:cancellingGrn.grnNumber,current:cancellingGrn.status,target:'CANCELLED',description:cancellingGrn.status==='PROCESSED'?'Cancelling reverses the received quantities from inventory. Every product must have enough available stock.':'This draft receipt will be cancelled. Enter the reason for the audit log.'}}
+        title="Cancel GRN" confirmLabel="Confirm Cancellation" closeLabel="Close"
+        reasonPlaceholder="Enter cancellation reason..." reason={cancelReason} onReasonChange={setCancelReason}
+        busy={cancelLoading} onClose={()=>setCancellingGrn(null)} onConfirm={handleConfirmCancelGrn}/>}
       {statusChangeDialog}
     </div>
   );

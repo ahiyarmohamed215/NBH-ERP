@@ -17,21 +17,27 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateGrnRequest {
+    @jakarta.validation.constraints.Size(max=1000)
     private String statusReason;
 
     @NotNull(message = "Supplier ID is required")
+    @jakarta.validation.constraints.Positive
     private Long supplierId;
+    @jakarta.validation.constraints.Positive
     private Long purchaseOrderId;
 
+    @jakarta.validation.constraints.Positive
     private Long warehouseId;
 
     private String grnType;
 
+    @jakarta.validation.constraints.Size(max=100)
     private String supplierInvoiceNumber;
 
     @NotNull(message = "Received date is required")
     private LocalDate receivedDate;
 
+    @jakarta.validation.constraints.Size(max=5000)
     private String notes;
 
     @NotEmpty(message = "GRN must have at least one line item")
@@ -44,17 +50,21 @@ public class CreateGrnRequest {
     public static class CreateGrnItemRequest {
 
         @NotNull(message = "Product ID is required")
+        @jakarta.validation.constraints.Positive
         private Long productId;
 
         @NotNull(message = "Received quantity is required")
         @Positive(message = "Quantity must be greater than zero")
+        @jakarta.validation.constraints.Digits(integer=36,fraction=2,message="Quantity supports up to 2 decimal places")
         private BigDecimal quantityReceived;
 
         @NotNull(message = "Unit cost is required")
         @PositiveOrZero(message = "Unit cost cannot be negative")
+        @jakarta.validation.constraints.Digits(integer=30,fraction=8,message="Unit cost is too large or too precise")
         private BigDecimal unitCost;
 
         @PositiveOrZero(message = "Selling price cannot be negative")
+        @jakarta.validation.constraints.Digits(integer=17,fraction=2)
         private BigDecimal sellingPrice;
 
         @jakarta.validation.constraints.DecimalMin(value = "-100", message = "MP% cannot be less than -100")
@@ -63,6 +73,7 @@ public class CreateGrnRequest {
 
         private Boolean useBrandMarkup;
 
+        @jakarta.validation.constraints.Size(max=255)
         private String notes;
     }
 }

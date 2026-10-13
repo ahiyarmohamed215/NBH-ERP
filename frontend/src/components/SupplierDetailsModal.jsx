@@ -1,3 +1,4 @@
+import StatusBadge from './StatusBadge';
 import React from 'react';
 import {Truck,UserRound,Phone,Mail,MapPin,Edit2,Printer,X,Ban,CheckCircle} from 'lucide-react';
 import './PurchaseInspectionModal.css';
@@ -15,7 +16,7 @@ export default function SupplierDetailsModal({supplier,active,onClose,onPrint,on
     <div className="glass-modal purchase-inspection supplier-inspection purchase-inspection-bottom-actions" role="dialog" aria-modal="true" aria-label="Supplier details">
       <header className="purchase-inspection-header purchase-inspection-header-details">
         <div className="purchase-inspection-header-main">
-          <div className="purchase-inspection-title"><div className="grn-inspection-symbol"><Truck size={22} strokeWidth={1.7}/></div><div><span className="purchase-inspection-caption">Supplier details</span><div className="purchase-inspection-number-row"><h2>{supplier.supplierCode || supplier.code || 'Supplier'}</h2></div></div></div>
+          <div className="purchase-inspection-title"><div className="grn-inspection-symbol"><Truck size={22} strokeWidth={1.7}/></div><div><span className="purchase-inspection-caption">Supplier details</span><div className="purchase-inspection-number-row"><h2>{supplier.supplierCode || supplier.code || 'Supplier'}</h2><StatusBadge status={active?'ACTIVE':'INACTIVE'} title={`Status: ${active?'Active':'Inactive'}`}/></div></div></div>
           <div className="purchase-inspection-header-controls"><button type="button" className="purchase-inspection-close" aria-label="Close supplier details" title="Close" onClick={onClose}><X size={18}/></button></div>
         </div>
         <div className="purchase-inspection-details-card">

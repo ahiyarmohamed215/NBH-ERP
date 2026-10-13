@@ -2,7 +2,6 @@ package com.nbh.erp.supplier.service;
 
 import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.BusinessException;
-import com.nbh.erp.common.exception.DuplicateResourceException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.grn.repository.GrnRepository;
 import com.nbh.erp.product.repository.ProductRepository;
@@ -23,14 +22,24 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SupplierService {
 
+    private final jakarta.validation.Validator validator;
     private final SupplierRepository supplierRepository;
     private final GrnRepository grnRepository;
     private final ProductRepository productRepository;
     private final AuditLogService auditLogService;
 
+    private void validateInput(CreateSupplierRequest request) {
+        if(request.getName()!=null)request.setName(request.getName().trim());
+        if(request.getSupplierCode()!=null)request.setSupplierCode(request.getSupplierCode().trim());
+        if(request.getEmail()!=null)request.setEmail(request.getEmail().trim());
+        request.setPhone(com.nbh.erp.common.validation.PhoneValidator.normalize(request.getPhone()));
+        var violations=validator.validate(request);
+        if(!violations.isEmpty())throw new BusinessException(violations.stream().map(jakarta.validation.ConstraintViolation::getMessage).sorted().collect(java.util.stream.Collectors.joining("; ")));
+    }
+
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
-        return supplierRepository.findAll().stream()
+        return supplierRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"createdAt","id")).stream()
                 .map(SupplierDto::from)
                 .collect(Collectors.toList());
     }
@@ -61,17 +70,11 @@ public class SupplierService {
 
     @Transactional
     public SupplierDto createSupplier(CreateSupplierRequest request) {
-        String code = request.getSupplierCode();
-        if (!StringUtils.hasText(code)) {
-            long count = supplierRepository.count() + 1;
-            code = String.format("SUPP-%04d", count);
-        } else {
-            code = code.trim().toUpperCase();
-        }
-
-        if (supplierRepository.existsBySupplierCode(code)) {
-            throw new DuplicateResourceException("Supplier", "code", code);
-        }
+        validateInput(request);
+        long next = supplierRepository.count() + 1;
+        String code;
+        do { code = String.format("SUPP-%04d", next++); }
+        while (supplierRepository.existsBySupplierCode(code));
 
         Supplier supplier = Supplier.builder()
                 .supplierCode(code)
@@ -93,20 +96,11 @@ public class SupplierService {
 
     @Transactional
     public SupplierDto updateSupplier(Long id, CreateSupplierRequest request) {
+        validateInput(request);
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
 
         SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + supplier.getName());
-
-        if (StringUtils.hasText(request.getSupplierCode())) {
-            String newCode = request.getSupplierCode().trim().toUpperCase();
-            supplierRepository.findBySupplierCode(newCode).ifPresent(existing -> {
-                if (!existing.getId().equals(id)) {
-                    throw new DuplicateResourceException("Supplier", "code", newCode);
-                }
-            });
-            supplier.setSupplierCode(newCode);
-        }
 
         supplier.setName(request.getName().trim());
         supplier.setContactPerson(request.getContactPerson());

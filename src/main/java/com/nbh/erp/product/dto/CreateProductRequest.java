@@ -47,6 +47,7 @@ public class CreateProductRequest {
 
     @PositiveOrZero(message = "Selling price cannot be negative")
     private BigDecimal sellingPrice;
+    private Boolean useBrandMarkup;
 
     private Integer minStockLevel = 5;
 }

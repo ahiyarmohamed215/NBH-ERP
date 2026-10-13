@@ -27,3 +27,8 @@
 @media(min-width:761px) and (max-height:800px){.purchase-product-search .purchase-search-input input{height:32px}}
 
 @media(min-width:761px) and (max-height:800px){.purchase-search-group{gap:6px}}
+
+.purchase-result-details>span:has(.purchase-result-reference-line){flex-basis:100%;min-width:0}
+.purchase-result-reference-line{display:flex;align-items:baseline;gap:10px;white-space:nowrap;min-width:0}
+.purchase-result-reference-line>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.purchase-result-reference-line>span:last-child{flex-shrink:0}

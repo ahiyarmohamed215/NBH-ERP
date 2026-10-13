@@ -19,8 +19,8 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   apis.warehouseApi.getAll=async()=>({data:[{id:10,code:'WH-10',name:'North',isActive:true},{id:20,code:'WH-20',name:'South',isActive:true}]});
   apis.brandApi.getAll=async()=>({data:[{id:1,code:'BRAND-1',name:'Test brand',markupPercent:25,isActive:true}]});
   apis.categoryApi.getAll=apis.categoryApi.getActive=async()=>({data:[{id:1,code:'CAT-1',name:'Test category',isActive:true}]});
-  apis.inventoryApi.getBalances=async()=>({data:{content:products.map(product=>({productId:product.id,productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,costPrice:product.costPrice,sellingPrice:product.sellingPrice}))}});
-  apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]}]}});
+  apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,costPrice:product.costPrice,sellingPrice:0}))}};};
+  apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]},{id:31,adjustmentNumber:'ADJ-OLD',adjustmentDate:'2026-10-09',warehouseName:'South',items:[{productId:2,productSku:'SKU-SECOND',productName:products[1].name,differenceQuantity:2,reason:'Opening stock'}]}]}});
   apis.staffQuotaApi.search=async()=>({data:{content:[{id:40,productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
   apis.staffQuotaApi.getSummary=async()=>({data:null});
   let printed='';window.open=()=>({document:{open(){},write(html){printed=html;},close(){}}});
@@ -34,11 +34,25 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
     await act(async()=>toolbar.querySelector('[aria-label="Filter by warehouse"]').click());
     await act(async()=>[...document.querySelectorAll('.modern-filter-options [role="option"]')].find(option=>option.textContent==='North').click());
     assert.equal(host.querySelectorAll('tbody tr').length,1);
+    assert.match(host.querySelector('tbody tr td:nth-child(7)').textContent,/35\.00/,'A zero balance price falls back to the product selling price');
+   }
+   if(tab==='adjustments') {
+    assert.ok(!toolbar.textContent.includes('All Reasons'));
+    const date=toolbar.querySelector('[aria-label="Stock adjustment date range"]');assert.ok(date);assert.equal(date.parentElement.firstElementChild,date,'Date range is the first filter');
+    assert.equal(host.querySelectorAll('tbody tr').length,2);
+    await act(async()=>date.click());
+    const calendar=document.querySelector('[aria-label="Choose Stock adjustment date range"]');assert.ok(calendar);
+    const now=new Date(),offset=(2026-now.getFullYear())*12+9-now.getMonth();
+    for(let step=0;step<Math.abs(offset);step++)await act(async()=>calendar.querySelector(`[aria-label="${offset<0?'Previous':'Next'} month"]`).click());
+    await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
+    await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
+    assert.equal(host.querySelectorAll('tbody tr').length,1);assert.match(host.querySelector('tbody').textContent,/ADJ-30/);
    }
    const print=toolbar.querySelector('[title^="Print"]');assert.ok(print,`${tab}: print button present`);
    printed='';await act(async()=>print.click());assert.ok(printed.includes('<table>') && printed.includes('Total records'),`${tab}: prints a real report`);
    assert.ok(!printed.includes('999991') && !printed.includes('999992'),'Cost data hidden in the UI stays out of printed reports');
    if(tab==='inventory-list') {assert.ok(printed.includes('SKU-FIRST') && !printed.includes('SKU-SECOND'));assert.ok(printed.includes('&lt;unsafe&gt;') && !printed.includes('<unsafe>'));}
+   if(tab==='adjustments') {assert.ok(printed.includes('ADJ-30') && !printed.includes('ADJ-OLD'));await act(async()=>toolbar.querySelector('[title="Reset all filters to default"]').click());assert.equal(host.querySelectorAll('tbody tr').length,2);}
   }
  } finally {await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT']) delete globalThis[key];}
 });

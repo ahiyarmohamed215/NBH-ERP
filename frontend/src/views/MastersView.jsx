@@ -1,3 +1,6 @@
+import {newestFirst} from '../utils/recordOrder';
+import SupplierEditorModal from '../components/SupplierEditorModal';
+import {supplierErrors,normalizePhone,phoneCountry} from '../utils/purchasingValidation';
 import SupplierDetailsModal from '../components/SupplierDetailsModal';
 import FilterSelect from '../components/FilterSelect';
 import {printCurrentDirectory} from '../utils/printDirectory';
@@ -231,7 +234,7 @@ const MastersView = React.forwardRef(function MastersView({
     } else if (activeTab === 'customers') {
       setModalForm({ code: '', name: '', contactPerson: '', phone: '', email: '', address: '', creditLimit: '0' });
     } else if (activeTab === 'suppliers') {
-      setModalForm({ code: '', name: '', contactPerson: '', phone: '', email: '', address: '' });
+      setModalForm({ code: '', name: '', contactPerson: '', phone: '', phoneCountry:'LK', email: '', address: '' });
     }
     setShowModal(true);
   };
@@ -262,6 +265,7 @@ const MastersView = React.forwardRef(function MastersView({
         ...item,
         contactNumber: item.contactNumber || item.phone || '',
         phone: item.phone || item.contactNumber || '',
+        phoneCountry:phoneCountry(item.phone || item.contactNumber),
       });
     }
     setShowModal(true);
@@ -273,6 +277,7 @@ const MastersView = React.forwardRef(function MastersView({
       addToast('Permission denied: Only authorized staff can edit existing records.', 'error');
       return;
     }
+    if(activeTab==='suppliers') {const errors=supplierErrors(modalForm);if(Object.keys(errors).length){addToast(Object.values(errors)[0],'error');return;}}
     try {
       setSaving(true);
       if (activeTab === 'products') {
@@ -292,6 +297,7 @@ const MastersView = React.forwardRef(function MastersView({
           unitOfMeasure: modalForm.unitOfMeasure || 'PCS',
           costPrice: editingItem ? (parseFloat(editingItem.costPrice) || 0) : 0,
           sellingPrice: editingItem ? (parseFloat(editingItem.sellingPrice) || 0) : 0,
+          useBrandMarkup: editingItem ? (editingItem.useBrandMarkup ?? Number(editingItem.sellingPrice || 0) === 0) : true,
           minStockLevel: parseInt(modalForm.minStockLevel, 10) || 0,
           description: modalForm.description?.trim() || null,
         };
@@ -359,8 +365,8 @@ const MastersView = React.forwardRef(function MastersView({
         }
       } else if (activeTab === 'suppliers') {
         const payload = {
-          ...modalForm,
-          supplierCode: modalForm.code || modalForm.supplierCode || '',
+          name:modalForm.name.trim(),contactPerson:modalForm.contactPerson?.trim() || '',
+          phone:normalizePhone(modalForm.phone,modalForm.phoneCountry || phoneCountry(modalForm.phone)),email:modalForm.email?.trim() || '',address:modalForm.address?.trim() || '',
         };
         if (editingItem) {
           await supplierApi.update(editingItem.id, payload);
@@ -444,7 +450,7 @@ const MastersView = React.forwardRef(function MastersView({
   const filteredWarehouses = filterList(warehouses, ['name', 'code', 'contactNumber', 'phone', 'address']);
   const filteredCategories = filterList(categories, ['code', 'name', 'description']);
   const filteredCustomers = filterList(customers, ['name', 'code', 'customerCode', 'phone', 'contactPerson', 'email']);
-  const filteredSuppliers = filterList(suppliers, ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email']);
+  const filteredSuppliers = filterList(newestFirst(suppliers), ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email']);
 
   const handlePrintSuppliers = (supplier = null) => {
     const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -1037,7 +1043,7 @@ const MastersView = React.forwardRef(function MastersView({
                         title="Click row to view product details"
                       >
                         <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{p.sku}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{p.name}<small style={{display:'block',marginTop:4,fontSize:'.73rem',fontWeight:400,color:'#64748b'}}>Selling price: LKR {Number(p.sellingPrice || 0).toFixed(2)}</small></td>
                         <td
                           style={{
                             padding: '12px 18px',
@@ -1822,6 +1828,10 @@ const MastersView = React.forwardRef(function MastersView({
 
               {viewingItem.type === 'products' && (
                 <>
+                  <div style={{ display:'grid',gridTemplateColumns:'140px 1fr',gap:8,padding:'10px 14px',background:'#f8fafc',borderRadius:8,border:'1px solid #e2e8f0' }}>
+                    <span style={{fontSize:'.85rem',color:'#64748b',fontWeight:600}}>Selling price</span>
+                    <span style={{fontWeight:600}}>LKR {Number(viewingItem.sellingPrice || 0).toFixed(2)}<small style={{display:'block',marginTop:4,fontSize:'.73rem',fontWeight:400,color:'#64748b'}}>{viewingItem.useBrandMarkup ? `Cost + brand MP% (${Number(viewingItem.brandMarkupPercent || 0).toFixed(2)}%)` : 'Manual price'}</small></span>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Category</span>
                     <span style={{ fontWeight: 600 }}>{viewingItem.categoryName || 'General / Uncategorized'}</span>
@@ -1950,7 +1960,8 @@ const MastersView = React.forwardRef(function MastersView({
       )}
 
       {/* Add / Edit Form Modal */}
-      {showModal && (
+      {showModal && activeTab==='suppliers' && <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>}
+      {showModal && activeTab!=='suppliers' && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}

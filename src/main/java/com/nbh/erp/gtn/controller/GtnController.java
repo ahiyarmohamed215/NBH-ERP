@@ -63,7 +63,7 @@ public class GtnController {
             @RequestParam(required = false) Long destinationWarehouseId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
-            @PageableDefault(size = 20) Pageable pageable
+            @PageableDefault(size = 20, sort = {"createdAt", "id"}, direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable
     ) {
         PagedResponse<GtnDto> response = gtnService.searchGtns(sourceWarehouseId, destinationWarehouseId, status, query, pageable);
         return ResponseEntity.ok(ApiResponse.ok(response));

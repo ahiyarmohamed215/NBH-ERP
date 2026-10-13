@@ -19,7 +19,7 @@ test('Purchasing popups share compact details, table controls and status workflo
     apis.productApi.getProducts=async()=>({data:{content:[{id:1,sku:'TEST-1',name:'Test product',defaultWarehouseId:1,costPrice:5}]}});
     apis.warehouseApi.getActive=async()=>({data:[{id:1,name:'North'},{id:2,name:'South'}]});
     apis.inventoryApi.getWarehouseStock=async()=>({data:[{productId:1,quantity:0,reservedQuantity:0}]});
-    const item = { id: 1, productId: 1, productSku: 'TEST-1', sku: 'TEST-1', productName: 'Test product', quantityTransferred: 2, quantityReturned: 2, quantity: 2, unitCost: 5, totalCost: 10 };
+    const item = { id: 1, productId: 1, productSku: 'TEST-1', sku: 'TEST-1', productName: 'Test product', quantityTransferred: 2, quantityReturned: 2, quantity: 2, unitCost: 5, sellingPrice: 125, totalCost: 10 };
     const docs = {
       GTN: { id: 1, dispatchDate:'2026-10-10', gtnNumber: 'GTN-1', sourceWarehouseId:1,destinationWarehouseId:2, sourceWarehouseName: 'North', destinationWarehouseName: 'South', status: 'TRANSFERRED', responsibleStaffId: 5, responsibleStaffName:'Transfer staff', items: [item] },
       PRN: { id: 2, prnNumber: 'PRN-2', supplierId:7,warehouseId:1,sourceGrnId:10,supplierName: 'Supplier', warehouseName: 'North', returnDate: '2026-10-10', createdAt:'2026-10-11T09:00:00', remarks:'Supplier requested return', status: 'PROCESSED', totalAmount: 10, items: [{...item,sourceGrnId:10,originalGrnNumber:'GRN-10',supplierId:7,supplierName:'Supplier',warehouseId:1,warehouseName:'North',reason:'Damaged'}] },
@@ -78,6 +78,11 @@ test('Purchasing popups share compact details, table controls and status workflo
       assert.ok(popup.querySelector('.purchase-inspection-items table').textContent.includes('Test product'));
       const actions = popup.querySelector('.purchase-inspection-table-toolbar');
       assert.ok(actions, `${type} has table search and print controls`);
+      if(type!=='GTN'){
+        assert.ok(popup.textContent.includes('Selling price'));
+        assert.ok(popup.textContent.includes('LKR 125.00'));
+        assert.ok(!popup.textContent.includes('Unit cost'));
+      }
       assert.equal(popup.querySelector('.purchase-inspection-actions'),null,'Popup has no bottom Print or Close buttons');
       const search=actions.querySelector(`[aria-label="Search ${type} products"]`);assert.ok(search);
       assert.equal(actions.querySelector('.modern-filter-trigger'),null);
@@ -100,7 +105,7 @@ test('Purchasing popups share compact details, table controls and status workflo
       assert.ok(popup.classList.contains('purchase-inspection-bottom-actions'));
       assert.ok(popup.querySelector('.purchase-inspection-details'));
       if(type==='PO') assert.equal(popup.querySelector('.purchase-inspection-detail-actions button').textContent.trim(),'Edit PO');
-      if(type==='PRN') assert.ok(popup.querySelector('.purchase-inspection-details').textContent.includes('Total valueLKR 10.00'));
+      if(type==='PRN') assert.ok(popup.querySelector('.purchase-inspection-details').textContent.includes('Total valueLKR 250.00'));
       assert.ok(popup.querySelector('.grn-inspection-symbol'));
       assert.ok([...popup.querySelectorAll('th')].some(cell => cell.textContent === 'Product name'));
       assert.equal(popup.querySelectorAll(`[title="Print ${type}"]`).length, 1);
@@ -165,7 +170,7 @@ test('Purchasing popups share compact details, table controls and status workflo
           await act(async()=>host.querySelector('.modern-filter-trigger').click());assert.deepEqual([...document.querySelectorAll('.modern-filter-options [role="option"]')].map(option=>option.textContent),['All Statuses','Draft','Inform to Order','Cancelled']);await act(async()=>document.querySelector('.modern-filter-popup').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
           await act(async()=>host.querySelector('[aria-label="Close PO details"]').click());
           printed='';await act(async()=>host.querySelector('[title="Print PO"]').click());
-          assert.ok(printed.includes('PO-3') && printed.includes('TEST-1') && printed.includes('Test product') && printed.includes('LKR 10.00'));
+          assert.ok(printed.includes('PO-3') && printed.includes('TEST-1') && printed.includes('Test product') && printed.includes('LKR 250.00'));
           assert.equal(host.querySelector('[role="dialog"]'),null);continue;
         }
         await changeStatus(`Cancel ${type}`);

@@ -17,7 +17,7 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
       if (!name.endsWith('Api') || !api || typeof api !== 'object') continue;
       for (const method of Object.keys(api)) if(typeof api[method]==='function') api[method]=async()=>({data:[]});
     }
-    apis.productApi.getProducts=async()=>({data:{content:[{id:1,sku:'TEST-1',name:'Test product',costPrice:4,defaultWarehouseId:2},{id:2,sku:'ZERO-2',name:'Zero stock product',costPrice:2,defaultWarehouseId:1},{id:3,sku:'RESERVED-3',name:'Fully reserved product',costPrice:3,defaultWarehouseId:2}]}});
+    apis.productApi.getProducts=async()=>({data:{content:[{id:1,sku:'TEST-1',name:'Test product',costPrice:4,sellingPrice:125,defaultWarehouseId:2},{id:2,sku:'ZERO-2',name:'Zero stock product',costPrice:2,sellingPrice:75,defaultWarehouseId:1},{id:3,sku:'RESERVED-3',name:'Fully reserved product',costPrice:3,defaultWarehouseId:2}]}});
     apis.supplierApi.getActive=async()=>({data:[{id:7,name:'Selected supplier'},{id:8,name:'Other supplier'}]});
     let savedPoPayload=null;
     apis.purchaseOrderApi.create=async payload=>{savedPoPayload=payload;return {data:{id:20,poNumber:'PO-20',...payload}};};
@@ -75,8 +75,20 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         const result=form.querySelector('[role="option"]');
         assert.ok(result.textContent.includes(name === 'PurchaseOrdersView' ? 'Available: 180' : 'Available: 90'),`${name}: results include available quantity`);
         const resultsText=form.querySelector('[role="listbox"]').textContent;
+        if(['GtnView','PurchaseOrdersView'].includes(name)){assert.match(resultsText,/Selling price: LKR 125\.00/);assert.ok(!resultsText.includes('Unit cost:'));}
+        if(name==='PrnView'){
+          assert.ok(!resultsText.includes('Supplier:'));
+          const reference=result.querySelector('.purchase-result-reference-line');
+          assert.ok(reference.textContent.includes('Warehouse: Product warehouse'));
+          assert.ok(reference.textContent.includes('GRN: GRN-10'));
+          assert.equal(reference.children.length,2,'Warehouse and original GRN share one detail line');
+        }
         assert.ok(!resultsText.includes('Zero stock product'));
         if(name === 'PurchaseOrdersView') assert.ok(!form.textContent.includes('Payment terms'));
+        if(['PrnView','PurchaseOrdersView'].includes(name)){
+          assert.ok([...form.querySelectorAll('th')].some(cell=>cell.textContent==='Selling price'));
+          assert.ok(![...form.querySelectorAll('th')].some(cell=>cell.textContent==='Unit cost'));
+        }
         await act(async()=>{
           Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(productSearch,'');
           productSearch.dispatchEvent(new window.Event('input',{bubbles:true}));
@@ -96,8 +108,8 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         assert.equal(form.querySelector('[role="listbox"]'),null);
         if(name === 'PurchaseOrdersView') {
           assert.equal(form.querySelector('.po-supplier-field').parentElement,form.querySelector('.purchase-entry-fields'),'Supplier and Qty share one row');
-          const card=form.querySelector('.po-product-card');assert.ok(card.textContent.includes('Product warehouse'));assert.ok(card.textContent.includes('LKR 4.00'));
-          assert.equal(form.querySelector('.purchase-entry-fields input[inputmode="decimal"]'),null);
+          const card=form.querySelector('.po-product-card');assert.ok(card.textContent.includes('Product warehouse'));assert.ok(card.textContent.includes('LKR 125.00'));
+          assert.equal(form.querySelector('.purchase-entry-fields input[data-purchase-field="cost"]'),null);
           assert.equal(form.querySelector('.po-supplier-field select').value,'','Supplier is selected by staff');
           assert.equal(form.querySelector('.purchase-fields input[type="date"]'),null,'PO uses its creation date');
           assert.ok(!form.textContent.includes('Expected date'));assert.equal(form.querySelectorAll('.po-supplier-field select').length,1,'The warehouse is filled automatically');
@@ -105,8 +117,8 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         if(name === 'PrnView') {
           const field=label=>[...form.querySelectorAll('label')].find(element=>element.textContent.startsWith(label)).querySelector('input,textarea');
           const card=form.querySelector('.prn-return-card');assert.ok(card.textContent.includes('First supplier'));assert.ok(card.textContent.includes('Product warehouse'));assert.ok(card.textContent.includes('GRN-10'));
-          assert.ok(card.querySelector('.prn-return-card-metrics').textContent.includes('LKR 6.00'));
-          assert.equal(form.querySelector('.purchase-entry-fields input[inputmode="decimal"]'),null,'Receipt price appears in the details card');
+          assert.ok(card.querySelector('.prn-return-card-metrics').textContent.includes('LKR 125.00'));
+          assert.equal(form.querySelector('.purchase-entry-fields input[data-purchase-field="cost"]'),null,'Receipt price appears in the details card');
           assert.ok(![...form.querySelectorAll('th')].some(cell=>cell.textContent==='Supplier'),'Supplier is displayed in the intake card instead of the creation table');
           assert.ok(![...form.querySelectorAll('th')].some(cell=>cell.textContent==='Warehouse'),'Warehouse is displayed in the intake card instead of the creation table');
           assert.equal(field('Return quantity').value,'','The user enters return quantity');
@@ -142,7 +154,7 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         assert.equal(quantityInput.value,''); assert.equal(add.disabled,true);
         await changeInput(quantityInput,'045');
         assert.equal(quantityInput.value,'45');
-        const costInput=form.querySelector('.purchase-entry-fields input[inputmode="decimal"]');
+        const costInput=form.querySelector('.purchase-entry-fields input[data-purchase-field="cost"]');
         if(costInput && !costInput.readOnly){
           await changeInput(costInput,'');
           assert.equal(costInput.value,''); assert.equal(add.disabled,true);
@@ -159,6 +171,7 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         await act(async()=>add.click());
         assert.equal(form.querySelectorAll('tbody tr').length,1,`${name}: item appears in table`);
         assert.ok(form.querySelector('tbody').textContent.includes('Test product'));
+        if(['PrnView','PurchaseOrdersView'].includes(name)) assert.ok(form.querySelector('tbody').textContent.includes('LKR 125.00'));
         await act(async()=>form.querySelector('[aria-label="Remove item 1"]').click());
         const confirmation=document.querySelector('[role="alertdialog"]');assert.ok(confirmation,`${name}: removing an added row asks for confirmation`);
         assert.ok(confirmation.textContent.includes('Test product'));
@@ -169,9 +182,9 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
         if(name === 'PurchaseOrdersView') {
           await act(async()=>{productSearch.blur();productSearch.focus();});
           const zeroStock=[...form.querySelectorAll('[role="option"]')].find(option=>option.textContent.includes('Zero stock product'));assert.ok(zeroStock);
-          await act(async()=>zeroStock.click());assert.ok(form.querySelector('.po-product-card').textContent.includes('Main warehouse'));assert.ok(form.querySelector('.po-product-card').textContent.includes('LKR 2.00'));
+          await act(async()=>zeroStock.click());assert.ok(form.querySelector('.po-product-card').textContent.includes('Main warehouse'));assert.ok(form.querySelector('.po-product-card').textContent.includes('LKR 75.00'));
           const secondSupplier=form.querySelector('.po-supplier-field select');await chooseField(secondSupplier,'8');await changeInput(quantityInput,'3');await act(async()=>add.click());assert.equal(form.querySelectorAll('tbody tr').length,2,'Zero-stock products can be ordered for their configured warehouse');
-          await act(async()=>form.querySelector('[aria-label="Edit item 1"]').click());assert.ok(form.querySelector('.po-product-card').textContent.includes('Product warehouse'));assert.ok(form.querySelector('.po-product-card').textContent.includes('LKR 4.00'));
+          await act(async()=>form.querySelector('[aria-label="Edit item 1"]').click());assert.ok(form.querySelector('.po-product-card').textContent.includes('Product warehouse'));assert.ok(form.querySelector('.po-product-card').textContent.includes('LKR 125.00'));
           await changeInput(quantityInput,'20');await act(async()=>add.click());
           const supplierSelect=form.querySelector('.po-supplier-field select');await chooseField(supplierSelect,'7');
           const notes=form.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(notes,'Order new stock');notes.dispatchEvent(new window.Event('input',{bubbles:true}));});
@@ -185,13 +198,13 @@ test('all purchasing creation forms use inline workspaces and report focus mode'
           await act(async()=>{productSearch.blur();productSearch.focus();});
           const otherWarehouse=[...form.querySelectorAll('[role="option"]')].find(option=>option.textContent.includes('Main warehouse'));
           await act(async()=>otherWarehouse.click());
-          assert.ok(form.querySelector('.prn-return-card-metrics').textContent.includes('LKR 9.00'));
+          assert.ok(form.querySelector('.prn-return-card-metrics').textContent.includes('LKR 125.00'));
           const reason=[...form.querySelectorAll('label')].find(label=>label.textContent.startsWith('Return reason')).querySelector('input');
           await changeInput(reason,'Quality issue');await changeInput(quantityInput,'3');
           await act(async()=>add.click());
           assert.equal(form.querySelectorAll('tbody tr').length,2,'One PRN can include different suppliers and warehouses');
           await act(async()=>form.querySelector('[aria-label="Edit item 1"]').click());
-          assert.ok(form.querySelector('.prn-return-card-metrics').textContent.includes('LKR 6.00'));
+          assert.ok(form.querySelector('.prn-return-card-metrics').textContent.includes('LKR 125.00'));
           assert.equal(reason.value,'Damaged packaging');await changeInput(quantityInput,'4');await act(async()=>add.click());
           const saveDraft=[...form.querySelectorAll('button')].find(button=>button.textContent.trim()==='Save Draft');
           await act(async()=>saveDraft.click());

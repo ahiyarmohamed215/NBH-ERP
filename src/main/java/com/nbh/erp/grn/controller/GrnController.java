@@ -32,7 +32,7 @@ public class GrnController {
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String query,
-            @PageableDefault(size = 20) Pageable pageable
+            @PageableDefault(size = 20, sort = {"createdAt", "id"}, direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable
     ) {
         PagedResponse<GrnDto> response = grnService.searchGrns(warehouseId, supplierId, status, query, pageable);
         return ResponseEntity.ok(ApiResponse.ok(response));

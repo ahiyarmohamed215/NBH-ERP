@@ -3,7 +3,7 @@ export function calculateGrnStaging(previous, field, value) {
   const updated = { ...previous, [field]: value };
   for (const key of ['quantity', 'freeQuantity', 'costPrice', 'salePrice', 'packQty', 'packSize']) {
     if (['quantity', 'costPrice', 'salePrice'].includes(key) && updated[key] === '') continue;
-    updated[key] = Math.max(key === 'packQty' || key === 'packSize' ? 1 : 0, Number(updated[key]) || 0);
+    updated[key] = ['quantity','costPrice','salePrice'].includes(key) ? Number(updated[key]) : Math.max(key === 'packQty' || key === 'packSize' ? 1 : 0, Number(updated[key]) || 0);
   }
   if (field === 'packQty' || field === 'packSize') updated.quantity = updated.packQty * updated.packSize;
   updated.brandMarkupPercent = Math.max(0, Number(previous.brandMarkupPercent ?? previous.markupPercent) || 0);
@@ -31,7 +31,7 @@ export function calculateGrnStaging(previous, field, value) {
 
 export function buildGrnItemsPayload(items) {
   return items.map((item, index) => {
-    const quantityReceived = Number(item.quantityReceived) + Number(item.freeQuantity || 0);
+    const quantityReceived = Number((Number(item.quantityReceived) + Number(item.freeQuantity || 0)).toFixed(2));
     const amount = Number(item.amount);
     const sellingPrice = Number(item.salePrice || 0);
     const markupPercent = Number(item.markupPercent || 0);
@@ -60,7 +60,7 @@ export function mergeGrnItems(items) {
     const key = String(item.productId);
     const previous = lines.get(key);
     if (!previous) { lines.set(key, { ...item }); continue; }
-    const quantityReceived = Number(previous.quantityReceived) + Number(item.quantityReceived);
+    const quantityReceived = Number((Number(previous.quantityReceived) + Number(item.quantityReceived)).toFixed(2));
     const freeQuantity = Number(previous.freeQuantity || 0) + Number(item.freeQuantity || 0);
     const purchaseValue = Number(previous.purchaseValue ?? previous.quantityReceived * previous.unitCost)
       + Number(item.purchaseValue ?? item.quantityReceived * item.unitCost);

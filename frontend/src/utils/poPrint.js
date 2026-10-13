@@ -1,3 +1,4 @@
+import {purchaseSellingPrice} from './purchaseSellingPrice';
 import { executeA4Print } from './printReport';
 
 const escape = value => String(value ?? '—').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -17,11 +18,11 @@ export function groupPoItems(order) {
 export function buildPoPrintHtml(orders) {
   const documents=Array.isArray(orders) ? orders : [orders];
   const sheets=documents.flatMap(order=>groupPoItems(order).map((group,index)=>{
-    const total=group.items.reduce((sum,item)=>sum+Number(item.quantity || 0)*Number(item.unitCost || 0),0);
+    const total=group.items.reduce((sum,item)=>sum+Number(item.quantity || 0)*purchaseSellingPrice(item),0);
     return `<section class="po-sheet"><header><div><strong>NBH ENTERPRISE</strong><p>Purchase order</p></div><div><h1>${escape(order.poNumber)}</h1><p>${escape(order.status?.replaceAll('_',' '))}</p></div></header>
       <div class="details"><div><span>Supplier</span><b>${escape(group.supplierName)}</b></div><div><span>Created date</span><b>${escape(purchaseOrderDate(order))}</b></div></div>
       <p class="remarks"><b>Remarks:</b> ${escape(order.notes)}</p>
-      <table><thead><tr><th>Product code</th><th>Product name</th><th>Destination warehouse</th><th>Qty</th><th>Unit cost (LKR)</th><th>Line total (LKR)</th></tr></thead><tbody>${group.items.map(item=>`<tr><td>${escape(item.sku || item.productSku)}</td><td>${escape(item.productName)}</td><td>${escape(item.warehouseName || order.warehouseName)}</td><td class="number">${escape(item.quantity)}</td><td class="number">${Number(item.unitCost || 0).toFixed(2)}</td><td class="number">${(Number(item.quantity || 0)*Number(item.unitCost || 0)).toFixed(2)}</td></tr>`).join('')}</tbody></table>
+      <table><thead><tr><th>Product code</th><th>Product name</th><th>Destination warehouse</th><th>Qty</th><th>Selling price (LKR)</th><th>Line total (LKR)</th></tr></thead><tbody>${group.items.map(item=>`<tr><td>${escape(item.sku || item.productSku)}</td><td>${escape(item.productName)}</td><td>${escape(item.warehouseName || order.warehouseName)}</td><td class="number">${escape(item.quantity)}</td><td class="number">${purchaseSellingPrice(item).toFixed(2)}</td><td class="number">${(Number(item.quantity || 0)*purchaseSellingPrice(item)).toFixed(2)}</td></tr>`).join('')}</tbody></table>
       <div class="total">Supplier total: LKR ${total.toFixed(2)}</div><footer>${escape(order.poNumber)} · Supplier copy ${index+1} of ${groupPoItems(order).length}</footer></section>`;
   })).join('');
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Purchase orders</title><style>

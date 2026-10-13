@@ -1,3 +1,5 @@
+import {newestFirst} from '../utils/recordOrder';
+import {documentErrors,numberError} from '../utils/purchasingValidation';
 import FilterSelect from '../components/FilterSelect';
 import '../components/PurchasingAppearance.css';
 import DateRangePicker, {matchesDateRange} from '../components/DateRangePicker';
@@ -175,6 +177,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
   };
 
   const handleSaveGtn = async (submitPending = true, statusReason) => {
+    const validationErrors=documentErrors('GTN',formData);if(validationErrors.length){addToast(validationErrors[0],'error');return;}
     if (formData.items.some(item=>!itemSourceId(item) || !itemDestinationId(item) || String(itemSourceId(item))===String(itemDestinationId(item)))) {
       addToast('Every item must have different source and destination warehouses.', 'error'); return;
     }
@@ -285,7 +288,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     }
   };
 
-  const filteredGtns = gtns.filter((g) => {
+  const filteredGtns = newestFirst(gtns).filter((g) => {
     if(!matchesDateRange(g.dispatchDate || g.createdAt,fromDate,toDate)) return false;
     const q = searchTerm.toLowerCase();
     const matchSearch =
@@ -753,7 +756,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
             </div>
 
             <div className="purchase-body">
-              <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false} intakeLayout="gtn"
+              <PurchaseLines products={products} items={formData.items} quantityField="quantityTransferred" withCost={false} intakeLayout="gtn" searchPriceField="sellingPrice"
                 onProductSelect={selectTransferProduct}
                 onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,sourceWarehouseId:''}));}}
                 buildItemData={product=>({sourceWarehouseId:productWarehouse(product),sourceWarehouseName:warehouses.find(warehouse=>String(warehouse.id)===String(productWarehouse(product)))?.name || product.warehouseName,
@@ -762,7 +765,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 addDisabled={!formData.destinationWarehouseId || Boolean(isSameWarehouse)} addHint={!formData.destinationWarehouseId ? 'Select the destination warehouse before adding products.' : undefined}
                 searchProducts={transferSearchProducts} resultQuantity={product=>product.availableQuantity} searchEmptyMessage="No matching products with available stock."
                 quantityDetails={(product, editing) => <><span>Available qty</span><strong>{!product ? '—' : stockError ? 'Unavailable' : remainingStock(product, editing) ?? 'Loading...'}</strong></>}
-                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea maxLength={5000} rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"

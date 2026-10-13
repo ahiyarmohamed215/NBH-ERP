@@ -79,6 +79,9 @@ public class StockAdjustmentService {
                 .build();
 
         for (CreateStockAdjustmentRequest.CreateStockAdjustmentItemRequest itemReq : request.getItems()) {
+            if (itemReq.getUnitCost()!=null && !SecurityUtils.canViewCostPrice()) {
+                throw new BusinessException("You do not have permission to set product cost");
+            }
             Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
 
@@ -91,7 +94,7 @@ public class StockAdjustmentService {
                     .systemQuantity(systemQty)
                     .physicalQuantity(itemReq.getPhysicalQuantity())
                     .differenceQuantity(diff)
-                    .unitCost(product.getCostPrice())
+                    .unitCost(itemReq.getUnitCost()!=null ? itemReq.getUnitCost() : product.getCostPrice())
                     .reason(itemReq.getReason())
                     .build();
 
@@ -126,6 +129,13 @@ public class StockAdjustmentService {
         String currentUsername = SecurityUtils.getCurrentUsername().orElse("system");
 
         for (StockAdjustmentItem item : adjustment.getItems()) {
+            // Opening/adjustment stock can establish a missing cost. A stock count
+            // retains an existing purchase cost; subsequent GRNs set the latest cost.
+            if ((item.getProduct().getCostPrice()==null || item.getProduct().getCostPrice().signum()==0)
+                    && item.getUnitCost()!=null && item.getUnitCost().signum()>0) {
+                item.getProduct().setCostPrice(item.getUnitCost());
+                productRepository.save(item.getProduct());
+            }
             stockService.adjustStock(
                     warehouseId,
                     item.getProduct().getId(),

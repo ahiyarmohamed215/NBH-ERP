@@ -1,4 +1,7 @@
+import DateRangePicker,{matchesDateRange} from '../components/DateRangePicker';
 import FilterSelect from '../components/FilterSelect';
+import {inventorySellingPrice} from '../utils/inventoryPricing';
+import {numberError} from '../utils/purchasingValidation';
 import {printCurrentDirectory} from '../utils/printDirectory';
 import './InventoryTheme.css';
 import '../components/PurchasingAppearance.css';
@@ -144,7 +147,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'Addition' | 'Reduction'
   const [filterWarehouse, setFilterWarehouse] = useState('ALL');
-  const [filterReason, setFilterReason] = useState('ALL');
+  const [adjustmentFrom,setAdjustmentFrom]=useState('');
+  const [adjustmentTo,setAdjustmentTo]=useState('');
 
   // Create Record Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -456,17 +460,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [invCategoryFilter, setInvCategoryFilter] = useState('ALL');
   const [invStatusFilter, setInvStatusFilter] = useState('ALL'); // 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
   const [viewingStockItem, setViewingStockItem] = useState(null);
+  const inventoryLoadGeneration=useRef(0);
 
   // Load warehouses, products, categories, and inventory balances
   const loadInventoryBalances = async () => {
+    const generation=++inventoryLoadGeneration.current;
     try {
       setInventoryLoading(true);
       const [balRes, prodRes, whRes, catRes] = await Promise.allSettled([
-        inventoryApi.getBalances({ size: 300 }),
-        productApi.getProducts({ size: 300 }),
+        inventoryApi.getBalances({ size: 300 },{force:true}),
+        productApi.getProducts({ size: 300 },{force:true}),
         warehouseApi.getAll(),
         categoryApi.getActive(),
       ]);
+      if(generation!==inventoryLoadGeneration.current)return;
 
       const fetchedBalances = balRes.status === 'fulfilled' ? (balRes.value.data?.content || balRes.value.data || []) : [];
       const fetchedProducts = prodRes.status === 'fulfilled' ? (prodRes.value.data?.content || prodRes.value.data || []) : [];
@@ -485,13 +492,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         items = fetchedBalances
           .filter((b) => Number(b.quantity ?? 0) > 0)
           .map((b) => {
-            const prod = fetchedProducts.find((p) => p.id === b.productId || p.sku === b.productSku);
+            const prod = fetchedProducts.find((p) => String(p.id) === String(b.productId) || (b.productSku && p.sku === b.productSku));
             const brandName = getBrandForProduct(prod || b);
             const qty = Number(b.quantity ?? 0);
             const reserved = Number(b.reservedQuantity ?? 0);
             const avail = Number(b.availableQuantity ?? (qty - reserved));
             const cost = canSeeCost ? Number(b.costPrice ?? prod?.costPrice ?? 0) : null;
-            const sell = Number(b.sellingPrice ?? prod?.sellingPrice ?? 0);
+            const sell = inventorySellingPrice(b,prod,canSeeCost);
             const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 5);
             return {
               id: b.id || `bal-${b.productId}-${b.warehouseId}`,
@@ -518,16 +525,21 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }
 
       setInventoryBalances(items);
+      setViewingStockItem(current=>current ? items.find(item=>item.id===current.id) || null : null);
     } catch (err) {
+      if(generation!==inventoryLoadGeneration.current)return;
       console.error(err);
       addToast('Failed to load inventory balances: ' + err.message, 'error');
     } finally {
-      setInventoryLoading(false);
+      if(generation===inventoryLoadGeneration.current)setInventoryLoading(false);
     }
   };
 
   useEffect(() => {
     loadInventoryBalances();
+  }, [canSeeCost]);
+
+  useEffect(() => {
     loadAdjustments();
   }, []);
 
@@ -602,18 +614,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
   // Adjustments are loaded live from backend adjustmentApi
 
-  // Unique reasons for filter dropdown
-  const uniqueReasons = useMemo(() => {
-    const reasons = new Set(adjustmentRecords.map((r) => r.reason).filter(Boolean));
-    return Array.from(reasons);
-  }, [adjustmentRecords]);
-
   // Filtered adjustments
   const filteredAdjustments = useMemo(() => {
     return adjustmentRecords.filter((rec) => {
       if (filterType !== 'ALL' && rec.type !== filterType) return false;
       if (filterWarehouse !== 'ALL' && rec.warehouse !== filterWarehouse && rec.warehouseId !== filterWarehouse) return false;
-      if (filterReason !== 'ALL' && rec.reason !== filterReason) return false;
+      if(!matchesDateRange(rec.date,adjustmentFrom,adjustmentTo))return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -629,13 +635,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }
       return true;
     });
-  }, [adjustmentRecords, filterType, filterWarehouse, filterReason, searchQuery]);
+  }, [adjustmentRecords, filterType, filterWarehouse, adjustmentFrom, adjustmentTo, searchQuery]);
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setFilterType('ALL');
     setFilterWarehouse('ALL');
-    setFilterReason('ALL');
+    setAdjustmentFrom('');setAdjustmentTo('');
   };
 
   const handleOpenCreateRecord = () => {
@@ -696,6 +702,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       addToast('Please select a valid reason', 'error');
       return;
     }
+    if(canSeeCost && createForm.type!=='Reduction') {
+      const error=numberError(createForm.costPrice,'Unit cost',{decimals:6});
+      if(error){addToast(error,'error');return;}
+    }
 
     try {
       setSubmittingRecord(true);
@@ -717,6 +727,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           {
             productId: prdId,
             physicalQuantity: targetPhysical,
+            ...(canSeeCost && createForm.type!=='Reduction' ? {unitCost:Number(createForm.costPrice)} : {}),
             reason: createForm.reason,
           },
         ],
@@ -1403,6 +1414,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
             {/* Right Controls: Filters, Reset, Print, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <DateRangePicker documentType="Stock adjustment" from={adjustmentFrom} to={adjustmentTo} onChange={(from,to)=>{setAdjustmentFrom(from);setAdjustmentTo(to);}}/>
               {/* Type filter */}
               <FilterSelect
                 value={filterType}
@@ -1428,22 +1440,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 ))}
               </FilterSelect>
 
-              {/* Reason filter */}
-              <FilterSelect
-                value={filterReason}
-                onChange={(e) => setFilterReason(e.target.value)}
-                style={{width:'135px'}}
-              >
-                <option value="ALL">All Reasons</option>
-                {uniqueReasons.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </FilterSelect>
-
               {/* Reset Filters button */}
-              {(filterType !== 'ALL' || filterWarehouse !== 'ALL' || filterReason !== 'ALL' || searchQuery) && (
+              {(filterType !== 'ALL' || filterWarehouse !== 'ALL' || adjustmentFrom || adjustmentTo || searchQuery) && (
                 <button
                   type="button"
                   onClick={handleClearFilters}

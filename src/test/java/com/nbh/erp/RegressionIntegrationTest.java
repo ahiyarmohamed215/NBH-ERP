@@ -55,6 +55,7 @@ class RegressionIntegrationTest {
  @Autowired com.nbh.erp.payment.service.SupplierPaymentService supplierPayments;
  @Autowired com.nbh.erp.purchasereturn.service.PurchaseReturnService purchaseReturns;
  @Autowired com.nbh.erp.inventory.repository.ProductStaffQuotaRepository quotas;
+ @Autowired com.nbh.erp.stockadjustment.service.StockAdjustmentService adjustments;
 
  Customer customer; Warehouse warehouse; Product product; Supplier supplier; User admin; MockMvc mvc;
  static BigDecimal n(String s) { return new BigDecimal(s); }
@@ -203,6 +204,14 @@ class RegressionIntegrationTest {
   var line=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();line.setProductId(product.getId());line.setQuantityReceived(n("5"));line.setUnitCost(n("4"));req.setItems(List.of(line));
   return req;
  }
+ @Test void grnNumbersAreGeneratedAutomaticallyAndRemainOnEdit() {
+  var request=automaticReceiptRequest();var first=grns.createGrn(request,false);
+  request.setNotes("Second receipt");var second=grns.createGrn(request,false);
+  assertTrue(first.getGrnNumber().startsWith("GRN-"));assertTrue(second.getGrnNumber().startsWith("GRN-"));
+  assertNotEquals(first.getGrnNumber(),second.getGrnNumber());
+  request.setNotes("Edited receipt");var edited=grns.updateGrn(first.getId(),request,false);
+  assertEquals(first.getGrnNumber(),edited.getGrnNumber());
+ }
  @Test void duplicateGrnProductsMergeOnCreateAndDraftUpdate() {
   var req=automaticReceiptRequest();
   var extra=new com.nbh.erp.grn.dto.CreateGrnRequest.CreateGrnItemRequest();extra.setProductId(product.getId());extra.setQuantityReceived(n("5"));extra.setUnitCost(n("6"));
@@ -213,6 +222,36 @@ class RegressionIntegrationTest {
   var posted=grns.updateGrn(draft.getId(),req,true);
   assertEquals(1,posted.getItems().size());assertEquals(0,n("50").compareTo(posted.getTotalAmount()));
   assertEquals(0,n("110").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+ }
+ @Test void openingStockAdjustmentEstablishesMissingCostAndBrandSellingPrice() {
+  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("OPEN-B").name("Opening brand").markupPercent(n("25")).build());
+  product.setBrand(brand);product.setCostPrice(BigDecimal.ZERO);product.setSellingPrice(BigDecimal.ZERO);product.setUseBrandMarkup(true);products.save(product);
+  var request=new com.nbh.erp.stockadjustment.dto.CreateStockAdjustmentRequest();request.setWarehouseId(warehouse.getId());request.setAdjustmentDate(LocalDate.now());request.setReason("Opening cost correction");
+  var item=new com.nbh.erp.stockadjustment.dto.CreateStockAdjustmentRequest.CreateStockAdjustmentItemRequest();item.setProductId(product.getId());item.setPhysicalQuantity(n("100"));item.setUnitCost(n("100"));request.setItems(List.of(item));
+  var draft=adjustments.createAdjustment(request,false);
+  assertEquals(0,products.findById(product.getId()).orElseThrow().getCostPrice().signum());
+  assertEquals(0,n("100").compareTo(draft.getItems().getFirst().getUnitCost()));
+  adjustments.processAdjustment(draft.getId());
+  var stockItem=stock.getStockBalance(warehouse.getId(),product.getId());
+  assertEquals(0,n("100").compareTo(stockItem.getCostPrice()));assertEquals(0,n("125").compareTo(stockItem.getSellingPrice()));assertEquals(0,n("100").compareTo(stockItem.getQuantity()));
+ }
+ @Test void receiptPricingPublishesAutomaticAndManualPricesOnlyWhenProcessed() {
+  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("PRICE-B").name("Pricing brand").markupPercent(n("25")).build());
+  product.setBrand(brand);products.save(product);
+  var request=automaticReceiptRequest();var line=request.getItems().getFirst();
+  line.setUseBrandMarkup(true);line.setUnitCost(n("100"));
+  var draft=grns.createGrn(request,false);
+  assertEquals(0,n("10").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
+  grns.processGrn(draft.getId(),"Receipt verified");
+  assertEquals(0,n("125").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
+  var brandUpdate=new com.nbh.erp.brand.dto.UpdateBrandRequest();brandUpdate.setName("Pricing brand");brandUpdate.setMarkupPercent(n("30"));
+  brandService.updateBrand(brand.getId(),brandUpdate);
+  assertEquals(0,n("130").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
+  line.setUseBrandMarkup(false);line.setSellingPrice(n("145"));
+  grns.updateGrn(draft.getId(),request,false);
+  assertEquals(0,n("145").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
+  brandUpdate.setMarkupPercent(n("50"));brandService.updateBrand(brand.getId(),brandUpdate);
+  assertEquals(0,n("145").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
  }
  @Test void automaticGrnWarehouseAndTypeSurviveDraftEditAndPosting() {
   var req=automaticReceiptRequest();var draft=grns.createGrn(req,false);

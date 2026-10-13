@@ -118,3 +118,6 @@
 .gtn-status-dialog textarea { width:100%; padding:10px; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:8px; font:inherit; resize:vertical; }
 .gtn-status-dialog .gtn-receipt-confirmation { margin-top:14px; }
 .gtn-status-dialog footer { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+
+.purchase-field-error{font-size:.7rem;font-weight:400;line-height:1.4;color:#be123c}
+.purchase-document input[aria-invalid="true"]{border-color:#e11d48}

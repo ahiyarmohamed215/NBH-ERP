@@ -2,7 +2,7 @@ import React,{useId,useState} from 'react';
 import {Search,X,CheckCircle} from 'lucide-react';
 import './PurchaseProductSearch.css';
 
-export default function PurchaseProductSearch({query,onQueryChange,results,onSelect,onClear,selected,editing=false,open,onOpenChange,resultQuantity,resultDetails,showWarehouse=true,emptyMessage='No matching products found.'}) {
+export default function PurchaseProductSearch({query,onQueryChange,results,onSelect,onClear,selected,editing=false,open,onOpenChange,resultQuantity,resultDetails,showWarehouse=true,priceField='costPrice',emptyMessage='No matching products found.'}) {
   const id=useId(),[active,setActive]=useState(0);
   const choose=product=>{onSelect(product);onOpenChange(false);};
   return <>
@@ -20,7 +20,7 @@ export default function PurchaseProductSearch({query,onQueryChange,results,onSel
         {results.map((product,index)=><button type="button" key={product.searchKey || product.id} id={`${id}-${index}`} role="option" aria-selected={index===active}
           onMouseDown={event=>event.preventDefault()} onMouseEnter={()=>setActive(index)} onClick={()=>choose(product)}>
           <span className="purchase-result-product"><span className="purchase-result-title"><span className="purchase-result-code">{product.sku || '—'}</span><span className="purchase-result-name">{product.name}</span></span>
-            <span className="purchase-result-details"><span>Unit cost: <b>LKR {Number(product.costPrice || 0).toFixed(2)}</b></span>{showWarehouse && product.warehouseName && <span>Warehouse: <b>{product.warehouseName}</b></span>}{resultDetails && <span>{resultDetails(product)}</span>}</span>
+            <span className="purchase-result-details"><span>{priceField==='sellingPrice'?'Selling price':'Unit cost'}: <b>LKR {Number(product[priceField] || 0).toFixed(2)}</b></span>{showWarehouse && product.warehouseName && <span>Warehouse: <b>{product.warehouseName}</b></span>}{resultDetails && <span>{resultDetails(product)}</span>}</span>
           </span>
           {resultQuantity && <span className="purchase-result-stock">Available: <b>{resultQuantity(product)}</b></span>}
         </button>)}

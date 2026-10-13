@@ -41,6 +41,10 @@ public class CreateStockAdjustmentRequest {
         @PositiveOrZero(message = "Physical quantity cannot be negative")
         private BigDecimal physicalQuantity;
 
+        @PositiveOrZero(message="Unit cost cannot be negative")
+        @jakarta.validation.constraints.Digits(integer=32,fraction=6)
+        private BigDecimal unitCost;
+
         private String reason;
     }
 }

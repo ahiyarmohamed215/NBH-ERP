@@ -66,6 +66,20 @@ public class Product extends BaseEntity {
     @Builder.Default
     private BigDecimal sellingPrice = BigDecimal.ZERO;
 
+    @Column(name = "use_brand_markup")
+    private Boolean useBrandMarkup;
+
+    public boolean isBrandMarkupPricing() {
+        return useBrandMarkup != null ? useBrandMarkup : sellingPrice == null || sellingPrice.signum() == 0;
+    }
+
+    public BigDecimal getSellingPrice() {
+        if (!isBrandMarkupPricing()) return sellingPrice != null ? sellingPrice : BigDecimal.ZERO;
+        BigDecimal cost = costPrice != null ? costPrice : BigDecimal.ZERO;
+        BigDecimal markup = brand != null && brand.getMarkupPercent() != null ? brand.getMarkupPercent() : BigDecimal.ZERO;
+        return cost.multiply(BigDecimal.ONE.add(markup.movePointLeft(2))).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
     @Column(name = "min_stock_level", nullable = false)
     @Builder.Default
     private Integer minStockLevel = 5;

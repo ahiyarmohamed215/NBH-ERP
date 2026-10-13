@@ -18,3 +18,24 @@
 
 .purchasing-no-shadows .animate-spin { animation:purchasing-refresh-spin .8s linear infinite; }
 @keyframes purchasing-refresh-spin { to { transform:rotate(360deg); } }
+
+/* Shared, subtle field feedback for GRN, GTN, PRN and PO workspaces. */
+:is(.grn-page,.purchase-document) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),textarea,select):focus,
+:is(.grn-page,.purchase-document) .modern-filter-trigger:focus-visible {
+  border-color:#93c5fd;
+  background:#f8fbff;
+  outline:none;
+  box-shadow:none;
+}
+:is(.grn-page,.purchase-document) :is(input,textarea,select)[aria-invalid="true"],
+:is(.grn-page,.purchase-document) :is(input,textarea,select):user-invalid {
+  border-color:#93c5fd;
+  background:#f8fbff;
+}
+:is(.grn-page,.purchase-document) :is(input,textarea,select)[aria-invalid="true"]:focus,
+:is(.grn-page,.purchase-document) :is(input,textarea,select):user-invalid:focus {
+  border-color:#60a5fa;
+}
+:is(.grn-page,.purchase-document) .purchase-field-error {
+  color:#0284c7;
+}

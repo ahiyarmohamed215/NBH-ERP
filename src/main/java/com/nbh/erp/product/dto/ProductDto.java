@@ -34,6 +34,7 @@ public class ProductDto {
     private String unitOfMeasure;
     private BigDecimal costPrice;
     private BigDecimal sellingPrice;
+    private Boolean useBrandMarkup;
     private Integer minStockLevel;
     private Boolean isActive;
     private LocalDateTime createdAt;
@@ -70,6 +71,7 @@ public class ProductDto {
                 .unitOfMeasure(p.getUnitOfMeasure())
                 .costPrice(allowCostPrice ? p.getCostPrice() : null)
                 .sellingPrice(p.getSellingPrice())
+                .useBrandMarkup(p.isBrandMarkupPricing())
                 .minStockLevel(p.getMinStockLevel())
                 .isActive(p.getIsActive())
                 .createdAt(p.getCreatedAt())
