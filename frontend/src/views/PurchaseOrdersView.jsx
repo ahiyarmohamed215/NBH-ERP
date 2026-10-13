@@ -656,8 +656,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         onPrint={() => printPurchaseOrder(selectedPo)}
         actions={[
           ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Edit PO',icon:Edit2,disabled:saving,onClick:()=>{const po=selectedPo;setSelectedPo(null);handleEditPo(po);}}] : []),
-          ...(selectedPo.status !== 'INFORM_TO_ORDER' ? [{label:'Inform to Order',icon:CheckCircle,tone:'success',disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
-          ...(selectedPo.status !== 'DRAFT' ? [{label:'Return to Draft',icon:RotateCw,disabled:saving,onClick:()=>handlePoStatus('DRAFT')}] : []),
+          ...(selectedPo.status === 'CANCELLED' ? [{label:'Inform to Order',icon:CheckCircle,tone:'success',disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
           ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Cancel PO',icon:Ban,tone:'danger',disabled:saving,onClick:()=>handlePoStatus('CANCELLED')}] : []),
         ]}
         columns={[

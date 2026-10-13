@@ -1,6 +1,18 @@
+import DeliveryVehicleWorkspace from '../components/DeliveryVehicleWorkspace';
+import DeliveryWorkspace from '../components/DeliveryWorkspace';
+import DeliveryDirectory from '../components/DeliveryDirectory';
+import DeliveryActionDialog from '../components/DeliveryActionDialog';
+import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
+import FilterSelect from '../components/FilterSelect';
+import DateRangePicker,{matchesDateRange} from '../components/DateRangePicker';
+import {printA4Report} from '../utils/printReport';
+import {useToast} from '../context/ToastContext';
+import './InventoryTheme.css';
+import './DeliveryTheme.css';
+import '../components/PurchasingAppearance.css';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Truck, Users, CheckCircle2, AlertCircle, Plus, Search, Navigation, Printer, RefreshCw, X, UserCheck, Gauge, Check, Download } from 'lucide-react';
+import { Truck, Users, CheckCircle2, AlertCircle, Plus, Search, Navigation, Printer, RefreshCw, X, Edit2, UserCheck, Gauge, Check, Download } from 'lucide-react';
 import { deliveryApi, deliveryRouteApi, vehicleApi } from '../api/apiClient';
 import api from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -32,12 +44,13 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const [summary, setSummary] = useState(null);
   const [pendingInvoices, setPendingInvoices] = useState([]);
 
-  // Toast notifications
-  const [toast, setToast] = useState(null);
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  const {addToast:showToast}=useToast();
+  const [tripBusy,setTripBusy]=useState(false);
+  const [vehicleBusy,setVehicleBusy]=useState(false);
+  const [vehicleSearch,setVehicleSearch]=useState('');
+  const [viewingVehicle,setViewingVehicle]=useState(null);
+  const [viewingRoute,setViewingRoute]=useState(null);
+  const [deliveryFrom,setDeliveryFrom]=useState(''),[deliveryTo,setDeliveryTo]=useState('');
 
   // Filter & Search states for deliveries
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,7 +164,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         api.get('/customers').catch(() => ({ data: { data: [] } }))
       ]);
 
-      setDeliveries(delivRes.data?.data || []);
+      setDeliveries(delivRes.data?.data?.content || delivRes.data?.data || delivRes.data?.content || delivRes.data || []);
 
       const rawRoutes = routesRes.data?.data || routesRes.data || [];
       const normalizedRoutes = (Array.isArray(rawRoutes) ? rawRoutes : []).map((r) => ({
@@ -171,10 +184,11 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         customerCount: r.customerCount != null ? r.customerCount : ((r.customerIds || []).length),
         customerIds: (r.customerIds || []).map(String),
         createdAt: r.createdAt || '',
+        isActive:r.isActive ?? true,
       }));
       setRoutes(normalizedRoutes);
 
-      setVehicles(vehRes.data?.data || []);
+      setVehicles(vehRes.data?.data || vehRes.data || []);
       setSummary(sumRes.data?.data || null);
 
       const rawUsers = usersRes.data?.data?.content || usersRes.data?.data || usersRes.data?.content || usersRes.data || [];
@@ -204,7 +218,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const loadPendingInvoices = async () => {
     try {
       const res = await deliveryApi.getPendingInvoices();
-      setPendingInvoices(res.data?.data || []);
+      setPendingInvoices(res.data?.data || res.data || []);
     } catch (err) {
       console.error('Failed to load pending invoices:', err);
       showToast('Could not load invoices for delivery', 'error');
@@ -244,6 +258,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       return;
     }
 
+    if(tripBusy)return;
+    setTripBusy(true);
     try {
       const payload = {
         warehouseId: newTripForm.warehouseId ? Number(newTripForm.warehouseId) : null,
@@ -266,7 +282,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       console.error('Error creating delivery trip:', err);
       const msg = err.response?.data?.message || err.message || 'Failed to create trip';
       showToast(msg, 'error');
-    }
+    } finally {setTripBusy(false);}
   };
 
   // Dispatch Action ("When it goes")
@@ -282,6 +298,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
   const handleConfirmDispatch = async () => {
     if (!selectedTrip) return;
+    if(tripBusy)return;
+    setTripBusy(true);
     try {
       await deliveryApi.dispatch(selectedTrip.id, {
         departureTime: dispatchForm.departureTime ? `${dispatchForm.departureTime}:00` : null,
@@ -289,11 +307,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         notes: dispatchForm.notes,
       });
       showToast(`Trip ${selectedTrip.deliveryNumber} dispatched on route!`, 'success');
+      setSelectedTrip(previous=>({...previous,status:'IN_TRANSIT',departureTime:dispatchForm.departureTime,startOdometer:dispatchForm.startOdometer!==''?Number(dispatchForm.startOdometer):previous.startOdometer,invoices:(previous.invoices || []).map(invoice=>({...invoice,deliveryStatus:'OUT_FOR_DELIVERY'}))}));
       setShowDispatchModal(false);
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Dispatch failed', 'error');
-    }
+    } finally {setTripBusy(false);}
   };
 
   // Complete Action ("When it returns & deliver")
@@ -309,6 +328,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
   const handleConfirmComplete = async () => {
     if (!selectedTrip) return;
+    if(tripBusy)return;
+    setTripBusy(true);
     try {
       await deliveryApi.complete(selectedTrip.id, {
         returnTime: completeForm.returnTime ? `${completeForm.returnTime}:00` : null,
@@ -316,11 +337,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         notes: completeForm.notes,
       });
       showToast(`Trip ${selectedTrip.deliveryNumber} completed! All invoices marked delivered.`, 'success');
+      setSelectedTrip(previous=>({...previous,status:'DELIVERED',returnTime:completeForm.returnTime,endOdometer:completeForm.endOdometer!==''?Number(completeForm.endOdometer):previous.endOdometer,invoices:(previous.invoices || []).map(invoice=>({...invoice,deliveryStatus:'DELIVERED'}))}));
       setShowCompleteModal(false);
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Completion failed', 'error');
-    }
+    } finally {setTripBusy(false);}
   };
 
   // Cancel Action
@@ -336,16 +358,19 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       showToast('Please provide a reason for cancelling this delivery', 'error');
       return;
     }
+    if(tripBusy)return;
+    setTripBusy(true);
     try {
       await deliveryApi.cancel(selectedTrip.id, {
         cancellationReason: cancelForm.cancellationReason,
       });
       showToast(`Trip ${selectedTrip.deliveryNumber} cancelled. Invoices restored to pending.`, 'info');
+      setSelectedTrip(previous=>({...previous,status:'CANCELLED',invoices:(previous.invoices || []).map(invoice=>({...invoice,deliveryStatus:'PENDING'}))}));
       setShowCancelModal(false);
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Cancellation failed', 'error');
-    }
+    } finally {setTripBusy(false);}
   };
 
   // -------------------------------------------------------------
@@ -584,6 +609,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       showToast('Vehicle plate number and model are required', 'error');
       return;
     }
+    if(vehicleBusy)return;
+    setVehicleBusy(true);
     try {
       const payload = {
         vehicleNumber: vehicleForm.vehicleNumber.trim().toUpperCase(),
@@ -604,7 +631,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to save vehicle', 'error');
-    }
+    } finally {setVehicleBusy(false);}
   };
 
   // Filtered deliveries list
@@ -621,9 +648,9 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       const matchStatus = statusFilter === 'ALL' || d.status === statusFilter;
       const matchRoute = routeFilter === 'ALL' || String(d.routeId) === String(routeFilter);
 
-      return matchSearch && matchStatus && matchRoute;
+      return matchSearch && matchStatus && matchRoute && matchesDateRange(d.scheduledDate || d.createdAt,deliveryFrom,deliveryTo);
     });
-  }, [deliveries, searchTerm, statusFilter, routeFilter]);
+  }, [deliveries, searchTerm, statusFilter, routeFilter,deliveryFrom,deliveryTo]);
 
   // Helpers
   const formatDuration = (mins) => {
@@ -644,8 +671,14 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     }
   };
 
+  const invoiceColumns=[{label:'Invoice number',value:row=>row.invoiceNumber},{label:'Customer',value:row=>row.customerName},{label:'Address',value:row=>row.address || row.customerAddress || '—'},{label:'Amount (LKR)',value:row=>Number(row.netTotal || 0).toLocaleString(undefined,{minimumFractionDigits:2})},{label:'Status',value:row=>row.deliveryStatus || selectedTrip?.status || '—'}];
+  const printTrip=trip=>{const escape=value=>String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));printA4Report({title:'Delivery Manifest',metaItems:[['Delivery number',trip.deliveryNumber],['Route',trip.routeName],['Vehicle',trip.vehicleNumber],['Driver',trip.driverName],['Assistant',trip.assistantStaffName],['Scheduled date',trip.scheduledDate],['Remarks',trip.notes]].map(([label,value])=>({label,value:escape(value)})),columns:invoiceColumns.map(column=>({header:column.label,accessor:row=>escape(column.value(row))})),data:trip.invoices || [],summaryItems:[{label:'Total (LKR)',value:Number(trip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})}]});};
+  const loadTrip=async(row,print=false)=>{try{const response=await deliveryApi.getById(row.id);const trip=response.data?.data || response.data || row;if(print)printTrip(trip);else {setSelectedTrip(trip);setShowManifestModal(true);}}catch(error){showToast(error.message || 'Could not load delivery','error');}};
+  if(showVehicleModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryVehicleWorkspace form={vehicleForm} setForm={setVehicleForm} busy={vehicleBusy} onClose={()=>setShowVehicleModal(false)} onSave={handleSaveVehicle}/></div>;
+  if(showCreateTripModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryWorkspace form={newTripForm} setForm={setNewTripForm} warehouses={warehouses} routes={routes} vehicles={vehicles} employees={employees} invoices={pendingInvoices} busy={tripBusy} onClose={()=>setShowCreateTripModal(false)} onSave={handleCreateDeliveryTrip}/></div>;
+
   return (
-    <div
+    <div className="delivery-theme inventory-theme purchasing-no-shadows"
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -662,31 +695,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         overflow: 'hidden',
       }}
     >
-      {/* Toast popup */}
-      {toast && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '24px',
-            zIndex: 9999,
-            padding: '12px 20px',
-            borderRadius: '8px',
-            backgroundColor: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#0284c7' : '#10b981',
-            color: '#ffffff',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
-          {toast.message}
-        </div>
-      )}
-
       {/* Page Header (Fixed / Sticky to Desktop Screen - Matching CustomersHub) */}
       <div
         style={{
@@ -715,28 +723,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={fetchData}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <RefreshCw size={15} /> Refresh
-          </button>
-
           {currentTab === 'deliveries' && (
             <button
               type="button"
@@ -756,7 +742,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 cursor: 'pointer',
               }}
             >
-              <Plus size={17} /> Schedule Delivery Trip
+              <Plus size={17} /> New Delivery
             </button>
           )}
 
@@ -779,7 +765,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 cursor: 'pointer',
               }}
             >
-              <Plus size={17} /> Create Delivery Route
+              <Plus size={17} /> New Delivery Route
             </button>
           )}
 
@@ -884,1008 +870,24 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
       </div>
 
-      {/* TAB 1: DELIVERIES LIST */}
+      {currentTab==='deliveries' && <DeliveryDirectory title="Delivery Trips" rows={filteredDeliveries} query={searchTerm} onQuery={setSearchTerm} loading={loading} onRefresh={fetchData} onView={row=>loadTrip(row)} onPrint={row=>loadTrip(row,true)} columns={[{label:'Delivery number',code:true,value:row=>row.deliveryNumber},{label:'Route',value:row=>row.routeName},{label:'Vehicle',value:row=>row.vehicleNumber},{label:'Driver / assistant',value:row=>[row.driverName,row.assistantStaffName].filter(Boolean).join(' / ')},{label:'Invoices',value:row=>row.totalInvoicesCount ?? 0},{label:'Date',value:row=>row.scheduledDate},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} filters={<><FilterSelect aria-label="Delivery status" title="Filter deliveries by status" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="ALL">All Statuses</option>{['SCHEDULED','IN_TRANSIT','DELIVERED','CANCELLED'].map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</FilterSelect><FilterSelect className="inventory-full-label-filter" aria-label="Delivery route filter" title="Filter deliveries by route" value={routeFilter} style={{width:'auto'}} onChange={event=>setRouteFilter(event.target.value)}><option value="ALL">All Routes</option>{routes.map(route=><option key={route.id} value={route.id}>{route.routeName}</option>)}</FilterSelect><DateRangePicker documentType="Delivery" from={deliveryFrom} to={deliveryTo} onChange={(from,to)=>{setDeliveryFrom(from);setDeliveryTo(to);}}/></>}/> }
 
-      {/* TAB 2: DELIVERY ROUTES (MATCHING CUSTOMER GROUPS UI) */}
-      {currentTab === 'routes' && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-            width: '100%',
-            maxWidth: '100%',
-            minWidth: 0,
-            boxSizing: 'border-box',
-            flex: 1,
-            minHeight: 0,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Header row with Title, subtitle and Create Route button */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '4px',
-              flexWrap: 'wrap',
-              gap: '12px',
-              flexShrink: 0,
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 4px 0' }}>
-                Delivery Routes
-              </h2>
-              <p style={{ color: '#64748b', fontSize: '0.86rem', margin: 0 }}>
-                Organize delivery destinations into routes and assign a dedicated staff member to manage each route.
-              </p>
-            </div>
+      {currentTab==='routes' && <DeliveryDirectory title="Delivery Routes" rows={filteredRoutes} query={routeSearchTerm} onQuery={setRouteSearchTerm} loading={loading} onRefresh={fetchData} columns={[{label:'Route code',code:true,value:row=>row.routeCode},{label:'Route',value:row=>row.routeName},{label:'Area',value:row=>row.area},{label:'Delivery days',value:row=>row.deliveryDays},{label:'Assigned staff',value:row=>row.assignedStaffName},{label:'Customers',value:row=>row.customerCount},{label:'Remarks',value:row=>row.description}]} canEdit={canEditDelivery} onView={setViewingRoute} onEdit={handleOpenRouteView}/>}
+      {currentTab==='vehicles' && <DeliveryDirectory title="Fleet Vehicles" rows={vehicles.filter(row=>[row.vehicleNumber,row.model,row.vehicleType,row.notes].some(value=>String(value || '').toLowerCase().includes(vehicleSearch.toLowerCase())))} query={vehicleSearch} onQuery={setVehicleSearch} loading={loading} onRefresh={fetchData} columns={[{label:'Plate number',code:true,value:row=>row.vehicleNumber},{label:'Model & make',value:row=>row.model},{label:'Type',value:row=>row.vehicleType},{label:'Capacity (kg)',value:row=>row.capacityKg},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} canEdit={canEditDelivery} onView={setViewingVehicle} onEdit={row=>{setVehicleForm({...row,capacityKg:row.capacityKg ?? '',notes:row.notes || ''});setShowVehicleModal(true);}}/>}
 
-            <button
-              type="button"
-              onClick={handleOpenCreateRouteView}
-              style={{
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '9px 18px',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                transition: 'background-color 0.15s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-            >
-              <Plus size={16} /> Create Delivery Route
-            </button>
-          </div>
+      {showDispatchModal && selectedTrip && <DeliveryActionDialog mode="dispatch" trip={selectedTrip} form={dispatchForm} setForm={setDispatchForm} busy={tripBusy} onClose={()=>setShowDispatchModal(false)} onConfirm={handleConfirmDispatch}/>}
+      {showCompleteModal && selectedTrip && <DeliveryActionDialog mode="complete" trip={selectedTrip} form={completeForm} setForm={setCompleteForm} busy={tripBusy} onClose={()=>setShowCompleteModal(false)} onConfirm={handleConfirmComplete}/>}
+      {showCancelModal && selectedTrip && <DeliveryActionDialog mode="cancel" trip={selectedTrip} form={cancelForm} setForm={setCancelForm} busy={tripBusy} onClose={()=>setShowCancelModal(false)} onConfirm={handleConfirmCancel}/>}
 
-          {/* Routes Toolbar: Search Input + Export CSV Icon */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              flexWrap: 'wrap',
-              flexShrink: 0,
-            }}
-          >
-            {/* Search bar filling width */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '11px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Search delivery routes by name, code, assigned staff, area..."
-                value={routeSearchTerm}
-                onChange={(e) => setRouteSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 32px 0 38px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.88rem',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
-                }}
-              />
-              {routeSearchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setRouteSearchTerm('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </div>
+      {showManifestModal && selectedTrip && <PurchaseInspectionModal type="Delivery" number={selectedTrip.deliveryNumber} status={selectedTrip.status} rows={selectedTrip.invoices || []} columns={invoiceColumns} tableToolbar tableSearchPlaceholder="Search invoice or customer..." tableSearchLabel="Search delivery invoices" emptyMessage="No matching invoices found." onPrint={()=>printTrip(selectedTrip)} onClose={()=>setShowManifestModal(false)} details={[{label:'Route',value:selectedTrip.routeName},{label:'Warehouse',value:selectedTrip.warehouseName},{label:'Vehicle',value:selectedTrip.vehicleNumber},{label:'Driver',value:selectedTrip.driverName},{label:'Assistant',value:selectedTrip.assistantStaffName},{label:'Scheduled date',value:selectedTrip.scheduledDate},{label:'Total (LKR)',value:Number(selectedTrip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})},{label:'Departure',value:formatTimeStr(selectedTrip.departureTime)},{label:'Return',value:formatTimeStr(selectedTrip.returnTime)},{label:'Remarks',value:selectedTrip.notes}]} detailActions={canEditDelivery ? [...(selectedTrip.status==='SCHEDULED'?[{label:'Dispatch Delivery',icon:Navigation,tone:'success',onClick:()=>handleOpenDispatch(selectedTrip)}]:[]),...(selectedTrip.status==='IN_TRANSIT'?[{label:'Complete Delivery',icon:CheckCircle2,tone:'success',onClick:()=>handleOpenComplete(selectedTrip)}]:[]),...(['SCHEDULED','IN_TRANSIT'].includes(selectedTrip.status)?[{label:'Cancel Delivery',icon:X,tone:'danger',onClick:()=>handleOpenCancel(selectedTrip)}]:[])] : []}/>}
+      {viewingVehicle && <PurchaseInspectionModal type="Fleet" number={viewingVehicle.vehicleNumber} status={viewingVehicle.status} rows={[viewingVehicle]} columns={[{label:'Model',value:row=>row.model},{label:'Type',value:row=>row.vehicleType},{label:'Capacity (kg)',value:row=>row.capacityKg ?? '—'},{label:'Notes',value:row=>row.notes || '—'}]} headerPrint onClose={()=>setViewingVehicle(null)} details={[{label:'Model',value:viewingVehicle.model},{label:'Type',value:viewingVehicle.vehicleType},{label:'Capacity',value:viewingVehicle.capacityKg?`${viewingVehicle.capacityKg} kg`:'—'},{label:'Remarks',value:viewingVehicle.notes}]} detailActions={canEditDelivery?[{label:'Edit Vehicle',icon:Edit2,onClick:()=>{setVehicleForm({...viewingVehicle,capacityKg:viewingVehicle.capacityKg ?? '',notes:viewingVehicle.notes || ''});setViewingVehicle(null);setShowVehicleModal(true);}}]:[]}/>}
 
-            {/* Right Controls: Export CSV Icon */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={handleExportRoutesCSV}
-                style={{
-                  height: '38px',
-                  width: '38px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
-                }}
-                title="Export delivery routes to CSV"
-              >
-                <Download size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Routes Cards Grid Scroll Container (Only cards scroll) */}
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              overflowY: 'auto',
-              paddingRight: '4px',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '14px',
-                paddingBottom: '16px',
-              }}
-            >
-              {filteredRoutes.length === 0 ? (
-                <div
-                  style={{
-                    gridColumn: '1 / -1',
-                    textAlign: 'center',
-                    padding: '48px 20px',
-                    color: '#64748b',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  No delivery routes found matching current search.
-                </div>
-              ) : (
-                filteredRoutes.map((route) => {
-                  const count = route.customerIds?.length || route.customerCount || 0;
-                  const assignedStaff = employees.find((s) => String(s.id) === String(route.assignedStaffId || route.salesmanId));
-                  const repName = route.assignedStaffName || route.salesmanName || assignedStaff?.fullName || assignedStaff?.name;
-
-                  return (
-                    <div
-                      key={route.id}
-                      onClick={() => handleOpenRouteView(route)}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        padding: '16px 18px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                        minHeight: '140px',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#0284c7';
-                        e.currentTarget.style.boxShadow = '0 4px 14px rgba(2, 132, 199, 0.12)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-                      }}
-                    >
-                      <div>
-                        {/* Card Top: Route Name & User Count Badge */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '6px',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {route.routeName || route.name}
-                            </h3>
-                            {route.routeCode && (
-                              <span
-                                style={{
-                                  fontSize: '0.72rem',
-                                  fontWeight: 600,
-                                  backgroundColor: '#f1f5f9',
-                                  color: '#475569',
-                                  padding: '1px 6px',
-                                  borderRadius: '4px',
-                                  fontFamily: 'monospace',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {route.routeCode}
-                              </span>
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              backgroundColor: '#f0f9ff',
-                              color: '#0284c7',
-                              border: '1px solid #bae6fd',
-                              borderRadius: '9999px',
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Users size={12} />
-                            {count} customer{count === 1 ? '' : 's'}
-                          </div>
-                        </div>
-
-                        {/* Description */}
-                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0 0 10px 0', lineHeight: 1.4 }}>
-                          {route.description || 'No description added'}
-                        </p>
-
-                        {/* Area & Delivery Days Info */}
-                        {(route.area || route.deliveryDays) && (
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '0.75rem', color: '#64748b' }}>
-                            {route.area && (
-                              <span style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
-                                <strong>Area:</strong> {route.area}
-                              </span>
-                            )}
-                            {route.deliveryDays && (
-                              <span style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
-                                <strong>Days:</strong> {route.deliveryDays}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Responsible Staff */}
-                        <p
-                          style={{
-                            color: repName ? '#0369a1' : '#64748b',
-                            fontSize: '0.8rem',
-                            fontWeight: 500,
-                            margin: '0 0 12px 0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <UserCheck size={14} color={repName ? '#0284c7' : '#94a3b8'} />
-                          {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
-                        </p>
-                      </div>
-
-                      {/* Card Footer: Manage link */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          paddingTop: '10px',
-                          borderTop: '1px solid #f1f5f9',
-                        }}
-                      >
-                        <span style={{ fontSize: '0.82rem', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          Manage Delivery Route →
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: FLEET VEHICLES */}
-      {currentTab === 'vehicles' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>PLATE NUMBER</th>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>MODEL & MAKE</th>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>TYPE</th>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>PAYLOAD CAPACITY</th>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>STATUS</th>
-                <th style={{ padding: '12px 16px', fontWeight: 700 }}>NOTES</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vehicles.map((v) => (
-                <tr key={v.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{v.vehicleNumber}</td>
-                  <td style={{ padding: '12px 16px', color: '#334155' }}>{v.model}</td>
-                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{v.vehicleType}</td>
-                  <td style={{ padding: '12px 16px', color: '#475569' }}>{v.capacityKg ? `${v.capacityKg} kg` : 'Standard'}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        backgroundColor: v.status === 'AVAILABLE' ? '#dcfce7' : v.status === 'ON_DELIVERY' ? '#e0f2fe' : '#fee2e2',
-                        color: v.status === 'AVAILABLE' ? '#15803d' : v.status === 'ON_DELIVERY' ? '#0369a1' : '#b91c1c',
-                      }}
-                    >
-                      {v.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.78rem' }}>{v.notes || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* MODAL 1: CREATE DELIVERY TRIP */}
-      {showCreateTripModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              maxWidth: '800px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Truck size={22} color="#0284c7" />
-                  Schedule Delivery Trip (Warehouse Dispatch)
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '4px 0 0 0' }}>
-                  Assign route, vehicle, two staff crew, and load customer invoices.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateTripModal(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <form onSubmit={handleCreateDeliveryTrip} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Row 1: Warehouse, Route, Scheduled Date */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Origin Warehouse *
-                  </label>
-                  <select
-                    value={newTripForm.warehouseId}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, warehouseId: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                    required
-                  >
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.code} - {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Delivery Route *
-                  </label>
-                  <select
-                    value={newTripForm.routeId}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, routeId: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                    required
-                  >
-                    <option value="">Select Route</option>
-                    {routes.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.routeCode} - {r.routeName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Scheduled Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={newTripForm.scheduledDate}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, scheduledDate: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Vehicle & Planned Departure */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Select Vehicle *
-                  </label>
-                  <select
-                    value={newTripForm.vehicleId}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, vehicleId: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                    required
-                  >
-                    <option value="">Select Vehicle</option>
-                    {vehicles.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.vehicleNumber} ({v.model} - {v.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Planned Departure Time ("When it goes")
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={newTripForm.departureTime}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, departureTime: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  />
-                </div>
-              </div>
-
-              {/* Two Assigned Staff Members (Required by user requirement) */}
-              <div
-                style={{
-                  backgroundColor: '#f0f9ff',
-                  border: '1px solid #bae6fd',
-                  borderRadius: '8px',
-                  padding: '14px',
-                }}
-              >
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0369a1', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Users size={16} />
-                  Assigned Crew (Two Staff Members Required for Delivery)
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                      Primary Staff 1: Driver *
-                    </label>
-                    <select
-                      value={newTripForm.driverId}
-                      onChange={(e) => setNewTripForm({ ...newTripForm, driverId: e.target.value })}
-                      style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #93c5fd', padding: '0 10px', fontSize: '0.85rem', backgroundColor: '#ffffff' }}
-                      required
-                    >
-                      <option value="">Select Primary Driver</option>
-                      {employees.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.fullName || emp.username} ({emp.employeeCode || 'Emp #' + emp.id})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                      Secondary Staff 2: Delivery Assistant / Helper *
-                    </label>
-                    <select
-                      value={newTripForm.assistantStaffId}
-                      onChange={(e) => setNewTripForm({ ...newTripForm, assistantStaffId: e.target.value })}
-                      style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #93c5fd', padding: '0 10px', fontSize: '0.85rem', backgroundColor: '#ffffff' }}
-                      required
-                    >
-                      <option value="">Select Delivery Assistant</option>
-                      {employees.map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.fullName || emp.username} ({emp.employeeCode || 'Emp #' + emp.id})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Invoices Selection List (Warehouse loading) */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
-                    Load Customer Sales Invoices ({pendingInvoices.length} Available in Warehouse) *
-                  </label>
-                  <div style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 600 }}>
-                    Selected: {newTripForm.selectedInvoiceIds.length} invoice(s)
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    maxHeight: '180px',
-                    overflowY: 'auto',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '8px',
-                    backgroundColor: '#f8fafc',
-                  }}
-                >
-                  {pendingInvoices.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-                      No unassigned completed sales invoices currently ready for delivery.
-                    </div>
-                  ) : (
-                    pendingInvoices.map((inv) => {
-                      const isSelected = newTripForm.selectedInvoiceIds.includes(inv.id);
-                      return (
-                        <label
-                          key={inv.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '8px 10px',
-                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                            borderRadius: '4px',
-                            marginBottom: '4px',
-                            cursor: 'pointer',
-                            border: isSelected ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
-                            fontSize: '0.82rem',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewTripForm({
-                                  ...newTripForm,
-                                  selectedInvoiceIds: [...newTripForm.selectedInvoiceIds, inv.id],
-                                });
-                              } else {
-                                setNewTripForm({
-                                  ...newTripForm,
-                                  selectedInvoiceIds: newTripForm.selectedInvoiceIds.filter((id) => id !== inv.id),
-                                });
-                              }
-                            }}
-                          />
-                          <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between' }}>
-                            <div>
-                              <strong>{inv.invoiceNumber}</strong> — {inv.customerName} ({inv.customerCode})
-                            </div>
-                            <div style={{ fontWeight: 700, color: '#0369a1' }}>
-                              ${Number(inv.netTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Notes & Starting Odometer */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Starting Odometer (km)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g. 45210"
-                    value={newTripForm.startOdometer}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, startOdometer: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                    Loading / Dispatch Notes
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Special instructions, gate pass #, fragile handling..."
-                    value={newTripForm.notes}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, notes: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  />
-                </div>
-              </div>
-
-              {/* Submit Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateTripModal(false)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '8px 20px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Confirm & Schedule Delivery Trip
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: DISPATCH TRIP ("When it goes") */}
-      {showDispatchModal && selectedTrip && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '480px', width: '100%', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Navigation size={22} color="#0284c7" />
-              Dispatch Delivery Trip: {selectedTrip.deliveryNumber}
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: '18px' }}>
-              Record the vehicle departure time. Assigned invoices will update to <strong>OUT FOR DELIVERY</strong>.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Departure Time ("When it goes") *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={dispatchForm.departureTime}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, departureTime: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Current Odometer (km)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={dispatchForm.startOdometer}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, startOdometer: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowDispatchModal(false)}
-                style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDispatch}
-                style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Confirm Dispatch
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: COMPLETE TRIP ("When it returns & trip duration") */}
-      {showCompleteModal && selectedTrip && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '480px', width: '100%', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 size={22} color="#16a34a" />
-              Complete Delivery: {selectedTrip.deliveryNumber}
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: '18px' }}>
-              Record return time and finalize trip. All loaded customer invoices will be marked <strong>DELIVERED</strong> and the trip duration will be recorded automatically.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Return Time ("When it returns") *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={completeForm.returnTime}
-                  onChange={(e) => setCompleteForm({ ...completeForm, returnTime: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Final Odometer (km)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={completeForm.endOdometer}
-                  onChange={(e) => setCompleteForm({ ...completeForm, endOdometer: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowCompleteModal(false)}
-                style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmComplete}
-                style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#16a34a', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Confirm Return & Deliver
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 4: CANCEL TRIP */}
-      {showCancelModal && selectedTrip && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '440px', width: '100%', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#b91c1c', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={22} color="#b91c1c" />
-              Cancel Delivery Trip
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: '16px' }}>
-              Are you sure you want to cancel trip <strong>{selectedTrip.deliveryNumber}</strong>? All {selectedTrip.totalInvoicesCount || 0} assigned invoices will revert to <strong>PENDING</strong> so they can be dispatched later.
-            </p>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                Cancellation Reason *
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Reason for cancellation (e.g. vehicle breakdown, weather, customer request)..."
-                value={cancelForm.cancellationReason}
-                onChange={(e) => setCancelForm({ cancellationReason: e.target.value })}
-                style={{ width: '100%', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '8px 10px', fontSize: '0.85rem' }}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowCancelModal(false)}
-                style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
-              >
-                No, Go Back
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmCancel}
-                style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#dc2626', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Confirm Cancellation
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: PRINTABLE DELIVERY MANIFEST / DISPATCH SHEET */}
-      {showManifestModal && selectedTrip && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '720px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0284c7', paddingBottom: '12px', marginBottom: '16px' }}>
-              <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  DELIVERY DISPATCH MANIFEST
-                </h2>
-                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
-                  Trip Number: <strong>{selectedTrip.deliveryNumber}</strong> | Status: <strong>{selectedTrip.status}</strong>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
-                >
-                  <Printer size={14} /> Print Sheet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowManifestModal(false)}
-                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            {/* Trip Details Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '6px', marginBottom: '16px', fontSize: '0.84rem' }}>
-              <div><strong>Route:</strong> {selectedTrip.routeName || 'Direct Route'}</div>
-              <div><strong>Vehicle:</strong> {selectedTrip.vehicleNumber} ({selectedTrip.vehicleModel})</div>
-              <div><strong>Primary Driver:</strong> {selectedTrip.driverName || 'Staff 1'}</div>
-              <div><strong>Delivery Assistant:</strong> {selectedTrip.assistantStaffName || 'Staff 2'}</div>
-              <div><strong>Departure ("Goes"):</strong> {formatTimeStr(selectedTrip.departureTime)}</div>
-              <div><strong>Return ("Returns"):</strong> {formatTimeStr(selectedTrip.returnTime)}</div>
-              <div><strong>Duration:</strong> {formatDuration(selectedTrip.tripDurationMinutes)}</div>
-              <div><strong>Total Net Value:</strong> ${Number(selectedTrip.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-            </div>
-
-            {/* Invoices list */}
-            <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a', margin: '0 0 10px 0' }}>
-              Loaded Invoices ({selectedTrip.invoices?.length || selectedTrip.totalInvoicesCount || 0})
-            </h4>
-
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', marginBottom: '24px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 10px' }}>Invoice #</th>
-                  <th style={{ padding: '8px 10px' }}>Customer Name</th>
-                  <th style={{ padding: '8px 10px' }}>Address</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount</th>
-                  <th style={{ padding: '8px 10px', textAlign: 'center' }}>Delivery Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(selectedTrip.invoices || []).map((inv) => (
-                  <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#0284c7' }}>{inv.invoiceNumber}</td>
-                    <td style={{ padding: '8px 10px' }}>{inv.customerName}</td>
-                    <td style={{ padding: '8px 10px', color: '#64748b' }}>{inv.address || 'Standard Delivery'}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>${Number(inv.netTotal || 0).toFixed(2)}</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d' }}>
-                        {inv.deliveryStatus || selectedTrip.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Signatures */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', paddingTop: '30px', borderTop: '1px dashed #cbd5e1', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
-              <div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '6px', fontWeight: 600 }}>Warehouse Dispatcher</div>
-              </div>
-              <div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '6px', fontWeight: 600 }}>Driver Signature</div>
-              </div>
-              <div>
-                <div style={{ borderTop: '1px solid #000', paddingTop: '6px', fontWeight: 600 }}>Assistant Signature</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
+      {viewingRoute && <PurchaseInspectionModal type="Route" number={viewingRoute.routeCode || viewingRoute.routeName} status={viewingRoute.isActive?'ACTIVE':'INACTIVE'} tableToolbar tableSearchPlaceholder="Search customer code or name..." tableSearchLabel="Search route customers" emptyMessage="No matching customers found." rows={customers.filter(customer=>(viewingRoute.customerIds || []).map(String).includes(String(customer.id)) || String(customer.routeId)===String(viewingRoute.id))} columns={[{label:'Customer code',value:row=>row.customerCode || row.code},{label:'Customer',value:row=>row.name || row.customerName},{label:'Phone',value:row=>row.phone},{label:'Address',value:row=>row.address}]} onClose={()=>setViewingRoute(null)} details={[{label:'Route',value:viewingRoute.routeName},{label:'Area',value:viewingRoute.area},{label:'Delivery days',value:viewingRoute.deliveryDays},{label:'Assigned staff',value:viewingRoute.assignedStaffName},{label:'Remarks',value:viewingRoute.description}]} detailActions={canEditDelivery?[{label:'Edit Route',icon:Edit2,onClick:()=>{handleOpenRouteView(viewingRoute);setViewingRoute(null);}}]:[]}/>}
       {/* MODAL 6: DELIVERY ROUTE VIEW POPUP (SPLIT 2 COLUMNS)          */}
       {/* ------------------------------------------------------------- */}
       {(selectedRoute || isCreatingRoute) && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop delivery-dialog"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
@@ -1918,7 +920,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
-                  {isCreatingRoute ? 'Create Delivery Route' : `Manage Delivery Route: ${routeEditForm.name}`}
+                  {isCreatingRoute ? 'New Delivery Route' : `Manage Delivery Route: ${routeEditForm.name}`}
                 </h3>
                 <span
                   style={{
@@ -2030,8 +1032,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                       Assigned Staff Member / Driver
                     </label>
-                    <select
-                      value={routeEditForm.assignedStaffId}
+                    <FilterSelect variant="field"
+                      aria-label="Assigned route staff" value={routeEditForm.assignedStaffId}
                       onChange={(e) => setRouteEditForm({ ...routeEditForm, assignedStaffId: e.target.value })}
                       style={{
                         width: '100%',
@@ -2054,7 +1056,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                           {s.fullName || s.name} {s.role ? `— ${s.role}` : (s.employeeCode ? `(${s.employeeCode})` : '')}
                         </option>
                       ))}
-                    </select>
+                    </FilterSelect>
                   </div>
 
                   {/* Area / Territory */}
@@ -2435,7 +1437,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       {/* ------------------------------------------------------------- */}
       {showAssignCustomerModal && (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop delivery-dialog"
           style={{ padding: '12px', zIndex: 1150, backgroundColor: 'rgba(15, 23, 42, 0.55)', overflowY: 'auto' }}
         >
           <div
@@ -2688,95 +1690,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
       )}
 
-      {/* MODAL 7: CREATE VEHICLE */}
-      {showVehicleModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', maxWidth: '440px', width: '100%', padding: '24px', boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0 0 16px 0' }}>
-              Add Delivery Fleet Vehicle
-            </h3>
-            <form onSubmit={handleSaveVehicle} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Plate Number *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. WP-CAB-4821"
-                  value={vehicleForm.vehicleNumber}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleNumber: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Model & Make *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Isuzu Elf 4-Ton Truck"
-                  value={vehicleForm.model}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Type</label>
-                  <select
-                    value={vehicleForm.vehicleType}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, vehicleType: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '0.85rem' }}
-                  >
-                    <option value="TRUCK">TRUCK</option>
-                    <option value="LORRY">LORRY</option>
-                    <option value="VAN">VAN</option>
-                    <option value="MOTORCYCLE">MOTORCYCLE</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Payload Capacity (kg)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 4000"
-                    value={vehicleForm.capacityKg}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, capacityKg: e.target.value })}
-                    style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Notes</label>
-                <input
-                  type="text"
-                  placeholder="Condition, registration expiration..."
-                  value={vehicleForm.notes}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, notes: e.target.value })}
-                  style={{ width: '100%', height: '36px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowVehicleModal(false)}
-                  style={{ padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#0284c7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Register Vehicle
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

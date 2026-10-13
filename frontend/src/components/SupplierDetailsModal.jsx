@@ -23,10 +23,9 @@ export default function SupplierDetailsModal({supplier,active,onClose,onPrint,on
         <div className="purchase-inspection-details-card">
           <dl className="purchase-inspection-details" aria-label="Supplier contact details">{details.map(({label,value,icon:Icon,wide})=><div key={label} className={wide?'purchase-inspection-detail-wide':undefined}><dt><Icon size={13} strokeWidth={1.7}/>{label}</dt><dd>{value || '—'}</dd></div>)}</dl>
           {canManage && <div className="purchase-inspection-detail-actions">
-            <button type="button" className="btn btn-glass" onClick={onEdit}><Edit2 size={15}/> Edit Supplier</button>
-            {status!=='ACTIVE' && <button type="button" className="btn btn-glass purchase-inspection-success" onClick={()=>onStatusChange('ACTIVE')}><CheckCircle size={15}/> Activate</button>}
-            {status!=='INACTIVE' && <button type="button" className="btn btn-glass purchase-inspection-danger" onClick={()=>onStatusChange('INACTIVE')}><Ban size={15}/> Deactivate</button>}
-            {status!=='DRAFT' && <button type="button" className="btn btn-glass" onClick={()=>onStatusChange('DRAFT')}>Return to draft</button>}
+            {status!=='INACTIVE' && <button type="button" className="btn btn-glass" onClick={onEdit}><Edit2 size={15}/> Edit Supplier</button>}
+            {status==='INACTIVE' && <button type="button" className="btn btn-glass purchase-inspection-success" onClick={()=>onStatusChange('ACTIVE')}><CheckCircle size={15}/> Process Supplier</button>}
+            {status!=='INACTIVE' && <button type="button" className="btn btn-glass purchase-inspection-danger" onClick={()=>onStatusChange('INACTIVE')}><Ban size={15}/> Cancel Supplier</button>}
           </div>}
         </div>
       </header>

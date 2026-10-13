@@ -138,14 +138,12 @@ test('Purchasing popups share compact details, table controls and status workflo
           assert.ok(host.querySelector('.purchase-inspection-header').textContent.includes(status));
           assert.ok(host.querySelector('.purchase-inspection-details').textContent.includes('Warehouse correction'));
         };
-        await transition('Change to Pending','PENDING');
-        assert.ok(actionByText('Mark Transferred').classList.contains('purchase-inspection-success'));
+        assert.equal(actionByText('Change to Pending'),undefined);
         await transition('Cancel GTN','CANCELLED');
         assert.equal(actionByText('Edit GTN'),undefined);
-        assert.ok(actionByText('Mark Transferred'));assert.ok(actionByText('Change to Pending'));
+        assert.ok(actionByText('Mark Transferred'));assert.equal(actionByText('Change to Pending'),undefined);
         await transition('Mark Transferred','TRANSFERRED');
         await transition('Cancel GTN','CANCELLED');
-        await transition('Change to Pending','PENDING');
         await transition('Mark Transferred','TRANSFERRED');
         assert.equal(host.querySelector('.purchase-inspection-items').closest('[role="dialog"]').querySelector('.purchase-inspection-header').querySelector('select, input, textarea'),null);
       } else {
@@ -161,12 +159,14 @@ test('Purchasing popups share compact details, table controls and status workflo
         if(type==='PO') {
           assert.equal(actionByText('Approve PO'),undefined);assert.ok(actionByText('Cancel PO'));
           assert.ok(actionByText('Edit PO'));assert.ok(host.querySelector('[title="Edit Purchase Order"]'));
-          await changeStatus('Inform to Order');assert.equal(docs.PO.status,'INFORM_TO_ORDER');
+          assert.equal(actionByText('Inform to Order'),undefined);
           assert.ok(actionByText('Edit PO'));assert.ok(host.querySelector('[title="Edit Purchase Order"]'));
           await changeStatus('Cancel PO');assert.equal(docs.PO.status,'CANCELLED');
           assert.equal(actionByText('Edit PO'),undefined);assert.equal(host.querySelector('[title="Edit Purchase Order"]'),null);
           await changeStatus('Inform to Order');assert.equal(docs.PO.status,'INFORM_TO_ORDER');
-          await changeStatus('Return to Draft');assert.equal(docs.PO.status,'DRAFT');
+          assert.equal(actionByText('Return to Draft'),undefined);
+          assert.equal(actionByText('Inform to Order'),undefined);
+          assert.ok(actionByText('Edit PO'));assert.ok(actionByText('Cancel PO'));
           await act(async()=>host.querySelector('.modern-filter-trigger').click());assert.deepEqual([...document.querySelectorAll('.modern-filter-options [role="option"]')].map(option=>option.textContent),['All Statuses','Draft','Inform to Order','Cancelled']);await act(async()=>document.querySelector('.modern-filter-popup').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
           await act(async()=>host.querySelector('[aria-label="Close PO details"]').click());
           printed='';await act(async()=>host.querySelector('[title="Print PO"]').click());

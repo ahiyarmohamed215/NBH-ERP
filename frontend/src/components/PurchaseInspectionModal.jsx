@@ -1,10 +1,10 @@
 import React,{useState} from 'react';
-import { Search, Printer, X, FileCheck, ArrowLeftRight, RotateCcw, ClipboardList, UserRound, Calendar, MessageSquare, Warehouse, Boxes } from 'lucide-react';
+import { Search, Printer, X, FileCheck, ArrowLeftRight, RotateCcw, ClipboardList, UserRound, Calendar, MessageSquare, Warehouse, Boxes, Truck, Navigation } from 'lucide-react';
 import { printA4Report } from '../utils/printReport';
 import './PurchaseInspectionModal.css';
 import StatusBadge from './StatusBadge';
 
-export default function PurchaseInspectionModal({ type, number, status, rows = [], columns, actions = [], headerActions = [], detailActions = [], onPrint, onClose, actionsPosition = 'bottom', details = [], detailsPosition = 'header', showHeaderClose = true, closeLabel = 'Close', tableToolbar = false, content, headerPrint = false, footer }) {
+export default function PurchaseInspectionModal({ type, number, status, rows = [], columns, actions = [], headerActions = [], detailActions = [], onPrint, onClose, actionsPosition = 'bottom', details = [], detailsPosition = 'header', showHeaderClose = true, closeLabel = 'Close', tableToolbar = false, tableSearchPlaceholder,tableSearchLabel,emptyMessage, content, headerPrint = false, footer }) {
   const [tableQuery,setTableQuery]=useState('');
   const query=tableQuery.trim().toLowerCase();
   const visibleRows=tableToolbar && query ? rows.filter(row=>columns.some(column=>String(column.value(row) ?? '').toLowerCase().includes(query))) : rows;
@@ -12,8 +12,8 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
   const cardActions=unifiedDetails ? [...detailActions,...headerActions,...actions] : detailActions;
   const managementActions=unifiedDetails ? [] : headerActions;
   const footerActions=unifiedDetails ? [] : actions;
-  const DocumentIcon = { GRN: FileCheck, GTN: ArrowLeftRight, PRN: RotateCcw, PO: ClipboardList, Inventory: Boxes }[type] || FileCheck;
-  const documentTitle = { GRN: 'Goods received note', GTN: 'Goods transfer note', PRN: 'Purchase return note', PO: 'Purchase order', Inventory: 'Inventory stock' }[type] || type;
+  const DocumentIcon = { GRN: FileCheck, GTN: ArrowLeftRight, PRN: RotateCcw, PO: ClipboardList, Inventory: Boxes,Delivery:Truck,Fleet:Truck,Route:Navigation }[type] || FileCheck;
+  const documentTitle = { GRN: 'Goods received note', GTN: 'Goods transfer note', PRN: 'Purchase return note', PO: 'Purchase order', Inventory: 'Inventory stock',Delivery:'Delivery trip',Fleet:'Fleet vehicle',Route:'Delivery route' }[type] || type;
   const printDocument = () => {
     if (onPrint) { onPrint(); return; }
     const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -60,14 +60,14 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
           {detailsPosition === 'sidebar' && <aside className="purchase-inspection-sidebar" aria-label={`${type} information`}>{detailsSection}{managementSection}</aside>}
           <section className="purchase-inspection-items" aria-label={`${type} products`}>
             {tableToolbar && !content && <div className="purchase-inspection-table-toolbar" aria-label={`${type} table controls`}>
-              <div className="purchase-inspection-table-search"><Search size={16}/><input type="search" aria-label={`Search ${type} products`} placeholder="Search product code or name..." value={tableQuery} onChange={event=>setTableQuery(event.target.value)}/>{tableQuery && <button type="button" aria-label="Clear table search" onClick={()=>setTableQuery('')}><X size={14}/></button>}</div>
+              <div className="purchase-inspection-table-search"><Search size={16}/><input type="search" aria-label={tableSearchLabel || `Search ${type} products`} placeholder={tableSearchPlaceholder || "Search product code or name..."} value={tableQuery} onChange={event=>setTableQuery(event.target.value)}/>{tableQuery && <button type="button" aria-label="Clear table search" onClick={()=>setTableQuery('')}><X size={14}/></button>}</div>
               <button type="button" className="purchase-inspection-table-print" title={`Print ${type}`} aria-label={`Print ${type}`} onClick={printDocument}><Printer size={15}/> Print</button>
             </div>}
 
             {content || <div className="purchase-inspection-table"><table className="glass-table">
               <thead><tr>{columns.map((column) => <th key={column.label} className={column.numeric ? 'purchase-inspection-number' : ''}>{column.label}</th>)}</tr></thead>
               <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={column.numeric ? 'purchase-inspection-number' : ''}>{column.value(row) ?? '—'}</td>)}</tr>)}
-                {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty">{query ? 'No matching products found.' : 'No products found.'}</td></tr>}
+                {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty">{emptyMessage || (query ? 'No matching products found.' : 'No products found.')}</td></tr>}
               </tbody>
             </table></div>}
           </section>

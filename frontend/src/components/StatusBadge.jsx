@@ -1,8 +1,8 @@
 import React from 'react';
 import './StatusBadge.css';
 
-const successStatuses = new Set(['ACTIVE', 'PROCESSED', 'TRANSFERRED', 'COMPLETED', 'APPROVED', 'RECEIVED', 'ORDERED', 'INFORM_TO_ORDER', 'IN_STOCK']);
-const pendingStatuses = new Set(['DRAFT', 'PENDING', 'PROCESSING', 'PARTIALLY_RECEIVED', 'LOW_STOCK']);
+const successStatuses = new Set(['AVAILABLE','DELIVERED','ACTIVE', 'PROCESSED', 'TRANSFERRED', 'COMPLETED', 'APPROVED', 'RECEIVED', 'ORDERED', 'INFORM_TO_ORDER', 'IN_STOCK']);
+const pendingStatuses = new Set(['SCHEDULED','IN_TRANSIT','ON_DELIVERY','DRAFT', 'PENDING', 'PROCESSING', 'PARTIALLY_RECEIVED', 'LOW_STOCK']);
 const inactiveStatuses = new Set(['INACTIVE', 'CANCELLED', 'CANCELED', 'REJECTED', 'OUT_OF_STOCK']);
 
 export default function StatusBadge({ status, onClick, title, disabled }) {

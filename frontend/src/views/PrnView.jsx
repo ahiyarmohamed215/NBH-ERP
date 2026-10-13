@@ -868,7 +868,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
         onClose={() => setSelectedPrn(null)}
         actions={[
           ...(selectedPrn.status !== 'CANCELLED' ? [{label:'Edit PRN',icon:Edit2,disabled:saving,onClick:()=>handleEditPrn(selectedPrn)}] : []),
-          ...(['DRAFT', 'PENDING', 'CANCELLED'].includes(selectedPrn.status) ? [{ label: selectedPrn.status === 'CANCELLED' ? 'Reprocess PRN' : 'Process PRN', icon: selectedPrn.status === 'CANCELLED' ? RotateCw : CheckCircle, tone:'success', disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []),
+          ...(selectedPrn.status === 'CANCELLED' ? [{ label: selectedPrn.status === 'CANCELLED' ? 'Reprocess PRN' : 'Process PRN', icon: selectedPrn.status === 'CANCELLED' ? RotateCw : CheckCircle, tone:'success', disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []),
           ...(selectedPrn.status !== 'CANCELLED' ? [{ label: 'Cancel PRN', icon: Ban, tone: 'danger', disabled: saving, onClick: ()=>handleCancelPRN() }] : []),
         ]}
         columns={[

@@ -839,7 +839,6 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
         onClose={() => setSelectedGtn(null)} onPrint={() => pdfApi.printGtn(selectedGtn.id)}
         actions={[
           ...(['DRAFT','PENDING','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Edit GTN', icon: Edit2, disabled: saving, onClick:()=>handleEditGtn(selectedGtn) }] : []),
-          ...(['DRAFT','CANCELLED','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Change to Pending', icon: RotateCw, disabled: saving, onClick:()=>openStatusChange('PENDING') }] : []),
           ...(['PENDING','CANCELLED'].includes(selectedGtn.status) ? [{ label: 'Mark Transferred', icon: CheckCircle, tone: 'success', disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
           ...(selectedGtn.status !== 'CANCELLED' ? [{ label: 'Cancel GTN', icon: Ban, tone: 'danger', disabled: saving, onClick:()=>openStatusChange('CANCELLED') }] : []),
         ]}
