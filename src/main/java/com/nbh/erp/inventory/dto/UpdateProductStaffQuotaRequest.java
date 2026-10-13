@@ -23,9 +23,20 @@ public class UpdateProductStaffQuotaRequest {
 
     private Boolean isActive;
 
+    private Long productId;
+    private Long userId;
+    private Boolean replaceDraftFields;
+
     private LocalDate validFrom;
 
     private LocalDate validTo;
 
+    @jakarta.validation.constraints.Size(max = 255)
     private String notes;
+
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
+    private String status;
+
+    @jakarta.validation.constraints.Size(max = 1000)
+    private String statusReason;
 }

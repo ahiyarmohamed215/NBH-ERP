@@ -34,6 +34,8 @@ export default function App() {
     return initialView === 'dashboard' ? '' : (p.get('tab') || '');
   });
 
+  const [purchaseCreateRequest,setPurchaseCreateRequest]=useState(null);
+  const purchaseCreateSequence=useRef(0);
   const rememberedTabs = useRef({});
   const tabOwner = useRef(null);
   const identity = user?.id ?? user?.username ?? null;
@@ -172,12 +174,12 @@ export default function App() {
         permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST'],
         subItems: [
           { id: 'inventory-list', label: 'Inventory List', permission: 'INVENTORY_VIEW' },
+          { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
           { id: 'pos-quotas', label: 'Inventory Allocation', permission: 'INVENTORY_VIEW' },
-          { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
           { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
+          { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
           { id: 'brands', label: 'Brands', permission: 'PRODUCT_MANAGE' },
           { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
-          { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
         ],
       },
       {
@@ -261,7 +263,8 @@ export default function App() {
   );
 
   // Seamless navigation helper supporting legacy and restructured routes
-  const navigateTo = useCallback((view, sub = '') => {
+  const navigateTo = useCallback((view, sub = '', action = '') => {
+    setPurchaseCreateRequest(view==='purchasing' && sub==='gtn' && action==='create' ? {tab:'gtn',id:++purchaseCreateSequence.current} : null);
     if (!sub && Object.prototype.hasOwnProperty.call(rememberedTabs.current, view)) {
       setCurrentView(view);
       setSubTab(rememberedTabs.current[view]);
@@ -538,6 +541,17 @@ export default function App() {
               )}
             </div>
 
+            {/* Fullscreen is part of the sidebar, clear of workspace actions. */}
+            {!isPosMode && <button type="button" onClick={toggleFullscreen}
+              title={isFullscreen?'Exit Full Screen (F11 or Alt+Enter)':'Enter Full Screen (F11 or Alt+Enter)'}
+              aria-label={isFullscreen?'Exit full screen':'Enter full screen'}
+              style={{display:'flex',alignItems:'center',justifyContent:isSidebarCollapsed?'center':'flex-start',gap:8,width:'100%',minHeight:34,marginBottom:12,padding:isSidebarCollapsed?'7px':'7px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#475569',fontFamily:'inherit',fontSize:'.77rem',cursor:'pointer',flexShrink:0,boxShadow:'none'}}
+              onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f8fafc';event.currentTarget.style.borderColor='#cbd5e1';}}
+              onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#fff';event.currentTarget.style.borderColor='#e2e8f0';}}>
+              {isFullscreen?<Minimize size={15}/>:<Maximize size={15}/>}
+              {!isSidebarCollapsed && (isFullscreen?'Exit full screen':'Full screen')}
+            </button>}
+
             {/* Standard Navigation Buttons */}
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {accessibleModules.map((mod) => {
@@ -687,7 +701,7 @@ export default function App() {
                 case 'customers': return <CustomersHub {...props} />;
                 case 'employees': return <EmployeesHub {...props} />;
                 case 'inventory': return <InventoryHub {...props} onNavigate={navigateTo} />;
-                case 'purchasing': return <PurchasingHub {...props} />;
+                case 'purchasing': return <PurchasingHub {...props} createRequest={view===currentView?purchaseCreateRequest:null} onCreateRequestHandled={id=>setPurchaseCreateRequest(current=>current?.id===id?null:current)} />;
                 case 'delivery': return <DeliveryHub {...props} />;
                 case 'reports': return <ReportsView {...props} />;
                 default: return <ErrorState type="not-found" onNavigateHome={() => navigateTo('dashboard')} />;
@@ -696,43 +710,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      {/* Floating Bottom-Right Fullscreen Trigger Button (Hidden in POS mode) */}
-      {!isPosMode && (
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          title={isFullscreen ? 'Exit Full Screen (F11 or Alt+Enter)' : 'Enter Full Screen (F11 or Alt+Enter)'}
-          style={{
-            position: 'fixed',
-            bottom: '18px',
-            right: '18px',
-            zIndex: 80,
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: '#2563eb',
-            padding: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f1f5f9';
-            e.currentTarget.style.borderColor = '#94a3b8';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.borderColor = '#cbd5e1';
-          }}
-        >
-          {isFullscreen ? <Minimize size={17} /> : <Maximize size={17} />}
-        </button>
-      )}
 
       {/* Standard ERP Keyboard Shortcuts Help Modal */}
       <KeyboardShortcutsModal

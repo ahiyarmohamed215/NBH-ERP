@@ -95,6 +95,8 @@ public class AuthService {
         user.setUpdatedBy(trimmedUsername);
 
         userRepository.save(user);
+        user.setEmployeeCode(user.getEmployeeCode());
+        userRepository.save(user);
         log.info("New user registered and pending approval: '{}'", user.getUsername());
     }
 

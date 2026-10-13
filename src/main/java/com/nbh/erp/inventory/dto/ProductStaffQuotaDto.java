@@ -69,14 +69,7 @@ public class ProductStaffQuotaDto {
             util = Math.min(100.0, sold.doubleValue() / alloc.doubleValue() * 100.0);
         }
 
-        String statusStr;
-        if (!Boolean.TRUE.equals(q.getIsActive())) {
-            statusStr = "INACTIVE";
-        } else if (rem.compareTo(BigDecimal.ZERO) <= 0) {
-            statusStr = "EXHAUSTED";
-        } else {
-            statusStr = "ACTIVE";
-        }
+        String statusStr = q.getAllocationStatus();
 
         BigDecimal totStock = totalStock != null ? totalStock : (currentStock != null ? currentStock : BigDecimal.ZERO);
 
@@ -96,7 +89,7 @@ public class ProductStaffQuotaDto {
                 .warehouseId(q.getWarehouse() != null ? q.getWarehouse().getId() : null)
                 .warehouseCode(q.getWarehouse() != null ? q.getWarehouse().getCode() : "ALL")
                 .warehouseName(q.getWarehouse() != null ? q.getWarehouse().getName() : "All Warehouses")
-                .allocatedQuantity(alloc)
+                .allocatedQuantity(q.getAllocatedQuantity())
                 .soldQuantity(sold)
                 .remainingQuantity(rem)
                 .utilizationPercentage(Math.round(util * 10.0) / 10.0)

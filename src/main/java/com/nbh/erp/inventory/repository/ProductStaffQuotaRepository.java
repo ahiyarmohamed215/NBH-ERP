@@ -13,6 +13,10 @@ import java.util.Optional;
 
 @Repository
 public interface ProductStaffQuotaRepository extends JpaRepository<ProductStaffQuota, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select q from ProductStaffQuota q where q.id = :id")
+    Optional<ProductStaffQuota> findByIdForUpdate(@Param("id") Long id);
+
 
     @Query("SELECT q FROM ProductStaffQuota q WHERE q.product.id = :productId AND q.user.id = :userId " +
            "AND (:warehouseId IS NULL OR q.warehouse.id = :warehouseId OR q.warehouse IS NULL) " +
@@ -35,23 +39,26 @@ public interface ProductStaffQuotaRepository extends JpaRepository<ProductStaffQ
             @Param("warehouseId") Long warehouseId
     );
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseId(Long productId, Long userId, Long warehouseId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseIsNull(Long productId, Long userId);
 
     List<ProductStaffQuota> findByProductId(Long productId);
 
     List<ProductStaffQuota> findByUserId(Long userId);
 
-    @Query("SELECT q FROM ProductStaffQuota q WHERE " +
-           "(:productId IS NULL OR q.product.id = :productId) AND " +
-           "(:userId IS NULL OR q.user.id = :userId) AND " +
-           "(:warehouseId IS NULL OR q.warehouse.id = :warehouseId) AND " +
+    @Query("SELECT q FROM ProductStaffQuota q LEFT JOIN q.product p LEFT JOIN q.user u LEFT JOIN q.warehouse w WHERE " +
+           "(:productId IS NULL OR p.id = :productId) AND " +
+           "(:userId IS NULL OR u.id = :userId) AND " +
+           "(:warehouseId IS NULL OR w.id = :warehouseId) AND " +
            "(:activeOnly IS NULL OR q.isActive = :activeOnly) AND " +
-           "(:query IS NULL OR LOWER(q.product.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(q.product.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(q.user.fullName) LIKE LOWER(CONCAT('%', :query, '%')) " +
-           "OR LOWER(q.user.username) LIKE LOWER(CONCAT('%', :query, '%')))")
+           "(:query IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(q.notes) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<ProductStaffQuota> searchQuotas(
             @Param("productId") Long productId,
             @Param("userId") Long userId,

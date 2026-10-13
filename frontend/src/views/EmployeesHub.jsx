@@ -1,3 +1,4 @@
+import {staffCode} from '../utils/staffCode';
 import { useState, useEffect, useMemo } from 'react';
 import { userApi, roleApi, pdfApi } from '../api/apiClient';
 import { useDataSync } from '../hooks/useDataSync';
@@ -164,7 +165,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         const str = typeof r === 'string' ? r : (r?.name || '');
         return str.toLowerCase().includes(q);
       });
-      return nameMatch || userMatch || emailMatch || phoneMatch || roleMatch;
+      return nameMatch || userMatch || emailMatch || phoneMatch || roleMatch || staffCode(emp).toLowerCase().includes(q);
     });
   }, [employees, searchQuery, statusFilter]);
 
@@ -263,7 +264,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         subtitle: `${emp.fullName || emp.username} (@${emp.username})`,
         metaItems: [
           { label: 'Employee ID', value: `#${emp.id}` },
-          { label: 'Code', value: emp.employeeCode || `EMP-${emp.id}` },
+          { label: 'Code', value: staffCode(emp) },
           { label: 'Primary Role', value: getPrimaryRole(emp) },
           { label: 'Status', value: emp.isActive ? 'Active' : 'Inactive' },
           { label: 'Phone', value: emp.phone || '—' },
@@ -337,6 +338,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       ],
       columns: [
         { header: 'Username', accessor: (u) => `@${u.username}` },
+        { header: 'Staff code', accessor: (u) => staffCode(u) },
         { header: 'Full Name', accessor: (u) => u.fullName || '—' },
         { header: 'Email', accessor: (u) => u.email || '—' },
         { header: 'Phone', accessor: (u) => u.phone || '—' },
@@ -883,7 +885,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               />
               <input
                 type="text"
-                placeholder="Search employees by name, username, email, phone, role..."
+                placeholder="Search employees by name, staff code, email, phone or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -1117,6 +1119,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                 <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.92rem' }}>
                                   {emp.fullName || emp.username}
                                 </div>
+                                <div style={{fontSize:'.72rem',color:'#2563eb',marginTop:'3px',fontWeight:500}}>Staff code: {staffCode(emp)}</div>
                                 {emp.fullName && (
                                   <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>@{emp.username}</div>
                                 )}
@@ -1379,7 +1382,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                         <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 500 }}>
                           @{pUser.username}
                         </span>
-                        {pUser.employeeCode && (
+                        {pUser.id != null && (
                           <span
                             style={{
                               fontSize: '0.72rem',
@@ -1392,7 +1395,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                               border: '1px solid #e2e8f0',
                             }}
                           >
-                            {pUser.employeeCode}
+                            {staffCode(pUser)}
                           </span>
                         )}
                         <span
@@ -1953,6 +1956,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div><label className="label">Staff code</label><input type="text" className="input-glass" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
                     <div>
                       <label className="label">Full Name *</label>
                       <input
@@ -2226,6 +2230,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div><label className="label">Staff code</label><input type="text" className="input-glass" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
                     <div>
                       <label className="label">Full Name</label>
                       <input
@@ -2433,7 +2438,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
                     @{viewingPendingEmployee.username}
-                    {viewingPendingEmployee.employeeCode && ` • ${viewingPendingEmployee.employeeCode}`}
+                    {` • ${staffCode(viewingPendingEmployee)}`}
                   </div>
                 </div>
               </div>
@@ -2800,6 +2805,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a', marginBottom: '10px' }}>
                   Contact Information
                 </div>
+                <div style={{display:'flex',justifyContent:'space-between',gap:'12px',marginBottom:'10px',fontSize:'.82rem'}}><span style={{color:'#64748b'}}>Staff code</span><strong style={{color:'#2563eb',fontWeight:500}}>{staffCode(viewingEmployee)}</strong></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
                   <div>
                     <span style={{ color: '#64748b', fontSize: '0.74rem', display: 'block' }}>Full Name</span>

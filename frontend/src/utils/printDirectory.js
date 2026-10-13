@@ -18,3 +18,12 @@ export function printCurrentDirectory(root, title) {
     summaryItems:[{label:'Total records',value:String(data.length)}]});
   return true;
 }
+
+export function printDirectoryRow(event,title) {
+  event.stopPropagation();
+  const row=event.currentTarget.closest('tr'),table=row?.closest('table')?.cloneNode(true);
+  if(!table)return false;
+  table.querySelector('tbody').replaceChildren(row.cloneNode(true));
+  const root=document.createElement('div');root.append(table);
+  return printCurrentDirectory(root,title);
+}

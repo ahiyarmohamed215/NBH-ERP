@@ -15,8 +15,7 @@ public class CreateSupplierRequest {
     @jakarta.validation.constraints.Pattern(regexp="^$|[A-Za-z0-9][A-Za-z0-9_-]*",message="Supplier code may contain letters, numbers, hyphens and underscores")
     private String supplierCode; // Optional: auto-generated if null/empty
 
-    @NotBlank(message = "Supplier name is required")
-    @Size(min = 2, max = 150)
+    @Size(max = 150)
     private String name;
 
     @Size(max=100,message="Contact person must be 100 characters or fewer")
@@ -32,4 +31,7 @@ public class CreateSupplierRequest {
 
     @Size(max=5000,message="Address must be 5000 characters or fewer")
     private String address;
+
+    @jakarta.validation.constraints.Pattern(regexp="DRAFT|ACTIVE|INACTIVE")
+    private String status;
 }

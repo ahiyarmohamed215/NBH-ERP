@@ -15,7 +15,7 @@ import {
   Plus,
 } from 'lucide-react';
 
-export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
+export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequest, onCreateRequestHandled }) {
   const { user } = useAuth();
   const isSuperAdmin = Boolean(
     user?.username === 'admin' ||
@@ -26,13 +26,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
   const userPermissions = user?.permissions || [];
 
   const [editingForms, setEditingForms] = useState({});
-  const formCallbacks = React.useMemo(() => Object.fromEntries(['grn','gtn','prn','purchase-orders'].map(id => [id, open => setEditingForms(previous=>({...previous,[id]:open}))])), []);
+  const formCallbacks = React.useMemo(() => Object.fromEntries(['suppliers','grn','gtn','prn','purchase-orders'].map(id => [id, open => setEditingForms(previous=>({...previous,[id]:open}))])), []);
 
   const mastersRef = useRef(null);
   const grnRef = useRef(null);
   const gtnRef = useRef(null);
   const prnRef = useRef(null);
   const poRef = useRef(null);
+  const handledCreateRequest=useRef(null);
 
   const subTabs = [
     {
@@ -93,6 +94,16 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
       setVisitedTabs((prev) => new Set([...prev, activeSubTab]));
     }
   }, [activeSubTab]);
+
+  // Consume the navigation action after the GTN view has mounted, including retained tabs.
+  useEffect(()=>{
+    if(!createRequest || createRequest.id===handledCreateRequest.current || createRequest.tab!==currentTab || !allowedTabs.some(tab=>tab.id===currentTab))return;
+    if(createRequest.tab==='gtn' && gtnRef.current?.openCreate){
+      handledCreateRequest.current=createRequest.id;
+      gtnRef.current.openCreate();
+      onCreateRequestHandled?.(createRequest.id);
+    }
+  },[createRequest,currentTab,visitedTabs,onCreateRequestHandled,user]);
 
   const handleTabClick = (tabId) => {
     setCurrentTab(tabId);
@@ -340,6 +351,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange }) {
           <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
             <MastersView
               ref={mastersRef}
+              onFormModeChange={formCallbacks.suppliers}
               activeSubTab="suppliers"
               isStandalone={true}
               allowedTabs={['suppliers']}

@@ -33,19 +33,19 @@ public class ProductStaffQuota extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "product_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
     private Product product;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user; // Staff / Sales rep with POS access
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id")
     private Warehouse warehouse; // Optional: if null, applies across all warehouses
 
-    @Column(name = "allocated_quantity", precision = 12, scale = 2, nullable = false)
+    @Column(name = "allocated_quantity", precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal allocatedQuantity = BigDecimal.ZERO;
 
@@ -56,6 +56,13 @@ public class ProductStaffQuota extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    @Column(name = "allocation_status", length = 20)
+    private String allocationStatus;
+
+    public String getAllocationStatus() {
+        return "CANCELLED".equals(allocationStatus) ? "INACTIVE" : allocationStatus != null ? allocationStatus : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE";
+    }
 
     @Column(name = "valid_from")
     private LocalDate validFrom;

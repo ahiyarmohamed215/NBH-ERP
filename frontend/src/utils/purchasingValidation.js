@@ -25,10 +25,10 @@ export function phoneError(value,country='LK') {
   return '';
 }
 export function normalizePhone(value,country='LK') {return String(value || '').trim() ? parsePhoneNumberFromString(value,country)?.number || value : '';}
-export function supplierErrors(form) {
+export function supplierErrors(form,{draft=false}={}) {
   const errors={},name=String(form.name || '').trim(),email=String(form.email || '').trim();
-  if(!name) errors.name='Enter a supplier name.';
-  else if(name.length<2 || name.length>150) errors.name='Supplier name must contain 2–150 characters.';
+  if(!name && !draft) errors.name='Enter a supplier name.';
+  else if(name && (name.length<2 || name.length>150)) errors.name='Supplier name must contain 2–150 characters.';
   if(String(form.contactPerson || '').length>100) errors.contactPerson='Contact person must be 100 characters or fewer.';
   const phone=phoneError(form.phone,form.phoneCountry || phoneCountry(form.phone));if(phone)errors.phone=phone;
   if(email && (email.length>100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))errors.email='Enter a valid email address (up to 100 characters).';

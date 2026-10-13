@@ -35,6 +35,7 @@ public class ProductStaffQuotaService {
     private final WarehouseRepository warehouseRepository;
     private final StockService stockService;
     private final StockBalanceRepository stockBalanceRepository;
+    private final com.nbh.erp.audit.service.AuditLogService audit;
 
     @Transactional(readOnly = true)
     public Page<ProductStaffQuotaDto> searchQuotas(
@@ -78,129 +79,93 @@ public class ProductStaffQuotaService {
 
     @Transactional
     public ProductStaffQuotaDto createOrUpdateQuota(CreateProductStaffQuotaRequest request) {
-        Product product = productRepository.findById(request.getProductId())
+        String target = request.getStatus() != null ? request.getStatus() : "ACTIVE";
+        if (!java.util.Set.of("DRAFT", "ACTIVE").contains(target)) throw new BusinessException("New allocations must be draft or active");
+        Product product = request.getProductId() == null ? null : productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
-
-        User user = userRepository.findById(request.getUserId())
+        User user = request.getUserId() == null ? null : userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
-
-        Warehouse warehouse = null;
-        if (request.getWarehouseId() != null) {
-            warehouse = warehouseRepository.findById(request.getWarehouseId()).orElse(null);
-        }
-        if (warehouse == null && product.getDefaultWarehouse() != null) {
-            warehouse = product.getDefaultWarehouse();
-        }
-
-        // Validate inventory stock availability
-        BigDecimal availableStock;
-        if (warehouse != null) {
-            availableStock = stockService.getAvailableStock(warehouse.getId(), product.getId());
-        } else {
-            BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
-            availableStock = tot != null ? tot : BigDecimal.ZERO;
-        }
-        if (availableStock == null) {
-            availableStock = BigDecimal.ZERO;
-        }
-
-        if (availableStock.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("Product '" + product.getName() + "' is out of stock (0 available). Cannot allocate inventory.");
-        }
-
-        if (request.getAllocatedQuantity() != null && request.getAllocatedQuantity().compareTo(availableStock) > 0) {
-            throw new BusinessException("Cannot allocate " + request.getAllocatedQuantity() + " units. Only " + availableStock + " units available in inventory stock for '" + product.getName() + "'.");
-        }
-
-        // Check if an existing quota already exists for this (product, user, warehouse)
-        Optional<ProductStaffQuota> existingOpt = (warehouse != null)
-                ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(), user.getId(), warehouse.getId())
-                : quotaRepository.findByProductIdAndUserIdAndWarehouseIsNull(product.getId(), user.getId());
-
-        ProductStaffQuota quota;
-        if (existingOpt.isPresent()) {
-            quota = existingOpt.get();
-            quota.setAllocatedQuantity(request.getAllocatedQuantity());
-            quota.setIsActive(true);
-            if (request.getValidFrom() != null) quota.setValidFrom(request.getValidFrom());
-            if (request.getValidTo() != null) quota.setValidTo(request.getValidTo());
-            if (request.getNotes() != null) quota.setNotes(request.getNotes());
-            log.info("Updated existing quota ID {} for user {} on product {} to {}",
-                    quota.getId(), user.getUsername(), product.getSku(), request.getAllocatedQuantity());
-        } else {
-            quota = ProductStaffQuota.builder()
-                    .product(product)
-                    .user(user)
-                    .warehouse(warehouse)
-                    .allocatedQuantity(request.getAllocatedQuantity())
-                    .soldQuantity(BigDecimal.ZERO)
-                    .isActive(true)
-                    .validFrom(request.getValidFrom())
-                    .validTo(request.getValidTo())
-                    .notes(request.getNotes())
-                    .build();
-            log.info("Created new quota for user {} on product {} allocated {}",
-                    user.getUsername(), product.getSku(), request.getAllocatedQuantity());
-        }
-
+        Warehouse warehouse = request.getWarehouseId() == null ? product != null ? product.getDefaultWarehouse() : null : warehouseRepository.findById(request.getWarehouseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+        Optional<ProductStaffQuota> existing = matchingAllocation(product,user,warehouse);
+        ProductStaffQuota quota = existing.orElseGet(() -> ProductStaffQuota.builder().product(product).user(user).warehouse(warehouse).soldQuantity(BigDecimal.ZERO).build());
+        if (existing.isPresent() && !target.equals(quota.getAllocationStatus())) throw new BusinessException("An allocation already exists. Open it to change its status");
+        BigDecimal sold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
+        if (request.getAllocatedQuantity() != null && request.getAllocatedQuantity().compareTo(sold) < 0) throw new BusinessException("Allocated quantity cannot be less than quantity already sold");
+        quota.setAllocatedQuantity(request.getAllocatedQuantity());
+        quota.setNotes(request.getNotes());
+        quota.setValidFrom(request.getValidFrom());quota.setValidTo(request.getValidTo());
+        validateAllocation(quota,target);
+        quota.setAllocationStatus(target);quota.setIsActive("ACTIVE".equals(target));
         ProductStaffQuota saved = quotaRepository.save(quota);
-        Long whId = saved.getWarehouse() != null ? saved.getWarehouse().getId() : 1L;
-        BigDecimal whStock = stockService.getAvailableStock(whId, product.getId());
-        BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
-        BigDecimal totalStock = tot != null ? tot : BigDecimal.ZERO;
-        return ProductStaffQuotaDto.fromEntity(saved, totalStock, whStock);
+        audit.log("ALLOCATION_CREATE", "ProductStaffQuota", String.valueOf(saved.getId()), "Saved " + target + " allocation");
+        return allocationDto(saved);
     }
 
     @Transactional
     public ProductStaffQuotaDto updateQuota(Long id, UpdateProductStaffQuotaRequest request) {
-        ProductStaffQuota quota = quotaRepository.findById(id)
+        ProductStaffQuota quota = quotaRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProductStaffQuota", "id", id));
-
+        String previous = quota.getAllocationStatus();
+        String target = request.getStatus() != null ? request.getStatus() : request.getIsActive() != null ? request.getIsActive() ? "ACTIVE" : "INACTIVE" : previous;
+        if (!java.util.Set.of("DRAFT", "ACTIVE", "INACTIVE").contains(target)) throw new BusinessException("Invalid allocation status");
+        if (!previous.equals(target) && (request.getStatusReason() == null || request.getStatusReason().isBlank())) throw new BusinessException("Enter a reason for this status change");
+        BigDecimal sold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
+        if ("DRAFT".equals(target) && sold.signum() > 0) throw new BusinessException("An allocation with sales cannot be returned to draft");
+        boolean replaceDraftFields = Boolean.TRUE.equals(request.getReplaceDraftFields());
+        if (replaceDraftFields || request.getProductId() != null || request.getUserId() != null) {
+            if (!"DRAFT".equals(previous)) throw new BusinessException("Only draft allocations can change their product or staff");
+            if (replaceDraftFields && request.getProductId() == null) {quota.setProduct(null);quota.setWarehouse(null);}
+            if (request.getProductId() != null) {
+                Product product = productRepository.findById(request.getProductId()).orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
+                quota.setProduct(product);quota.setWarehouse(product.getDefaultWarehouse());
+            }
+            if (replaceDraftFields && request.getUserId() == null) quota.setUser(null);
+            if (request.getUserId() != null) quota.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId())));
+            Optional<ProductStaffQuota> duplicate = matchingAllocation(quota.getProduct(),quota.getUser(),quota.getWarehouse());
+            if (duplicate.isPresent() && !duplicate.get().getId().equals(id)) throw new BusinessException("An allocation already exists for this product and staff");
+        }
+        if (replaceDraftFields && request.getAllocatedQuantity() == null) quota.setAllocatedQuantity(null);
         if (request.getAllocatedQuantity() != null) {
-            Product product = quota.getProduct();
-            Warehouse warehouse = quota.getWarehouse();
-            BigDecimal availableStock;
-            if (warehouse != null) {
-                availableStock = stockService.getAvailableStock(warehouse.getId(), product.getId());
-            } else {
-                BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(product.getId());
-                availableStock = tot != null ? tot : BigDecimal.ZERO;
-            }
-            if (availableStock == null) {
-                availableStock = BigDecimal.ZERO;
-            }
-
-            if (availableStock.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BusinessException("Product '" + product.getName() + "' is out of stock (0 available). Cannot allocate inventory.");
-            }
-
-            if (request.getAllocatedQuantity().compareTo(availableStock) > 0) {
-                throw new BusinessException("Cannot allocate " + request.getAllocatedQuantity() + " units. Only " + availableStock + " units available in inventory stock for '" + product.getName() + "'.");
-            }
+            if (request.getAllocatedQuantity().compareTo(sold) < 0) throw new BusinessException("Allocated quantity cannot be less than quantity already sold");
             quota.setAllocatedQuantity(request.getAllocatedQuantity());
         }
-        if (request.getSoldQuantity() != null) {
-            quota.setSoldQuantity(request.getSoldQuantity());
-        }
-        if (request.getIsActive() != null) {
-            quota.setIsActive(request.getIsActive());
-        }
-        if (request.getValidFrom() != null) {
-            quota.setValidFrom(request.getValidFrom());
-        }
-        if (request.getValidTo() != null) {
-            quota.setValidTo(request.getValidTo());
-        }
-        if (request.getNotes() != null) {
-            quota.setNotes(request.getNotes());
-        }
+        if (request.getSoldQuantity() != null) quota.setSoldQuantity(request.getSoldQuantity());
+        if (request.getNotes() != null) quota.setNotes(request.getNotes());
+        if (request.getValidFrom() != null) quota.setValidFrom(request.getValidFrom());
+        if (request.getValidTo() != null) quota.setValidTo(request.getValidTo());
+        // Deactivating does not require stock. Activation and active quantity edits do.
+        if (!"INACTIVE".equals(target) && (!previous.equals(target) || request.getAllocatedQuantity() != null || "DRAFT".equals(target))) validateAllocation(quota,target);
+        quota.setAllocationStatus(target);quota.setIsActive("ACTIVE".equals(target));
+        if (!previous.equals(target)) audit.log("ALLOCATION_STATUS", "ProductStaffQuota", String.valueOf(id), previous + " → " + target + ": " + request.getStatusReason().trim());
+        return allocationDto(quotaRepository.save(quota));
+    }
 
-        ProductStaffQuota saved = quotaRepository.save(quota);
-        Long whId = saved.getWarehouse() != null ? saved.getWarehouse().getId() : 1L;
-        BigDecimal whStock = stockService.getAvailableStock(whId, saved.getProduct().getId());
-        BigDecimal tot = stockBalanceRepository.getTotalEnterpriseStockForProduct(saved.getProduct().getId());
-        BigDecimal totalStock = tot != null ? tot : BigDecimal.ZERO;
-        return ProductStaffQuotaDto.fromEntity(saved, totalStock, whStock);
+    private Optional<ProductStaffQuota> matchingAllocation(Product product,User user,Warehouse warehouse) {
+        if (product == null || user == null) return Optional.empty();
+        return warehouse != null ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(),user.getId(),warehouse.getId())
+                : quotaRepository.findByProductIdAndUserIdAndWarehouseIsNull(product.getId(),user.getId());
+    }
+
+    private void validateAllocation(ProductStaffQuota quota,String target) {
+        BigDecimal quantity = quota.getAllocatedQuantity();
+        if ("DRAFT".equals(target)) {
+            if (quota.getProduct() == null && quota.getUser() == null && quantity == null && (quota.getNotes() == null || quota.getNotes().isBlank())) throw new BusinessException("Fill at least one input before saving a draft");
+            return;
+        }
+        if (quota.getProduct() == null || quota.getUser() == null || quantity == null || quantity.signum() <= 0) throw new BusinessException("Complete product, staff and allocated quantity before activation");
+        BigDecimal available = quota.getWarehouse() != null ? stockService.getAvailableStock(quota.getWarehouse().getId(),quota.getProduct().getId()) : stockBalanceRepository.getTotalEnterpriseStockForProduct(quota.getProduct().getId());
+        if (available == null) available = BigDecimal.ZERO;
+        BigDecimal sold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
+        BigDecimal remaining = quantity.subtract(sold);
+        if (remaining.compareTo(available) > 0) throw new BusinessException("Cannot allocate: only " + available + " units are available in inventory");
+    }
+
+    private ProductStaffQuotaDto allocationDto(ProductStaffQuota quota) {
+        if (quota.getProduct() == null) return ProductStaffQuotaDto.fromEntity(quota,BigDecimal.ZERO,BigDecimal.ZERO);
+        BigDecimal total = stockBalanceRepository.getTotalEnterpriseStockForProduct(quota.getProduct().getId());
+        BigDecimal warehouseStock = quota.getWarehouse() == null ? total : stockService.getAvailableStock(quota.getWarehouse().getId(),quota.getProduct().getId());
+        return ProductStaffQuotaDto.fromEntity(quota,total,warehouseStock);
     }
 
     @Transactional

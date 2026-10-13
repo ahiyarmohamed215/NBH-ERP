@@ -26,3 +26,17 @@
 @media(prefers-reduced-motion:reduce){.supplier-editor-spinner{animation:none}}
 @media(max-width:480px){.supplier-editor .supplier-editor-fields{gap:10px;padding:12px}.supplier-editor .supplier-editor-header,.supplier-editor footer{padding:12px}.supplier-editor input,.supplier-editor textarea{padding:7px;font-size:.8rem}}
 @media(max-height:550px){.supplier-editor .supplier-editor-fields{gap:8px 12px;padding:10px 16px}.supplier-editor .supplier-editor-header,.supplier-editor footer{padding:9px 16px}.supplier-editor input,.supplier-editor .supplier-phone-input .modern-select-field{height:32px}.supplier-editor textarea{height:42px}}
+
+.supplier-workspace-shell{display:flex;flex:1;min-height:0;padding:12px;box-sizing:border-box}
+.supplier-workspace.supplier-editor{width:100%;max-height:none;overflow:hidden;border-radius:12px}
+.supplier-workspace form{flex:1;min-height:0}
+.supplier-workspace .supplier-editor-fields{align-content:start;padding:0;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.supplier-workspace .allocation-workspace-body{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;overflow:auto}
+.supplier-workspace .allocation-workspace-actions{padding:12px 22px}
+.supplier-workspace .allocation-workspace-actions>div{display:flex;gap:8px}
+.supplier-workspace .allocation-workspace-actions .allocation-primary{color:#fff}
+.supplier-workspace .allocation-inline-review{align-self:stretch}
+@media(max-width:700px){.supplier-workspace .allocation-workspace-body{grid-template-columns:1fr}.supplier-workspace .allocation-workspace-actions>span{display:none}.supplier-workspace .allocation-workspace-header{padding:12px}.supplier-workspace .allocation-workspace-title p{display:none}.supplier-workspace .allocation-workspace-body{padding:14px}}
+@media(max-height:650px){.supplier-workspace .allocation-workspace-header{padding:12px 18px}.supplier-workspace .allocation-workspace-body{padding:14px 18px}.supplier-workspace .supplier-editor-fields{gap:10px 14px}}
+
+@media(max-width:480px){.supplier-workspace-shell{padding:6px}.supplier-workspace .supplier-editor-fields{grid-template-columns:1fr}.supplier-workspace .allocation-workspace-actions{padding:10px;justify-content:flex-end}.supplier-workspace .allocation-workspace-actions>div{gap:5px;flex-wrap:wrap}.supplier-workspace .allocation-workspace-actions button{padding:7px 10px;font-size:.75rem}.supplier-workspace .allocation-workspace-title h2{font-size:1.05rem}.supplier-workspace .allocation-title-icon{width:34px;height:34px}.supplier-workspace .allocation-workspace-header{gap:8px}}

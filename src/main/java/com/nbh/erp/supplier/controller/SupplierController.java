@@ -78,6 +78,12 @@ public class SupplierController {
         return ResponseEntity.ok(ApiResponse.ok("Supplier status updated", null));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
+    public ResponseEntity<ApiResponse<SupplierDto>> changeStatus(@PathVariable Long id,@Valid @RequestBody com.nbh.erp.supplier.dto.SupplierStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Supplier status updated",supplierService.changeStatus(id,request.status(),request.reason())));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
     @Operation(summary = "Delete a supplier")

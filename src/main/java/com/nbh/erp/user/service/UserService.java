@@ -77,6 +77,8 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
+        savedUser.setEmployeeCode(savedUser.getEmployeeCode());
+        userRepository.save(savedUser);
         return UserDto.from(savedUser);
     }
 
@@ -99,6 +101,7 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
         user.setPhone(request.getPhone());
+        user.setEmployeeCode(user.getEmployeeCode());
 
         boolean isSuperAdmin = SecurityUtils.isSuperAdmin(user);
 
@@ -230,6 +233,7 @@ public class UserService {
         user.setApprovalStatus("APPROVED");
         user.setIsActive(true);
 
+        user.setEmployeeCode(user.getEmployeeCode());
         User approvedUser = userRepository.save(user);
 
         auditLogService.log(

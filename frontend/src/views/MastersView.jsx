@@ -1,5 +1,8 @@
 import {newestFirst} from '../utils/recordOrder';
 import SupplierEditorModal from '../components/SupplierEditorModal';
+import MasterWorkspace from '../components/MasterWorkspace';
+import MasterDirectoryTable from '../components/MasterDirectoryTable';
+import './InventoryTheme.css';
 import {supplierErrors,normalizePhone,phoneCountry} from '../utils/purchasingValidation';
 import SupplierDetailsModal from '../components/SupplierDetailsModal';
 import FilterSelect from '../components/FilterSelect';
@@ -58,6 +61,7 @@ const MastersView = React.forwardRef(function MastersView({
   subtitle = '',
   hideHeader = false,
   printDirectory = false,
+  onFormModeChange,
 }, ref) {
   const directoryRef=React.useRef(null);
   const [activeTab, setActiveTab] = useState(() => activeSubTab || 'products');
@@ -90,6 +94,8 @@ const MastersView = React.forwardRef(function MastersView({
   const [editingItem, setEditingItem] = useState(null);
   const [modalForm, setModalForm] = useState({});
   const [saving, setSaving] = useState(false);
+
+  useEffect(()=>{onFormModeChange?.(showModal && ['suppliers','products','brands','warehouses','categories'].includes(activeTab));return ()=>onFormModeChange?.(false);},[activeTab,showModal,onFormModeChange]);
 
   // View Details Modal State
   const [viewingItem, setViewingItem] = useState(null);
@@ -209,6 +215,8 @@ const MastersView = React.forwardRef(function MastersView({
     }
   };
 
+  const supplierStatus=item=>item?.status || (isItemActive(item)?'ACTIVE':'INACTIVE');
+  const handleSupplierStatus=(supplier,target)=>requestStatusChange({type:'Supplier',number:supplier.name || supplier.supplierCode,current:supplierStatus(supplier),target,onConfirm:async reason=>{const response=await supplierApi.changeStatus(supplier.id,target,reason);setViewingItem(previous=>previous?.id===supplier.id?{...previous,...(response.data?.data || response.data),status:target,isActive:target==='ACTIVE'}:previous);await loadTabData();addToast('Supplier status updated','success');}});
   const isItemActive = (item) => Boolean(item?.isActive ?? item?.active ?? false);
 
   const handleOpenAdd = () => {
@@ -271,13 +279,14 @@ const MastersView = React.forwardRef(function MastersView({
     setShowModal(true);
   };
 
-  const handleSave = async (e) => {
+  const handleSave = async (e, requestedStatus) => {
+    const supplierDraft=requestedStatus==='DRAFT' || editingItem?.status==='DRAFT';
     e.preventDefault();
     if (editingItem && !canEditCurrentTab) {
       addToast('Permission denied: Only authorized staff can edit existing records.', 'error');
       return;
     }
-    if(activeTab==='suppliers') {const errors=supplierErrors(modalForm);if(Object.keys(errors).length){addToast(Object.values(errors)[0],'error');return;}}
+    if(activeTab==='suppliers') {const errors=supplierErrors(modalForm,{draft:supplierDraft});if(Object.keys(errors).length){addToast(Object.values(errors)[0],'error');return;}}
     try {
       setSaving(true);
       if (activeTab === 'products') {
@@ -365,7 +374,8 @@ const MastersView = React.forwardRef(function MastersView({
         }
       } else if (activeTab === 'suppliers') {
         const payload = {
-          name:modalForm.name.trim(),contactPerson:modalForm.contactPerson?.trim() || '',
+          status:editingItem ? supplierStatus(editingItem) : supplierDraft?'DRAFT':'ACTIVE',
+          name:modalForm.name?.trim() || null,contactPerson:modalForm.contactPerson?.trim() || '',
           phone:normalizePhone(modalForm.phone,modalForm.phoneCountry || phoneCountry(modalForm.phone)),email:modalForm.email?.trim() || '',address:modalForm.address?.trim() || '',
         };
         if (editingItem) {
@@ -432,8 +442,9 @@ const MastersView = React.forwardRef(function MastersView({
   const filterList = (list, searchFields) => {
     return list.filter((item) => {
       const active = isItemActive(item);
+      if(activeTab==='suppliers'){if(statusFilter!=='ALL' && supplierStatus(item)!==statusFilter)return false;}else {
       if (statusFilter === 'ACTIVE' && !active) return false;
-      if (statusFilter === 'INACTIVE' && active) return false;
+      if (statusFilter === 'INACTIVE' && active) return false;}
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         return searchFields.some((field) => {
@@ -463,7 +474,7 @@ const MastersView = React.forwardRef(function MastersView({
       phone: escapeText(item.phone),
       email: escapeText(item.email),
       address: escapeText(item.address),
-      status: isItemActive(item) ? 'Active' : 'Inactive',
+      status: supplierStatus(item),
     });
     if (supplier) {
       const details = supplierDetails(supplier);
@@ -489,7 +500,7 @@ const MastersView = React.forwardRef(function MastersView({
       title: 'Supplier Directory',
       metaItems: [
         { label: 'Search', value: escapeText(searchTerm) || 'All suppliers' },
-        { label: 'Status', value: statusFilter === 'ALL' ? 'All' : statusFilter === 'ACTIVE' ? 'Active' : 'Inactive' },
+        { label: 'Status', value: statusFilter === 'ALL' ? 'All' : statusFilter },
       ],
       columns: [
         { header: 'Code', accessor: 'code' },
@@ -654,8 +665,11 @@ const MastersView = React.forwardRef(function MastersView({
     return <Database size={28} color="#2563eb" />;
   };
 
+  if(showModal && ['products','brands','warehouses','categories'].includes(activeTab))return <MasterWorkspace type={activeTab} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} brands={brands} categories={categories} warehouses={warehouses} onClose={()=>setShowModal(false)} onSave={handleSave}/>;
+  if(showModal && activeTab==='suppliers')return <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>;
+
   return (
-    <div ref={directoryRef} className={activeTab === 'suppliers' ? 'purchasing-no-shadows' : undefined}
+    <div ref={directoryRef} className={activeTab === 'suppliers' ? 'purchasing-no-shadows' : ['products','brands','warehouses','categories'].includes(activeTab) ? 'inventory-theme purchasing-no-shadows' : undefined}
       style={{
         flex: 1,
         height: '100%',
@@ -714,7 +728,7 @@ const MastersView = React.forwardRef(function MastersView({
               cursor: 'pointer',
             }}
           >
-            <Plus size={17} /> Add {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab === 'warehouses' ? 'Warehouse' : activeTab === 'customers' ? 'Customer' : activeTab === 'suppliers' ? 'Supplier' : activeTab.slice(0, -1)}
+            <Plus size={17} /> {['products','brands','warehouses','categories'].includes(activeTab)?'New':'Add'} {activeTab === 'categories' ? 'Category' : activeTab === 'products' ? 'Product' : activeTab === 'warehouses' ? 'Warehouse' : activeTab === 'customers' ? 'Customer' : activeTab === 'suppliers' ? 'Supplier' : activeTab.slice(0, -1)}
           </button>
         </div>
       )}
@@ -869,6 +883,7 @@ const MastersView = React.forwardRef(function MastersView({
             }}
           >
             <option value="ALL">All Statuses</option>
+            {activeTab==='suppliers' && <option value="DRAFT">Draft</option>}
             <option value="ACTIVE">Active Only</option>
             <option value="INACTIVE">Inactive Only</option>
           </ToolbarFilter>
@@ -1002,532 +1017,7 @@ const MastersView = React.forwardRef(function MastersView({
             </div>
           )}
 
-          {!loading && activeTab === 'products' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>UNIT</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>MIN STOCK</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan="10" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      No products found matching current criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProducts.map((p) => {
-                    const active = isItemActive(p);
-                    const pWhName = p.warehouseName || p.defaultWarehouseName || (warehouses.find(w => String(w.id) === String(p.warehouseId || p.defaultWarehouseId))?.name);
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => setViewingItem({ ...p, type: 'products' })}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view product details"
-                      >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{p.sku}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{p.name}<small style={{display:'block',marginTop:4,fontSize:'.73rem',fontWeight:400,color:'#64748b'}}>Selling price: LKR {Number(p.sellingPrice || 0).toFixed(2)}</small></td>
-                        <td
-                          style={{
-                            padding: '12px 18px',
-                            fontSize: '0.85rem',
-                            color: '#475569',
-                            maxWidth: '220px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                          title={p.description || p.notes || p.note || ''}
-                        >
-                          {p.description || p.notes || p.note || '—'}
-                        </td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <span
-                            style={{
-                              backgroundColor: '#f1f5f9',
-                              color: '#334155',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              border: '1px solid #e2e8f0',
-                            }}
-                          >
-                            {getBrandForProduct(p)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <span
-                            style={{
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {p.categoryName || 'General'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <span
-                            style={{
-                              backgroundColor: pWhName ? '#f0fdf4' : '#f8fafc',
-                              color: pWhName ? '#15803d' : '#64748b',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.78rem',
-                              fontWeight: 600,
-                              border: pWhName ? '1px solid #dcfce7' : '1px solid #e2e8f0',
-                            }}
-                          >
-                            {pWhName || 'Main Warehouse'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 18px', fontWeight: 500, color: '#475569' }}>{p.unitOfMeasure || 'PCS'}</td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <span style={{ fontWeight: 600, color: p.minStockLevel > 10 ? '#16a34a' : '#d97706' }}>
-                            {p.minStockLevel || 0}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(p.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
-                        </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit(p);
-                              }}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#475569',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.color = '#0f172a';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.color = '#475569';
-                              }}
-                              title="Edit Product"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {!loading && activeTab === 'brands' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND CODE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', backgroundColor: '#fafbfc' }}>MP%</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION / NOTES</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBrands.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      No brands found matching current criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredBrands.map((b) => {
-                    const active = isItemActive(b);
-                    return (
-                      <tr
-                        key={b.id}
-                        onClick={() => setViewingItem({ ...b, type: 'brands' })}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view brand details"
-                      >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{b.code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{b.name}</td>
-                        <td style={{ padding: '12px 18px', color: '#475569' }}>{Number(b.markupPercent || 0).toFixed(2)}%</td>
-                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{b.description || '—'}</td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(b.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
-                        </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <div
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(b)}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#0284c7',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              title="Edit Brand"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {!loading && activeTab === 'warehouses' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CONTACT NUMBER</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredWarehouses.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      No warehouses found matching current criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredWarehouses.map((w) => {
-                    const active = isItemActive(w);
-                    const contact = w.contactNumber || w.phone || '—';
-                    return (
-                      <tr
-                        key={w.id}
-                        onClick={() => setViewingItem({ ...w, type: 'warehouses' })}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view warehouse details"
-                      >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{w.code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{w.name}</td>
-                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{w.address || '—'}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 500, color: '#334155' }}>{contact}</td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(w.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
-                        </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit(w);
-                              }}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#475569',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.color = '#0f172a';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.color = '#475569';
-                              }}
-                              title="Edit Warehouse"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {!loading && activeTab === 'categories' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY NAME</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DESCRIPTION</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th style={{ padding: '12px 18px', fontSize: '0.74rem', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right', position: 'sticky', top: 0, backgroundColor: '#fafbfc', zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCategories.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px', color: '#64748b' }}>
-                      No categories found matching current criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCategories.map((c) => {
-                    const active = isItemActive(c);
-                    return (
-                      <tr
-                        key={c.id}
-                        onClick={() => setViewingItem({ ...c, type: 'categories' })}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view category details"
-                      >
-                        <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{c.code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{c.name}</td>
-                        <td style={{ padding: '12px 18px', color: '#64748b' }}>{c.description || '—'}</td>
-                        <td style={{ padding: '12px 18px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleActive(c.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
-                        </td>
-                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEdit(c);
-                              }}
-                              style={{
-                                width: '30px',
-                                height: '30px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                color: '#475569',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.color = '#0f172a';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.color = '#475569';
-                              }}
-                              title="Edit Category"
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
+          {!loading && ['products','brands','warehouses','categories'].includes(activeTab) && <MasterDirectoryTable type={activeTab} rows={activeTab==='products'?filteredProducts:activeTab==='brands'?filteredBrands:activeTab==='warehouses'?filteredWarehouses:filteredCategories} warehouses={warehouses} getBrand={getBrandForProduct} canEdit={canEditCurrentTab} isActive={isItemActive} onView={item=>setViewingItem({...item,type:activeTab})} onEdit={handleOpenEdit}/>}
 
           {!loading && activeTab === 'customers' && (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -1692,7 +1182,7 @@ const MastersView = React.forwardRef(function MastersView({
                         title="Click row to view supplier details"
                       >
                         <td style={{ padding: '12px 18px', fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
-                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{s.name}</td>
+                        <td style={{ padding: '12px 18px', fontWeight: 600, color: '#0f172a' }}>{s.name || 'Supplier name not entered'}</td>
                         <td style={{ padding: '12px 18px', color: '#475569' }}>{s.contactPerson || '—'}</td>
                         <td style={{ padding: '12px 18px', color: '#475569' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '250px' }}>
@@ -1703,8 +1193,7 @@ const MastersView = React.forwardRef(function MastersView({
                         </td>
                         <td style={{ padding: '12px 18px', color: '#64748b' }}>{s.address || '—'}</td>
                         <td style={{ padding: '12px 18px' }}>
-                          <StatusBadge status={active ? 'ACTIVE' : 'INACTIVE'}
-                            title={`Status: ${active ? 'Active' : 'Inactive'}`} />
+                          <StatusBadge status={supplierStatus(s)} title={`Status: ${supplierStatus(s)}`} />
                         </td>
                         <td style={{ padding: '12px 18px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
@@ -1736,7 +1225,7 @@ const MastersView = React.forwardRef(function MastersView({
 
       {/* View Details Modal */}
       {viewingItem?.type === 'suppliers' && <SupplierDetailsModal supplier={viewingItem} active={isItemActive(viewingItem)} canManage={canEditCurrentTab}
-        onClose={()=>setViewingItem(null)} onPrint={()=>handlePrintSuppliers(viewingItem)} onStatusChange={()=>handleToggleActive(viewingItem.id,isItemActive(viewingItem))}
+        onClose={()=>setViewingItem(null)} onPrint={()=>handlePrintSuppliers(viewingItem)} onStatusChange={target=>handleSupplierStatus(viewingItem,target)}
         onEdit={()=>{const item=viewingItem;setViewingItem(null);handleOpenEdit(item);}}/>}
       {viewingItem && viewingItem.type !== 'suppliers' && (
         <div
@@ -1960,8 +1449,7 @@ const MastersView = React.forwardRef(function MastersView({
       )}
 
       {/* Add / Edit Form Modal */}
-      {showModal && activeTab==='suppliers' && <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>}
-      {showModal && activeTab!=='suppliers' && (
+      {showModal && activeTab==='customers' && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
@@ -1984,294 +1472,6 @@ const MastersView = React.forwardRef(function MastersView({
             </div>
 
             <form onSubmit={handleSave}>
-              {activeTab === 'products' && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        PRODUCT CODE (SKU) *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. SKU-PROD-001"
-                        value={modalForm.sku || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, sku: e.target.value.toUpperCase() })}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        PRODUCT NAME *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. Standard Cement 50kg"
-                        value={modalForm.name || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        BRAND *
-                      </label>
-                      <select
-                        className="input-glass"
-                        value={modalForm.brandId || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, brandId: e.target.value })}
-                        required
-                      >
-                        <option value="">Select Brand...</option>
-                        {brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        CATEGORY *
-                      </label>
-                      <select
-                        className="input-glass"
-                        value={modalForm.categoryId || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, categoryId: e.target.value })}
-                        required
-                      >
-                        <option value="">Select Category...</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        WAREHOUSE *
-                      </label>
-                      <select
-                        className="input-glass"
-                        value={modalForm.warehouseId || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, warehouseId: e.target.value })}
-                        required
-                      >
-                        <option value="">Select Warehouse...</option>
-                        {warehouses.map((w) => (
-                          <option key={w.id} value={w.id}>
-                            {w.name} {w.code ? `(${w.code})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        UNIT OF MEASURE
-                      </label>
-                      <select
-                        className="input-glass"
-                        value={modalForm.unitOfMeasure || 'PCS'}
-                        onChange={(e) => setModalForm({ ...modalForm, unitOfMeasure: e.target.value })}
-                      >
-                        {['PCS', 'BOX', 'KG', 'LTR', 'MTR', 'PKT', 'DOZ', 'SET', 'BAG', 'ROLL'].map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        MIN STOCK ALERT LEVEL
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="input-glass"
-                        value={modalForm.minStockLevel || '0'}
-                        onChange={(e) => setModalForm({ ...modalForm, minStockLevel: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                      DESCRIPTION / NOTE
-                    </label>
-                    <textarea
-                      className="input-glass"
-                      rows="2"
-                      placeholder="Optional notes or product specifications"
-                      value={modalForm.description || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'brands' && (
-                <>
-                  <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px', fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-                    MP% (Markup on cost)
-                    <input type="number" className="input-glass" min="0" max="99999" step="0.01"
-                      value={modalForm.markupPercent ?? 0}
-                      onChange={(e) => setModalForm({ ...modalForm, markupPercent: e.target.value })} />
-                    <small style={{ fontSize: '.72rem', fontWeight: 400, color: '#64748b' }}>Used to calculate the selling price when receiving this brand’s products.</small>
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        BRAND CODE (ID) *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. PRIMA"
-                        value={modalForm.code || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        BRAND NAME *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. Prima Flour & Mills"
-                        value={modalForm.name || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                      DESCRIPTION / NOTES
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. Wheat flour, bakery supplies, noodles and pre-mixes"
-                      value={modalForm.description || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
-                    />
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'warehouses' && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        WAREHOUSE CODE *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. WH-001"
-                        value={modalForm.code || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        WAREHOUSE NAME *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. Central Logistics Hub"
-                        value={modalForm.name || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        CONTACT NUMBER
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. +94 77 123 4567"
-                        value={modalForm.contactNumber || modalForm.phone || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, contactNumber: e.target.value, phone: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        WAREHOUSE ADDRESS
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. 100 Port Access Road, Colombo"
-                        value={modalForm.address || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, address: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'categories' && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        CATEGORY CODE (ID) *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. CAT-001"
-                        value={modalForm.code || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, code: e.target.value.toUpperCase() })}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                        CATEGORY NAME *
-                      </label>
-                      <input
-                        type="text"
-                        className="input-glass"
-                        placeholder="e.g. Industrial Tools & Parts"
-                        value={modalForm.name || ''}
-                        onChange={(e) => setModalForm({ ...modalForm, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '5px' }}>
-                      DESCRIPTION
-                    </label>
-                    <input
-                      type="text"
-                      className="input-glass"
-                      placeholder="e.g. Heavy-duty tools, fixtures, and power assembly equipment"
-                      value={modalForm.description || ''}
-                      onChange={(e) => setModalForm({ ...modalForm, description: e.target.value })}
-                    />
-                  </div>
-                </>
-              )}
-
               {activeTab === 'customers' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px', marginBottom: '14px' }}>

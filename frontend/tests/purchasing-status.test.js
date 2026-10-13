@@ -15,7 +15,7 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     apis.authApi.getMe=async()=>({data:{username:'admin',roles:['ROLE_ADMIN'],permissions:[]}});
     let supplier={id:1,supplierCode:'SUP-1',name:'Test supplier',contactPerson:'Supplier contact',phone:'0771234567',email:'supplier@example.com',address:'Colombo',isActive:true},toggleCalls=0,fail=true;
     apis.supplierApi.getAll=async()=>({data:[{...supplier}]});
-    apis.supplierApi.toggleActive=async(id,reason)=>{assert.equal(id,1);assert.equal(reason,'Account paused for review');toggleCalls++;if(fail) throw new Error('Status update failed');supplier={...supplier,isActive:!supplier.isActive};return {data:null};};
+    apis.supplierApi.changeStatus=async(id,status,reason)=>{assert.equal(id,1);assert.equal(reason,'Account paused for review');toggleCalls++;if(fail) throw new Error('Status update failed');supplier={...supplier,status,isActive:status==='ACTIVE'};return {data:supplier};};
     const {AuthProvider}=await server.ssrLoadModule('/src/context/AuthContext.jsx');const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');
     const render=async(View,props={})=>act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider,null,React.createElement(View,props)))));
     const {default:Masters}=await server.ssrLoadModule('/src/views/MastersView.jsx');await render(Masters,{activeSubTab:'suppliers',isStandalone:true,allowedTabs:['suppliers']});

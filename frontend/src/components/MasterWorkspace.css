@@ -1,0 +1,10 @@
+.master-workspace .allocation-workspace-body{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;overflow:auto}
+.master-workspace-inputs{display:flex;flex-direction:column;gap:14px;min-width:0;border:0;padding:0;margin:0}
+.master-workspace-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.master-workspace .allocation-workspace-title p{margin-bottom:0}
+.master-workspace input{height:38px}.master-workspace textarea{height:76px}.master-workspace .modern-select-field{height:38px}
+.master-workspace-hint{margin-top:-8px;font-size:.72rem;color:#64748b;line-height:1.4}
+.master-workspace .allocation-workspace-actions{padding:12px 18px}
+@media(max-height:720px){.master-workspace .allocation-workspace-header{padding:12px 18px}.master-workspace .allocation-workspace-body{padding:14px 18px}.master-workspace-inputs{gap:10px}.master-workspace input,.master-workspace .modern-select-field{height:34px}.master-workspace textarea{height:60px}}
+@media(max-width:700px){.master-workspace .allocation-workspace-body{grid-template-columns:1fr}.master-workspace .allocation-workspace-actions>span{display:none}}
+@media(max-width:480px){.master-workspace-pair{grid-template-columns:1fr}.master-workspace .allocation-workspace-header,.master-workspace .allocation-workspace-body{padding:12px}.master-workspace .allocation-workspace-title p{display:none}}

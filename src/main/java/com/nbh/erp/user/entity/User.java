@@ -43,6 +43,11 @@ public class User extends BaseEntity {
     @Column(name = "employee_code", length = 30)
     private String employeeCode;
 
+    // Legacy users without a stored code use the same stable ID-based code as new staff.
+    public String getEmployeeCode() {
+        return employeeCode != null && !employeeCode.isBlank() ? employeeCode.trim() : id != null ? String.format(java.util.Locale.ROOT, "EMP-%04d", id) : null;
+    }
+
     @Column(name = "commission_rate", precision = 5, scale = 2)
     @Builder.Default
     private java.math.BigDecimal commissionRate = java.math.BigDecimal.ZERO;

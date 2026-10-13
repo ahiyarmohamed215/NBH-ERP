@@ -1,21 +1,42 @@
-.purchase-inspection.inventory-stock-inspection{width:min(880px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px);border:1px solid #e2e8f0;border-radius:12px;box-shadow:none}
-.inventory-stock-inspection .purchase-inspection-header-main{align-items:flex-start}
-.inventory-stock-inspection .purchase-inspection-title{min-width:0}
-.inventory-stock-inspection .purchase-inspection-number-row{flex-wrap:wrap;gap:8px 12px}
-.inventory-stock-inspection h2{overflow-wrap:anywhere}
-.inventory-stock-body{padding:16px 20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;min-height:0}
-.inventory-stock-body dl{margin:0}
-.inventory-stock-body dt{font-size:.74rem;color:#64748b;margin-bottom:6px}
-.inventory-stock-body dd{margin:0;font-size:.86rem;font-weight:600;color:#334155;overflow-wrap:anywhere}
-.inventory-stock-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;padding:14px 16px;border:1px solid #dbeafe;border-radius:8px;background:#f8fbff}
-.inventory-stock-body h3{margin:0 0 10px;font-size:.8rem;font-weight:600;color:#475569}
-.inventory-stock-metrics,.inventory-stock-pricing{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.inventory-stock-metrics>div,.inventory-stock-pricing>div{padding:12px;border:1px solid #e2e8f0;border-radius:8px;background:#fafbfc}
-.inventory-stock-metrics dd{font-size:1.15rem;font-variant-numeric:tabular-nums}
-.inventory-stock-metrics dd small{font-size:.7rem;font-weight:400;color:#64748b}
-.inventory-stock-pricing{grid-template-columns:repeat(3,minmax(0,1fr))}
-.inventory-stock-pricing>div:first-child{background:#eff6ff;border-color:#dbeafe}
-.inventory-stock-pricing>div:first-child dd{color:#2563eb}
-.inventory-stock-footer{display:flex;justify-content:flex-end;padding:12px 20px;border-top:1px solid #e2e8f0;flex-shrink:0}
-.inventory-stock-footer .btn{min-height:36px;border:1px solid #cbd5e1;background:#fff;color:#475569;padding:7px 18px;box-shadow:none}
-@media(max-width:600px){.inventory-stock-details,.inventory-stock-metrics,.inventory-stock-pricing{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-stock-body{padding:12px;gap:16px}.inventory-stock-footer{padding:12px}.inventory-stock-inspection .purchase-inspection-title{gap:8px}.inventory-stock-inspection h2{font-size:1rem}}
+/* Inventory uses the purchasing inspection frame with a stock summary. */
+.purchase-inspection.inventory-inspection{width:min(1100px,calc(100vw - 24px));height:min(536px,calc(100dvh - 24px));max-width:1100px;max-height:calc(100dvh - 24px);box-sizing:border-box;box-shadow:none}
+.inventory-inspection .purchase-inspection-title{min-width:0;flex:1}
+.inventory-inspection .purchase-inspection-header-main{min-width:0}
+.inventory-inspection .purchase-inspection-number-row{flex-wrap:wrap;gap:6px 12px}
+.inventory-inspection .purchase-inspection-number-row h2{min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:1.3rem;letter-spacing:-.025em}
+.inventory-inspection .purchase-inspection-header-controls{flex-shrink:0;gap:8px}
+.inventory-inspection .purchase-inspection-header-controls .purchase-inspection-table-print{height:34px;font-size:.8rem;padding:0 14px}
+.inventory-inspection .purchase-inspection-header-details{max-height:none;overflow:visible;flex-shrink:0;padding:18px 24px!important;gap:14px!important}
+.inventory-inspection .purchase-inspection-details-card{height:auto;min-height:96px;grid-template-columns:minmax(0,1fr);padding:14px 18px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc}
+.inventory-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(3,minmax(0,1fr));max-height:none;overflow:visible;gap:12px 24px}
+.inventory-inspection .purchase-inspection-details dt{font-size:.7rem;color:#64748b;font-weight:400;margin-bottom:5px}
+.inventory-inspection .purchase-inspection-details dt svg{color:#94a3b8}
+.inventory-inspection .purchase-inspection-details dd{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.86rem;font-weight:500;color:#334155}
+.inventory-inspection .purchase-inspection-body{min-height:0;flex:1 1 0}
+.inventory-inspection .purchase-inspection-items{overflow:visible;padding:18px 24px}
+.inventory-stock-summary{display:flex;flex-direction:column;justify-content:center;gap:22px;flex:1;min-height:0}
+.inventory-stock-summary section+section{border-top:1px solid #e2e8f0;padding-top:20px}
+.inventory-stock-section-title{display:flex;align-items:flex-start;gap:9px;margin-bottom:16px}
+.inventory-stock-section-title>svg{color:#2563eb;flex-shrink:0;margin-top:1px}
+.inventory-stock-summary h3{margin:0;font-size:.88rem;font-weight:600;letter-spacing:-.01em;color:#0f172a}
+.inventory-stock-summary-caption{margin:4px 0 0;font-size:.73rem;color:#64748b;line-height:1.4}
+.inventory-stock-summary dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;gap:0}
+.inventory-stock-summary dl>div{min-width:0;border-left:1px solid #e2e8f0;padding:0 22px}
+.inventory-stock-summary dl>div:first-child{padding-left:0;border-left:0}
+.inventory-stock-summary dt{font-size:.75rem;color:#64748b;margin-bottom:7px;font-weight:400}
+.inventory-stock-summary dd{margin:0;font-size:1.65rem;font-weight:600;letter-spacing:-.03em;line-height:1.3;color:#334155;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.inventory-stock-summary dd small{font-size:.7rem;color:#64748b;font-weight:400;letter-spacing:0}
+.inventory-stock-metric-note{margin:6px 0 0;font-size:.68rem;color:#94a3b8;line-height:1.4}
+.inventory-stock-summary-quantities>div:nth-child(2) dd{color:#2563eb}
+.inventory-stock-summary dl.inventory-stock-summary-prices{grid-template-columns:repeat(3,minmax(0,1fr))}
+.inventory-stock-summary-prices dd{font-size:1.12rem;font-weight:600;letter-spacing:-.015em}
+.inventory-stock-summary-prices>div:first-child dd{color:#2563eb}
+.inventory-inspection>.inventory-stock-summary-footer{display:flex;justify-content:flex-end;box-sizing:border-box;width:100%;padding:12px 24px;border-top:1px solid #e2e8f0;background:#fff;border-radius:0 0 12px 12px;flex:0 0 auto;position:relative;z-index:1}
+.purchase-inspection .inventory-stock-summary-footer .btn{min-height:36px;padding:7px 24px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;color:#475569;font-family:inherit;font-size:.82rem;font-weight:500;box-shadow:none}
+.purchase-inspection .inventory-stock-summary-footer .btn:hover:not(:disabled){background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
+.inventory-stock-summary-footer .btn:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+@media(max-width:700px){.inventory-stock-summary dl{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 0}.inventory-stock-summary-quantities>div:nth-child(3){border-left:0;padding-left:0}.inventory-stock-summary dd{font-size:1.2rem}.inventory-stock-summary dl>div{padding:0 12px}.inventory-stock-summary-prices dd{font-size:.9rem}.inventory-stock-metric-note{display:none}}
+@media(max-width:600px){.inventory-inspection .purchase-inspection-header-details{padding:12px 16px!important;gap:10px!important}.inventory-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.inventory-inspection .purchase-inspection-number-row h2{font-size:1rem}.inventory-inspection .purchase-inspection-items{padding:12px 16px}.inventory-inspection>.inventory-stock-summary-footer{padding:10px 16px}}
+@media(max-width:480px){.inventory-stock-summary dl.inventory-stock-summary-prices{grid-template-columns:1fr;gap:10px}.inventory-stock-summary-prices>div{display:flex;justify-content:space-between;align-items:center;gap:10px;border:0!important;padding:0!important}.inventory-stock-summary-prices dt{margin:0}.inventory-stock-summary{gap:14px}.inventory-stock-summary section+section{padding-top:14px}.inventory-stock-section-title{margin-bottom:10px}}
+@media(max-height:650px){.inventory-stock-summary{gap:14px}.inventory-stock-summary section+section{padding-top:14px}.inventory-stock-section-title{margin-bottom:12px}.inventory-stock-summary dd{font-size:1.2rem}.inventory-stock-summary-prices dd{font-size:.98rem}.inventory-stock-metric-note{display:none}}
+@media(max-height:500px){.inventory-inspection .purchase-inspection-header-details{padding:10px 14px!important;gap:8px!important}.inventory-inspection .purchase-inspection-details-card{min-height:0;padding:8px 12px}.inventory-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{gap:6px 14px}.inventory-inspection .purchase-inspection-details dt{margin-bottom:3px}.inventory-inspection .purchase-inspection-items{padding:10px 14px}.inventory-stock-section-title{margin-bottom:8px}.inventory-stock-summary-caption{display:none}}

@@ -369,6 +369,7 @@ export const supplierApi = {
   create: (data) => api.post('/suppliers', data),
   update: (id, data) => api.put(`/suppliers/${id}`, data),
   toggleActive: (id, reason) => api.patch(`/suppliers/${id}/toggle-active`, {reason}),
+  changeStatus: (id,status,reason) => api.patch(`/suppliers/${id}/status`, {status,reason}),
   delete: (id) => api.delete(`/suppliers/${id}`),
 };
 

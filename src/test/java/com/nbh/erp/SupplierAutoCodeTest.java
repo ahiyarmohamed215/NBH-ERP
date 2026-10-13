@@ -24,7 +24,7 @@ class SupplierAutoCodeTest {
         var request=new CreateSupplierRequest();request.setName("New supplier");request.setSupplierCode("MANUAL");
         assertEquals("SUPP-0004",service.createSupplier(request).getSupplierCode());
         var existing=Supplier.builder().id(8L).supplierCode("SUPP-0004").name("New supplier").isActive(true).build();
-        when(repository.findById(8L)).thenReturn(java.util.Optional.of(existing));
+        when(repository.findByIdForUpdate(8L)).thenReturn(java.util.Optional.of(existing));
         request.setName("Updated supplier");request.setSupplierCode("CHANGED");
         try(var authorization=mockStatic(com.nbh.erp.security.SecurityUtils.class)) {
             assertEquals("SUPP-0004",service.updateSupplier(8L,request).getSupplierCode());

@@ -20,7 +20,7 @@ public class Supplier extends BaseEntity {
     @Column(name = "supplier_code", nullable = false, unique = true, length = 20)
     private String supplierCode;
 
-    @Column(nullable = false, length = 150)
+    @Column(length = 150)
     private String name;
 
     @Column(name = "contact_person", length = 100)
@@ -34,6 +34,11 @@ public class Supplier extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String address;
+
+    @Column(name = "supplier_status", length = 20)
+    private String status;
+
+    public String getStatus() { return status != null ? status : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE"; }
 
     @Column(name = "is_active", nullable = false)
     @Builder.Default

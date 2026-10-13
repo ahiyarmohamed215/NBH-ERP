@@ -55,6 +55,7 @@ class RegressionIntegrationTest {
  @Autowired com.nbh.erp.payment.service.SupplierPaymentService supplierPayments;
  @Autowired com.nbh.erp.purchasereturn.service.PurchaseReturnService purchaseReturns;
  @Autowired com.nbh.erp.inventory.repository.ProductStaffQuotaRepository quotas;
+ @Autowired com.nbh.erp.inventory.service.ProductStaffQuotaService allocationService;
  @Autowired com.nbh.erp.stockadjustment.service.StockAdjustmentService adjustments;
 
  Customer customer; Warehouse warehouse; Product product; Supplier supplier; User admin; MockMvc mvc;
@@ -749,5 +750,18 @@ class RegressionIntegrationTest {
   var tenRequest=new com.nbh.erp.gtn.dto.CreateGtnRequest();tenRequest.setResponsibleStaffId(admin.getId());tenRequest.setItems(tenLines);var tenDocument=transfers.createGtn(tenRequest,true);
   var tenPdf=new com.lowagie.text.pdf.PdfReader(context.getBean(com.nbh.erp.pdf.service.PdfGenerationService.class).generateGtnPdf(tenDocument.getId()));assertEquals(3,tenPdf.getNumberOfPages(),"Ten mixed-route lines from three source warehouses print as three source sheets");tenPdf.close();
 
+ }
+ @Test void partialAllocationDraftCanBeCompletedActivatedAndDeactivated() throws Exception {
+  mvc.perform(post("/api/v1/inventory/staff-quotas").contentType("application/json").content("{\"status\":\"DRAFT\",\"notes\":\"Complete staff allocation later\"}"))
+   .andExpect(status().isCreated()).andExpect(jsonPath("$.data.status").value("DRAFT"));
+  quotas.flush();
+  mvc.perform(get("/api/v1/inventory/staff-quotas")).andExpect(status().isOk()).andExpect(jsonPath("$.data.content[0].status").value("DRAFT"));
+  var saved=quotas.findAll().stream().filter(q->"Complete staff allocation later".equals(q.getNotes())).findFirst().orElseThrow();
+  assertNull(saved.getProduct());assertNull(saved.getUser());assertNull(saved.getAllocatedQuantity());assertFalse(saved.getIsActive());
+  var edit=com.nbh.erp.inventory.dto.UpdateProductStaffQuotaRequest.builder().productId(product.getId()).userId(admin.getId()).allocatedQuantity(n("5")).status("DRAFT").replaceDraftFields(true).build();
+  assertEquals("DRAFT",allocationService.updateQuota(saved.getId(),edit).getStatus());quotas.flush();
+  assertEquals("ACTIVE",allocationService.updateQuota(saved.getId(),com.nbh.erp.inventory.dto.UpdateProductStaffQuotaRequest.builder().status("ACTIVE").statusReason("Allocation approved").build()).getStatus());
+  assertEquals("INACTIVE",allocationService.updateQuota(saved.getId(),com.nbh.erp.inventory.dto.UpdateProductStaffQuotaRequest.builder().status("INACTIVE").statusReason("Staff reassigned").build()).getStatus());
+  assertFalse(quotas.findById(saved.getId()).orElseThrow().getIsActive());
  }
 }

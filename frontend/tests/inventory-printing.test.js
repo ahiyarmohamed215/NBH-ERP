@@ -42,11 +42,20 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
     assert.ok(popup.textContent.includes('LKR 35.00'));
     assert.ok(!popup.textContent.includes('999991') && !popup.textContent.includes('Unit cost'));
     const field=label=>[...popup.querySelectorAll('dl>div')].find(row=>row.querySelector('dt').textContent===label).querySelector('dd').textContent;
-    assert.match(field('Available quantity'),/^17/);assert.match(field('Reserved quantity'),/^3/);
-    assert.match(field('Minimum stock level'),/^0/,'A zero backend threshold is preserved');
+    const value=field;
+    assert.match(value('Available quantity'),/^17/);assert.match(value('Reserved quantity'),/^3/);
+    assert.match(value('Minimum stock level'),/^0/,'A zero backend threshold is preserved');
+    assert.ok(popup.querySelector('.purchase-inspection-details-card'));
+    assert.equal(popup.querySelector('.purchase-inspection-table-toolbar'),null);
+    assert.equal(popup.querySelector('table'),null);
+    assert.ok(popup.querySelector('.purchase-inspection-header-controls [aria-label="Print Inventory"]'));
+    assert.equal(popup.querySelector('[aria-label="Print Inventory"]').textContent.trim(),'Print');
     assert.equal(field('Warehouse code'),'WH-10','Warehouse code is resolved from the matching warehouse');
     assert.ok(!popup.textContent.includes('Potential Retail Revenue') && !popup.textContent.includes('Gross Margin') && !popup.textContent.includes('Manufacturer'));
-    await act(async()=>popup.querySelector('[aria-label="Close stock details"]').click());
+    assert.ok(popup.querySelector('[aria-label="Close Inventory details"]'));
+    const bottomClose=popup.querySelector('.inventory-stock-summary-footer button');assert.equal(bottomClose.textContent,'Close');
+    assert.equal(bottomClose.closest('footer').parentElement,popup,'Close footer is outside the flexible summary content');
+    await act(async()=>bottomClose.click());
     assert.equal(host.querySelector('[role="dialog"]'),null);
    }
    if(tab==='adjustments') {
