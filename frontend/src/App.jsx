@@ -605,7 +605,6 @@ export default function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
                       <Icon
                         size={17}
-                        color={isCurrentModule ? '#0284c7' : '#64748b'}
                         style={{ flexShrink: 0 }}
                       />
                       {!isSidebarCompact && (

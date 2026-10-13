@@ -316,7 +316,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
               }}
 
             >
-              <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
+              <Icon size={16} />
               {tab.label}
             </button>
           );

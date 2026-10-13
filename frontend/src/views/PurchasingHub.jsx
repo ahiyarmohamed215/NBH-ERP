@@ -276,7 +276,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
               onClick={() => handleTabClick(tab.id)}
 
             >
-              <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
+              <Icon size={16} />
               {tab.label}
             </button>
           );

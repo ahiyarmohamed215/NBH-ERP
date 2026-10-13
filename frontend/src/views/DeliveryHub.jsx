@@ -779,7 +779,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           onClick={() => setCurrentTab('deliveries')}
 
         >
-          <Truck size={16} /> Delivery Trips ({deliveries.length})
+          <Truck size={16} /> Delivery Trips
         </button>
 
         <button data-active={currentTab === 'routes'} aria-pressed={currentTab === 'routes'} className="erp-tab"
@@ -787,7 +787,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           onClick={() => setCurrentTab('routes')}
 
         >
-          <Navigation size={16} /> Delivery Routes ({routes.length})
+          <Navigation size={16} /> Delivery Routes
         </button>
 
         <button data-active={currentTab === 'vehicles'} aria-pressed={currentTab === 'vehicles'} className="erp-tab"
@@ -795,7 +795,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           onClick={() => setCurrentTab('vehicles')}
 
         >
-          <Gauge size={16} /> Fleet Vehicles ({vehicles.length})
+          <Gauge size={16} /> Fleet Vehicles
         </button>
 
       </div>

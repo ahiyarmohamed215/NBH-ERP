@@ -32,6 +32,9 @@ padding layer. Purchasing's focused editor sets `data-focused="true"`.
 
 Use `erp-tabs` and `erp-tab` with `data-active` and `aria-pressed` for the current
 navigation pattern. Tabs scroll horizontally instead of wrapping or shrinking.
+Navigation hover colour is controlled in one place by `--erp-nav-hover` in
+`ErpDesignSystem.css`. Icons inherit text colour through `currentColor`; do not
+set per-page icon colour props. Delivery navigation uses labels without counts.
 Use `erp-button`, `erp-button-primary`, `erp-field`, `erp-table`,
 `erp-table-heading`, and `erp-table-cell` for the corresponding roles. These
 roles own typography and dimensions; do not duplicate those inline. Inline styles

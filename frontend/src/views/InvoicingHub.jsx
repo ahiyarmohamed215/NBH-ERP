@@ -1030,7 +1030,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               onClick={() => handleTabClick(tab.id)}
 
             >
-              <Icon size={16} color={isActive ? '#0284c7' : '#64748b'} />
+              <Icon size={16} />
               {tab.label}
             </button>
           );
