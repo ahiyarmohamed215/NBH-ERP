@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface CustomerRepository extends JpaRepository<Customer, Long> {
+public interface CustomerRepository extends com.nbh.erp.common.repository.RecyclableRepository<Customer> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.Query("select e from Customer e where e.id = :id")
+    @org.springframework.data.jpa.repository.Query("select e from Customer e where e.id = :id and e.deletedAt is null")
     java.util.Optional<Customer> findAnyByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
     default Optional<Customer> findByIdForUpdate(Long id) {

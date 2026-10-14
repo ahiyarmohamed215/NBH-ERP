@@ -7,9 +7,9 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends com.nbh.erp.common.repository.RecyclableRepository<User> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.Query("select e from User e where e.id = :id")
+    @org.springframework.data.jpa.repository.Query("select e from User e where e.id = :id and e.deletedAt is null")
     java.util.Optional<User> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
     java.util.List<User> findByIsActiveTrueAndApprovalStatusOrderByFullNameAsc(String approvalStatus);
@@ -22,6 +22,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     boolean existsByUsernameIgnoreCase(String username);
     boolean existsByEmailIgnoreCase(String email);
-    org.springframework.data.domain.Page<User> findByApprovalStatus(String approvalStatus, org.springframework.data.domain.Pageable pageable);
-    long countByApprovalStatus(String approvalStatus);
+    org.springframework.data.domain.Page<User> findByApprovalStatusAndDeletedAtIsNull(String approvalStatus, org.springframework.data.domain.Pageable pageable);
+    long countByApprovalStatusAndDeletedAtIsNull(String approvalStatus);
 }

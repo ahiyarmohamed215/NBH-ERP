@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BrandService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final BrandRepository brandRepository;
     private final AuditLogService auditLogService;
@@ -94,6 +95,7 @@ public class BrandService {
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
         SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
+        brand.requireNotDeleted();
 
         brand.setName(request.getName().trim());
         brand.setDescription(request.getDescription());
@@ -113,6 +115,7 @@ public class BrandService {
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
         SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
+        brand.requireNotDeleted();
 
         brand.setIsActive(!brand.getIsActive());
         brandRepository.save(brand);
@@ -123,6 +126,6 @@ public class BrandService {
 
     @Transactional
     public void deleteBrand(Long id) {
-        SecurityUtils.enforceNoDelete("Brand", id);
+        recycleBin.delete("BRAND", id);
     }
 }

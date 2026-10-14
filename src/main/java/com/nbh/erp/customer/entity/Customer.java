@@ -15,7 +15,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Customer extends BaseEntity {
+public class Customer extends com.nbh.erp.common.entity.RecyclableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

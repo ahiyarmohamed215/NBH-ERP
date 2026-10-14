@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProductStaffQuotaRepository extends JpaRepository<ProductStaffQuota, Long> {
+public interface ProductStaffQuotaRepository extends com.nbh.erp.common.repository.RecyclableRepository<ProductStaffQuota> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @Query("select q from ProductStaffQuota q where q.id = :id")
+    @Query("select q from ProductStaffQuota q where q.id = :id and q.deletedAt is null")
     Optional<ProductStaffQuota> findByIdForUpdate(@Param("id") Long id);
 
 
@@ -50,7 +50,7 @@ public interface ProductStaffQuotaRepository extends JpaRepository<ProductStaffQ
     List<ProductStaffQuota> findByUserId(Long userId);
 
     @Query("SELECT q FROM ProductStaffQuota q LEFT JOIN q.product p LEFT JOIN q.user u LEFT JOIN q.warehouse w WHERE " +
-           "(:productId IS NULL OR p.id = :productId) AND " +
+           "q.deletedAt IS NULL AND (:productId IS NULL OR p.id = :productId) AND " +
            "(:userId IS NULL OR u.id = :userId) AND " +
            "(:warehouseId IS NULL OR w.id = :warehouseId) AND " +
            "(:activeOnly IS NULL OR q.isActive = :activeOnly) AND " +

@@ -11,7 +11,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Category extends BaseEntity {
+public class Category extends com.nbh.erp.common.entity.RecyclableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

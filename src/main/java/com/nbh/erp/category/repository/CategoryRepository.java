@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface CategoryRepository extends JpaRepository<Category, Long> {
+public interface CategoryRepository extends com.nbh.erp.common.repository.RecyclableRepository<Category> {
     Optional<Category> findByCode(String code);
     boolean existsByCode(String code);
     List<Category> findByIsActiveTrue();

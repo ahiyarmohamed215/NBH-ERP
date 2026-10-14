@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WarehouseService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final WarehouseRepository warehouseRepository;
     private final StockBalanceRepository stockBalanceRepository;
@@ -79,6 +80,7 @@ public class WarehouseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
 
         SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
+        warehouse.requireNotDeleted();
 
         warehouseRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -107,6 +109,7 @@ public class WarehouseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
 
         SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
+        warehouse.requireNotDeleted();
 
         warehouse.setIsActive(!warehouse.getIsActive());
         warehouseRepository.save(warehouse);
@@ -117,7 +120,7 @@ public class WarehouseService {
 
     @Transactional
     public void deleteWarehouse(Long id) {
-        SecurityUtils.enforceNoDelete("Warehouse", id);
+        recycleBin.delete("WAREHOUSE", id);
     }
 }
 

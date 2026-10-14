@@ -29,6 +29,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -179,13 +180,13 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public PagedResponse<UserDto> getPendingUsers(Pageable pageable) {
-        Page<UserDto> page = userRepository.findByApprovalStatus("PENDING", pageable).map(UserDto::from);
+        Page<UserDto> page = userRepository.findByApprovalStatusAndDeletedAtIsNull("PENDING", pageable).map(UserDto::from);
         return PagedResponse.from(page);
     }
 
     @Transactional(readOnly = true)
     public long getPendingUsersCount() {
-        return userRepository.countByApprovalStatus("PENDING");
+        return userRepository.countByApprovalStatusAndDeletedAtIsNull("PENDING");
     }
 
     @Transactional
@@ -281,7 +282,7 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id) {
-        SecurityUtils.enforceNoDelete("User", id);
+        recycleBin.delete("USER", id);
     }
 
     @Transactional(readOnly = true)

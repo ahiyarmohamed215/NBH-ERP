@@ -1,6 +1,6 @@
 # Supplier recycle bin
 
-Supplier managers can delete suppliers from Purchasing → Supplier List using the delete icon. Deletion excludes the supplier from directories, search, and new supplier selections. Recycle bin offers restore and permanent deletion.
+Supplier managers can delete suppliers from Purchasing → Supplier List using the delete icon. Deletion excludes the supplier from directories, search, and new supplier selections. Open the global recycle bin from the sidebar profile menu to restore or permanently delete records.
 
 Restore returns the supplier to the status it had before deletion. Deleted suppliers cannot be edited or activated directly. Supplier names in linked GRNs, PRNs, purchase orders, inventory products, supplier payments, and GRN PDFs include `(deleted from the system)`. Restoring automatically removes this label.
 

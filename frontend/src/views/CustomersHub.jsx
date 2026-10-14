@@ -3,6 +3,7 @@ import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import { Trash2 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import useRecordDeletion from '../hooks/useRecordDeletion';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   customerApi,
@@ -68,6 +69,7 @@ import { historyDocumentReference, historyDetailRows } from '../utils/customerHi
 export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
   const { user } = useAuth();
   const canEditCustomer = canEditModule(user, 'CUSTOMER');
+  const customerDeletion=useRecordDeletion('CUSTOMER','Customer',()=>loadInitialData());
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useModuleTab('customers',activeSubTab === 'routes' ? 'groups' : activeSubTab === 'ranges' ? 'targets' : activeSubTab,'list',user);
@@ -1851,6 +1853,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               </button>
 
                               {/* Edit */}
+                              {canEditCustomer && <button type="button" className="erp-table-icon-action" data-tone="danger" aria-label="Delete Customer" title="Delete Customer" onClick={event=>{event.stopPropagation();customerDeletion.requestDeletion(c);}}><Trash2 size={13}/></button>}
                               <button aria-label="Edit Customer" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
@@ -5562,6 +5565,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           </div>
         </div>
       )}
+      {customerDeletion.deletionDialog}
     </div>
   );
 }

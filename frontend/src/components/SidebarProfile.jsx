@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { authApi, userApi } from '../api/apiClient';
+import './SidebarProfile.css';
+import { canUseRecycleBin } from '../utils/recycleBinAccess';
 import {
   User,
   LogOut,
@@ -15,6 +17,7 @@ import {
   PhoneCall,
   Mail,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 
 export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpenShortcuts }) {
@@ -139,6 +142,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
       {/* Upward Profile Menu Popover */}
       {menuOpen && (
         <div
+          className="sidebar-profile-menu"
           style={{
             position: 'absolute',
             bottom: 'calc(100% + 6px)',
@@ -203,8 +207,9 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
               <Settings size={16} color="#64748b" />
-              Profile Settings & Password
+              <span>Profile Settings &amp; Password</span>
             </button>
+            {canUseRecycleBin(user) && <button type="button" className="erp-button" onClick={() => {setMenuOpen(false);onNavigate?.('recycle-bin');}}><Trash2 size={16}/><span>Recycle bin</span></button>}
 
             <button className="erp-button"
               type="button"
@@ -229,7 +234,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
               <HelpCircle size={16} color="#64748b" />
-              Help & Support
+              <span>Help &amp; Support</span>
             </button>
           </div>
 
@@ -257,7 +262,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
               <LogOut size={15} />
-              Sign Out
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
@@ -266,6 +271,11 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
       {/* Main Profile Trigger Button in Sidebar with Integrated Connected Status */}
       <div
         onClick={() => setMenuOpen(!menuOpen)}
+        role="button"
+        tabIndex={0}
+        aria-label="Open profile menu"
+        aria-expanded={menuOpen}
+        onKeyDown={event => {if(event.key==='Enter' || event.key===' '){event.preventDefault();setMenuOpen(open=>!open);}}}
         style={{
           padding: isCollapsed ? '12px 0' : '10px 18px 10px 10px',
           display: 'flex',

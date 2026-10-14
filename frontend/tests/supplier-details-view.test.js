@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createServer } from 'vite';
 import { Window } from 'happy-dom';
 
-test('SupplierDetailsModal Minimalist Floating Card renders and behaves correctly', async () => {
+test('SupplierDetailsModal floating card renders readable layout and all interactions work', async () => {
   const window = new Window();
   Object.assign(globalThis, { window, document: window.document, IS_REACT_ACT_ENVIRONMENT: true });
   const { createRoot } = await import('react-dom/client');
@@ -13,7 +13,6 @@ test('SupplierDetailsModal Minimalist Floating Card renders and behaves correctl
     appType: 'custom',
     optimizeDeps: { noDiscovery: true, include: [] },
   });
-
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -32,10 +31,7 @@ test('SupplierDetailsModal Minimalist Floating Card renders and behaves correctl
       status: 'ACTIVE',
     };
 
-    let printCalls = 0;
-    let closeCalls = 0;
-    let editCalls = 0;
-    let statusChangeTarget = null;
+    let printCalls = 0, closeCalls = 0, editCalls = 0, statusTarget = null;
 
     await act(async () => {
       root.render(
@@ -45,85 +41,93 @@ test('SupplierDetailsModal Minimalist Floating Card renders and behaves correctl
           onPrint: () => printCalls++,
           onClose: () => closeCalls++,
           onEdit: () => editCalls++,
-          onStatusChange: (status) => (statusChangeTarget = status),
+          onStatusChange: (s) => (statusTarget = s),
           canManage: true,
         })
       );
     });
 
     const modal = host.querySelector('.glass-modal');
-    assert.ok(modal, 'Modal should render');
-    assert.ok(modal.classList.contains('supplier-floating-card'));
-    assert.ok(modal.classList.contains('supplier-inspection'));
+    assert.ok(modal, 'Modal renders');
+    assert.ok(modal.classList.contains('supplier-floating-card'), 'Has floating-card class');
+    assert.ok(modal.classList.contains('supplier-inspection'), 'Has supplier-inspection class');
 
-    // Initials
-    const avatar = modal.querySelector('.supplier-floating-avatar');
-    assert.equal(avatar.textContent.trim(), 'AI', 'Avatar should display initials of Acme Industrial');
+    // Test-required selectors
+    assert.ok(modal.querySelector('.purchase-inspection-details-card'), 'purchase-inspection-details-card exists');
+    assert.ok(modal.querySelector('.purchase-inspection-detail-actions'), 'purchase-inspection-detail-actions exists');
 
-    // Supplier Name & Code
-    assert.ok(modal.querySelector('.supplier-floating-title').textContent.includes('Acme Industrial Solutions'));
-    assert.ok(modal.querySelector('.supplier-floating-code').textContent.includes('SUP-001'));
+    // Avatar initials
+    const avatar = modal.querySelector('.supplier-card-avatar');
+    assert.equal(avatar.textContent.trim(), 'AI');
 
-    // Status Badge
-    const statusBadge = modal.querySelector('.erp-status-badge');
-    assert.ok(statusBadge, 'Status badge must exist');
-    assert.ok(statusBadge.textContent.includes('ACTIVE'));
+    // Name + code
+    assert.ok(modal.querySelector('.supplier-card-name').textContent.includes('Acme Industrial Solutions'));
+    assert.ok(modal.querySelector('.supplier-card-code').textContent.includes('SUP-001'));
 
-    // Detail content
+    // Status badge
+    const badge = modal.querySelector('.erp-status-badge');
+    assert.ok(badge);
+
+    // Contact details are readable
     assert.ok(modal.textContent.includes('Jane Doe'));
     assert.ok(modal.textContent.includes('+94 77 123 4567'));
     assert.ok(modal.textContent.includes('jane@acme.com'));
     assert.ok(modal.textContent.includes('123 Galle Road, Colombo 03'));
 
-    // Phone and Email links
-    const phoneLink = modal.querySelector('a[href="tel:+94 77 123 4567"]');
-    assert.ok(phoneLink, 'Should have clickable tel: link');
-    const emailLink = modal.querySelector('a[href="mailto:jane@acme.com"]');
-    assert.ok(emailLink, 'Should have clickable mailto: link');
+    // Clickable links
+    assert.ok(modal.querySelector('a[href="tel:+94 77 123 4567"]'));
+    assert.ok(modal.querySelector('a[href="mailto:jane@acme.com"]'));
 
-    // Print button
+    // Vertical row layout (not grid cells)
+    const rows = modal.querySelectorAll('.supplier-card-row');
+    assert.ok(rows.length >= 4, 'At least 4 detail rows');
+
+    // Print action
     const printBtn = modal.querySelector('[title="Print Supplier Details (A4)"]');
-    assert.ok(printBtn, 'Print button should exist');
+    assert.ok(printBtn);
     await act(async () => printBtn.click());
-    assert.equal(printCalls, 1, 'onPrint should be called');
+    assert.equal(printCalls, 1);
 
-    // Edit button
-    const editBtn = [...modal.querySelectorAll('button')].find((b) => b.textContent.includes('Edit Supplier'));
-    assert.ok(editBtn, 'Edit Supplier button should exist');
+    // Edit action
+    const editBtn = [...modal.querySelectorAll('.purchase-inspection-detail-actions button')]
+      .find(b => b.textContent.includes('Edit Supplier'));
+    assert.ok(editBtn);
     await act(async () => editBtn.click());
-    assert.equal(editCalls, 1, 'onEdit should be called');
+    assert.equal(editCalls, 1);
 
-    // Deactivate / Cancel Supplier
-    const cancelBtn = [...modal.querySelectorAll('button')].find((b) => b.textContent.includes('Cancel Supplier'));
-    assert.ok(cancelBtn, 'Cancel Supplier button should exist for ACTIVE status');
+    // Deactivate Supplier (deactivate)
+    const cancelBtn = [...modal.querySelectorAll('.purchase-inspection-detail-actions button')]
+      .find(b => b.textContent.includes('Deactivate Supplier'));
+    assert.ok(cancelBtn);
     await act(async () => cancelBtn.click());
-    assert.equal(statusChangeTarget, 'INACTIVE', 'onStatusChange should receive INACTIVE');
+    assert.equal(statusTarget, 'INACTIVE');
 
-    // Test inactive status button
+    // Close button
+    const closeBtn = modal.querySelector('[aria-label="Close supplier details"]');
+    assert.ok(closeBtn);
+    await act(async () => closeBtn.click());
+    assert.equal(closeCalls, 1);
+
+    // Render with INACTIVE status → Reactivate Supplier button
     await act(async () => {
       root.render(
         React.createElement(SupplierDetailsModal, {
           supplier: { ...supplier, status: 'INACTIVE' },
           active: false,
           onPrint: () => {},
-          onClose: () => closeCalls++,
+          onClose: () => {},
           onEdit: () => {},
-          onStatusChange: (status) => (statusChangeTarget = status),
+          onStatusChange: (s) => (statusTarget = s),
           canManage: true,
         })
       );
     });
 
-    const processBtn = [...modal.querySelectorAll('button')].find((b) => b.textContent.includes('Process Supplier'));
-    assert.ok(processBtn, 'Process Supplier button should exist for INACTIVE status');
+    const processBtn = [...host.querySelectorAll('.purchase-inspection-detail-actions button')]
+      .find(b => b.textContent.includes('Reactivate Supplier'));
+    assert.ok(processBtn);
     await act(async () => processBtn.click());
-    assert.equal(statusChangeTarget, 'ACTIVE', 'onStatusChange should receive ACTIVE');
-
-    // Close button
-    const closeBtn = modal.querySelector('[aria-label="Close supplier details"]');
-    assert.ok(closeBtn, 'Close button with aria-label should exist');
-    await act(async () => closeBtn.click());
-    assert.equal(closeCalls, 1, 'onClose should be called');
+    assert.equal(statusTarget, 'ACTIVE');
   } finally {
     await act(async () => root.unmount());
     await server.close();

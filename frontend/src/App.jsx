@@ -14,6 +14,8 @@ import ReportsView from './views/ReportsView';
 import CustomersHub from './views/CustomersHub';
 import DeliveryHub from './views/DeliveryHub';
 import SidebarProfile from './components/SidebarProfile';
+import RecycleBinView from './views/RecycleBinView';
+import {canUseRecycleBin} from './utils/recycleBinAccess';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 import {canAccessModule,canAccessTab,resolveModuleTab} from './utils/moduleAccess';
@@ -263,12 +265,12 @@ export default function App() {
   }, [moduleDefinitions, isSuperAdmin, userPermissions,user]);
 
   const allowedModuleIds = useMemo(
-    () => accessibleModules.map((m) => m.id),
-    [accessibleModules]
+    () => [...accessibleModules.map((m) => m.id), ...(canUseRecycleBin(user)?['recycle-bin']:[])],
+    [accessibleModules,user]
   );
 
   const allModuleIds = useMemo(
-    () => moduleDefinitions.map((m) => m.id),
+    () => [...moduleDefinitions.map((m) => m.id),'recycle-bin'],
     [moduleDefinitions]
   );
 
@@ -396,7 +398,7 @@ export default function App() {
     if (user && allowedModuleIds.length > 0) {
       if (!allowedModuleIds.includes(currentView)) {
         navigateTo(allowedModuleIds[0]);
-      } else if (currentView !== 'dashboard') {
+      } else if (currentView !== 'dashboard' && currentView !== 'recycle-bin') {
         const allowedTab=resolveModuleTab(user,currentView,subTab);
         if(allowedTab!==subTab)setSubTab(allowedTab || '');
       }
@@ -702,6 +704,7 @@ export default function App() {
               };
               switch (view) {
                 case 'dashboard': return <DashboardView onNavigate={navigateTo} />;
+                case 'recycle-bin': return <RecycleBinView/>;
                 case 'invoicing': return <InvoicingHub {...props} />;
                 case 'payments': return <PaymentsHub {...props} />;
                 case 'customers': return <CustomersHub {...props} />;

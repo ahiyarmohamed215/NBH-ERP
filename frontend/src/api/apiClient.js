@@ -367,6 +367,13 @@ export const customerTargetApi = {
   delete: (id) => api.delete(`/customer-targets/${id}`),
 };
 
+export const recycleBinApi = {
+  getAll: () => api.get('/recycle-bin'),
+  delete: (type,id) => api.delete(`/recycle-bin/${type}/${id}`),
+  restore: (type,id) => api.post(`/recycle-bin/${type}/${id}/restore`),
+  permanentlyDelete: (type,id) => api.delete(`/recycle-bin/${type}/${id}/permanent`),
+};
+
 export const supplierApi = {
   getAll: () => api.get('/suppliers'),
   getActive: (config = {}) => api.get('/suppliers/active', config),

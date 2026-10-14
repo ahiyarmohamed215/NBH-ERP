@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final CustomerRepository customerRepository;
     private final InvoiceRepository invoiceRepository;
@@ -156,6 +157,6 @@ public class CustomerService {
     @Transactional
     public void deleteCustomer(Long id) {
         // Enforce ERP policy: records cannot be deleted once created
-        SecurityUtils.enforceNoDelete("Customer", id);
+        recycleBin.delete("CUSTOMER", id);
     }
 }

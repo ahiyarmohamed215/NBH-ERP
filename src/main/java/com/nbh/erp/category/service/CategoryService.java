@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CategoryService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
@@ -73,6 +74,7 @@ public class CategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
         SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
+        category.requireNotDeleted();
 
         categoryRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -99,6 +101,7 @@ public class CategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
         SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
+        category.requireNotDeleted();
 
         category.setIsActive(!category.getIsActive());
         categoryRepository.save(category);
@@ -109,7 +112,7 @@ public class CategoryService {
 
     @Transactional
     public void deleteCategory(Long id) {
-        SecurityUtils.enforceNoDelete("Category", id);
+        recycleBin.delete("CATEGORY", id);
     }
 }
 

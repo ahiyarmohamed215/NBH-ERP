@@ -1,0 +1,6 @@
+.sidebar-profile-menu .erp-button {display:grid !important;grid-template-columns:18px minmax(0,1fr);align-items:center;gap:10px !important;width:100%;min-height:40px;padding:10px 16px !important;border:0;border-radius:0;background:transparent;color:#334155;font-family:inherit;font-size:var(--erp-text-small);line-height:1.4;text-align:left;cursor:pointer;}
+.sidebar-profile-menu .erp-button svg {width:16px;height:16px;flex-shrink:0;justify-self:center;color:inherit;}
+.sidebar-profile-menu .erp-button:hover {background:#f1f5f9;}
+.sidebar-profile-menu .erp-button:focus-visible {outline:2px solid var(--erp-accent);outline-offset:-2px;}
+.sidebar-profile-menu .erp-button {white-space:normal !important;}
+.sidebar-profile-menu .erp-button span {min-width:0;overflow-wrap:anywhere;}

@@ -28,6 +28,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ProductStaffQuotaService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final ProductStaffQuotaRepository quotaRepository;
     private final ProductRepository productRepository;
@@ -143,8 +144,10 @@ public class ProductStaffQuotaService {
 
     private Optional<ProductStaffQuota> matchingAllocation(Product product,User user,Warehouse warehouse) {
         if (product == null || user == null) return Optional.empty();
-        return warehouse != null ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(),user.getId(),warehouse.getId())
+        var match = warehouse != null ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(),user.getId(),warehouse.getId())
                 : quotaRepository.findByProductIdAndUserIdAndWarehouseIsNull(product.getId(),user.getId());
+        if(match.isPresent() && match.get().isDeleted()) throw new BusinessException("This allocation was deleted. Restore it from the recycle bin before making changes");
+        return match;
     }
 
     private void validateAllocation(ProductStaffQuota quota,String target) {
@@ -170,7 +173,7 @@ public class ProductStaffQuotaService {
 
     @Transactional
     public void deleteQuota(Long id) {
-        com.nbh.erp.security.SecurityUtils.enforceNoDelete("ProductStaffQuota", id);
+        recycleBin.delete("ALLOCATION", id);
     }
 
     @Transactional(readOnly = true)

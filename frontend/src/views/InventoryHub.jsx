@@ -5,6 +5,7 @@ import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
 import {staffCode} from '../utils/staffCode';
 import AllocationWorkspace from '../components/AllocationWorkspace';
 import AllocationTable from '../components/AllocationTable';
+import useRecordDeletion from '../hooks/useRecordDeletion';
 import StockDetailsModal from '../components/StockDetailsModal';
 import DateRangePicker,{matchesDateRange} from '../components/DateRangePicker';
 import FilterSelect from '../components/FilterSelect';
@@ -79,6 +80,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const canEditInventory = canEditModule(user, 'INVENTORY');
   const canSeeCost = canViewCostPrice(user);
   const { addToast } = useToast();
+  const allocationDeletion=useRecordDeletion('ALLOCATION','Inventory allocation',()=>loadQuotas());
   const mastersRef = useRef(null);
   const directoryRef=useRef(null);
 
@@ -1824,7 +1826,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             </div>
           </div>
 
-          <AllocationTable rows={filteredQuotas} loading={loadingQuotas} canEdit={canEditInventory} statusOf={quotaStatus} onView={handleViewQuota} onEdit={q=>handleOpenQuotaModal(null,q)} onCreate={()=>handleOpenQuotaModal()}/>
+          <AllocationTable rows={filteredQuotas} loading={loadingQuotas} canEdit={canEditInventory} statusOf={quotaStatus} onView={handleViewQuota} onEdit={q=>handleOpenQuotaModal(null,q)} onCreate={()=>handleOpenQuotaModal()} onDelete={allocationDeletion.requestDeletion}/>
 
         </div>
       )}
@@ -2659,6 +2661,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         reason={quotaStatusReason} onReasonChange={setQuotaStatusReason} busy={savingQuota} onClose={()=>setQuotaStatusChange(null)} onConfirm={confirmQuotaStatus}/>}
       {viewingStockItem && <StockDetailsModal item={viewingStockItem} canSeeCost={canSeeCost} onClose={()=>setViewingStockItem(null)}/>}
 
+      {allocationDeletion.deletionDialog}
     </div>
   );
 }

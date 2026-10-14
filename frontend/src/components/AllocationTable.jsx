@@ -1,10 +1,10 @@
 import React from 'react';
-import {Edit2,Printer,ShieldCheck} from 'lucide-react';
+import {Edit2,Printer,ShieldCheck,Trash2} from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import {staffCode} from '../utils/staffCode';
 import {printCurrentDirectory} from '../utils/printDirectory';
 
-export default function AllocationTable({rows,loading,canEdit,onView,onEdit,statusOf,onCreate}) {
+export default function AllocationTable({rows,loading,canEdit,onView,onEdit,onDelete,statusOf,onCreate}) {
   const printRow=event=>{
     event.stopPropagation();
     const row=event.currentTarget.closest('tr'),table=row.closest('table').cloneNode(true);
@@ -22,7 +22,7 @@ export default function AllocationTable({rows,loading,canEdit,onView,onEdit,stat
         <td className="allocation-list-quantity erp-table-cell"><span className={q.productId && stock<=0?'allocation-list-stock-empty':undefined}>{q.productId?stock.toLocaleString():'—'}</span>{q.productId && <small> {unit}</small>}</td>
         <td className="allocation-list-quantity erp-table-cell">{q.allocatedQuantity==null?'—':Number(q.allocatedQuantity).toLocaleString()}{q.allocatedQuantity!=null && <small> {unit}</small>}</td>
         <td className="erp-table-cell" onClick={event=>event.stopPropagation()}><StatusBadge status={statusOf(q)}/></td>
-        <td className="allocation-list-actions erp-table-cell erp-table-actions"><div className="allocation-list-row-actions">{canEdit && <button className="erp-table-icon-action" type="button" title="Edit Allocation" aria-label="Edit Allocation" onClick={event=>{event.stopPropagation();onEdit(q);}}><Edit2 size={13}/></button>}<button className="erp-table-icon-action" type="button" title="Print Allocation" aria-label="Print Allocation" onClick={printRow}><Printer size={13}/></button></div></td>
+        <td className="allocation-list-actions erp-table-cell erp-table-actions"><div className="allocation-list-row-actions">{canEdit && <button className="erp-table-icon-action" type="button" title="Edit Allocation" aria-label="Edit Allocation" onClick={event=>{event.stopPropagation();onEdit(q);}}><Edit2 size={13}/></button>}<button className="erp-table-icon-action" type="button" title="Print Allocation" aria-label="Print Allocation" onClick={printRow}><Printer size={13}/></button>{canEdit && onDelete && <button className="erp-table-icon-action" data-tone="danger" type="button" title="Delete Allocation" aria-label="Delete Allocation" onClick={event=>{event.stopPropagation();onDelete(q);}}><Trash2 size={13}/></button>}</div></td>
       </tr>;
     })}</tbody>
   </table></div></div>;

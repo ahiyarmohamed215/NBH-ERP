@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface BrandRepository extends JpaRepository<Brand, Long> {
+public interface BrandRepository extends com.nbh.erp.common.repository.RecyclableRepository<Brand> {
 
     List<Brand> findByIsActiveTrue();
 
@@ -20,8 +20,8 @@ public interface BrandRepository extends JpaRepository<Brand, Long> {
 
     boolean existsByCodeAndIdNot(String code, Long id);
 
-    @Query("SELECT b FROM Brand b WHERE " +
+    @Query("SELECT b FROM Brand b WHERE b.deletedAt IS NULL AND (" +
            "LOWER(b.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(b.code) LIKE LOWER(CONCAT('%', :query, '%'))")
+           "LOWER(b.code) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Brand> searchBrands(@Param("query") String query);
 }

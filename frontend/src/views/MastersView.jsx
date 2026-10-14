@@ -6,7 +6,7 @@ import MasterDirectoryTable from '../components/MasterDirectoryTable';
 import './InventoryTheme.css';
 import {supplierErrors,normalizePhone,phoneCountry} from '../utils/purchasingValidation';
 import SupplierDetailsModal from '../components/SupplierDetailsModal';
-import SupplierRecycleBin from '../components/SupplierRecycleBin';
+import useRecordDeletion from '../hooks/useRecordDeletion';
 import SupplierDeleteDialog from '../components/SupplierDeleteDialog';
 import FilterSelect from '../components/FilterSelect';
 import {printCurrentDirectory} from '../utils/printDirectory';
@@ -19,6 +19,7 @@ import {
   categoryApi,
   customerApi,
   supplierApi,
+  recycleBinApi,
   productApi,
   brandApi,
 } from '../api/apiClient';
@@ -81,7 +82,6 @@ const MastersView = React.forwardRef(function MastersView({
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [showSupplierBin, setShowSupplierBin] = useState(false);
   const [deletingSupplier, setDeletingSupplier] = useState(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
   const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
@@ -129,6 +129,7 @@ const MastersView = React.forwardRef(function MastersView({
     }
   };
   const canEditCurrentTab = canEditModule(user, getTabModule(activeTab));
+  const masterDeletion=useRecordDeletion(getTabModule(activeTab),activeTab==='categories'?'Category':activeTab==='warehouses'?'Warehouse':activeTab==='brands'?'Brand':'Record',()=>loadTabData());
 
   React.useImperativeHandle(ref, () => ({
     openAdd: handleOpenAdd,
@@ -229,7 +230,7 @@ const MastersView = React.forwardRef(function MastersView({
     if (!deletingSupplier || deletingBusy || !canEditCurrentTab) return;
     setDeletingBusy(true);
     try {
-      await supplierApi.delete(deletingSupplier.id);
+      await recycleBinApi.delete('SUPPLIER',deletingSupplier.id);
       setDeletingSupplier(null); setViewingItem(null);
       await loadTabData(); addToast('Supplier moved to recycle bin', 'success');
     } catch (error) { addToast(error.response?.data?.message || error.message || 'Unable to delete supplier', 'error'); }
@@ -687,7 +688,6 @@ const MastersView = React.forwardRef(function MastersView({
   if(showModal && ['products','brands','warehouses','categories'].includes(activeTab))return <MasterWorkspace type={activeTab} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} brands={brands} categories={categories} warehouses={warehouses} onClose={()=>setShowModal(false)} onSave={handleSave}/>;
   if(showModal && activeTab==='suppliers')return <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>;
 
-  if (showSupplierBin && activeTab === 'suppliers' && canEditCurrentTab) return <SupplierRecycleBin onBack={() => setShowSupplierBin(false)} onChanged={loadTabData}/>;
 
   return (
     <div ref={directoryRef} className={(activeTab === 'suppliers' ? 'purchasing-no-shadows' : ['products','brands','warehouses','categories'].includes(activeTab) ? 'inventory-theme purchasing-no-shadows' : '') + (isStandalone || hideHeader ? '' : ' erp-page')}
@@ -855,12 +855,11 @@ const MastersView = React.forwardRef(function MastersView({
 
         {/* Right Controls: Status Filter, Reset, Export CSV (icon only), & Refresh (icon only) */}
         <div className={activeTab === 'suppliers' ? 'purchase-date-controls' : undefined} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-          {activeTab === 'suppliers' && canEditCurrentTab && <button className="btn btn-glass erp-button" onClick={() => { setStatusFilter('ALL'); setShowSupplierBin(true); }}><Trash2 size={15}/> Recycle bin</button>}
           {/* Status Filter Dropdown */}
           <ToolbarFilter
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{
+            style={activeTab==='suppliers'?{width:'140px'}:{
               height: '38px',
               padding: '0 30px 0 12px',
               width: '140px',
@@ -886,10 +885,12 @@ const MastersView = React.forwardRef(function MastersView({
               transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
             }}
             onFocus={(e) => {
+              if(activeTab==='suppliers')return;
               e.currentTarget.style.borderColor = '#0284c7';
               e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
             }}
             onBlur={(e) => {
+              if(activeTab==='suppliers')return;
               e.currentTarget.style.borderColor = '#cbd5e1';
               e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
             }}
@@ -1025,7 +1026,7 @@ const MastersView = React.forwardRef(function MastersView({
             </div>
           )}
 
-          {!loading && ['products','brands','warehouses','categories'].includes(activeTab) && <MasterDirectoryTable type={activeTab} rows={activeTab==='products'?filteredProducts:activeTab==='brands'?filteredBrands:activeTab==='warehouses'?filteredWarehouses:filteredCategories} warehouses={warehouses} getBrand={getBrandForProduct} canEdit={canEditCurrentTab} isActive={isItemActive} onView={item=>setViewingItem({...item,type:activeTab})} onEdit={handleOpenEdit}/>}
+          {!loading && ['products','brands','warehouses','categories'].includes(activeTab) && <MasterDirectoryTable type={activeTab} rows={activeTab==='products'?filteredProducts:activeTab==='brands'?filteredBrands:activeTab==='warehouses'?filteredWarehouses:filteredCategories} warehouses={warehouses} getBrand={getBrandForProduct} canEdit={canEditCurrentTab} isActive={isItemActive} onView={item=>setViewingItem({...item,type:activeTab})} onEdit={handleOpenEdit} onDelete={activeTab==='products'?undefined:masterDeletion.requestDeletion}/>}
 
           {!loading && activeTab === 'customers' && (
             <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -1162,7 +1163,7 @@ const MastersView = React.forwardRef(function MastersView({
                         title="Click row to view supplier details"
                       >
                         <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{code}</td>
-                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{s.name || 'Supplier name not entered'}</td>
+                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{s.name || '—'}</td>
                         <td className="erp-table-cell" style={{ color: '#475569' }}>{s.contactPerson || '—'}</td>
                         <td className="erp-table-cell" style={{ color: '#475569' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '250px' }}>
@@ -1206,9 +1207,11 @@ const MastersView = React.forwardRef(function MastersView({
       </div>
 
       {/* View Details Modal */}
+      {masterDeletion.deletionDialog}
       {deletingSupplier && <SupplierDeleteDialog supplier={deletingSupplier} busy={deletingBusy} onClose={() => setDeletingSupplier(null)} onConfirm={handleDeleteSupplier}/>}
       {viewingItem?.type === 'suppliers' && <SupplierDetailsModal supplier={viewingItem} active={isItemActive(viewingItem)} canManage={canEditCurrentTab}
         onClose={()=>setViewingItem(null)} onPrint={()=>handlePrintSuppliers(viewingItem)} onStatusChange={target=>handleSupplierStatus(viewingItem,target)}
+        onDelete={()=>setDeletingSupplier(viewingItem)}
         onEdit={()=>{const item=viewingItem;setViewingItem(null);handleOpenEdit(item);}}/>}
       {viewingItem && viewingItem.type !== 'suppliers' && (
         <div

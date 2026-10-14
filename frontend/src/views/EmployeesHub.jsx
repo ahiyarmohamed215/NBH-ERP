@@ -13,13 +13,15 @@ import { printA4Report } from '../utils/printReport';
 import { ToolbarActions, TableRowActions } from '../components/ToolbarActions';
 import RoleSearchSelector from '../components/RoleSearchSelector';
 import RolesView from './RolesView';
+import useRecordDeletion from '../hooks/useRecordDeletion';
 import './EmployeeDialogs.css';
-import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info } from 'lucide-react';
+import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info, Trash2 } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
   const canEditUser = canEditModule(currentUser, 'USER');
   const { addToast } = useToast();
+  const employeeDeletion=useRecordDeletion('USER','Employee',()=>loadData());
 
   const isSuperAdminUser = (emp) => {
     if (!emp) return false;
@@ -1100,6 +1102,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                               printTitle="Print Employee Record (A4)"
                               pdfTitle="Download Employee PDF (A4)"
                               editTitle="Edit Employee"
+                              extraActions={canEditUser && !isSuperAdminUser(emp) && String(emp.id)!==String(currentUser.id) ? <button type="button" className="erp-table-icon-action" data-tone="danger" aria-label="Delete Employee" title="Delete Employee" onClick={()=>employeeDeletion.requestDeletion(emp)}><Trash2 size={13}/></button> : null}
                             />
                           </td>
                         </tr>
@@ -2855,6 +2858,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
+      {employeeDeletion.deletionDialog}
     </div>
   );
 }

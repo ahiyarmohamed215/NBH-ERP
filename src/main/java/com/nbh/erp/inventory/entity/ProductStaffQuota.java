@@ -27,7 +27,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProductStaffQuota extends BaseEntity {
+public class ProductStaffQuota extends com.nbh.erp.common.entity.RecyclableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
