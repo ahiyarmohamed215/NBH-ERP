@@ -25,7 +25,7 @@ public class PurchaseReturnController {
     private final PurchaseReturnService purchaseReturnService;
 
     @GetMapping("/return-sources")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRN_PROCESS') or hasAuthority('PRN_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('PRN')")
     public ResponseEntity<ApiResponse<java.util.List<PurchaseReturnService.ReturnSource>>> getReturnSources() {
         return ResponseEntity.ok(ApiResponse.ok(purchaseReturnService.getReturnSources()));
     }
@@ -38,6 +38,7 @@ public class PurchaseReturnController {
     }
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('PRN')")
     @Operation(summary = "Search purchase returns with filters")
     public ResponseEntity<ApiResponse<PagedResponse<PurchaseReturnDto>>> searchPurchaseReturns(
             @RequestParam(required = false) Long warehouseId,
@@ -51,6 +52,7 @@ public class PurchaseReturnController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('PRN')")
     @Operation(summary = "Get purchase return details by ID")
     public ResponseEntity<ApiResponse<PurchaseReturnDto>> getPurchaseReturnById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(purchaseReturnService.getPurchaseReturnById(id)));

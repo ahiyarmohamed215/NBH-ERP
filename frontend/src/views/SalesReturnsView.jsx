@@ -1,3 +1,4 @@
+import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect } from 'react';
 import { buildSalesReturnPayload } from '../utils/invoiceMapping';
 import { salesReturnApi, salesApi } from '../api/apiClient';
@@ -472,7 +473,7 @@ export default function SalesReturnsView({ embedded = false }) {
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+          <div className="erp-table-scroll erp-table-frame" style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
             <table className="glass-table erp-table" style={{ margin: 0 }}>
               <thead>
                 <tr>
@@ -483,7 +484,7 @@ export default function SalesReturnsView({ embedded = false }) {
                   <th className="erp-table-heading">Refund Amount</th>
                   <th className="erp-table-heading">Reason</th>
                   <th className="erp-table-heading">Date</th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right' }}>Actions</th>
+                  <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -508,17 +509,17 @@ export default function SalesReturnsView({ embedded = false }) {
                       title="Click row to view return details"
                     >
                       <td className="erp-table-cell">
-                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>
+                        <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1d4ed8' }}>
                           {r.returnNumber}
                         </span>
                       </td>
                       <td className="erp-table-cell">
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>
+                        <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>
                           {r.invoiceNumber}
                         </span>
                       </td>
                       <td className="erp-table-cell">
-                        <span className="badge badge-warning" style={{ fontFamily: 'monospace' }}>
+                        <span className="badge badge-warning erp-table-code" style={{ fontFamily: 'monospace' }}>
                           {r.creditNoteNumber || '—'}
                         </span>
                       </td>
@@ -602,7 +603,7 @@ export default function SalesReturnsView({ embedded = false }) {
 
             <h3 style={{ fontSize: 'var(--erp-text-nav)', color: '#0f172a', marginBottom: '8px' }}>Returned Items</h3>
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <table className="glass-table erp-table" style={{ margin: 0 }}>
+              <div className="erp-table-frame erp-table-scroll"><table className="glass-table erp-table" style={{ margin: 0 }}>
                 <thead>
                   <tr>
                     <th className="erp-table-heading">Product</th>
@@ -622,9 +623,9 @@ export default function SalesReturnsView({ embedded = false }) {
                       <td className="erp-table-cell" style={{ textAlign: 'right' }}>${Number(it.unitPrice || 0).toFixed(2)}</td>
                       <td className="erp-table-cell">
                         {it.isRestocked ? (
-                          <span className="badge badge-success">Restocked</span>
+                          <StatusBadge status="RESTOCKED"/>
                         ) : (
-                          <span className="badge badge-danger">Scrapped</span>
+                          <StatusBadge status="SCRAPPED"/>
                         )}
                       </td>
                       <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
@@ -633,7 +634,7 @@ export default function SalesReturnsView({ embedded = false }) {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>

@@ -1,3 +1,7 @@
+import {hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
+import StatusBadge from '../components/StatusBadge';
 import {staffCode} from '../utils/staffCode';
 import { useState, useEffect, useMemo } from 'react';
 import { userApi, roleApi, pdfApi } from '../api/apiClient';
@@ -29,11 +33,11 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   // Old links to unfinished modules fall back to the employee list.
   const resolveTab = tab => {
-    if (tab === 'roles' || tab === 'groups') return 'roles';
+    if (tab === 'roles') return 'roles';
     if (tab === 'pending-approvals' || tab === 'approvals') return 'pending-approvals';
     return 'list';
   };
-  const [activeTab, setActiveTab] = useState(() => resolveTab(activeSubTab));
+  const [activeTab, setActiveTab] = useModuleTab('employees',resolveTab(activeSubTab),'list',currentUser);
 
   // Pending approvals card toggle
   const [hidePending, setHidePending] = useState(false);
@@ -92,9 +96,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     try {
       setLoading(true);
       const [allRes, pendingRes, rolesRes] = await Promise.all([
-        userApi.getAll({ page: 0, size: 200 }),
-        userApi.getPending({ page: 0, size: 50 }),
-        roleApi.getAll(),
+        hasPermission(currentUser,'USER_VIEW') ? userApi.getAll({ page: 0, size: 200 }) : Promise.resolve({data:[]}),
+        userApi.getPending({ page: 0, size: 50 }).catch(()=>({data:[]})),
+        roleApi.getAll().catch(()=>({data:[]})),
       ]);
 
       setEmployees(allRes.data?.content || allRes.data || []);
@@ -681,7 +685,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           </p>
         </div>
 
-        <button
+        <button disabled={!hasPermission(currentUser,'USER_MANAGE')}
           type="button"
           onClick={handleOpenAdd}
           className="btn btn-primary erp-button erp-button-primary"
@@ -698,7 +702,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       </div>
 
       {/* Subtabs Bar (Underline Style - Fixed / Sticky at Top) */}
-      <div className="erp-tabs"
+      <ErpTabs module="employees"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -706,23 +710,23 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           flexShrink: 0,
         }}
       >
-        <button data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'} className="erp-tab"
+        <ErpTab tabId="list" data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'}
           type="button"
           onClick={() => handleTabChange('list')}
 
         >
           <ListFilter size={16} /> Employee List
-        </button>
+        </ErpTab>
 
-        <button data-active={activeTab === 'roles' || activeTab === 'groups'} aria-pressed={activeTab === 'roles' || activeTab === 'groups'} className="erp-tab"
+        <ErpTab tabId="roles" data-active={activeTab === 'roles' || activeTab === 'groups'} aria-pressed={activeTab === 'roles' || activeTab === 'groups'}
           type="button"
           onClick={() => handleTabChange('roles')}
 
         >
           <Shield size={16} /> Employee Roles
-        </button>
+        </ErpTab>
 
-        <button data-active={activeTab === 'pending-approvals'} aria-pressed={activeTab === 'pending-approvals'} className="erp-tab"
+        <ErpTab tabId="pending-approvals" data-active={activeTab === 'pending-approvals'} aria-pressed={activeTab === 'pending-approvals'}
           type="button"
           onClick={() => handleTabChange('pending-approvals')}
 
@@ -743,9 +747,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               {pendingApprovals.length}
             </span>
           )}
-        </button>
+        </ErpTab>
 
-      </div>
+      </ErpTabs>
 
       {/* Tab 1: Employee List */}
       {activeTab === 'list' && (
@@ -960,7 +964,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           </div>
 
           {/* Employees Table (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -973,7 +977,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -995,7 +999,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1079,62 +1083,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
                           <td className="erp-table-cell">
                             {isSuperAdminUser(emp) ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: 'var(--erp-text-body)',
-                                  fontWeight: 600,
-                                  color: '#16a34a',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title="Status: Active"
-                              >
-                                <span
-                                  style={{
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#16a34a',
-                                    display: 'inline-block',
-                                  }}
-                                />
-                                Active
-                              </span>
+                              <StatusBadge status={"ACTIVE"} title="Status: Active"/>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
+                              <StatusBadge status={emp.isActive ? 'Active' : 'Inactive'} onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleActive(emp);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: 0,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  fontSize: 'var(--erp-text-body)',
-                                  fontWeight: 600,
-                                  color: emp.isActive ? '#16a34a' : '#dc2626',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}
-                              >
-                                <span
-                                  style={{
-                                    width: '7px',
-                                    height: '7px',
-                                    borderRadius: '50%',
-                                    backgroundColor: emp.isActive ? '#16a34a' : '#dc2626',
-                                    display: 'inline-block',
-                                  }}
-                                />
-                                {emp.isActive ? 'Active' : 'Inactive'}
-                              </button>
+                                }} title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}/>
                             )}
                           </td>
 

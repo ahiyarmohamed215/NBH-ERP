@@ -24,28 +24,28 @@ public class SupplierController {
     private final SupplierService supplierService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SUPPLIER')")
     @Operation(summary = "List all suppliers")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> getAllSuppliers() {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getAllSuppliers()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SUPPLIER')")
     @Operation(summary = "List active suppliers for purchase dropdowns")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> getActiveSuppliers() {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getActiveSuppliers()));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SUPPLIER')")
     @Operation(summary = "Search suppliers by name or code")
     public ResponseEntity<ApiResponse<List<SupplierDto>>> searchSuppliers(@RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.searchSuppliers(query)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SUPPLIER')")
     @Operation(summary = "Get supplier by ID")
     public ResponseEntity<ApiResponse<SupplierDto>> getSupplierById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(supplierService.getSupplierById(id)));
@@ -89,6 +89,25 @@ public class SupplierController {
     @Operation(summary = "Delete a supplier")
     public ResponseEntity<Void> deleteSupplier(@PathVariable Long id) {
         supplierService.deleteSupplier(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/recycle-bin")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
+    public ResponseEntity<ApiResponse<List<SupplierDto>>> recycleBin() {
+        return ResponseEntity.ok(ApiResponse.ok(supplierService.getRecycleBin()));
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
+    public ResponseEntity<ApiResponse<SupplierDto>> restore(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok("Supplier restored", supplierService.restoreSupplier(id)));
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SUPPLIER_MANAGE')")
+    public ResponseEntity<Void> permanentlyDelete(@PathVariable Long id) {
+        supplierService.permanentlyDeleteSupplier(id);
         return ResponseEntity.noContent().build();
     }
 }

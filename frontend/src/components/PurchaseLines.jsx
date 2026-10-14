@@ -1,3 +1,4 @@
+import {Edit2} from 'lucide-react';
 import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
 import {numberError} from '../utils/purchasingValidation';
 import {usePurchaseItemRemoval} from '../hooks/usePurchaseItemRemoval';
@@ -41,14 +42,14 @@ export default function PurchaseLines({ products, items, onChange, quantityField
   return <div className="purchase-lines">
     <div className="purchase-items">
       <h3>Items ({items.length})</h3>
-      <div className="purchase-table-scroll">
-        <table className="glass-table erp-table"><thead><tr><th className="erp-table-heading">Product code</th><th className="erp-table-heading">Product name</th>{extraColumns.map(column=><th className="erp-table-heading" key={column.label}>{column.label}</th>)}<th className="purchase-number erp-table-heading">Qty</th>{withCost && <th className="purchase-number erp-table-heading">{showSellingPrice ? 'Selling price' : 'Unit cost'}</th>}<th className="purchase-number erp-table-heading">Actions</th></tr></thead>
+      <div className="purchase-table-scroll erp-table-scroll erp-table-frame">
+        <table className="glass-table erp-table"><thead><tr><th className="erp-table-heading">Product code</th><th className="erp-table-heading">Product name</th>{extraColumns.map(column=><th className="erp-table-heading" key={column.label}>{column.label}</th>)}<th className="purchase-number erp-table-heading">Qty</th>{withCost && <th className="purchase-number erp-table-heading">{showSellingPrice ? 'Selling price' : 'Unit cost'}</th>}<th className="purchase-number erp-table-heading erp-table-actions">Actions</th></tr></thead>
           <tbody>{items.map((item,index) => {
             const p=products.find(p=>String(p.id)===String(item.productId));
-            return <tr key={index}><td className="purchase-product-code erp-table-cell">{p?.sku || item.sku || item.productSku || '—'}</td><td className="erp-table-cell">{p?.name || item.productName || item.productId}</td>
+            return <tr key={index}><td className="purchase-product-code erp-table-cell erp-table-code">{p?.sku || item.sku || item.productSku || '—'}</td><td className="erp-table-cell">{p?.name || item.productName || item.productId}</td>
               {extraColumns.map(column=><td className="erp-table-cell" key={column.label}>{column.value(item)}</td>)}<td className="purchase-number erp-table-cell">{item[quantityField]}</td>{withCost && <td className="purchase-number erp-table-cell">LKR {(showSellingPrice ? purchaseSellingPrice(item,products) : Number(item.unitCost || 0)).toFixed(2)}</td>}
-              <td className="purchase-number erp-table-cell"><div className="purchase-row-actions"><button type="button" aria-label={`Edit item ${index+1}`} onClick={()=>{setEditing(index);const selected=p ? {...p,defaultWarehouseId:item.sourceWarehouseId || item.warehouseId || p.defaultWarehouseId} : null;setSelectedProduct(selected);onProductSelect?.(selected,item,index);setProductId(item.productId);setQuantity(item[quantityField]);setCost(item.unitCost || 0);setQuery(`${p?.sku || item.sku || item.productSku || ''} — ${p?.name || item.productName || ''}`);setShowResults(false);}}><Pencil size={15}/></button>
-                <button type="button" aria-label={`Remove item ${index+1}`} onClick={()=>requestRemove(index)}><Trash2 size={15}/></button></div></td></tr>;
+              <td className="purchase-number erp-table-cell erp-table-actions"><div className="purchase-row-actions"><button className="erp-table-icon-action" type="button" aria-label={`Edit item ${index+1}`} onClick={()=>{setEditing(index);const selected=p ? {...p,defaultWarehouseId:item.sourceWarehouseId || item.warehouseId || p.defaultWarehouseId} : null;setSelectedProduct(selected);onProductSelect?.(selected,item,index);setProductId(item.productId);setQuantity(item[quantityField]);setCost(item.unitCost || 0);setQuery(`${p?.sku || item.sku || item.productSku || ''} — ${p?.name || item.productName || ''}`);setShowResults(false);}}><Edit2 size={15}/></button>
+                <button className="erp-table-icon-action" data-tone="danger" type="button" aria-label={`Remove item ${index+1}`} onClick={()=>requestRemove(index)}><Trash2 size={15}/></button></div></td></tr>;
           })}</tbody></table>
         {!items.length && <p className="purchase-empty">Select a product and add your first item.</p>}
       </div>

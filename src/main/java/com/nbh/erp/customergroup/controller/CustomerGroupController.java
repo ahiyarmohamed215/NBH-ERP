@@ -24,7 +24,7 @@ public class CustomerGroupController {
     private final CustomerGroupService customerGroupService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "Get customer groups (defaults to all groups)")
     public ResponseEntity<ApiResponse<List<CustomerGroupDto>>> getAllGroups(
             @RequestParam(required = false, defaultValue = "true") boolean includeInactive
@@ -33,14 +33,14 @@ public class CustomerGroupController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "Get active customer groups")
     public ResponseEntity<ApiResponse<List<CustomerGroupDto>>> getActiveGroups() {
         return ResponseEntity.ok(ApiResponse.ok(customerGroupService.getActiveGroups()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "Get customer group by ID")
     public ResponseEntity<ApiResponse<CustomerGroupDto>> getGroupById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(customerGroupService.getGroupById(id)));

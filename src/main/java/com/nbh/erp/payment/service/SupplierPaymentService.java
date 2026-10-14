@@ -13,10 +13,10 @@ public class SupplierPaymentService {
  private final com.nbh.erp.purchasereturn.repository.PurchaseReturnRepository returns;
  public record Receipt(Long id,String grnNumber,String supplier,BigDecimal total,BigDecimal returns,BigDecimal paid,BigDecimal balance) {}
  public record Payment(Long id,Long grnId,String supplier,BigDecimal amount,LocalDate date,String method,boolean reversed) {}
- private Payment dto(com.nbh.erp.payment.entity.SupplierPayment p) { return new Payment(p.getId(),p.getGrn().getId(),p.getGrn().getSupplier().getName(),p.getAmount(),p.getPaymentDate(),p.getMethod(),p.isReversed()); }
+ private Payment dto(com.nbh.erp.payment.entity.SupplierPayment p) { return new Payment(p.getId(),p.getGrn().getId(),p.getGrn().getSupplier().getDisplayName(),p.getAmount(),p.getPaymentDate(),p.getMethod(),p.isReversed()); }
  @Transactional(readOnly=true) public java.util.List<Payment> list() { return payments.findAll().stream().map(this::dto).toList(); }
  @Transactional(readOnly=true) public java.util.List<Receipt> outstanding() {
-  return grns.findAll().stream().filter(g->"PROCESSED".equals(g.getStatus())).map(g->{var returned=returns.totalReturned(g.getId());var paid=payments.totalPaid(g.getId());return new Receipt(g.getId(),g.getGrnNumber(),g.getSupplier().getName(),g.getTotalAmount(),returned,paid,g.getTotalAmount().subtract(returned).subtract(paid));}).toList();
+  return grns.findAll().stream().filter(g->"PROCESSED".equals(g.getStatus())).map(g->{var returned=returns.totalReturned(g.getId());var paid=payments.totalPaid(g.getId());return new Receipt(g.getId(),g.getGrnNumber(),g.getSupplier().getDisplayName(),g.getTotalAmount(),returned,paid,g.getTotalAmount().subtract(returned).subtract(paid));}).toList();
  }
  @Transactional public Payment pay(Long grnId,BigDecimal amount,String method) {
   var ticket=idempotency.reserve("supplierPayment",grnId+"|"+amount+"|"+method);

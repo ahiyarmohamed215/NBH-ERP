@@ -1,4 +1,5 @@
 package com.nbh.erp.delivery.controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.delivery.dto.CreateDeliveryRequest;
@@ -28,6 +29,7 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Search and list delivery trips")
     public ResponseEntity<ApiResponse<List<DeliveryDto>>> searchDeliveries(
             @RequestParam(required = false) String status,
@@ -42,24 +44,28 @@ public class DeliveryController {
     }
 
     @GetMapping("/summary")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get delivery KPI metrics summary")
     public ResponseEntity<ApiResponse<DeliverySummaryDto>> getSummaryMetrics() {
         return ResponseEntity.ok(ApiResponse.ok(deliveryService.getSummaryMetrics()));
     }
 
     @GetMapping("/pending-invoices")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get completed sales invoices available to be loaded for delivery")
     public ResponseEntity<ApiResponse<List<InvoiceDto>>> getPendingInvoicesForDelivery() {
         return ResponseEntity.ok(ApiResponse.ok(deliveryService.getPendingInvoicesForDelivery()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get delivery trip details with manifest of assigned invoices")
     public ResponseEntity<ApiResponse<DeliveryDto>> getDeliveryById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(deliveryService.getDeliveryById(id)));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Create and schedule a new delivery trip")
     public ResponseEntity<ApiResponse<DeliveryDto>> createDelivery(@Valid @RequestBody CreateDeliveryRequest req) {
         DeliveryDto created = deliveryService.createDelivery(req);
@@ -68,6 +74,7 @@ public class DeliveryController {
     }
 
     @PostMapping("/{id}/dispatch")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Dispatch vehicle on route (records departure time and marks In Transit)")
     public ResponseEntity<ApiResponse<DeliveryDto>> dispatchDelivery(
             @PathVariable Long id,
@@ -77,6 +84,7 @@ public class DeliveryController {
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Complete delivery trip (records return time, calculates trip duration, marks invoices delivered)")
     public ResponseEntity<ApiResponse<DeliveryDto>> completeDelivery(
             @PathVariable Long id,
@@ -86,6 +94,7 @@ public class DeliveryController {
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Cancel delivery trip and restore invoices to pending status")
     public ResponseEntity<ApiResponse<DeliveryDto>> cancelDelivery(
             @PathVariable Long id,

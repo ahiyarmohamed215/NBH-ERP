@@ -1,3 +1,5 @@
+import {useAuth} from '../context/AuthContext';
+import {hasPermission} from '../utils/moduleAccess';
 import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
 import {newestFirst} from '../utils/recordOrder';
 import {documentErrors,numberError} from '../utils/purchasingValidation';
@@ -29,6 +31,8 @@ import {
 } from 'lucide-react';
 
 const PrnView = React.forwardRef(function PrnView(props, ref) {
+  const auth=useAuth();
+  const canManage=hasPermission(auth?.user,'PRN_PROCESS');
   const [showCreateForm, setShowCreateForm] = useState(false);
   useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [prns, setPrns] = useState([]);
@@ -523,7 +527,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
       </div>
 
       {/* PRN Table (Fixed Table Frame, Sticky Header - Exact CustomerHub Look) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -538,7 +542,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
               flexDirection: 'column',
             }}
           >
-            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '760px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -563,7 +567,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -596,7 +600,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                         title="Click row to view return details"
                       >
                         <td className="erp-table-cell">
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                          <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {p.prnNumber}
                           </span>
                         </td>
@@ -618,9 +622,9 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                         <td className="erp-table-cell" style={{ color: '#64748b' }}>
                           {p.notes || p.remarks || '—'}
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            {p.status !== 'CANCELLED' && (<button
+                            {p.status !== 'CANCELLED' && (<button disabled={!canManage} aria-label="Edit PRN" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -645,7 +649,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                             >
                               <Edit2 size={13} />
                             </button>)}
-                            <button
+                            <button aria-label="Print PRN" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -856,11 +860,10 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
           { label: 'Remarks', value: selectedPrn.notes || selectedPrn.remarks, wide: true },
         ]}
         onClose={() => setSelectedPrn(null)}
-        actions={[
+        actions={canManage ? ([
           ...(selectedPrn.status !== 'CANCELLED' ? [{label:'Edit PRN',icon:Edit2,disabled:saving,onClick:()=>handleEditPrn(selectedPrn)}] : []),
-          ...(selectedPrn.status === 'CANCELLED' ? [{ label: selectedPrn.status === 'CANCELLED' ? 'Reprocess PRN' : 'Process PRN', icon: selectedPrn.status === 'CANCELLED' ? RotateCw : CheckCircle, tone:'success', disabled: saving, onClick: () => handleProcessPrn(selectedPrn.id, selectedPrn.prnNumber) }] : []),
           ...(selectedPrn.status !== 'CANCELLED' ? [{ label: 'Cancel PRN', icon: Ban, tone: 'danger', disabled: saving, onClick: ()=>handleCancelPRN() }] : []),
-        ]}
+        ]) : []}
         columns={[
           { label: 'Product code', value: item => item.productSku || '—' },
           { label: 'Product name', value: item => item.productName },

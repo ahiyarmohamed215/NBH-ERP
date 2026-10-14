@@ -1,3 +1,4 @@
+import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   customerMonthlyRangeApi,
@@ -1222,7 +1223,7 @@ export default function CustomerMonthlyRangeHub({
          ───────────────────────────────────────────────────────────── */}
       {subTab === 'dashboard' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1236,7 +1237,7 @@ export default function CustomerMonthlyRangeHub({
               minHeight: 0,
             }}
           >
-            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '860px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1246,7 +1247,7 @@ export default function CustomerMonthlyRangeHub({
                     <th className="erp-table-heading" style={{ textAlign: 'center' }}>CURRENT RANGE</th>
                     <th className="erp-table-heading">PROGRESS TO NEXT TARGET</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right' }}>REMAINING</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1285,7 +1286,7 @@ export default function CustomerMonthlyRangeHub({
                               {c.customerName}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                              <span
+                              <span className="erp-table-code"
                                 style={{
                                   fontFamily: 'monospace',
                                   fontSize: 'var(--erp-text-caption)',
@@ -1308,7 +1309,7 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Assigned Staff */}
-                          <td className="erp-table-cell">
+                          <td className="erp-table-cell erp-table-actions">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span
                                 style={{
@@ -1320,7 +1321,7 @@ export default function CustomerMonthlyRangeHub({
                                 {c.assignedStaffName || 'Unassigned'}
                               </span>
                               {canEdit && (
-                                <button
+                                <button aria-label="Change assigned staff" className="erp-table-icon-action"
                                   type="button"
                                   onClick={() => handleOpenAssignStaff(c)}
                                   title="Change assigned staff"
@@ -1438,8 +1439,8 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Actions: View History */}
-                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                            <button className="erp-button"
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                            <button aria-label="View monthly range progression history" className="erp-button erp-table-icon-action"
                               type="button"
                               onClick={() => handleViewCustomerHistory(c)}
                               style={{
@@ -1462,9 +1463,7 @@ export default function CustomerMonthlyRangeHub({
                                 e.currentTarget.style.borderColor = '#e2e8f0';
                               }}
                               title="View monthly range progression history"
-                            >
-                              <Clock size={12} color="#0284c7" /> History
-                            </button>
+                            ><Clock size={12} color="#0284c7" /></button>
                           </td>
                         </tr>
                       );
@@ -1539,7 +1538,7 @@ export default function CustomerMonthlyRangeHub({
          ───────────────────────────────────────────────────────────── */}
       {subTab === 'setup' && (
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1553,7 +1552,7 @@ export default function CustomerMonthlyRangeHub({
               minHeight: 0,
             }}
           >
-            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1564,7 +1563,7 @@ export default function CustomerMonthlyRangeHub({
                     <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center' }}>CUSTOMERS (THIS MONTH)</th>
                     <th className="erp-table-heading">DESCRIPTION</th>
-                    {canEdit && <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>}
+                    {canEdit && <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1604,7 +1603,7 @@ export default function CustomerMonthlyRangeHub({
                           </td>
 
                           {/* Range Code */}
-                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                          <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                             {r.rangeCode}
                           </td>
 
@@ -1641,19 +1640,7 @@ export default function CustomerMonthlyRangeHub({
 
                           {/* Status */}
                           <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                            <span
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                                fontSize: 'var(--erp-text-caption)',
-                                fontWeight: 600,
-                                background: r.isActive ? '#dcfce7' : '#fee2e2',
-                                color: r.isActive ? '#15803d' : '#b91c1c',
-                                border: r.isActive ? '1px solid #bbf7d0' : '1px solid #fecaca',
-                              }}
-                            >
-                              {r.isActive ? 'Active' : 'Inactive'}
-                            </span>
+                            <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} />
                           </td>
 
                           {/* Customer Count */}
@@ -1681,9 +1668,9 @@ export default function CustomerMonthlyRangeHub({
 
                           {/* Action Buttons */}
                           {canEdit && (
-                            <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                            <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                               <div style={{ display: 'inline-flex', gap: '4px' }}>
-                                <button className="erp-button"
+                                <button aria-label="Edit range details" className="erp-button erp-table-icon-action"
                                   type="button"
                                   onClick={() => handleOpenEditRange(r)}
                                   style={{
@@ -1698,12 +1685,12 @@ export default function CustomerMonthlyRangeHub({
                                     gap: '3px',
                                   }}
                                   title="Edit range details"
-                                >
-                                  <Edit2 size={11} /> Edit
-                                </button>
+                                ><Edit2 size={11} /></button>
 
                                 {!isBaseline && (
-                                  <button
+                                  <button className="erp-table-icon-action" data-tone={r.isActive ? 'danger' : undefined}
+                                    aria-label={r.isActive ? 'Deactivate range' : 'Activate range'}
+                                    title={r.isActive ? 'Deactivate range' : 'Activate range'}
                                     type="button"
                                     onClick={() => handleToggleRangeStatus(r)}
                                     style={{
@@ -1719,7 +1706,7 @@ export default function CustomerMonthlyRangeHub({
                                       cursor: 'pointer',
                                     }}
                                   >
-                                    {r.isActive ? 'Deactivate' : 'Activate'}
+                                    {r.isActive ? <X size={13}/> : <Check size={13}/>}
                                   </button>
                                 )}
                               </div>
@@ -1793,7 +1780,7 @@ export default function CustomerMonthlyRangeHub({
           </div>
 
           {/* Staff Member Target Achievements Table */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1807,7 +1794,7 @@ export default function CustomerMonthlyRangeHub({
               minHeight: 0,
             }}
           >
-            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>

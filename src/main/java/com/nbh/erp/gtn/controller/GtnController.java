@@ -25,7 +25,7 @@ public class GtnController {
     private final GtnService gtnService;
 
     @GetMapping("/responsible-staff")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('GTN_PROCESS')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('GTN')")
     public ResponseEntity<ApiResponse<java.util.List<GtnService.ResponsibleStaff>>> responsibleStaff() {
         return ResponseEntity.ok(ApiResponse.ok(gtnService.getResponsibleStaff()));
     }
@@ -57,6 +57,7 @@ public class GtnController {
     }
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('GTN')")
     @Operation(summary = "Search GTNs with filters")
     public ResponseEntity<ApiResponse<PagedResponse<GtnDto>>> searchGtns(
             @RequestParam(required = false) Long sourceWarehouseId,
@@ -70,6 +71,7 @@ public class GtnController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('GTN')")
     @Operation(summary = "Get GTN details by ID")
     public ResponseEntity<ApiResponse<GtnDto>> getGtnById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(gtnService.getGtnById(id)));

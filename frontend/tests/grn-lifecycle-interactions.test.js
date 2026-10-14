@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createServer } from 'vite';
 import { Window } from 'happy-dom';
 
-test('processed GRNs stay editable and cancelled GRNs can be reprocessed from the popup', async () => {
+test('processed GRNs stay editable and cancelled GRNs have no status actions', async () => {
   const window = new Window();
   Object.assign(globalThis, { window, document: window.document, localStorage: window.localStorage, IS_REACT_ACT_ENVIRONMENT: true });
   const { createRoot } = await import('react-dom/client');
@@ -68,13 +68,13 @@ test('processed GRNs stay editable and cancelled GRNs can be reprocessed from th
     assert.equal(grn.status, 'PROCESSED');
     failCancel = false;
     await act(async () => button('Confirm Cancellation').click());
-    assert.equal(grn.status, 'CANCELLED'); assert.ok(button('Reprocess GRN'));
+    assert.equal(grn.status, 'CANCELLED'); assert.equal(button('Reprocess GRN'), undefined);
     assert.equal(button('Edit GRN'), undefined);
     assert.equal(host.querySelector('tbody [title="Edit GRN"]'), null);
     assert.equal(host.querySelector('tbody [title="Reprocess GRN"]'), null);
-    await act(async () => button('Reprocess GRN').click());
-    assert.equal(processCalls, 1); assert.equal(grn.status, 'PROCESSED');
-    assert.equal(button('Reprocess GRN'), undefined); assert.ok(button('Cancel GRN'));
+    assert.equal(processCalls, 0); assert.equal(grn.status, 'CANCELLED');
+    assert.equal(button('Cancel GRN'), undefined);
+    assert.equal(host.querySelector('.purchase-inspection-detail-actions button'), null);
   } finally {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5500)); root.unmount(); });
     await server.close(); await window.happyDOM.close();

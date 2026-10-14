@@ -12,7 +12,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   const apis=await server.ssrLoadModule('/src/api/apiClient.js');
   for(const [name,api] of Object.entries(apis)) if(name.endsWith('Api') && api && typeof api==='object') for(const method of Object.keys(api)) if(typeof api[method]==='function') api[method]=async()=>({data:[]});
   localStorage.setItem('nbh_token',`test.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.sig`);
-  apis.authApi.getMe=async()=>({data:{username:'inventory-clerk',roles:['ROLE_USER'],permissions:['INVENTORY_VIEW']}});
+  apis.authApi.getMe=async()=>({data:{username:'inventory-clerk',roles:['ROLE_USER'],permissions:['INVENTORY_VIEW','PRODUCT_VIEW','WAREHOUSE_VIEW','BRAND_VIEW','CATEGORY_VIEW']}});
   const products=[{id:1,sku:'SKU-FIRST',name:'First item <unsafe>',costPrice:999991,sellingPrice:35,isActive:true,defaultWarehouseId:10,defaultWarehouseName:'North'},
     {id:2,sku:'SKU-SECOND',name:'Second item',costPrice:999992,sellingPrice:45,isActive:true,defaultWarehouseId:20,defaultWarehouseName:'South'}];
   apis.productApi.getProducts=async()=>({data:{content:products}});

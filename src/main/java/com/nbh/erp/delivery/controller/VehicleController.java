@@ -1,4 +1,5 @@
 package com.nbh.erp.delivery.controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.delivery.dto.CreateVehicleRequest;
@@ -23,24 +24,28 @@ public class VehicleController {
     private final VehicleService vehicleService;
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get all delivery vehicles")
     public ResponseEntity<ApiResponse<List<VehicleDto>>> getAllVehicles() {
         return ResponseEntity.ok(ApiResponse.ok(vehicleService.getAllVehicles()));
     }
 
     @GetMapping("/available")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get all available active delivery vehicles")
     public ResponseEntity<ApiResponse<List<VehicleDto>>> getAvailableVehicles() {
         return ResponseEntity.ok(ApiResponse.ok(vehicleService.getAvailableVehicles()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
     @Operation(summary = "Get vehicle details by ID")
     public ResponseEntity<ApiResponse<VehicleDto>> getVehicleById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(vehicleService.getVehicleById(id)));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Add a new delivery vehicle")
     public ResponseEntity<ApiResponse<VehicleDto>> createVehicle(@Valid @RequestBody CreateVehicleRequest req) {
         VehicleDto created = vehicleService.createVehicle(req);
@@ -49,6 +54,7 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Update delivery vehicle details")
     public ResponseEntity<ApiResponse<VehicleDto>> updateVehicle(
             @PathVariable Long id,
@@ -58,6 +64,7 @@ public class VehicleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Deactivate a delivery vehicle")
     public ResponseEntity<ApiResponse<Void>> deleteVehicle(@PathVariable Long id) {
         vehicleService.deleteVehicle(id);

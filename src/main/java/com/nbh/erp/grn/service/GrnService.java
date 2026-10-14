@@ -162,6 +162,7 @@ public class GrnService {
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
         Warehouse warehouse = resolveWarehouse(request);
+        if (supplier.isDeleted() && request.getPurchaseOrderId() == null) throw new BusinessException("Deleted suppliers cannot be selected for new GRNs");
 
         String grnNumber = sequenceService.generateGrnNumber();
 
@@ -207,6 +208,7 @@ public class GrnService {
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", request.getSupplierId()));
 
         Warehouse warehouse = resolveWarehouse(request, savedDestinations(grn));
+        if (supplier.isDeleted() && !supplier.getId().equals(grn.getSupplier().getId())) throw new BusinessException("Deleted suppliers cannot be selected for this GRN");
         var updatedItems = buildItems(grn, request);
         boolean wasProcessed = "PROCESSED".equals(grn.getStatus());
         if (wasProcessed) {
@@ -233,7 +235,7 @@ public class GrnService {
                 savedGrn.getGrnNumber(),
                 String.format("GRN %s updated for supplier '%s' by %s. Total: %s",
                         savedGrn.getGrnNumber(),
-                        savedGrn.getSupplier().getName(),
+                        savedGrn.getSupplier().getDisplayName(),
                         SecurityUtils.getCurrentUsername().orElse("SYSTEM"),
                         savedGrn.getTotalAmount())
         );
@@ -362,7 +364,7 @@ public class GrnService {
                     item.getUnitCost(),
                     "GRN",
                     grn.getGrnNumber(),
-                    "Supplier: " + grn.getSupplier().getName() + " (Inv: " + grn.getSupplierInvoiceNumber() + ")"
+                    "Supplier: " + grn.getSupplier().getDisplayName() + " (Inv: " + grn.getSupplierInvoiceNumber() + ")"
             );
         }
 
@@ -381,7 +383,7 @@ public class GrnService {
                 "Grn",
                 grn.getGrnNumber(),
                 String.format("GRN %s processed for supplier '%s'. Total: %s",
-                        grn.getGrnNumber(), grn.getSupplier().getName(), grn.getTotalAmount())
+                        grn.getGrnNumber(), grn.getSupplier().getDisplayName(), grn.getTotalAmount())
         );
 
         log.info("GRN '{}' processed successfully. Total: {}", grn.getGrnNumber(), grn.getTotalAmount());

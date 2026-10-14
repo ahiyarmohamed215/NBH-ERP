@@ -29,6 +29,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<List<CustomerRangeConfigDto>>> getAllRanges() {
         List<CustomerRangeConfigDto> ranges = customerRangeService.getAllRanges();
         return ResponseEntity.ok(ApiResponse.ok(ranges));
@@ -72,6 +73,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping("/customer/{customerId}/progress")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<CustomerMonthlyProgressDto>> getCustomerProgress(
             @PathVariable Long customerId,
             @RequestParam(required = false) BigDecimal cartTotal) {
@@ -80,6 +82,7 @@ public class CustomerRangeController {
     }
 
     @GetMapping("/customer/{customerId}/history")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<List<CustomerRangeHistoryDto>>> getCustomerRangeHistory(
             @PathVariable Long customerId) {
         List<CustomerRangeHistoryDto> history = customerRangeService.getCustomerRangeHistory(customerId);
@@ -91,6 +94,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping("/my-targets")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<Page<StaffCustomerTargetDto>>> getMyCustomerTargets(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long rangeId,
@@ -103,6 +107,7 @@ public class CustomerRangeController {
     }
 
     @GetMapping("/near-target")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<List<StaffCustomerTargetDto>>> getMyCustomersNearTarget() {
         List<StaffCustomerTargetDto> list = customerRangeService.getMyCustomersNearTarget();
         return ResponseEntity.ok(ApiResponse.ok(list));
@@ -113,6 +118,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping("/manager-dashboard")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<ManagerRangeDashboardDto>> getManagerDashboard(
             @RequestParam(required = false) String yearMonth,
             @RequestParam(required = false) Long staffId,
@@ -126,6 +132,7 @@ public class CustomerRangeController {
     }
 
     @GetMapping("/staff-performance")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     public ResponseEntity<ApiResponse<List<StaffPerformanceDto>>> getStaffPerformance(
             @RequestParam(required = false) String yearMonth) {
         List<StaffPerformanceDto> report = customerRangeService.getStaffPerformanceReport(yearMonth);

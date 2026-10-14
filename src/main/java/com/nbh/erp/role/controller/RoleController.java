@@ -26,6 +26,7 @@ public class RoleController {
     private final RoleService roleService;
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('ROLE')")
     @Operation(summary = "Get all available system roles and their permissions, optionally filtered by search query")
     public ResponseEntity<ApiResponse<List<RoleDto>>> getAllRoles(
             @RequestParam(value = "search", required = false) String search
@@ -35,6 +36,7 @@ public class RoleController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('ROLE')")
     @Operation(summary = "Search roles by name or description")
     public ResponseEntity<ApiResponse<List<RoleDto>>> searchRoles(
             @RequestParam("query") String query
@@ -45,7 +47,7 @@ public class RoleController {
 
 
     @GetMapping("/permissions")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('ROLE')")
     @Operation(summary = "Get all system permissions available for role assignment")
     public ResponseEntity<ApiResponse<List<PermissionDto>>> getAllPermissions() {
         List<PermissionDto> permissions = roleService.getAllPermissions();
@@ -53,7 +55,7 @@ public class RoleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MANAGE','USER_MANAGE')")
     @Operation(summary = "Create a custom user role")
     public ResponseEntity<ApiResponse<RoleDto>> createRole(@Valid @RequestBody CreateRoleRequest request) {
         RoleDto created = roleService.createRole(request);
@@ -61,7 +63,7 @@ public class RoleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MANAGE','USER_MANAGE')")
     @Operation(summary = "Update custom role permissions and description")
     public ResponseEntity<ApiResponse<RoleDto>> updateRole(
             @PathVariable Long id,
@@ -72,7 +74,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','ROLE_MANAGE','USER_MANAGE')")
     @Operation(summary = "Delete a custom role")
     public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
         roleService.deleteRole(id);

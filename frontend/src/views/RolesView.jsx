@@ -275,6 +275,7 @@ export default function RolesView({ onRoleChange }) {
         </div>
         <button className="erp-button erp-button-primary"
           type="button"
+          disabled={!canEditRole}
           onClick={openCreateModal}
           style={{
             padding: '9px 18px',

@@ -191,7 +191,7 @@ public class PdfGenerationService {
             PdfPCell c1 = new PdfPCell();
             c1.setBorder(Rectangle.NO_BORDER);
             c1.addElement(new Paragraph("GRN #: " + grn.getGrnNumber(), boldBody));
-            c1.addElement(new Paragraph("Supplier: " + grn.getSupplier().getName(), bodyFont));
+            c1.addElement(new Paragraph("Supplier: " + grn.getSupplier().getDisplayName(), bodyFont));
             c1.addElement(new Paragraph("Supplier Inv: " + (grn.getSupplierInvoiceNumber() != null ? grn.getSupplierInvoiceNumber() : "-"), bodyFont));
 
             PdfPCell c2 = new PdfPCell();

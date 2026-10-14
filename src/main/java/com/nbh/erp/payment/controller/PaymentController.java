@@ -28,7 +28,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','PAYMENT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('PAYMENT')")
     @Operation(summary = "Search customer payments and receipts history")
     public ResponseEntity<ApiResponse<PagedResponse<PaymentDto>>> searchPayments(
             @RequestParam(required = false) Long customerId,
@@ -47,7 +47,7 @@ public class PaymentController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','PAYMENT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('PAYMENT')")
     @Operation(summary = "Get single payment receipt by ID")
     public ResponseEntity<ApiResponse<PaymentDto>> getPaymentById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(paymentService.getPaymentById(id)));

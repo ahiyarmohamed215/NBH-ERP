@@ -555,6 +555,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
         grnDate: fullGrn.receivedDate || formatBusinessDate(),
         purchaseOrderId: fullGrn.purchaseOrderId || '',
         supplierId: fullGrn.supplierId || '',
+        supplierName: fullGrn.supplierName || '',
         grnType: fullGrn.grnType || GRN_TYPES[0],
         supplierInvoiceNumber: fullGrn.supplierInvoiceNumber || '',
         remarks: fullGrn.notes || '',
@@ -976,7 +977,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
           </div>
 
           {/* GRN Table (Fixed Table Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -992,7 +993,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               flexDirection: 'column',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '840px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1014,7 +1015,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1047,7 +1048,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         title="Click row to view complete GRN details"
                       >
                         <td className="erp-table-cell">
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                          <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {g.grnNumber}
                           </span>
                           {g.supplierInvoiceNumber && (
@@ -1071,10 +1072,10 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         <td className="erp-table-cell" style={{ color: '#475569', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={g.notes || g.remarks || ''}>
                           {g.notes || g.remarks || '—'}
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             {canEditGrn && g.status !== 'CANCELLED' && (
-                              <button
+                              <button aria-label="Edit GRN" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1100,7 +1101,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                                 <Edit2 size={13} />
                               </button>
                             )}
-                            <button
+                            <button aria-label="Print GRN PDF" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1280,6 +1281,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             <label>Supplier *<FilterSelect variant="field" aria-label="Supplier" className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
               <option value="">Select supplier</option>
               {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {editingGrnId && formData.supplierId && !suppliers.some(s => String(s.id) === String(formData.supplierId)) && <option value={formData.supplierId}>{formData.supplierName}</option>}
             </FilterSelect></label>
             <label>GRN date *<input className="input-glass erp-field" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
             <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass erp-field" name="remarks" maxLength={5000} rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
@@ -1297,11 +1299,11 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
               </span>
             </div>
 
-            <div className="grn-table-scroll">
+            <div className="grn-table-scroll erp-table-scroll erp-table-frame">
               <table className="glass-table erp-table" style={{ margin: 0, minWidth: '600px', width: '100%' }}>
                 <thead><tr>
                   <th className="erp-table-heading">Product code</th><th className="erp-table-heading">Product name</th><th className="grn-number erp-table-heading">Qty</th><th className="grn-number erp-table-heading">Unit cost</th>
-                  <th className="grn-number erp-table-heading">MP%</th><th className="grn-number erp-table-heading">Selling price</th><th className="grn-number erp-table-heading">Actions</th>
+                  <th className="grn-number erp-table-heading">MP%</th><th className="grn-number erp-table-heading">Selling price</th><th className="grn-number erp-table-heading erp-table-actions">Actions</th>
                 </tr></thead>
                 <tbody>
                   {formData.items.length === 0 && <tr><td colSpan="7" className="grn-empty erp-table-cell">Search a product and add it to the GRN.</td></tr>}
@@ -1312,9 +1314,9 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     <td className="grn-number erp-table-cell">LKR {Number(item.unitCost || 0).toFixed(2)}</td>
                     <td className="grn-number erp-table-cell">{Number(item.markupPercent || 0).toFixed(2)}%</td>
                     <td className="grn-number erp-table-cell">LKR {Number(item.salePrice || 0).toFixed(2)}</td>
-                    <td className="grn-number erp-table-cell"><div className="grn-row-actions">
-                      <button type="button" title="Edit line" aria-label={`Edit item ${index + 1}`} onClick={() => handleEditItem(index)}><Edit2 size={14} /></button>
-                      <button type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => requestRemove(index)}><Trash2 size={14} /></button>
+                    <td className="grn-number erp-table-cell erp-table-actions"><div className="grn-row-actions">
+                      <button className="erp-table-icon-action" type="button" title="Edit line" aria-label={`Edit item ${index + 1}`} onClick={() => handleEditItem(index)}><Edit2 size={14} /></button>
+                      <button className="erp-table-icon-action" data-tone="danger" type="button" title="Remove line" aria-label={`Remove item ${index + 1}`} onClick={() => requestRemove(index)}><Trash2 size={14} /></button>
                     </div></td>
                   </tr>)}
                 </tbody>
@@ -1492,7 +1494,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
       {selectedGrn && (
         <GrnDetailsModal grn={selectedGrn} onClose={() => setSelectedGrn(null)}
           onPrint={() => handlePrintPdf(selectedGrn.id)} onCancel={() => handleOpenCancelModal(selectedGrn)}
-          canManage={canEditGrn} processing={processingGrnId !== null} onProcess={() => handleProcessGrn(selectedGrn)}
+          canManage={canEditGrn} processing={processingGrnId !== null}
           onEdit={() => { const grn = selectedGrn; setSelectedGrn(null); handleEditGrn(grn); }} />
       )}
 

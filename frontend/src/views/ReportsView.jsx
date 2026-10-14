@@ -1,3 +1,7 @@
+import {useAuth} from '../context/AuthContext';
+import {hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import { downloadAuthenticated } from '../api/apiClient';
 import React, { useState, useEffect, useMemo } from 'react';
@@ -30,6 +34,7 @@ import AuditHub from './AuditHub';
 const INITIAL_OUTSTANDING_CUSTOMERS = [];
 
 export default function ReportsView({ activeSubTab = 'customer-reports', onSubTabChange }) {
+  const {user}=useAuth();
   const { addToast } = useToast();
 
   // Primary Category Tabs matching user screenshot
@@ -41,12 +46,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
     { id: 'day-summary', label: 'Day Summary', title: 'Day Summary & Audit Ledger', icon: ShieldCheck },
   ];
 
-  const [currentPrimaryTab, setCurrentPrimaryTab] = useState(() => {
-    if (activeSubTab && PRIMARY_TABS.some((t) => t.id === activeSubTab)) {
-      return activeSubTab;
-    }
-    return 'customer-reports';
-  });
+  const [currentPrimaryTab, setCurrentPrimaryTab] = useModuleTab('reports',activeSubTab,'customer-reports',user);
 
   // Customer Reports Sub-Tabs matching user screenshot
   const CUSTOMER_SUB_TABS = [
@@ -77,6 +77,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
   const [loadingOutstanding, setLoadingOutstanding] = useState(false);
 
   const loadOutstandingReport = async () => {
+    if(!hasPermission(user,'REPORT_VIEW')){setOutstandingList([]);return;}
     try {
       setLoadingOutstanding(true);
       const res = await reportApi.getOutstandingPayments();
@@ -294,7 +295,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       </div>
 
       {/* Primary Category Tabs (Row 1 matching user screenshot) */}
-      <div className="erp-tabs"
+      <ErpTabs module="reports"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -307,7 +308,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
           const isActive = currentPrimaryTab === tab.id;
 
           return (
-            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+            <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => {
@@ -318,10 +319,10 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
             >
               <Icon size={16} />
               {tab.label}
-            </button>
+            </ErpTab>
           );
         })}
-      </div>
+      </ErpTabs>
 
       {/* ------------------------------------------------------------- */}
       {/* 1. CUSTOMER REPORTS TAB CONTENT (Matching user screenshot) */}
@@ -329,21 +330,21 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
       {currentPrimaryTab === 'customer-reports' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px', overflow: 'hidden' }}>
           {/* Sub-Navigation Tabs (Row 2 matching user screenshot) */}
-          <div className="erp-tabs" style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+          <ErpTabs  style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
             {CUSTOMER_SUB_TABS.map((sub) => {
               const isActive = customerSubTab === sub.id;
               return (
-                <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+                <ErpTab data-active={isActive} aria-pressed={isActive}
                   key={sub.id}
                   type="button"
                   onClick={() => setCustomerSubTab(sub.id)}
 
                 >
                   {sub.label}
-                </button>
+                </ErpTab>
               );
             })}
-          </div>
+          </ErpTabs>
 
           {/* Sub-Tab 1: OUTSTANDING BALANCES (Matching screenshot) */}
           {customerSubTab === 'outstanding' && (
@@ -576,7 +577,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
               </div>
 
               {/* Customer Outstanding Balances Table Card */}
-              <div
+              <div className="erp-table-frame"
                 style={{
                   flex: 1,
                   minHeight: 0,
@@ -599,7 +600,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                   </p>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
+                <div className="erp-table-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
                   <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                       <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -609,7 +610,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                         <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>8–21 DAYS</th>
                         <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'right' }}>22+ DAYS</th>
                         <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'center' }}>INVOICES</th>
-                        <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'center' }}>ACTIONS</th>
+                        <th className="erp-table-heading erp-table-actions" style={{ position: 'sticky', top: 0, zIndex: 10, textAlign: 'center' }}>ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -655,15 +656,13 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                           </td>
 
                           {/* Actions */}
-                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                            <button
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                            <button aria-label="View Customer Statement"
                               type="button"
-                              className="btn btn-glass btn-sm erp-button"
+                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                               onClick={() => setSelectedStatement(c)}
                               title="View Customer Statement"
-                            >
-                              <Eye size={14} /> Statement
-                            </button>
+                            ><Eye size={14} /></button>
                           </td>
                         </tr>
                       ))}
@@ -987,7 +986,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                 Unpaid Invoices Breakdown
               </h4>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-small)' }}>
+                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-small)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
                       <th className="erp-table-heading">Invoice #</th>
@@ -999,7 +998,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                   <tbody>
                     {(selectedStatement.invoices || []).map((inv, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7' }}>{inv.invoiceNo}</td>
+                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7' }}>{inv.invoiceNo}</td>
                         <td className="erp-table-cell" style={{ color: '#64748b' }}>{inv.date}</td>
                         <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
                           LKR {inv.balance.toFixed(2)}
@@ -1008,7 +1007,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </div>
 

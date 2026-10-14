@@ -16,7 +16,7 @@ test('inventory New stock transfer opens GTN creation directly, including repeat
   apis.authApi.getMe=async()=>({data:{id:1,username:'admin',fullName:'Admin',roles:['ROLE_ADMIN'],permissions:[]}});
   const {AuthProvider}=await server.ssrLoadModule('/src/context/AuthContext.jsx');const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');const {default:App}=await server.ssrLoadModule('/src/App.jsx');
   await act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider,null,React.createElement(App)))));
-  const fullscreen=host.querySelector('[aria-label="Enter full screen"]');assert.ok(fullscreen);assert.notEqual(fullscreen.style.position,'fixed','Fullscreen cannot overlap workspace actions');
+  assert.equal(host.querySelector('[aria-label="Enter full screen"]'),null,'Sidebar fullscreen control was removed');
   const button=(scope,text)=>[...scope.querySelectorAll('button')].find(button=>button.textContent.trim()===text);
   const open=async()=>{
    const inventory=host.querySelector('[data-workspace="inventory"]');

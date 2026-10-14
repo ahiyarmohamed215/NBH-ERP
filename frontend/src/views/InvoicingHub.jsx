@@ -1,3 +1,8 @@
+import {canWriteTab,hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
+import {Edit2} from 'lucide-react';
+import StatusBadge from '../components/StatusBadge';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import { invoiceTotal } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo } from 'react';
@@ -57,12 +62,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     { id: 'quotations', label: 'Quotations', icon: FileText },
   ];
 
-  const [currentTab, setCurrentTab] = useState(() => {
-    if (activeSubTab && (INVOICING_TABS.some((t) => t.id === activeSubTab) || activeSubTab === 'pos')) {
-      return activeSubTab;
-    }
-    return 'sales';
-  });
+  const [currentTab, setCurrentTab] = useModuleTab('invoicing',activeSubTab,'sales',user);
 
   useEffect(() => {
     if (activeSubTab) {
@@ -118,6 +118,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   // Load live invoices from backend
   const loadBackendInvoices = async () => {
+    if(!hasPermission(user,'SALES_VIEW')){setInvoices([]);return;}
     try {
       setLoadingInvoices(true);
       const res = await salesApi.search({ size: 100 });
@@ -977,7 +978,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
         {/* Action Button matching current active tab - Matching InventoryHub */}
         {currentTab === 'quotations' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'invoicing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={() => setShowCreateQuotationModal(true)}
             style={{
@@ -991,7 +992,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <Plus size={17} /> New Quotation
           </button>
         ) : (
-          <button className="erp-button"
+          <button disabled={!hasPermission(user,'SALES_CREATE')} className="erp-button"
             type="button"
             onClick={() => handleTabClick('pos')}
             style={{
@@ -1011,7 +1012,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       </div>
 
       {/* Subtabs Bar (Underline Style matching InventoryHub - Fixed / Sticky) */}
-      <div className="erp-tabs"
+      <ErpTabs module="invoicing"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1024,7 +1025,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           const isActive = currentTab === tab.id;
 
           return (
-            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+            <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
@@ -1032,10 +1033,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             >
               <Icon size={16} />
               {tab.label}
-            </button>
+            </ErpTab>
           );
         })}
-      </div>
+      </ErpTabs>
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 3: SALES (Commercial Invoices - Standardized Inventory Structure) */}
@@ -1332,7 +1333,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           </div>
 
           {/* Invoices Table Card (Fixed Frame, Sticky Header matching InventoryHub) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1348,7 +1349,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1361,7 +1362,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     {visibleColumns.paid && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
                     {visibleColumns.balance && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
                     {visibleColumns.delivery && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1379,7 +1380,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     >
                       {/* Invoice # */}
                       {visibleColumns.invoiceNumber && (
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {inv.invoiceNumber}
                         </td>
                       )}
@@ -1436,29 +1437,17 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       {/* Delivery Status */}
                       {visibleColumns.delivery && (
                         <td className="erp-table-cell">
-                          {inv.deliveryStatus === 'DELIVERED' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                              <CheckCircle size={11} /> Delivered
-                            </span>
-                          ) : inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 700, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                              <Truck size={11} /> On Route {inv.deliveryNumber ? `(${inv.deliveryNumber})` : ''}
-                            </span>
-                          ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '9999px', fontSize: 'var(--erp-text-caption)', fontWeight: 600, backgroundColor: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }}>
-                              <Clock size={11} /> Pending Delivery
-                            </span>
-                          )}
+                          <StatusBadge status={inv.deliveryStatus || 'PENDING'} label={inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? `ON ROUTE${inv.deliveryNumber ? ` (${inv.deliveryNumber})` : ''}` : inv.deliveryStatus === 'DELIVERED' ? 'DELIVERED' : 'PENDING DELIVERY'}/>
                         </td>
                       )}
 
                       {/* Actions */}
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'inline-flex', gap: '6px' }}>
                           {canEditSales && (
-                            <button
+                            <button aria-label="Edit Invoice"
                               type="button"
-                              className="btn btn-glass btn-sm erp-button"
+                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingInvoice({ ...inv });
@@ -1466,7 +1455,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                               title="Edit Invoice"
                               style={{ padding: '4px 8px', color: '#0284c7' }}
                             >
-                              <Edit3 size={14} />
+                              <Edit2 size={14} />
                             </button>
                           )}
                         </div>
@@ -1780,7 +1769,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           )}
 
           {/* Table Container (Matching InventoryHub) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1796,7 +1785,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1823,7 +1812,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CASHIER / STAFF</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL AMOUNT</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1867,7 +1856,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           />
                         </td>
                         <td className="erp-table-cell">
-                          <span
+                          <span className="erp-table-code"
                             style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: 'var(--erp-text-button)' }}
                             title="Click to inspect items"
                           >
@@ -1901,28 +1890,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                           Rs. {Number(hb.netTotal || hb.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                          {hb.status === 'SENT_TO_WAREHOUSE' ? (
-                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#e0f2fe', color: '#0369a1', fontWeight: 700 }}>
-                              Sent to WH
-                            </span>
-                          ) : hb.status === 'STOCK_ADJUSTED' ? (
-                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
-                              Stock Adjusted
-                            </span>
-                          ) : hb.status === 'DISPATCHED' ? (
-                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>
-                              Dispatched
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
-                              Held at POS
-                            </span>
-                          )}
+                          <StatusBadge status={hb.status || 'HELD_AT_POS'}/>
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                             {/* 1. Resume in POS (Primary Action) */}
-                            <button className="erp-button erp-button-primary"
+                            <button disabled={!hasPermission(user,'SALES_CREATE')} aria-label="Resume billing in POS" className="erp-button erp-button-primary erp-table-icon-action"
                               type="button"
                               onClick={() => handleResumeHeldBill(hb)}
                               style={{
@@ -1936,12 +1909,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                               title="Resume billing in POS"
-                            >
-                              <PlayCircle size={13} /> Resume
-                            </button>
+                            ><PlayCircle size={13} /></button>
 
                             {/* 2. View details */}
-                            <button className="erp-button"
+                            <button aria-label="View bill items & details" className="erp-button erp-table-icon-action"
                               type="button"
                               onClick={() => setSelectedHeldDetail(hb)}
                               style={{
@@ -1964,13 +1935,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                 e.currentTarget.style.backgroundColor = '#ffffff';
                               }}
                               title="View bill items & details"
-                            >
-                              <Eye size={13} /> View
-                            </button>
+                            ><Eye size={13} /></button>
 
                             {/* Optional Warehouse helper if already in warehouse workflow */}
                             {hb.status === 'SENT_TO_WAREHOUSE' && (
-                              <button className="erp-button"
+                              <button disabled={!hasPermission(user,'INVENTORY_ADJUST')} aria-label="Adjust warehouse stock quantities" className="erp-button erp-table-icon-action"
                                 type="button"
                                 onClick={() => handleOpenStockAdjustment(hb)}
                                 style={{
@@ -1984,12 +1953,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                   cursor: 'pointer',
                                 }}
                                 title="Adjust warehouse stock quantities"
-                              >
-                                <Edit3 size={11} /> Stock
-                              </button>
+                              ><Edit2 size={11} /></button>
                             )}
                             {hb.status === 'STOCK_ADJUSTED' && (
-                              <button className="erp-button"
+                              <button disabled={!hasPermission(user,'SALES_EDIT')} aria-label="Generate Dispatch Note" className="erp-button erp-table-icon-action"
                                 type="button"
                                 onClick={() => handleOpenSingleDispatchModal(hb)}
                                 style={{
@@ -2003,9 +1970,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                   cursor: 'pointer',
                                 }}
                                 title="Generate Dispatch Note"
-                              >
-                                <Truck size={11} /> Dispatch
-                              </button>
+                              ><Truck size={11} /></button>
                             )}
                           </div>
                         </td>
@@ -2185,7 +2150,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           </div>
 
           {/* Table Container */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -2201,7 +2166,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -2211,7 +2176,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VALID UNTIL</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2222,7 +2187,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {qt.quotationNo}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
@@ -2236,14 +2201,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         LKR {Number(qt.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <span className={`badge ${qt.status === 'ACCEPTED' ? 'badge-success' : 'badge-info'}`} style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
-                          {qt.status}
-                        </span>
+                        <StatusBadge status={qt.status} />
                       </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           {qt.status !== 'ACCEPTED' && (
-                            <button className="erp-button"
+                            <button aria-label="Convert to commercial invoice" className="erp-button erp-table-icon-action"
                               type="button"
                               onClick={() => handleConvertQuotationToInvoice(qt)}
                               style={{
@@ -2257,13 +2220,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                 cursor: 'pointer',
                               }}
                               title="Convert to commercial invoice"
-                            >
-                              <CheckCircle size={12} /> Convert
-                            </button>
+                            ><CheckCircle size={12} /></button>
                           )}
-                          <button
+                          <button aria-label="Print quotation"
                             type="button"
-                            className="btn btn-glass btn-sm erp-button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                             onClick={() => {
                               addToast(`Quotation ${qt.quotationNo} printed`, 'info');
                               window.print();
@@ -2466,7 +2427,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </h4>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
+                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                       <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center' }}>#</th>
@@ -2481,7 +2442,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     {selectedInvoiceItems.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td className="erp-table-cell" style={{ textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
-                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                           {item.code || item.productSku || item.sku || '-'}
                         </td>
                         <td className="erp-table-cell" style={{ fontWeight: 600, color: '#1e293b' }}>
@@ -2499,7 +2460,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </div>
 
@@ -2823,7 +2784,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
+              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
                     <th className="erp-table-heading">Code</th>
@@ -2836,7 +2797,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <tbody>
                   {(selectedHeldDetail.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600 }}>
@@ -2854,7 +2815,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
@@ -2941,7 +2902,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
+              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
                     <th className="erp-table-heading">Code</th>
@@ -2955,7 +2916,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <tbody>
                   {(adjustingHeldBill.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600 }}>
@@ -2997,9 +2958,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                         Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
                       </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                         {adjustingHeldBill.items.length > 1 && (
-                          <button
+                          <button data-tone="danger" aria-label="Remove line item" className="erp-table-icon-action"
                             type="button"
                             onClick={() => {
                               const updatedItems = adjustingHeldBill.items.filter((_, i) => i !== idx);
@@ -3021,7 +2982,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
@@ -3116,7 +3077,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               {/* Aggregated Items Table */}
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
+                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
                       <th className="erp-table-heading">Code / SKU</th>
@@ -3129,7 +3090,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <tbody>
                     {(dispatchNoteData.items || []).map((it, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {it.productSku || it.sku || '-'}
                         </td>
                         <td className="erp-table-cell" style={{ fontWeight: 600 }}>
@@ -3147,7 +3108,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
 
               {/* Total & Summary */}

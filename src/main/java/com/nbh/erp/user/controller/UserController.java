@@ -26,7 +26,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('USER')")
     @Operation(summary = "Get paginated list of all users")
     public ResponseEntity<ApiResponse<PagedResponse<UserDto>>> getAllUsers(@PageableDefault(size = 20) Pageable pageable) {
         PagedResponse<UserDto> response = userService.getAllUsers(pageable);
@@ -34,7 +34,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('USER')")
     @Operation(summary = "Get single user by ID")
     public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable Long id) {
         UserDto user = userService.getUserById(id);
@@ -69,7 +69,7 @@ public class UserController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('USER')")
     @Operation(summary = "Get paginated list of pending user approval requests")
     public ResponseEntity<ApiResponse<PagedResponse<UserDto>>> getPendingUsers(@PageableDefault(size = 20) Pageable pageable) {
         PagedResponse<UserDto> response = userService.getPendingUsers(pageable);
@@ -77,7 +77,7 @@ public class UserController {
     }
 
     @GetMapping("/pending/count")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('USER')")
     @Operation(summary = "Get count of pending user approval requests")
     public ResponseEntity<ApiResponse<Long>> getPendingUsersCount() {
         long count = userService.getPendingUsersCount();
@@ -107,21 +107,27 @@ public class UserController {
     }
 
     @GetMapping("/sales-reps")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('CUSTOMER_VIEW') or hasAuthority('USER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STAFF')")
     @Operation(summary = "Get list of active users for sales rep / cashier assignment")
-    public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getSalesReps() {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers()));
+    public ResponseEntity<ApiResponse<java.util.List<com.nbh.erp.user.dto.StaffReferenceDto>>> getSalesReps() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers().stream().map(com.nbh.erp.user.dto.StaffReferenceDto::from).toList()));
     }
 
     @GetMapping("/pos-staff")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('INVENTORY_MANAGE') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STAFF')")
     @Operation(summary = "Get list of active staff members with POS access")
-    public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getPosStaff() {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getPosStaff()));
+    public ResponseEntity<ApiResponse<java.util.List<com.nbh.erp.user.dto.StaffReferenceDto>>> getPosStaff() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getPosStaff().stream().map(com.nbh.erp.user.dto.StaffReferenceDto::from).toList()));
+    }
+
+    @GetMapping("/lookup")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STAFF')")
+    public ResponseEntity<ApiResponse<java.util.List<com.nbh.erp.user.dto.StaffReferenceDto>>> getStaffLookup() {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers().stream().map(com.nbh.erp.user.dto.StaffReferenceDto::from).toList()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('USER_VIEW') or hasAuthority('USER_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('USER')")
     @Operation(summary = "Get list of all active approved users")
     public ResponseEntity<ApiResponse<java.util.List<UserDto>>> getActiveUsers() {
         return ResponseEntity.ok(ApiResponse.ok(userService.getActiveUsers()));

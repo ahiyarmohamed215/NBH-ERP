@@ -93,7 +93,7 @@ public class BrandService {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
-        SecurityUtils.enforceCanEdit("PRODUCT", "Brand: " + brand.getName());
+        SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
 
         brand.setName(request.getName().trim());
         brand.setDescription(request.getDescription());
@@ -112,7 +112,7 @@ public class BrandService {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
 
-        SecurityUtils.enforceCanEdit("PRODUCT", "Brand: " + brand.getName());
+        SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
 
         brand.setIsActive(!brand.getIsActive());
         brandRepository.save(brand);

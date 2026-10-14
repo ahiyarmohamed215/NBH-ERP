@@ -62,7 +62,7 @@ public class ProductDto {
                 .brandName(p.getBrand() != null ? p.getBrand().getName() : null)
                 .brandMarkupPercent(p.getBrand() != null ? p.getBrand().getMarkupPercent() : BigDecimal.ZERO)
                 .supplierId(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getId() : null)
-                .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getName() : null)
+                .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getDisplayName() : null)
                 .warehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)
                 .warehouseName(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getName() : null)
                 .warehouseCode(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getCode() : null)

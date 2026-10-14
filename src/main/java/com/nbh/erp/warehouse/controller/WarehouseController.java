@@ -24,21 +24,21 @@ public class WarehouseController {
     private final WarehouseService warehouseService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('WAREHOUSE')")
     @Operation(summary = "List all warehouses")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getAllWarehouses() {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getAllWarehouses()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('WAREHOUSE')")
     @Operation(summary = "List active warehouses for selection dropdowns")
     public ResponseEntity<ApiResponse<List<WarehouseDto>>> getActiveWarehouses() {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getActiveWarehouses()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('WAREHOUSE')")
     @Operation(summary = "Get warehouse by ID")
     public ResponseEntity<ApiResponse<WarehouseDto>> getWarehouseById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(warehouseService.getWarehouseById(id)));

@@ -17,8 +17,10 @@ public interface SupplierRepository extends JpaRepository<Supplier, Long> {
     Optional<Supplier> findBySupplierCode(String supplierCode);
     boolean existsBySupplierCode(String supplierCode);
     List<Supplier> findByIsActiveTrue();
+    List<Supplier> findByDeletedAtIsNull(org.springframework.data.domain.Sort sort);
+    List<Supplier> findByDeletedAtIsNotNullAndPurgedAtIsNullOrderByDeletedAtDesc();
 
-    @Query("SELECT s FROM Supplier s WHERE LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
-            "OR LOWER(s.supplierCode) LIKE LOWER(CONCAT('%', :query, '%'))")
+    @Query("SELECT s FROM Supplier s WHERE s.deletedAt IS NULL AND (LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+            "OR LOWER(s.supplierCode) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Supplier> searchSuppliers(@Param("query") String query);
 }

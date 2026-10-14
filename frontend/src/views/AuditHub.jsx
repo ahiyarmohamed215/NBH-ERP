@@ -736,7 +736,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
       </div>
 
       {/* AUDIT LOG TABLE / LEDGER WORKSPACE */}
-      <div
+      <div className="erp-table-frame"
         style={{
           flex: 1,
           minHeight: 0,
@@ -785,7 +785,7 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
         </div>
 
         {/* Table Content */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div className="erp-table-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {loading ? (
             <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
               <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px auto', display: 'block', color: '#0284c7' }} />
@@ -928,8 +928,8 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
                       </td>
 
                       {/* View Action */}
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <button
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                        <button aria-label="View complete audit record details" className="erp-table-icon-action"
                           type="button"
                           onClick={() => setViewingLog(log)}
                           title="View complete audit record details"

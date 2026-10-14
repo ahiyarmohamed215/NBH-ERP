@@ -113,125 +113,22 @@ export function TableRowActions({
   editTitle = 'Edit Record',
   extraActions = null,
 }) {
-  const baseButtonStyle = {
-    width: '30px',
-    height: '30px',
-    minWidth: '30px',
-    background: '#ffffff',
-    border: '1px solid #e2e8f0',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    color: '#334155',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.15s ease',
-    padding: 0,
-    outline: 'none',
-  };
-
-  return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-      {extraActions}
-
-      {onPrint && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrint();
-          }}
-          style={baseButtonStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f1f5f9';
-            e.currentTarget.style.color = '#0f172a';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.color = '#334155';
-          }}
-          title={printTitle}
-        >
-          <Printer size={13} />
-        </button>
-      )}
-
-      {onView && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView();
-          }}
-          style={{
-            ...baseButtonStyle,
-            borderColor: '#e2e8f0',
-            color: '#0284c7',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f0f9ff';
-            e.currentTarget.style.borderColor = '#bae6fd';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.borderColor = '#e2e8f0';
-          }}
-          title={viewTitle}
-        >
-          <Eye size={13} />
-        </button>
-      )}
-
-      {onHistory && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onHistory();
-          }}
-          style={{
-            ...baseButtonStyle,
-            border: '1px solid #bae6fd',
-            color: '#0284c7',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f0f9ff';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-          }}
-          title={historyTitle}
-        >
-          <History size={13} />
-        </button>
-      )}
-
-      {onEdit && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          style={{
-            ...baseButtonStyle,
-            color: '#475569',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f1f5f9';
-            e.currentTarget.style.color = '#0f172a';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-            e.currentTarget.style.color = '#475569';
-          }}
-          title={editTitle}
-        >
-          <Edit2 size={13} />
-        </button>
-      )}
-    </div>
-  );
+  const actions = [
+    [onPrint, printTitle, Printer],
+    [onView, viewTitle, Eye],
+    [onDownloadPdf, pdfTitle, Download],
+    [onHistory, historyTitle, History],
+    [onEdit, editTitle, Edit2],
+  ];
+  return <div className="erp-row-actions" onClick={event=>event.stopPropagation()}>
+    {extraActions}
+    {actions.filter(([handler])=>handler).map(([handler,title,Icon])=>(
+      <button key={title} type="button" className="erp-table-icon-action"
+        title={title} aria-label={title} onClick={event=>{event.stopPropagation();handler();}}>
+        <Icon size={13}/>
+      </button>
+    ))}
+  </div>;
 }
 
 export default ToolbarActions;

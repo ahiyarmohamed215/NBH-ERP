@@ -1927,7 +1927,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           </div>
 
           {/* Sales Items Table Styled Exactly Like Customer Table */}
-          <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+          <div className="erp-table-scroll erp-table-frame" style={{ width: '100%', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#ffffff' }}>
             <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1982,7 +1982,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         </span>
                       </td>
 
-                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#2563eb' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 600, color: '#2563eb' }}>
                         {item.sku}
                       </td>
 
@@ -2015,9 +2015,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
                       <td className="erp-table-cell">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                          <button
+                          <button aria-label="Minus" title="Minus"
                             type="button"
-                            className="btn btn-glass btn-sm erp-button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                             style={{ padding: '2px 5px', height: '24px', width: '24px' }}
                             onClick={() => updateTableItemQty(item.id, -1)}
                           >
@@ -2030,9 +2030,9 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                             value={item.quantity}
                             onChange={(e) => setTableItemQtyDirect(item.id, e.target.value)}
                           />
-                          <button
+                          <button aria-label="Plus" title="Plus"
                             type="button"
-                            className="btn btn-glass btn-sm erp-button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                             style={{ padding: '2px 5px', height: '24px', width: '24px' }}
                             onClick={() => updateTableItemQty(item.id, 1)}
                           >
@@ -2056,8 +2056,8 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         Rs. {item.total.toFixed(2)}
                       </td>
 
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <button
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                        <button aria-label="Remove item" className="erp-table-icon-action" data-tone="danger"
                           type="button"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                           onClick={() => removeFromCart(item.id)}
@@ -2246,7 +2246,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 </span>
               </div>
 
-              <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <div className="erp-table-scroll erp-table-frame" style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                 {myInvoices.length === 0 ? (
                   <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
                     No completed bills recorded in this session yet.
@@ -2260,13 +2260,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         <th className="erp-table-heading">Date</th>
                         <th className="erp-table-heading" style={{ textAlign: 'center' }}>Items</th>
                         <th className="erp-table-heading" style={{ textAlign: 'right' }}>Amount</th>
-                        <th className="erp-table-heading" style={{ textAlign: 'center' }}>Action</th>
+                        <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {myInvoices.map((inv) => (
                         <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
+                          <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
                             {inv.invoiceNumber}
                           </td>
                           <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
@@ -2281,15 +2281,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                             Rs. {Number(inv.netTotal || 0).toFixed(2)}
                           </td>
-                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                            <button
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                            <button aria-label="View" title="View"
                               type="button"
-                              className="btn btn-glass btn-sm erp-button"
+                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                               onClick={() => setSelectedInvoiceDetail(inv)}
                               style={{ padding: '3px 8px', gap: '4px' }}
-                            >
-                              <Eye size={12} /> View
-                            </button>
+                            ><Eye size={12} /></button>
                           </td>
                         </tr>
                       ))}
@@ -2463,14 +2461,14 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
             {/* Staff Overview Table */}
             <div style={{ marginBottom: '18px', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
+              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                     <th className="erp-table-heading">Staff Name</th>
                     <th className="erp-table-heading">Username</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center' }}>Completed Bills</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total Amount</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Action</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2506,26 +2504,24 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                         <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
                           Rs. {Number(c.totalSalesAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                          <button
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                          <button aria-label="View Bills" title="View Bills"
                             type="button"
-                            className={(`btn ${selectedStaffForBills === c.username ? 'btn-primary' : 'btn-glass'} btn-sm`) + ' erp-button'}
+                            className={((`btn ${selectedStaffForBills === c.username ? 'btn-primary' : 'btn-glass'} btn-sm`) + ' erp-button') + ' erp-table-icon-action'}
                             onClick={() => setSelectedStaffForBills(c.username)}
                             style={{ padding: '4px 10px', gap: '4px' }}
-                          >
-                            <FileText size={12} /> View Bills
-                          </button>
+                          ><FileText size={12} /></button>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             {/* Selected Staff's Detailed Bills */}
             {selectedStaffForBills && (
-              <div style={{ border: '2px solid #3b82f6', borderRadius: '10px', padding: '16px', background: '#f8fafc' }}>
+              <div className="erp-table-frame" style={{ border: '2px solid #3b82f6', borderRadius: '10px', padding: '16px', background: '#f8fafc' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
                     Bills created by <strong>{selectedStaffForBills}</strong>
@@ -2539,7 +2535,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                   </button>
                 </div>
 
-                <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                <div className="erp-table-scroll" style={{ maxHeight: '240px', overflowY: 'auto' }}>
                   {allInvoices.filter((inv) => inv.createdBy === selectedStaffForBills).length === 0 ? (
                     <div style={{ padding: '18px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
                       No bills recorded for this staff member in this period.
@@ -2561,7 +2557,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                           .filter((inv) => inv.createdBy === selectedStaffForBills)
                           .map((inv) => (
                             <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
+                              <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
                                 {inv.invoiceNumber}
                               </td>
                               <td className="erp-table-cell" style={{ fontWeight: 600 }}>
@@ -2576,15 +2572,13 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                               <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
                                 Rs. {Number(inv.netTotal || 0).toFixed(2)}
                               </td>
-                              <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                <button
+                              <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                <button aria-label="Inspect" title="Inspect"
                                   type="button"
-                                  className="btn btn-glass btn-sm erp-button"
+                                  className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                                   onClick={() => setSelectedInvoiceDetail(inv)}
                                   style={{ padding: '2px 8px', gap: '3px' }}
-                                >
-                                  <Eye size={12} /> Inspect
-                                </button>
+                                ><Eye size={12} /></button>
                               </td>
                             </tr>
                           ))}
@@ -2636,7 +2630,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
             </div>
 
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
-              <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
+              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                     <th className="erp-table-heading">Code</th>
@@ -2649,7 +2643,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                 <tbody>
                   {(selectedInvoiceDetail.items || []).map((it, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#2563eb' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
                         {it.productSku || it.sku || '-'}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600 }}>
@@ -2667,7 +2661,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px' }}>

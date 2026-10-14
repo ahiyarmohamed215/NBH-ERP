@@ -21,7 +21,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('REPORT_VIEW') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DASHBOARD')")
     @Operation(summary = "Get executive dashboard metrics, stock valuations, and recent transactions")
     public ResponseEntity<ApiResponse<DashboardDto>> getDashboardSummary() {
         return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDashboardSummary()));

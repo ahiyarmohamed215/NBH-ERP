@@ -1,3 +1,8 @@
+import {hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
+import { Trash2 } from 'lucide-react';
+import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   customerApi,
@@ -65,12 +70,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const canEditCustomer = canEditModule(user, 'CUSTOMER');
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState(() => {
-    if (activeSubTab === 'groups' || activeSubTab === 'routes') return 'groups';
-    if (activeSubTab === 'history') return 'history';
-    if (activeSubTab === 'targets' || activeSubTab === 'ranges') return 'targets';
-    return 'list';
-  });
+  const [activeTab, setActiveTab] = useModuleTab('customers',activeSubTab === 'routes' ? 'groups' : activeSubTab === 'ranges' ? 'targets' : activeSubTab,'list',user);
 
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -230,7 +230,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       const [cRes, sRes, uRes, rRes] = await Promise.allSettled([
         customerApi.getAll(),
         salesmanApi.getAll(),
-        userApi.getAll({ page: 0, size: 200 }),
+        userApi.getStaffLookup(),
         customerGroupApi.getAll(true),
       ]);
 
@@ -1280,7 +1280,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         </div>
 
         {activeTab !== 'history' && (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!hasPermission(user,'CUSTOMER_MANAGE')} className="erp-button erp-button-primary"
             type="button"
             onClick={handleOpenAddCustomer}
             style={{
@@ -1297,7 +1297,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <div className="erp-tabs"
+      <ErpTabs module="customers"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1305,38 +1305,38 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           flexShrink: 0,
         }}
       >
-        <button data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'} className="erp-tab"
+        <ErpTab tabId="list" data-active={activeTab === 'list'} aria-pressed={activeTab === 'list'}
           type="button"
           onClick={() => handleTabChange('list')}
 
         >
           <ListFilter size={16} /> Customer List
-        </button>
+        </ErpTab>
 
-        <button data-active={activeTab === 'groups'} aria-pressed={activeTab === 'groups'} className="erp-tab"
+        <ErpTab tabId="groups" data-active={activeTab === 'groups'} aria-pressed={activeTab === 'groups'}
           type="button"
           onClick={() => handleTabChange('groups')}
 
         >
           <Users size={16} /> Customer Groups
-        </button>
+        </ErpTab>
 
-        <button data-active={activeTab === 'history'} aria-pressed={activeTab === 'history'} className="erp-tab"
+        <ErpTab tabId="history" data-active={activeTab === 'history'} aria-pressed={activeTab === 'history'}
           type="button"
           onClick={() => handleTabChange('history')}
 
         >
           <History size={16} /> Customer History
-        </button>
+        </ErpTab>
 
-        <button data-active={activeTab === 'targets'} aria-pressed={activeTab === 'targets'} className="erp-tab"
+        <ErpTab tabId="targets" data-active={activeTab === 'targets'} aria-pressed={activeTab === 'targets'}
           type="button"
           onClick={() => handleTabChange('targets')}
 
         >
           <Target size={16} /> Range & Targets
-        </button>
-      </div>
+        </ErpTab>
+      </ErpTabs>
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 1: Customer List View                                    */}
@@ -1619,7 +1619,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           </div>
 
           {/* Customers Table (Fixed Table Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1635,7 +1635,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               flexDirection: 'column',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1661,7 +1661,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -1782,44 +1782,16 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
 
                           <td className="erp-table-cell">
-                            <button
-                              type="button"
-                              onClick={(e) => {
+                            <StatusBadge status={active ? 'Active' : 'Inactive'} onClick={(e) => {
                                 e.stopPropagation();
                                 setConfirmStatusModal({ isOpen: true, customer: c });
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                fontSize: 'var(--erp-text-small)',
-                                fontWeight: 500,
-                                color: active ? '#16a34a' : '#dc2626',
-                                whiteSpace: 'nowrap',
-                              }}
-                              title={`Status: ${active ? 'Active' : 'Inactive'} (Click to change status)`}
-                            >
-                              <span
-                                style={{
-                                  width: '7px',
-                                  height: '7px',
-                                  borderRadius: '50%',
-                                  backgroundColor: active ? '#16a34a' : '#dc2626',
-                                  display: 'inline-block',
-                                }}
-                              />
-                              {active ? 'Active' : 'Inactive'}
-                            </button>
+                              }} title={`Status: ${active ? 'Active' : 'Inactive'} (Click to change status)`}/>
                           </td>
 
-                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                               {/* Print Customer Profile A4 */}
-                              <button
+                              <button aria-label="Print Customer Statement (A4)" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1852,7 +1824,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               </button>
 
                               {/* History */}
-                              <button
+                              <button aria-label="View Customer History & Ledger" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1879,7 +1851,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               </button>
 
                               {/* Edit */}
-                              <button
+                              <button aria-label="Edit Customer" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2704,7 +2676,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </div>
 
                     {/* Table of Assigned Customers */}
-                    <div
+                    <div className="erp-table-frame"
                       style={{
                         border: '1px solid #e2e8f0',
                         borderRadius: '8px',
@@ -2716,7 +2688,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         flexDirection: 'column',
                       }}
                     >
-                      <div style={{ flex: 1, overflowY: 'auto' }}>
+                      <div className="erp-table-scroll" style={{ flex: 1, overflowY: 'auto' }}>
                         <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                           <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
@@ -2782,18 +2754,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                                   </td>
                                   <td className="erp-table-cell">
-                                    <span
-                                      style={{
-                                        fontSize: 'var(--erp-text-caption)',
-                                        fontWeight: 600,
-                                        padding: '2px 7px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
-                                        color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
-                                      }}
-                                    >
-                                      {isCustomerActive(c) ? 'Active' : 'Inactive'}
-                                    </span>
+                                    <StatusBadge status={isCustomerActive(c) ? 'Active' : 'Inactive'} />
                                   </td>
                                 </tr>
                               ))
@@ -3471,7 +3432,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     </div>
 
                     {/* Assigned Customers Table with Remove button */}
-                    <div
+                    <div className="erp-table-frame"
                       style={{
                         border: '1px solid #e2e8f0',
                         borderRadius: '8px',
@@ -3483,14 +3444,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         flexDirection: 'column',
                       }}
                     >
-                      <div style={{ flex: 1, overflowY: 'auto' }}>
+                      <div className="erp-table-scroll" style={{ flex: 1, overflowY: 'auto' }}>
                         <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                           <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                             <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
                               <th className="erp-table-heading">Customer</th>
                               <th className="erp-table-heading">Contact / Phone</th>
                               <th className="erp-table-heading">Status</th>
-                              <th className="erp-table-heading" style={{ textAlign: 'right' }}>Action</th>
+                              <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right' }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3550,21 +3511,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                                   </td>
                                   <td className="erp-table-cell">
-                                    <span
-                                      style={{
-                                        fontSize: 'var(--erp-text-caption)',
-                                        fontWeight: 600,
-                                        padding: '2px 7px',
-                                        borderRadius: '9999px',
-                                        backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
-                                        color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
-                                      }}
-                                    >
-                                      {isCustomerActive(c) ? 'Active' : 'Inactive'}
-                                    </span>
+                                    <StatusBadge status={isCustomerActive(c) ? 'Active' : 'Inactive'} />
                                   </td>
-                                  <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                                    <button className="erp-button"
+                                  <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
+                                    <button data-tone="danger" aria-label="Remove customer from group" className="erp-button erp-table-icon-action"
                                       type="button"
                                       onClick={() => {
                                         setRouteEditForm({
@@ -3580,9 +3530,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         padding: '3px 6px',
                                       }}
                                       title="Remove customer from group"
-                                    >
-                                      Remove
-                                    </button>
+                                    ><Trash2 size={13}/></button>
                                   </td>
                                 </tr>
                               ))
@@ -4467,7 +4415,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
                       {/* Invoices Table */}
-                      <div
+                      <div className="erp-table-frame"
                         style={{
                           backgroundColor: '#ffffff',
                           border: '1px solid #e2e8f0',
@@ -4481,7 +4429,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           minHeight: 0,
                         }}
                       >
-                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                        <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -4492,7 +4440,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>PAID AMOUNT</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>BALANCE</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'center' }}>TAGS</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4519,7 +4467,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
                                       <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
@@ -4555,8 +4503,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {isPaid ? 'paid' : isPartial ? 'partial' : 'unpaid'}
                                         </span>
                                       </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <button
+                                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                        <button aria-label="Print invoice" className="erp-table-icon-action"
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Invoice', inv); }}
                                           style={{
@@ -4589,8 +4537,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* TAB 2: ADVANCE PAYMENTS TABLE */}
                   {historyTableTab === 'advances' && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                      <div className="erp-table-frame" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -4600,7 +4548,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>DEPOSIT AMOUNT</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>AVAILABLE BALANCE</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4625,7 +4573,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {adv.voucherNo || adv.id}
                                       </td>
                                       <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
@@ -4641,23 +4589,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         LKR {Number(adv.balance || 0).toFixed(2)}
                                       </td>
                                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <span
-                                          style={{
-                                            fontSize: 'var(--erp-text-caption)',
-                                            fontWeight: 600,
-                                            padding: '2px 8px',
-                                            borderRadius: '9999px',
-                                            backgroundColor: isActive ? '#dcfce7' : '#f1f5f9',
-                                            color: isActive ? '#15803d' : '#64748b',
-                                            border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                            textTransform: 'lowercase',
-                                          }}
-                                        >
-                                          {adv.status ? adv.status.toLowerCase() : 'active'}
-                                        </span>
+                                        <StatusBadge status={adv.status || 'ACTIVE'}/>
                                       </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <button
+                                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                        <button aria-label="Print advance voucher" className="erp-table-icon-action"
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Advance Payment', adv); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -4680,8 +4615,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* TAB 3: PAYMENTS TABLE */}
                   {historyTableTab === 'payments' && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                      <div className="erp-table-frame" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -4691,7 +4626,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <th className="erp-table-heading">PAYMENT METHOD</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>AMOUNT PAID</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4714,13 +4649,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                   >
-                                    <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                    <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                       {pmt.receiptNo || pmt.id}
                                     </td>
                                     <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
                                       {pmt.displayDate || pmt.paymentDate}
                                     </td>
-                                    <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
+                                    <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', color: '#475569' }}>
                                       {pmt.invoiceNo || '—'}
                                     </td>
                                     <td className="erp-table-cell" style={{ color: '#475569' }}>
@@ -4730,23 +4665,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       LKR {Number(pmt.amount || 0).toFixed(2)}
                                     </td>
                                     <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                      <span
-                                        style={{
-                                          fontSize: 'var(--erp-text-caption)',
-                                          fontWeight: 600,
-                                          padding: '2px 8px',
-                                          borderRadius: '9999px',
-                                          backgroundColor: '#dcfce7',
-                                          color: '#15803d',
-                                          border: '1px solid #bbf7d0',
-                                          textTransform: 'lowercase',
-                                        }}
-                                      >
-                                        {pmt.status ? pmt.status.toLowerCase() : 'cleared'}
-                                      </span>
+                                      <StatusBadge status={pmt.status || 'CLEARED'}/>
                                     </td>
-                                    <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                      <button
+                                    <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                      <button aria-label="Print receipt" className="erp-table-icon-action"
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); printHistoryDocument('Payment Receipt', pmt); }}
                                         style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -4768,8 +4690,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* TAB 4: CHEQUES TABLE */}
                   {historyTableTab === 'cheques' && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                      <div className="erp-table-frame" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -4779,7 +4701,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <th className="erp-table-heading">INVOICE / REF #</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>AMOUNT</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4807,7 +4729,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {chq.chequeNo || chq.referenceNumber || chq.paymentNumber || chq.id}
                                       </td>
                                       <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
@@ -4816,30 +4738,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       <td className="erp-table-cell" style={{ color: '#0f172a', fontWeight: 500 }}>
                                         {chq.bankName || '—'}
                                       </td>
-                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
+                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', color: '#475569' }}>
                                         {chq.invoiceNo || '—'}
                                       </td>
                                       <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
                                         LKR {Number(chq.amount || 0).toFixed(2)}
                                       </td>
                                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <span
-                                          style={{
-                                            fontSize: 'var(--erp-text-caption)',
-                                            fontWeight: 600,
-                                            padding: '2px 8px',
-                                            borderRadius: '9999px',
-                                            backgroundColor: isCleared ? '#dcfce7' : isPending ? '#fef3c7' : isBounced ? '#fee2e2' : '#e0f2fe',
-                                            color: isCleared ? '#15803d' : isPending ? '#b45309' : isBounced ? '#b91c1c' : '#0284c7',
-                                            border: isCleared ? '1px solid #bbf7d0' : isPending ? '1px solid #fde68a' : isBounced ? '1px solid #fecaca' : '1px solid #bae6fd',
-                                            textTransform: 'lowercase',
-                                          }}
-                                        >
-                                          {chq.status ? chq.status.toLowerCase() : 'pending'}
-                                        </span>
+                                        <StatusBadge status={chq.status || 'PENDING'}/>
                                       </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <button
+                                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                        <button aria-label="Print cheque" className="erp-table-icon-action"
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Cheque', chq); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -4862,8 +4771,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {/* TAB 5: OUTSTANDING PAYMENTS TABLE */}
                   {historyTableTab === 'outstanding' && (
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                      <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+                      <div className="erp-table-frame" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
                           <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                               <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -4874,7 +4783,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>PAID AMOUNT</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'right' }}>OUTSTANDING BALANCE</th>
                                 <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>ACTIONS</th>
+                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4899,7 +4808,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                                     >
-                                      <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
+                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
                                         {inv.invoiceNumber || inv.id}
                                       </td>
                                       <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
@@ -4935,8 +4844,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           {Number(inv.paidAmount || 0) > 0 ? 'partial' : 'unpaid'}
                                         </span>
                                       </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <button
+                                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                                        <button aria-label="Print outstanding invoice" className="erp-table-icon-action"
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); printHistoryDocument('Outstanding Invoice', inv); }}
                                           style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -4970,7 +4879,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           customers={customers}
           salesmen={salesmen}
           routes={routes}
-          canEdit={canEditCustomer}
+          canEdit={canEditModule(user,'CUSTOMER_TARGET')}
           addToast={addToast}
         />
       )}
@@ -5303,7 +5212,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* ------------------------------------------------------------- */}
       {previewModalDoc && (
         <div className="modal-backdrop" style={{ zIndex: 1200 }} onClick={() => setPreviewModalDoc(null)}>
-          <div role="dialog" aria-modal="true" aria-label={`${previewModalDoc.docType} details`} onClick={(e) => e.stopPropagation()}
+          <div className="erp-table-scroll erp-table-frame" role="dialog" aria-modal="true" aria-label={`${previewModalDoc.docType} details`} onClick={(e) => e.stopPropagation()}
             style={{ background: '#fff', borderRadius: '12px', padding: '24px', width: 'min(850px, 94vw)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div><h3>{previewModalDoc.docType} Details</h3><p>Ref: {historyDocumentReference(previewModalDoc.data)}</p></div>

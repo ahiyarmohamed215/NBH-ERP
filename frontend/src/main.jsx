@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import './style.css';
 import './components/ErpDesignSystem.css';
+import './components/ErpTables.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

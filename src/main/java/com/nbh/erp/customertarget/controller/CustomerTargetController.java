@@ -25,7 +25,7 @@ public class CustomerTargetController {
     private final CustomerTargetService targetService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW') or hasAuthority('CUSTOMER_TARGET_VIEW') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     @Operation(summary = "List all customer range targets")
     public ResponseEntity<ApiResponse<List<CustomerTargetDto>>> getAllTargets(
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly
@@ -34,14 +34,14 @@ public class CustomerTargetController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW') or hasAuthority('CUSTOMER_TARGET_VIEW') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     @Operation(summary = "Get target by ID with real-time tier metrics")
     public ResponseEntity<ApiResponse<CustomerTargetDto>> getTargetById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(targetService.getTargetById(id)));
     }
 
     @GetMapping("/customer/{customerId}/progress")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW') or hasAuthority('CUSTOMER_TARGET_VIEW') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
     @Operation(summary = "Get active target progress and unlocked discount ranges for POS checkout & customer summary")
     public ResponseEntity<ApiResponse<List<CustomerTargetProgressDto>>> getCustomerTargetProgress(
             @PathVariable Long customerId

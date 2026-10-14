@@ -25,28 +25,28 @@ public class BrandController {
     private final BrandService brandService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_VIEW') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('BRAND')")
     @Operation(summary = "List all brands")
     public ResponseEntity<ApiResponse<List<BrandDto>>> getAllBrands() {
         return ResponseEntity.ok(ApiResponse.ok(brandService.getAllBrands()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_VIEW') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('BRAND')")
     @Operation(summary = "List active brands for selection dropdowns")
     public ResponseEntity<ApiResponse<List<BrandDto>>> getActiveBrands() {
         return ResponseEntity.ok(ApiResponse.ok(brandService.getActiveBrands()));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_VIEW') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('BRAND')")
     @Operation(summary = "Search brands by name or code")
     public ResponseEntity<ApiResponse<List<BrandDto>>> searchBrands(@RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(ApiResponse.ok(brandService.searchBrands(query)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_VIEW') or hasAuthority('PRODUCT_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('BRAND')")
     @Operation(summary = "Get brand by ID")
     public ResponseEntity<ApiResponse<BrandDto>> getBrandById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(brandService.getBrandById(id)));

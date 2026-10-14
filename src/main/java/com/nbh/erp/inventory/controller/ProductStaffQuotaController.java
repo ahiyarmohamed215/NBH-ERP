@@ -28,7 +28,7 @@ public class ProductStaffQuotaController {
     private final ProductStaffQuotaService quotaService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
     @Operation(summary = "Search product staff quotas with filters")
     public ResponseEntity<ApiResponse<PagedResponse<ProductStaffQuotaDto>>> searchQuotas(
             @RequestParam(required = false) Long productId,
@@ -43,14 +43,14 @@ public class ProductStaffQuotaController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
     @Operation(summary = "Get high-level quota metrics and allocation overview")
     public ResponseEntity<ApiResponse<QuotaSummaryDto>> getSummaryMetrics() {
         return ResponseEntity.ok(ApiResponse.ok(quotaService.getSummaryMetrics()));
     }
 
     @GetMapping("/check")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
     @Operation(summary = "Check remaining quota limit for staff member and product before billing")
     public ResponseEntity<ApiResponse<QuotaCheckResultDto>> checkStaffQuota(
             @RequestParam Long productId,
@@ -63,7 +63,7 @@ public class ProductStaffQuotaController {
     }
 
     @GetMapping("/product-stock/{productId}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW') or hasAuthority('INVENTORY_MANAGE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
     @Operation(summary = "Get available inventory stock for a product before allocation")
     public ResponseEntity<ApiResponse<ProductStockAvailabilityDto>> getProductStockAvailability(
             @PathVariable Long productId,
@@ -74,7 +74,7 @@ public class ProductStaffQuotaController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
     @Operation(summary = "Get a specific quota allocation by ID")
     public ResponseEntity<ApiResponse<ProductStaffQuotaDto>> getQuotaById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(quotaService.getQuotaById(id)));

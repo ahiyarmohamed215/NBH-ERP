@@ -38,6 +38,18 @@ public class Supplier extends BaseEntity {
     @Column(name = "supplier_status", length = 20)
     private String status;
 
+    private java.time.LocalDateTime deletedAt;
+    private java.time.LocalDateTime purgedAt;
+    @Column(length = 20)
+    private String statusBeforeDelete;
+
+    public boolean isDeleted() { return deletedAt != null; }
+
+    public String getDisplayName() {
+        String label = name != null ? name : supplierCode;
+        return isDeleted() ? label + " (deleted from the system)" : name;
+    }
+
     public String getStatus() { return status != null ? status : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE"; }
 
     @Column(name = "is_active", nullable = false)

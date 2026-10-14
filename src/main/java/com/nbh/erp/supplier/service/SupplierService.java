@@ -43,7 +43,7 @@ public class SupplierService {
 
     @Transactional(readOnly = true)
     public List<SupplierDto> getAllSuppliers() {
-        return supplierRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"createdAt","id")).stream()
+        return supplierRepository.findByDeletedAtIsNull(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"createdAt","id")).stream()
                 .map(SupplierDto::from)
                 .collect(Collectors.toList());
     }
@@ -51,6 +51,7 @@ public class SupplierService {
     @Transactional(readOnly = true)
     public List<SupplierDto> getActiveSuppliers() {
         return supplierRepository.findByIsActiveTrue().stream()
+                .filter(s -> !s.isDeleted())
                 .map(SupplierDto::from)
                 .collect(Collectors.toList());
     }
@@ -69,6 +70,7 @@ public class SupplierService {
     public SupplierDto getSupplierById(Long id) {
         Supplier supplier = supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+        if (supplier.getPurgedAt() != null) throw new ResourceNotFoundException("Supplier", "id", id);
         return SupplierDto.from(supplier);
     }
 
@@ -107,6 +109,7 @@ public class SupplierService {
                 .orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
 
         SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + supplier.getName());
+        ensureNotDeleted(supplier);
 
         if(request.getStatus()!=null && !request.getStatus().equals(supplier.getStatus()))throw new BusinessException("Change supplier status from the view popup with a reason");
         validateInput(request,supplier.getStatus());
@@ -136,6 +139,7 @@ public class SupplierService {
         if(!java.util.Set.of("DRAFT","ACTIVE","INACTIVE").contains(target))throw new BusinessException("Invalid supplier status");
         Supplier supplier=supplierRepository.findByIdForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Supplier","id",id));
         SecurityUtils.enforceCanEdit("SUPPLIER","Supplier: "+supplier.getSupplierCode());
+        ensureNotDeleted(supplier);
         String previous=supplier.getStatus();
         var input=new CreateSupplierRequest();input.setName(supplier.getName());input.setContactPerson(supplier.getContactPerson());input.setPhone(supplier.getPhone());input.setEmail(supplier.getEmail());input.setAddress(supplier.getAddress());
         if(!"INACTIVE".equals(target))validateInput(input,target);
@@ -147,6 +151,54 @@ public class SupplierService {
 
     @Transactional
     public void deleteSupplier(Long id) {
-        SecurityUtils.enforceNoDelete("Supplier", id);
+        Supplier supplier = locked(id);
+        ensureNotDeleted(supplier);
+        supplier.setStatusBeforeDelete(supplier.getStatus());
+        supplier.setDeletedAt(java.time.LocalDateTime.now());
+        supplier.setIsActive(false);
+        supplierRepository.save(supplier);
+        auditLogService.log("SUPPLIER_DELETE", "PURCHASING", "Supplier", supplier.getSupplierCode(), "Moved supplier to recycle bin");
+    }
+
+    @Transactional(readOnly = true)
+    public List<SupplierDto> getRecycleBin() {
+        return supplierRepository.findByDeletedAtIsNotNullAndPurgedAtIsNullOrderByDeletedAtDesc().stream().map(SupplierDto::from).toList();
+    }
+
+    private Supplier locked(Long id) {
+        SecurityUtils.enforceCanEdit("SUPPLIER", "Supplier: " + id);
+        return supplierRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Supplier", "id", id));
+    }
+
+    private void ensureNotDeleted(Supplier supplier) {
+        if (supplier.isDeleted()) throw new BusinessException("Restore this supplier from the recycle bin before changing it");
+    }
+
+    @Transactional
+    public SupplierDto restoreSupplier(Long id) {
+        Supplier supplier = locked(id);
+        if (!supplier.isDeleted() || supplier.getPurgedAt() != null) throw new BusinessException("Only suppliers in the recycle bin can be restored");
+        String previous = supplier.getStatusBeforeDelete() != null ? supplier.getStatusBeforeDelete() : "INACTIVE";
+        supplier.setDeletedAt(null);
+        supplier.setStatus(previous);
+        supplier.setIsActive("ACTIVE".equals(previous));
+        supplier.setStatusBeforeDelete(null);
+        auditLogService.log("SUPPLIER_RESTORE", "PURCHASING", "Supplier", supplier.getSupplierCode(), "Restored supplier from recycle bin");
+        return SupplierDto.from(supplierRepository.save(supplier));
+    }
+
+    @Transactional
+    public void permanentlyDeleteSupplier(Long id) {
+        Supplier supplier = locked(id);
+        if (!supplier.isDeleted() || supplier.getPurgedAt() != null) throw new BusinessException("Only suppliers in the recycle bin can be permanently deleted");
+        // Keep only the historical identity so every existing foreign key and transaction remains valid.
+        supplier.setPurgedAt(java.time.LocalDateTime.now());
+        supplier.setStatusBeforeDelete(null);
+        supplier.setContactPerson(null);
+        supplier.setPhone(null);
+        supplier.setEmail(null);
+        supplier.setAddress(null);
+        supplierRepository.save(supplier);
+        auditLogService.log("SUPPLIER_PURGE", "PURCHASING", "Supplier", supplier.getSupplierCode(), "Permanently removed supplier; historical identity retained for linked records");
     }
 }

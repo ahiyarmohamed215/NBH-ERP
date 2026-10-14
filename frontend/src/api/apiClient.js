@@ -19,8 +19,11 @@ const api = axios.create({
 // Deduplication & In-Memory TTL Cache for GET requests
 const inFlightRequests = new Map();
 const apiCache = new Map();
+let cacheGeneration=0;
 
 export const clearApiCache = (pattern) => {
+  cacheGeneration++;
+  inFlightRequests.clear();
   if (!pattern) {
     apiCache.clear();
     return;
@@ -54,8 +57,10 @@ api.request = function (configOrUrl, maybeConfig) {
 
   // Deduplicate and cache safe GET requests
   if (method === 'get' && !config.skipDedupe) {
+    const generation=cacheGeneration;
     const serializedParams = config.params ? JSON.stringify(config.params) : '';
-    const dedupeKey = `GET:${config.url || ''}:${serializedParams}`;
+    const sessionKey = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_token') || '' : '';
+    const dedupeKey = `GET:${sessionKey}:${config.url || ''}:${serializedParams}`;
 
     // 1. Check TTL cache if not bypassed
     if (!config.skipCache && apiCache.has(dedupeKey)) {
@@ -74,13 +79,13 @@ api.request = function (configOrUrl, maybeConfig) {
     const requestPromise = originalRequest(config)
       .then((data) => {
         const ttl = config.cacheTtl !== undefined ? config.cacheTtl : getDefaultTtlForUrl(config.url);
-        if (ttl > 0 && !config.skipCache && data) {
+        if (ttl > 0 && !config.skipCache && data && generation===cacheGeneration) {
           apiCache.set(dedupeKey, { data, expiresAt: Date.now() + ttl });
         }
         return data;
       })
       .finally(() => {
-        inFlightRequests.delete(dedupeKey);
+        if(inFlightRequests.get(dedupeKey)===requestPromise)inFlightRequests.delete(dedupeKey);
       });
 
     inFlightRequests.set(dedupeKey, requestPromise);
@@ -265,12 +270,13 @@ export const downloadAuthenticated = async (url, filename) => {
 export const authApi = {
   login: (username, password) => api.post('/auth/login', { username, password }),
   signup: (data) => api.post('/auth/signup', data),
-  getMe: () => api.get('/auth/me'),
+  getMe: () => api.get('/auth/me', {skipCache:true,skipDedupe:true}),
   logout: () => api.post('/auth/logout'),
   updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 export const userApi = {
+  getStaffLookup: () => api.get('/users/lookup'),
   getAll: (params) => fetchAllPages('/users', params),
   getPending: (params) => fetchAllPages('/users/pending', params),
   getPendingCount: () => api.get('/users/pending/count'),
@@ -371,6 +377,9 @@ export const supplierApi = {
   toggleActive: (id, reason) => api.patch(`/suppliers/${id}/toggle-active`, {reason}),
   changeStatus: (id,status,reason) => api.patch(`/suppliers/${id}/status`, {status,reason}),
   delete: (id) => api.delete(`/suppliers/${id}`),
+  getRecycleBin: () => api.get('/suppliers/recycle-bin'),
+  restore: (id) => api.post(`/suppliers/${id}/restore`),
+  permanentlyDelete: (id) => api.delete(`/suppliers/${id}/permanent`),
 };
 
 export const salesmanApi = {

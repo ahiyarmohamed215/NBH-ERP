@@ -76,7 +76,7 @@ public class PurchaseReturnService {
                 for (var stock : stocked) {
                     var key = stock.getKey();
                     result.add(new ReturnSource(product.getId(), product.getSku(), product.getName(), product.getBarcode(), grn.getId(), grn.getGrnNumber(),
-                            grn.getSupplier().getId(), grn.getSupplier().getName(), key.warehouseId(), warehouseNames.get(key.warehouseId()),
+                            grn.getSupplier().getId(), grn.getSupplier().getDisplayName(), key.warehouseId(), warehouseNames.get(key.warehouseId()),
                             receiptCost(receiptLines), stock.getValue(), remaining));
                 }
             }
@@ -221,7 +221,7 @@ public class PurchaseReturnService {
         if (!Set.of("DRAFT", "PENDING", "CANCELLED").contains(prn.getStatus())) throw new BusinessException("Cannot process PRN in its current status");
         var receiptTotals = validateReturn(prn, null);
         for (var item : sortedItems(prn)) stockService.decreaseStock(item.getReturnWarehouse().getId(), item.getProduct().getId(), item.getQuantityReturned(), item.getUnitCost(),
-                "PRN", prn.getPrnNumber(), "Returned to supplier: " + item.getReturnSupplier().getName() + " (GRN: " + item.getOriginalGrnId() + ")");
+                "PRN", prn.getPrnNumber(), "Returned to supplier: " + item.getReturnSupplier().getDisplayName() + " (GRN: " + item.getOriginalGrnId() + ")");
         prn.setTotalAmount(receiptTotals.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add));prn.setStatus("PROCESSED");
         return PurchaseReturnDto.from(purchaseReturnRepository.save(prn));
     }

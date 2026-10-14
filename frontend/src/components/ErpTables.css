@@ -1,0 +1,94 @@
+/* Shared GRN table appearance for every ERP module and embedded directory. */
+:root {
+  --erp-table-header-bg: #fafbfc;
+  --erp-table-header-color: #475569;
+  --erp-table-row-bg: #ffffff;
+  --erp-table-row-hover: #f8fafc;
+  --erp-table-divider: #f1f5f9;
+  --erp-table-cell-padding: 12px 14px;
+  --erp-table-radius: 8px;
+  --erp-table-action-size: 30px;
+  --erp-table-action-border: #bae6fd;
+  --erp-table-action-danger-border: #fecaca;
+}
+
+.erp-table-frame.erp-table-frame {
+  min-width:0; max-width:100%; border:1px solid var(--erp-border) !important;
+  border-radius:var(--erp-table-radius) !important; background:var(--erp-table-row-bg);
+  overflow:hidden; box-shadow:none !important;
+}
+.erp-table-scroll.erp-table-scroll {
+  min-width:0; min-height:0; max-width:100%; overflow:auto;
+  scrollbar-color:#cbd5e1 transparent; scrollbar-width:thin;
+}
+.erp-table-scroll.erp-table-frame { overflow:auto; }
+.erp-table.erp-table {
+  width:100%; margin:0; border-collapse:collapse; border-spacing:0;
+  font-family:var(--font-sans); font-size:var(--erp-text-body) !important;
+  line-height:1.5; font-variant-numeric:tabular-nums; text-align:left;
+  color:var(--erp-text); background:var(--erp-table-row-bg);
+}
+.erp-table.erp-table > thead {
+  position:sticky; top:0; z-index:2; background:var(--erp-table-header-bg);
+}
+.erp-table.erp-table > thead > tr > th {
+  padding:var(--erp-table-cell-padding) !important;
+  font-family:var(--font-sans); font-size:var(--erp-text-caption) !important;
+  font-weight:600 !important; letter-spacing:.04em; line-height:1.5;
+  text-transform:uppercase; white-space:nowrap;
+  color:var(--erp-table-header-color) !important;
+  background:var(--erp-table-header-bg) !important;
+  border:0; border-bottom:1px solid var(--erp-border) !important;
+}
+.erp-table.erp-table > tbody > tr > td {
+  padding:var(--erp-table-cell-padding) !important;
+  font-size:var(--erp-text-body) !important; line-height:1.5; vertical-align:middle;
+  border-bottom:1px solid var(--erp-table-divider) !important;
+}
+.erp-table.erp-table > tbody > tr { background:var(--erp-table-row-bg); }
+.erp-table.erp-table > tbody > tr:hover,
+.erp-table.erp-table > tbody > tr:hover > td { background:var(--erp-table-row-hover) !important; }
+.erp-table.erp-table > tbody > tr[aria-selected="true"],
+.erp-table.erp-table > tbody > tr[aria-selected="true"] > td { background:var(--erp-accent-soft) !important; }
+.erp-table.erp-table > tfoot > tr > :is(td,th) {
+  padding:var(--erp-table-cell-padding) !important; font-size:var(--erp-text-body);
+  background:var(--erp-table-header-bg); border-top:1px solid var(--erp-border);
+}
+.erp-table.erp-table .erp-table-code { font-family:monospace; font-weight:700; color:var(--erp-accent) !important; }
+.erp-table.erp-table .erp-table-actions { text-align:right !important; white-space:nowrap; }
+.erp-table.erp-table .erp-table-actions > div { justify-content:flex-end !important; gap:6px !important; }
+
+/* Only icon actions get a fixed square size. Text actions keep their labels. */
+.erp-table.erp-table .erp-table-icon-action {
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:var(--erp-table-action-size) !important; min-width:var(--erp-table-action-size) !important;
+  height:var(--erp-table-action-size) !important; min-height:var(--erp-table-action-size) !important;
+  padding:0 !important; border:1px solid var(--erp-table-action-border) !important;
+  border-radius:var(--erp-control-radius) !important; background:#fff !important;
+  color:var(--erp-accent) !important; cursor:pointer;
+}
+.erp-table.erp-table .erp-table-icon-action:hover:not(:disabled) { background:var(--erp-accent-soft) !important; }
+.erp-table.erp-table .erp-table-icon-action svg { width:13px !important; height:13px !important; color:inherit; stroke:currentColor; }
+.erp-table.erp-table .erp-table-icon-action[data-tone="danger"] { color:var(--danger) !important; border-color:var(--erp-table-action-danger-border) !important; }
+.erp-table.erp-table .erp-table-icon-action[data-tone="danger"]:hover:not(:disabled) { background:var(--danger-bg) !important; }
+.erp-table.erp-table .erp-table-icon-action:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.erp-table.erp-table .erp-table-icon-action:disabled { opacity:.55; cursor:not-allowed; }
+.erp-row-actions { display:inline-flex; align-items:center; gap:6px; }
+.erp-table.erp-table .erp-status-badge { text-transform:uppercase; }
+
+/* Legacy badges use the same shape and type as GRN's StatusBadge. */
+.erp-table.erp-table .badge {
+  display:inline-flex; align-items:center; gap:6px; padding:6px 10px !important;
+  border:0 !important; border-radius:5px !important;
+  font-family:var(--font-sans); font-size:var(--erp-text-badge) !important;
+  font-weight:600; letter-spacing:.035em; line-height:1.4; white-space:nowrap;
+}
+.erp-table .badge-success { background:#dcfce7 !important; color:#15803d !important; }
+.erp-table .badge-warning { background:#fef3c7 !important; color:#a16207 !important; }
+.erp-table .badge-danger { background:#fff1f2 !important; color:#be123c !important; }
+.erp-table .badge-info { background:#dbeafe !important; color:#1d4ed8 !important; }
+
+@media(max-width:700px) {
+  /* Wide data stays legible inside the table scroller, not the page scroller. */
+  .erp-table-scroll > .erp-table { min-width:600px; }
+}

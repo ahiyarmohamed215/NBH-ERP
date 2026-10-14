@@ -1,3 +1,8 @@
+import {canWriteTab,hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
+import { Trash2 } from 'lucide-react';
+import StatusBadge from '../components/StatusBadge';
 import DeliveryVehicleWorkspace from '../components/DeliveryVehicleWorkspace';
 import DeliveryWorkspace from '../components/DeliveryWorkspace';
 import DeliveryDirectory from '../components/DeliveryDirectory';
@@ -23,7 +28,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const { user } = useAuth();
   const canEditDelivery = canEditModule(user, 'DELIVERY');
   // Primary Tabs: 'deliveries' | 'routes' | 'vehicles'
-  const [currentTab, setCurrentTab] = useState(['deliveries', 'routes', 'vehicles'].includes(activeSubTab) ? activeSubTab : 'deliveries');
+  const [currentTab, setCurrentTab] = useModuleTab('delivery',activeSubTab,'deliveries',user);
 
   useEffect(() => {
     if (activeSubTab) {
@@ -159,7 +164,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         deliveryRouteApi.getAll(),
         vehicleApi.getAll(),
         deliveryApi.getSummary(),
-        api.get('/users').catch(() => ({ data: { data: [] } })),
+        api.get('/users/lookup').catch(() => ({ data: { data: [] } })),
         api.get('/warehouses').catch(() => ({ data: { data: [] } })),
         api.get('/customers').catch(() => ({ data: { data: [] } }))
       ]);
@@ -716,7 +721,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {currentTab === 'deliveries' && (
-            <button className="erp-button erp-button-primary"
+            <button disabled={!canWriteTab(user,'delivery',currentTab)} className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateTrip}
               style={{
@@ -732,7 +737,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           )}
 
           {currentTab === 'routes' && (
-            <button className="erp-button erp-button-primary"
+            <button disabled={!canWriteTab(user,'delivery',currentTab)} className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateRouteView}
               style={{
@@ -748,7 +753,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           )}
 
           {currentTab === 'vehicles' && (
-            <button className="erp-button erp-button-primary"
+            <button disabled={!canWriteTab(user,'delivery',currentTab)} className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateVehicle}
               style={{
@@ -766,7 +771,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       </div>
 
       {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
-      <div className="erp-tabs"
+      <ErpTabs module="delivery"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -774,31 +779,31 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           flexShrink: 0,
         }}
       >
-        <button data-active={currentTab === 'deliveries'} aria-pressed={currentTab === 'deliveries'} className="erp-tab"
+        <ErpTab tabId="deliveries" data-active={currentTab === 'deliveries'} aria-pressed={currentTab === 'deliveries'}
           type="button"
           onClick={() => setCurrentTab('deliveries')}
 
         >
           <Truck size={16} /> Delivery Trips
-        </button>
+        </ErpTab>
 
-        <button data-active={currentTab === 'routes'} aria-pressed={currentTab === 'routes'} className="erp-tab"
+        <ErpTab tabId="routes" data-active={currentTab === 'routes'} aria-pressed={currentTab === 'routes'}
           type="button"
           onClick={() => setCurrentTab('routes')}
 
         >
           <Navigation size={16} /> Delivery Routes
-        </button>
+        </ErpTab>
 
-        <button data-active={currentTab === 'vehicles'} aria-pressed={currentTab === 'vehicles'} className="erp-tab"
+        <ErpTab tabId="vehicles" data-active={currentTab === 'vehicles'} aria-pressed={currentTab === 'vehicles'}
           type="button"
           onClick={() => setCurrentTab('vehicles')}
 
         >
           <Gauge size={16} /> Fleet Vehicles
-        </button>
+        </ErpTab>
 
-      </div>
+      </ErpTabs>
 
       {currentTab==='deliveries' && <DeliveryDirectory title="Delivery Trips" rows={filteredDeliveries} query={searchTerm} onQuery={setSearchTerm} loading={loading} onRefresh={fetchData} onView={row=>loadTrip(row)} onPrint={row=>loadTrip(row,true)} columns={[{label:'Delivery number',code:true,value:row=>row.deliveryNumber},{label:'Route',value:row=>row.routeName},{label:'Vehicle',value:row=>row.vehicleNumber},{label:'Driver / assistant',value:row=>[row.driverName,row.assistantStaffName].filter(Boolean).join(' / ')},{label:'Invoices',value:row=>row.totalInvoicesCount ?? 0},{label:'Date',value:row=>row.scheduledDate},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} filters={<><FilterSelect aria-label="Delivery status" title="Filter deliveries by status" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="ALL">All Statuses</option>{['SCHEDULED','IN_TRANSIT','DELIVERED','CANCELLED'].map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</FilterSelect><FilterSelect className="inventory-full-label-filter" aria-label="Delivery route filter" title="Filter deliveries by route" value={routeFilter} style={{width:'auto'}} onChange={event=>setRouteFilter(event.target.value)}><option value="ALL">All Routes</option>{routes.map(route=><option key={route.id} value={route.id}>{route.routeName}</option>)}</FilterSelect><DateRangePicker documentType="Delivery" from={deliveryFrom} to={deliveryTo} onChange={(from,to)=>{setDeliveryFrom(from);setDeliveryTo(to);}}/></>}/> }
 
@@ -1153,7 +1158,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                 </div>
 
                 {/* Assigned Customers Table Container */}
-                <div
+                <div className="erp-table-frame"
                   style={{
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
@@ -1165,14 +1170,14 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     flexDirection: 'column',
                   }}
                 >
-                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <div className="erp-table-scroll" style={{ flex: 1, overflowY: 'auto' }}>
                     <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-body)' }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                         <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
                           <th className="erp-table-heading">Customer</th>
                           <th className="erp-table-heading">Contact / Phone</th>
                           <th className="erp-table-heading">Status</th>
-                          <th className="erp-table-heading" style={{ textAlign: 'right' }}>Action</th>
+                          <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1232,21 +1237,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                                 {c.phone && <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>{c.phone}</div>}
                               </td>
                               <td className="erp-table-cell">
-                                <span
-                                  style={{
-                                    fontSize: 'var(--erp-text-caption)',
-                                    fontWeight: 600,
-                                    padding: '2px 7px',
-                                    borderRadius: '9999px',
-                                    backgroundColor: isCustomerActive(c) ? '#dcfce7' : '#fee2e2',
-                                    color: isCustomerActive(c) ? '#15803d' : '#b91c1c',
-                                  }}
-                                >
-                                  {isCustomerActive(c) ? 'Active' : 'Inactive'}
-                                </span>
+                                <StatusBadge status={isCustomerActive(c) ? 'Active' : 'Inactive'} />
                               </td>
-                              <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                                <button className="erp-button"
+                              <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
+                                <button data-tone="danger" aria-label="Remove customer from route" className="erp-button erp-table-icon-action"
                                   type="button"
                                   onClick={() => {
                                     setRouteEditForm({
@@ -1262,9 +1256,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                                     padding: '3px 6px',
                                   }}
                                   title="Remove customer from route"
-                                >
-                                  Remove
-                                </button>
+                                ><Trash2 size={13}/></button>
                               </td>
                             </tr>
                           ))

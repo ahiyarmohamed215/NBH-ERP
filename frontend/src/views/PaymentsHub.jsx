@@ -1,3 +1,7 @@
+import {canWriteTab,hasPermission,canAccessTab} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
+import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect, useMemo } from 'react';
 import SettlementPanel from '../components/SettlementPanel';
 import { formatBusinessDate, invoiceTotal } from '../utils/invoiceMapping';
@@ -33,12 +37,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
     { id: 'outstanding-payments', label: 'Outstanding Payments', icon: AlertCircle },
   ];
 
-  const [currentTab, setCurrentTab] = useState(() => {
-    if (activeSubTab && PAYMENT_TABS.some((t) => t.id === activeSubTab)) {
-      return activeSubTab;
-    }
-    return 'payments';
-  });
+  const [currentTab, setCurrentTab] = useModuleTab('payments',activeSubTab,'payments',user);
 
   useEffect(() => {
     if (activeSubTab && PAYMENT_TABS.some((t) => t.id === activeSubTab)) {
@@ -154,6 +153,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   };
 
   const loadBackendInvoices = async () => {
+    if(!canAccessTab(user,'payments','outstanding-payments')){setInvoices([]);return;}
     try {
       setLoadingInvoices(true);
       const res = await salesApi.search({ size: 100 });
@@ -248,6 +248,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   };
 
   const handleVoidPayment = async (payment) => {
+    if(!canEditPayment){addToast('You do not have permission to void payments.','error');return;}
     if (!window.confirm(`Are you sure you want to void payment receipt ${payment.receiptNo || payment.paymentNumber}?`)) {
       return;
     }
@@ -468,7 +469,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
 
         {/* Action Button matching current tab */}
         {currentTab === 'advance-payments' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'payments',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={() => setShowRecordAdvanceModal(true)}
             style={{
@@ -482,7 +483,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             <Plus size={17} /> Record Advance
           </button>
         ) : (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'payments',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={() => {
               setPaymentForm({
@@ -509,7 +510,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
       </div>
 
       {/* Sub-Tabs Navigation Bar */}
-      <div className="erp-tabs"
+      <ErpTabs module="payments"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -521,24 +522,20 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           const isActive = currentTab === tab.id;
           const IconComponent = tab.icon;
           return (
-            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+            <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
 
-              onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.color = '#0f172a';
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.color = '#64748b';
-              }}
+
+
             >
               <IconComponent size={16} />
               {tab.label}
-            </button>
+            </ErpTab>
           );
         })}
-      </div>
+      </ErpTabs>
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 1: PAYMENTS (Customer Payments & Receipts) */}
@@ -690,7 +687,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           </div>
 
           {/* Table Container */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -705,7 +702,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -716,7 +713,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AMOUNT PAID</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -727,10 +724,10 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {p.receiptNo}
                       </td>
-                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>
                         {p.invoiceNo}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{p.customerName}</td>
@@ -742,34 +739,28 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                         LKR {Number(p.amount || 0).toFixed(2)}
                       </td>
                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <span className="badge badge-success" style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
-                          {p.status}
-                        </span>
+                        <StatusBadge status={p.status} />
                       </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <button
+                          <button aria-label="Print Receipt"
                             type="button"
-                            className="btn btn-glass btn-sm erp-button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                             onClick={() => {
                               addToast(`Payment receipt ${p.receiptNo} preview printed`, 'info');
                               window.print();
                             }}
                             style={{ padding: '4px 8px' }}
                             title="Print Receipt"
-                          >
-                            <Printer size={13} /> Print
-                          </button>
-                          <button
+                          ><Printer size={13} /></button>
+                          <button data-tone="danger" aria-label="Void Payment"
                             type="button"
-                            className="btn btn-glass btn-sm erp-button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                             onClick={() => handleVoidPayment(p)}
                             style={{ padding: '4px 8px', color: '#dc2626' }}
                             title="Void Payment"
-                            disabled={p.status === 'VOIDED'}
-                          >
-                            <X size={13} /> Void
-                          </button>
+                            disabled={!canEditPayment || p.status === 'VOIDED'}
+                          ><X size={13} /></button>
                         </div>
                       </td>
                     </tr>
@@ -918,7 +909,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           </div>
 
           {/* Table Container */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -933,7 +924,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -944,7 +935,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>AVAILABLE CREDIT</th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -955,7 +946,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                         {a.voucherNo}
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{a.customerName}</td>
@@ -970,23 +961,19 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       </td>
                       <td className="erp-table-cell" style={{ color: '#334155' }}>{a.paymentMethod}</td>
                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <span className="badge badge-success" style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', borderRadius: '4px' }}>
-                          {a.status}
-                        </span>
+                        <StatusBadge status={a.status} />
                       </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <button
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                        <button aria-label="Print Advance Voucher"
                           type="button"
-                          className="btn btn-glass btn-sm erp-button"
+                          className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                           onClick={() => {
                             addToast(`Advance deposit voucher ${a.voucherNo} preview printed`, 'info');
                             window.print();
                           }}
                           style={{ padding: '4px 8px' }}
                           title="Print Advance Voucher"
-                        >
-                          <Printer size={13} /> Print
-                        </button>
+                        ><Printer size={13} /></button>
                       </td>
                     </tr>
                   ))}
@@ -1154,7 +1141,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
           </div>
 
           {/* Table Container */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1169,7 +1156,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1181,7 +1168,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>
                     <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>
                     <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1203,7 +1190,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                           {inv.invoiceNumber}
                         </td>
                         <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
@@ -1225,22 +1212,11 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                           Rs. {Number(inv.balanceAmount || 0).toFixed(2)}
                         </td>
                         <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                          <span
-                            style={{
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              fontSize: 'var(--erp-text-caption)',
-                              fontWeight: 700,
-                              backgroundColor: inv.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
-                              color: inv.status === 'PARTIAL' ? '#b45309' : '#b91c1c',
-                            }}
-                          >
-                            {inv.status}
-                          </span>
+                          <StatusBadge status={inv.status} />
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <button className="erp-button erp-button-primary"
+                            <button aria-label="Record payment against this invoice" className="erp-button erp-button-primary erp-table-icon-action"
                               type="button"
                               onClick={() => {
                                 setPaymentForm({
@@ -1261,12 +1237,10 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                                 cursor: 'pointer',
                               }}
                               title="Record payment against this invoice"
-                            >
-                              <Plus size={12} /> Pay
-                            </button>
-                            <button
+                            ><Plus size={12} /></button>
+                            <button aria-label="View invoice details"
                               type="button"
-                              className="btn btn-glass btn-sm erp-button"
+                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                               onClick={() => setSelectedInvoice(inv)}
                               style={{ padding: '4px 7px' }}
                               title="View invoice details"
@@ -1624,7 +1598,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                 </h4>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
+                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                       <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center' }}>#</th>
@@ -1639,7 +1613,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     {selectedInvoiceItems.map((item, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td className="erp-table-cell" style={{ textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
-                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
                           {item.code || item.productSku || item.sku || '-'}
                         </td>
                         <td className="erp-table-cell" style={{ fontWeight: 600, color: '#1e293b' }}>
@@ -1664,7 +1638,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </div>
 

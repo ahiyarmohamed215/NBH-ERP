@@ -25,6 +25,7 @@ public class StockAdjustmentController {
     private final StockAdjustmentService adjustmentService;
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STOCK_ADJUSTMENT')")
     @Operation(summary = "Search stock adjustments with filters")
     public ResponseEntity<ApiResponse<PagedResponse<StockAdjustmentDto>>> searchAdjustments(
             @RequestParam(required = false) Long warehouseId,
@@ -37,6 +38,7 @@ public class StockAdjustmentController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STOCK_ADJUSTMENT')")
     @Operation(summary = "Get stock adjustment by ID")
     public ResponseEntity<ApiResponse<StockAdjustmentDto>> getAdjustmentById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(adjustmentService.getAdjustmentById(id)));

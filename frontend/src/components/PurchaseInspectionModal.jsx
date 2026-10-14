@@ -64,7 +64,7 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
               <button type="button" className="purchase-inspection-table-print" title={`Print ${type}`} aria-label={`Print ${type}`} onClick={printDocument}><Printer size={15}/> Print</button>
             </div>}
 
-            {content || <div className="purchase-inspection-table"><table className="glass-table erp-table">
+            {content || <div className="purchase-inspection-table erp-table-scroll erp-table-frame"><table className="glass-table erp-table">
               <thead><tr>{columns.map((column) => <th key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-heading'}>{column.label}</th>)}</tr></thead>
               <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-cell'}>{column.value(row) ?? '—'}</td>)}</tr>)}
                 {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty erp-table-cell">{emptyMessage || (query ? 'No matching products found.' : 'No products found.')}</td></tr>}

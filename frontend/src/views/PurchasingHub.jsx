@@ -1,3 +1,7 @@
+import {canWriteTab,hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import {canAccessTab} from '../utils/moduleAccess';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import '../components/PurchasingAppearance.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -69,24 +73,14 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
   ];
 
   // Filter accessible tabs
-  const allowedTabs = subTabs.filter(
-    (tab) =>
-      isSuperAdmin ||
-      !tab.permission ||
-      userPermissions.includes(tab.permission) ||
-      (tab.id === 'purchase-orders' && (isSuperAdmin || userPermissions.includes('SUPPLIER_MANAGE')))
-  );
+  const allowedTabs = subTabs.filter(tab=>canAccessTab(user,'purchasing',tab.id));
 
-  const [currentTab, setCurrentTab] = useState(() => {
-    if (activeSubTab && allowedTabs.some((t) => t.id === activeSubTab)) {
-      return activeSubTab;
-    }
-    return allowedTabs.length > 0 ? allowedTabs[0].id : 'suppliers';
-  });
+  const [currentTab, setCurrentTab] = useModuleTab('purchasing',activeSubTab,'suppliers',user);
 
   const focusedDocument = Boolean(editingForms[currentTab]);
 
   const [visitedTabs, setVisitedTabs] = useState(() => new Set([currentTab]));
+  useEffect(()=>{if(currentTab)setVisitedTabs(previous=>previous.has(currentTab)?previous:new Set([...previous,currentTab]));},[currentTab]);
 
   useEffect(() => {
     if (activeSubTab && allowedTabs.some((t) => t.id === activeSubTab)) {
@@ -170,7 +164,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
 
         {/* Dynamic Action Button (CustomerHub Styled Button) */}
         {currentTab === 'suppliers' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -187,7 +181,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <Plus size={17} /> New Supplier
           </button>
         ) : currentTab === 'grn' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -204,7 +198,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <Plus size={17} /> New Goods Received
           </button>
         ) : currentTab === 'gtn' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -221,7 +215,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
         ) : currentTab === 'prn' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -238,7 +232,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             <RotateCcw size={16} /> New Purchase Return
           </button>
         ) : currentTab === 'purchase-orders' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -258,7 +252,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
       </div>
 
       {/* Subtabs Bar (Underline Style matching CustomersHub - Fixed / Sticky) */}
-      <div className="erp-tabs"
+      <ErpTabs module="purchasing"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -270,7 +264,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
           return (
-            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+            <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
@@ -278,10 +272,10 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             >
               <Icon size={16} />
               {tab.label}
-            </button>
+            </ErpTab>
           );
         })}
-      </div>
+      </ErpTabs>
 
       </>}
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}

@@ -1,3 +1,5 @@
+import {useAuth} from '../context/AuthContext';
+import {hasPermission} from '../utils/moduleAccess';
 import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
 import {newestFirst} from '../utils/recordOrder';
 import {documentErrors,numberError} from '../utils/purchasingValidation';
@@ -29,6 +31,8 @@ import {
 } from 'lucide-react';
 
 const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, ref) {
+  const auth=useAuth();
+  const canManage=hasPermission(auth?.user,'SUPPLIER_MANAGE');
   const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   const [suppliers, setSuppliers] = useState([]);
@@ -140,6 +144,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
   const calculateGrandTotal = () => {
     return formData.items.reduce((sum, it) => sum + (it.totalCost || 0), 0);
   };
+  const selectableSuppliers = editingPoId ? [...suppliers, ...formData.items.filter(item => !suppliers.some(supplier => String(supplier.id) === String(item.supplierId))).map(item => ({id:item.supplierId,name:item.supplierName}))].filter((supplier,index,list) => supplier.id && list.findIndex(item => String(item.id) === String(supplier.id)) === index) : suppliers;
   const productWarehouse=product=>product?.defaultWarehouseId || product?.warehouseId;
   const productWarehouseName=product=>warehouses.find(warehouse=>String(warehouse.id)===String(productWarehouse(product)))?.name || product?.defaultWarehouseName || product?.warehouseName;
   const stockQuantity=product=>inventory.filter(stock=>String(stock.productId)===String(product.id)).reduce((sum,stock)=>sum+availableStock(stock),0);
@@ -392,7 +397,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
       </div>
 
       {/* Full-Width Purchase Orders Table */}
-      <div
+      <div className="erp-table-frame"
         style={{
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
@@ -408,7 +413,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
           flexDirection: 'column',
         }}
       >
-        <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+        <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
           <table className="erp-table" aria-busy={loading} style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{position:'sticky',top:0,zIndex:10}}><tr>{['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS'].map(label=><th className="erp-table-heading" key={label} style={{ background:'#fafbfc', borderBottom:'1px solid #e2e8f0' }}>{label}</th>)}</tr></thead>
             <tbody>
@@ -433,7 +438,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     title="Click row to inspect order details"
                   >
                     <td className="erp-table-cell">
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                      <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                         {po.poNumber}
                       </span>
                     </td>
@@ -447,9 +452,9 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                     <td className="erp-table-cell" style={{ color:'#64748b' }}>{purchaseOrderDate(po)}</td>
                     <td className="erp-table-cell"><StatusBadge status={po.status}/></td>
                     <td className="erp-table-cell" style={{ color:'#475569', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={po.notes || ''}>{po.notes || '—'}</td>
-                    <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                    <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                        {['DRAFT','INFORM_TO_ORDER'].includes(po.status) && (<button
+                        {['DRAFT','INFORM_TO_ORDER'].includes(po.status) && (<button disabled={!canManage} aria-label="Edit Purchase Order" className="erp-table-icon-action"
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -474,7 +479,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                         >
                           <Edit2 size={13} />
                         </button>)}
-                        <button
+                        <button aria-label="Print PO" className="erp-table-icon-action"
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -579,7 +584,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                   <div className="prn-return-card-metrics"><div><span>Selling price</span><b>{product && intakeProduct ? `LKR ${purchaseSellingPrice(intakeProduct,products).toFixed(2)}` : '—'}</b></div>
                     <div><span>Stock in system</span><b>{product && intakeProduct && inventoryLoaded ? stockQuantity(intakeProduct) : '—'}</b></div></div>
                 </div>}
-                intakeFields={<label className="po-supplier-field">Supplier *<FilterSelect variant="field" aria-label="Supplier" value={formData.supplierId} onChange={event=>setFormData(previous=>({...previous,supplierId:event.target.value}))}><option value="">Choose supplier</option>{suppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</FilterSelect></label>}
+                intakeFields={<label className="po-supplier-field">Supplier *<FilterSelect variant="field" aria-label="Supplier" value={formData.supplierId} onChange={event=>setFormData(previous=>({...previous,supplierId:event.target.value}))}><option value="">Choose supplier</option>{selectableSuppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</FilterSelect></label>}
                 onProductSelect={selectOrderProduct} validateItem={validateOrderItem} addDisabled={!canOrderProduct(intakeProduct) || !formData.supplierId}
                 addHint={intakeProduct && !canOrderProduct(intakeProduct) ? 'Ordering needs an active product with a delivery warehouse set in Inventory.' : undefined}
                 buildItemData={()=>({warehouseName:productWarehouseName(intakeProduct),supplierId:Number(formData.supplierId),supplierName:suppliers.find(supplier=>String(supplier.id)===String(formData.supplierId))?.name})} onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,supplierId:''}));}}
@@ -650,11 +655,10 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
         ]}
         onClose={() => setSelectedPo(null)}
         onPrint={() => printPurchaseOrder(selectedPo)}
-        actions={[
+        actions={canManage ? ([
           ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Edit PO',icon:Edit2,disabled:saving,onClick:()=>{const po=selectedPo;setSelectedPo(null);handleEditPo(po);}}] : []),
-          ...(selectedPo.status === 'CANCELLED' ? [{label:'Inform to Order',icon:CheckCircle,tone:'success',disabled:saving,onClick:()=>handlePoStatus('INFORM_TO_ORDER')}] : []),
           ...(['DRAFT','INFORM_TO_ORDER'].includes(selectedPo.status) ? [{label:'Cancel PO',icon:Ban,tone:'danger',disabled:saving,onClick:()=>handlePoStatus('CANCELLED')}] : []),
-        ]}
+        ]) : []}
         columns={[
           { label: 'Product code', value: item => item.sku || item.productSku || '—' },
           { label: 'Product name', value: item => item.productName },

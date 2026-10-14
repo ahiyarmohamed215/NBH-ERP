@@ -1,3 +1,6 @@
+import {canWriteTab,hasPermission} from '../utils/moduleAccess';
+import useModuleTab from '../hooks/useModuleTab';
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
 import {staffCode} from '../utils/staffCode';
 import AllocationWorkspace from '../components/AllocationWorkspace';
@@ -89,12 +92,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     { id: 'categories', label: 'Categories', icon: LayoutGrid },
   ];
 
-  const [currentTab, setCurrentTab] = useState(() => {
-    if (activeSubTab && INVENTORY_TABS.some((t) => t.id === activeSubTab)) {
-      return activeSubTab;
-    }
-    return 'inventory-list';
-  });
+  const [currentTab, setCurrentTab] = useModuleTab('inventory',activeSubTab,'inventory-list',user);
 
   // Sync subTab prop
   useEffect(() => {
@@ -783,7 +781,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
         {/* Action Button matching current active tab */}
         {currentTab === 'pos-quotas' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={() => handleOpenQuotaModal()}
             style={{
@@ -797,7 +795,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             <Plus size={17} /> New Allocation
           </button>
         ) : currentTab === 'adjustments' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleOpenCreateRecord}
             style={{
@@ -811,7 +809,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             <Plus size={17} /> New Adjustment
           </button>
         ) : currentTab === 'inventory-list' ? (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleNavigateGTN}
             style={{
@@ -825,7 +823,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
         ) : (
-          <button className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAdd}
             style={{
@@ -842,7 +840,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       </div>
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <div className="inventory-tabs erp-tabs"
+      <ErpTabs module="inventory" className="inventory-tabs"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -855,7 +853,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           const isActive = currentTab === tab.id;
 
           return (
-            <button data-active={isActive} aria-pressed={isActive} className="erp-tab"
+            <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
@@ -863,10 +861,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             >
               <Icon size={16} />
               {tab.label}
-            </button>
+            </ErpTab>
           );
         })}
-      </div>
+      </ErpTabs>
 
       {/* ------------------------------------------------------------- */}
       {/* 1. INVENTORY LIST TAB (Live Stock Balances with Qty, Cost, Selling, Valuation) */}
@@ -1081,7 +1079,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           </div>
 
           {/* Table Container (Fixed / Sticky Frame - Matching Customer/Employee Look) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1097,7 +1095,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               overflow: 'hidden',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1141,7 +1139,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         title="Click row to view full stock details"
                       >
-                        <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                        <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                           {item.sku}
                         </td>
                         <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
@@ -1488,7 +1486,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           </div>
 
           {/* Adjustment Records Table (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1504,7 +1502,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               flexDirection: 'column',
             }}
           >
-            <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -1517,7 +1515,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BATCH</th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>QUANTITY</th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REASON</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>ACTIONS</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1544,7 +1542,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                           title="Click row to view record details"
                         >
-                          <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                          <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                             {rec.recordNo}
                           </td>
                           <td className="erp-table-cell" style={{ color: '#475569' }}>
@@ -1564,7 +1562,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
                             {rec.warehouse}
                           </td>
-                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#64748b' }}>
+                          <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', color: '#64748b' }}>
                             {rec.sku}
                           </td>
                           <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
@@ -1579,9 +1577,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           <td className="erp-table-cell" style={{ color: '#475569' }}>
                             {rec.reason}
                           </td>
-                          <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                              <button
+                              <button aria-label={canEditInventory ? "Edit Adjustment" : "View Only (Edit Restricted)"} className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();

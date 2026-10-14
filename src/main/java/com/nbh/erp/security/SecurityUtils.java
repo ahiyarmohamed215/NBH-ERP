@@ -70,10 +70,35 @@ public final class SecurityUtils {
         return getCurrentUserAuthorities().contains(authorityName);
     }
 
+    /** Shared read policy, including the reference records required by an assigned workflow. */
+    public static boolean canRead(String module) {
+        if (isAdministrator()) return true;
+        Set<String> authorities = getCurrentUserAuthorities();
+        String upper = module.toUpperCase(java.util.Locale.ROOT);
+        if (java.util.stream.Stream.of(upper + "_VIEW", upper + "_MANAGE", upper + "_PROCESS")
+                .anyMatch(authorities::contains)) return true;
+        Set<String> references = switch (upper) {
+            case "DASHBOARD" -> Set.of("DASHBOARD_VIEW", "REPORT_VIEW", "INVENTORY_VIEW");
+            case "ROLE" -> Set.of("USER_MANAGE");
+            case "STAFF" -> Set.of("USER_VIEW", "USER_MANAGE", "CUSTOMER_VIEW", "CUSTOMER_MANAGE", "CUSTOMER_TARGET_VIEW", "CUSTOMER_TARGET_MANAGE", "INVENTORY_VIEW", "INVENTORY_MANAGE", "INVENTORY_ADJUST", "SALES_CREATE", "SALES_VIEW_ALL", "DELIVERY_VIEW", "DELIVERY_MANAGE");
+            case "PAYMENT" -> Set.of("PAYMENT_CREATE");
+            case "QUOTATION" -> Set.of("SALES_CREATE", "SALES_VIEW_ALL");
+            case "SALES" -> Set.of("SALES_VIEW_ALL", "SALES_CREATE", "SALES_EDIT", "SALES_RETURN", "SALES_VOID", "PAYMENT_CREATE");
+            case "PRODUCT", "BRAND", "CATEGORY" -> Set.of("PRODUCT_VIEW", "PRODUCT_MANAGE", "INVENTORY_VIEW", "INVENTORY_MANAGE", "INVENTORY_ADJUST", "GRN_PROCESS", "GTN_PROCESS", "PRN_PROCESS", "SALES_CREATE", "QUOTATION_MANAGE");
+            case "WAREHOUSE", "INVENTORY" -> Set.of("INVENTORY_VIEW", "INVENTORY_MANAGE", "INVENTORY_ADJUST", "GRN_PROCESS", "GTN_PROCESS", "PRN_PROCESS", "SALES_CREATE", "QUOTATION_MANAGE", "DELIVERY_VIEW", "DELIVERY_MANAGE");
+            case "SUPPLIER" -> Set.of("GRN_VIEW", "GRN_PROCESS", "PRN_VIEW", "PRN_PROCESS");
+            case "CUSTOMER" -> Set.of("SALES_CREATE", "QUOTATION_VIEW", "QUOTATION_MANAGE", "PAYMENT_CREATE", "DELIVERY_VIEW", "DELIVERY_MANAGE", "CUSTOMER_TARGET_VIEW", "CUSTOMER_TARGET_MANAGE");
+            case "CUSTOMER_TARGET" -> Set.of("CUSTOMER_VIEW", "CUSTOMER_MANAGE", "SALES_CREATE");
+            case "GRN" -> Set.of("PRN_PROCESS");
+            case "STOCK_ADJUSTMENT" -> Set.of("INVENTORY_VIEW", "INVENTORY_MANAGE", "INVENTORY_ADJUST");
+            default -> Set.of();
+        };
+        return references.stream().anyMatch(authorities::contains);
+    }
+
     /**
      * Determines whether the current authenticated staff member has permission to edit records.
-     * Only authorized management staff (Super Admin, Admin, Manager, or users with module management permissions)
-     * are permitted to edit records.
+     * Administrators have full access; other staff need the module's write permission.
      */
     public static boolean canEdit(String module) {
         Set<String> authorities = getCurrentUserAuthorities();
@@ -82,7 +107,7 @@ public final class SecurityUtils {
         }
 
         // Super Admin or Admin can always edit
-        if (authorities.contains("ROLE_SUPER_ADMIN") || authorities.contains("ROLE_ADMIN") || authorities.contains("ROLE_MANAGER")) {
+        if (isAdministrator()) {
             return true;
         }
 
@@ -94,12 +119,15 @@ public final class SecurityUtils {
             }
         }
 
-        // Explicit edit authority
-        if (authorities.contains("CAN_EDIT") || authorities.contains("RECORD_EDIT") || authorities.contains("USER_MANAGE")) {
-            return true;
-        }
-
-        return false;
+        Set<String> aliases = switch (module == null ? "" : module.toUpperCase(java.util.Locale.ROOT)) {
+            case "ROLE" -> Set.of("USER_MANAGE");
+            case "CUSTOMER_TARGET" -> Set.of("CUSTOMER_MANAGE");
+            case "INVENTORY", "STOCK_ADJUSTMENT" -> Set.of("INVENTORY_ADJUST");
+            case "PAYMENT" -> Set.of("PAYMENT_CREATE");
+            case "QUOTATION" -> Set.of("SALES_CREATE");
+            default -> Set.of();
+        };
+        return aliases.stream().anyMatch(authorities::contains);
     }
 
     /**
@@ -174,9 +202,10 @@ public final class SecurityUtils {
     }
     public static void checkRoleGrant(com.nbh.erp.role.entity.Role role) {
         if (hasRole("SUPER_ADMIN") || isSuperAdmin()) return;
-        if ("ROLE_SUPER_ADMIN".equals(role.getName())) throw new AccessDeniedException("Only a super administrator can grant this role");
+        String roleName=role.getName().trim().toUpperCase(java.util.Locale.ROOT).replaceFirst("^ROLE_", "");
+        if ("SUPER_ADMIN".equals(roleName)) throw new AccessDeniedException("Only a super administrator can grant this role");
         if (hasRole("ADMIN")) return;
-        if (java.util.Set.of("ROLE_ADMIN", "ROLE_MANAGER", "ROLE_DIRECTOR").contains(role.getName()) ||
+        if (java.util.Set.of("ADMIN", "MANAGER", "DIRECTOR").contains(roleName) ||
             !role.getPermissions().stream().allMatch(p -> hasAuthority(p.getName())))
             throw new AccessDeniedException("Cannot grant privileges beyond your own");
     }

@@ -157,11 +157,6 @@ h4 {
   text-align: left;
 }
 
-.sidebar-nav-btn:hover {
-  background: var(--slate-100);
-  color: var(--slate-900);
-}
-
 .sidebar-nav-btn.active {
   background: var(--primary-50);
   border-color: var(--primary-200);
@@ -178,11 +173,6 @@ h4 {
 .sidebar-nav-btn .forward-icon {
   color: var(--slate-400);
   opacity: 0.6;
-}
-
-.sidebar-nav-btn:hover .forward-icon {
-  color: var(--slate-600);
-  opacity: 0.9;
 }
 
 .sidebar-nav-btn.active .forward-icon {

@@ -22,7 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_VIEW')")
+@PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('INVENTORY')")
 @Tag(name = "Inventory & Stock Ledger", description = "Central Stock engine query and ledger audit APIs")
 public class StockController {
 

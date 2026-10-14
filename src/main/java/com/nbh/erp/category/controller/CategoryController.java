@@ -24,21 +24,21 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CATEGORY')")
     @Operation(summary = "List all categories")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getAllCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getAllCategories()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CATEGORY')")
     @Operation(summary = "List active categories for product selection")
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getActiveCategories() {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getActiveCategories()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CATEGORY')")
     @Operation(summary = "Get category by ID")
     public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getCategoryById(id)));

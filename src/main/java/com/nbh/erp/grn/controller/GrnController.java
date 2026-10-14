@@ -26,6 +26,7 @@ public class GrnController {
     private final GrnService grnService;
 
     @GetMapping
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('GRN')")
     @Operation(summary = "Search GRNs with filters")
     public ResponseEntity<ApiResponse<PagedResponse<GrnDto>>> searchGrns(
             @RequestParam(required = false) Long warehouseId,
@@ -39,6 +40,7 @@ public class GrnController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('GRN')")
     @Operation(summary = "Get GRN details with line items by ID")
     public ResponseEntity<ApiResponse<GrnDto>> getGrnById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(grnService.getGrnById(id)));

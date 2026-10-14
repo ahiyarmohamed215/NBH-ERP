@@ -89,7 +89,7 @@ public class CustomerTargetService {
 
     @Transactional
     public CustomerTargetDto createTarget(CreateCustomerTargetRequest request) {
-        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
+        SecurityUtils.enforceCanEdit("CUSTOMER_TARGET", "Customer Target");
 
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new BusinessException("Start date cannot be after end date");
@@ -169,7 +169,7 @@ public class CustomerTargetService {
 
     @Transactional
     public CustomerTargetDto updateTarget(Long id, CreateCustomerTargetRequest request) {
-        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
+        SecurityUtils.enforceCanEdit("CUSTOMER_TARGET", "Customer Target");
 
         CustomerTarget target = targetRepository.findByIdWithTiers(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
@@ -248,7 +248,7 @@ public class CustomerTargetService {
 
     @Transactional
     public void toggleActive(Long id) {
-        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
+        SecurityUtils.enforceCanEdit("CUSTOMER_TARGET", "Customer Target");
         CustomerTarget target = targetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
         CustomerRepository.requireActive(target.getCustomer());
@@ -266,7 +266,7 @@ public class CustomerTargetService {
 
     @Transactional
     public void deleteTarget(Long id) {
-        SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Target");
+        SecurityUtils.enforceCanEdit("CUSTOMER_TARGET", "Customer Target");
         CustomerTarget target = targetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerTarget", "id", id));
         CustomerRepository.requireActive(target.getCustomer());

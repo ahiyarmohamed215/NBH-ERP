@@ -24,28 +24,28 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "List all customers")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers() {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getAllCustomers()));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "List active customers")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> getActiveCustomers() {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getActiveCustomers()));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "Search customers by name, code or phone")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> searchCustomers(@RequestParam(required = false, defaultValue = "") String query) {
         return ResponseEntity.ok(ApiResponse.ok(customerService.searchCustomers(query)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_VIEW')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "Get customer by ID")
     public ResponseEntity<ApiResponse<CustomerDto>> getCustomerById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(customerService.getCustomerById(id)));

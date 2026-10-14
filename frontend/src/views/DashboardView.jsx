@@ -1,3 +1,6 @@
+import StatusBadge from '../components/StatusBadge';
+import {useAuth} from '../context/AuthContext';
+import {hasPermission} from '../utils/moduleAccess';
 import React, { useState, useEffect } from 'react';
 import { dashboardApi, pdfApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -14,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function DashboardView({ onNavigate }) {
+  const {user}=useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
@@ -51,10 +55,10 @@ export default function DashboardView({ onNavigate }) {
           <p className="erp-page-description">Real-time enterprise metrics, sales performance & inventory status</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-primary erp-button" onClick={() => onNavigate('pos')}>
+          <button disabled={!hasPermission(user,'SALES_CREATE')} className="btn btn-primary erp-button" onClick={() => onNavigate('pos')}>
             <ShoppingCart size={18} /> Open POS
           </button>
-          <button className="btn btn-glass erp-button" onClick={() => onNavigate('grn')}>
+          <button disabled={!hasPermission(user,'GRN_PROCESS')} className="btn btn-glass erp-button" onClick={() => onNavigate('grn')}>
             <PlusCircle size={18} /> New Goods Received
           </button>
         </div>
@@ -138,14 +142,14 @@ export default function DashboardView({ onNavigate }) {
             </button>
           </div>
 
-          <table className="glass-table erp-table">
+          <div className="erp-table-frame erp-table-scroll"><table className="glass-table erp-table">
             <thead>
               <tr>
                 <th className="erp-table-heading">Invoice #</th>
                 <th className="erp-table-heading">Customer</th>
                 <th className="erp-table-heading">Total</th>
                 <th className="erp-table-heading">Status</th>
-                <th className="erp-table-heading">Action</th>
+                <th className="erp-table-heading erp-table-actions">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -156,29 +160,25 @@ export default function DashboardView({ onNavigate }) {
               ) : (
                 data.recentInvoices?.map((inv) => (
                   <tr key={inv.id}>
-                    <td className="erp-table-cell" style={{ fontWeight: 600, color: '#2563eb' }}>{inv.invoiceNumber}</td>
+                    <td className="erp-table-cell erp-table-code" style={{ fontWeight: 600, color: '#2563eb' }}>{inv.invoiceNumber}</td>
                     <td className="erp-table-cell">{inv.customerName}</td>
                     <td className="erp-table-cell" style={{ fontWeight: 700 }}>Rs. {Number(inv.netTotal).toFixed(2)}</td>
                     <td className="erp-table-cell">
-                      <span className={`badge ${inv.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}`}>
-                        {inv.status}
-                      </span>
+                      <StatusBadge status={inv.status} />
                     </td>
-                    <td className="erp-table-cell">
-                      <button
+                    <td className="erp-table-cell erp-table-actions">
+                      <button aria-label="Print Invoice PDF Directly"
                         type="button"
                         onClick={() => pdfApi.printInvoice(inv.id)}
-                        className="btn btn-glass btn-sm erp-button"
+                        className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                         title="Print Invoice PDF Directly"
-                      >
-                        <Printer size={14} /> Print
-                      </button>
+                      ><Printer size={14} /></button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         {/* Recent GRN Receipts */}
@@ -190,14 +190,14 @@ export default function DashboardView({ onNavigate }) {
             </button>
           </div>
 
-          <table className="glass-table erp-table">
+          <div className="erp-table-frame erp-table-scroll"><table className="glass-table erp-table">
             <thead>
               <tr>
                 <th className="erp-table-heading">GRN #</th>
                 <th className="erp-table-heading">Supplier</th>
                 <th className="erp-table-heading">Warehouse</th>
                 <th className="erp-table-heading">Status</th>
-                <th className="erp-table-heading">Action</th>
+                <th className="erp-table-heading erp-table-actions">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -208,29 +208,25 @@ export default function DashboardView({ onNavigate }) {
               ) : (
                 data.recentGrns?.map((grn) => (
                   <tr key={grn.id}>
-                    <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0d9488' }}>{grn.grnNumber}</td>
+                    <td className="erp-table-cell erp-table-code" style={{ fontWeight: 600, color: '#0d9488' }}>{grn.grnNumber}</td>
                     <td className="erp-table-cell">{grn.supplierName}</td>
                     <td className="erp-table-cell">{grn.warehouseName}</td>
                     <td className="erp-table-cell">
-                      <span className={`badge ${grn.status === 'PROCESSED' ? 'badge-success' : 'badge-info'}`}>
-                        {grn.status}
-                      </span>
+                      <StatusBadge status={grn.status} />
                     </td>
-                    <td className="erp-table-cell">
-                      <button
+                    <td className="erp-table-cell erp-table-actions">
+                      <button aria-label="Print GRN PDF Directly"
                         type="button"
                         onClick={() => pdfApi.printGrn(grn.id)}
-                        className="btn btn-glass btn-sm erp-button"
+                        className="btn btn-glass btn-sm erp-button erp-table-icon-action"
                         title="Print GRN PDF Directly"
-                      >
-                        <Printer size={14} /> Print
-                      </button>
+                      ><Printer size={14} /></button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </div>

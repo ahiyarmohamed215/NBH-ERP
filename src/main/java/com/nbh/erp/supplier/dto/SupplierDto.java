@@ -25,6 +25,7 @@ public class SupplierDto {
     private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
 
     public Boolean getActive() {
         return isActive;
@@ -35,7 +36,7 @@ public class SupplierDto {
                 .id(s.getId())
                 .supplierCode(s.getSupplierCode())
                 .code(s.getSupplierCode())
-                .name(s.getName())
+                .name(s.getDisplayName())
                 .contactPerson(s.getContactPerson())
                 .phone(s.getPhone())
                 .email(s.getEmail())
@@ -44,6 +45,7 @@ public class SupplierDto {
                 .status(s.getStatus())
                 .createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt())
+                .deletedAt(s.getDeletedAt())
                 .build();
     }
 }

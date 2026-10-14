@@ -29,7 +29,7 @@ public class QuotationController {
     private final QuotationService quotationService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('QUOTATION')")
     @Operation(summary = "Search quotations")
     public ResponseEntity<ApiResponse<PagedResponse<QuotationDto>>> searchQuotations(
             @RequestParam(required = false) Long customerId,
@@ -45,14 +45,14 @@ public class QuotationController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('QUOTATION')")
     @Operation(summary = "Get quotation by ID")
     public ResponseEntity<ApiResponse<QuotationDto>> getQuotationById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(quotationService.getQuotationById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','QUOTATION_MANAGE','SALES_CREATE')")
     @Operation(summary = "Create quotation with backend number generation and calculations")
     public ResponseEntity<ApiResponse<QuotationDto>> createQuotation(@Valid @RequestBody CreateQuotationRequest request) {
         QuotationDto quotation = quotationService.createQuotation(request);
@@ -61,7 +61,7 @@ public class QuotationController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','QUOTATION_MANAGE','SALES_CREATE')")
     @Operation(summary = "Update existing quotation")
     public ResponseEntity<ApiResponse<QuotationDto>> updateQuotation(
             @PathVariable Long id,
@@ -72,7 +72,7 @@ public class QuotationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','QUOTATION_MANAGE','SALES_CREATE')")
     @Operation(summary = "Delete quotation")
     public ResponseEntity<ApiResponse<Void>> deleteQuotation(@PathVariable Long id) {
         quotationService.deleteQuotation(id);
@@ -80,7 +80,7 @@ public class QuotationController {
     }
 
     @PostMapping("/{id}/convert-to-invoice")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','QUOTATION_MANAGE','SALES_CREATE')")
     @Operation(summary = "Convert accepted quotation to commercial invoice")
     public ResponseEntity<ApiResponse<InvoiceDto>> convertToInvoice(
             @PathVariable Long id,

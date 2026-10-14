@@ -70,7 +70,8 @@ public class RoleService {
         if (request.getPermissions() != null) {
             for (String permName : request.getPermissions()) {
                 permissionRepository.findByName(permName)
-                        .ifPresent(permissions::add);
+                        .map(permissions::add)
+                        .orElseThrow(() -> new ResourceNotFoundException("Permission", "name", permName));
             }
         }
 
@@ -105,7 +106,8 @@ public class RoleService {
             Set<Permission> permissions = new HashSet<>();
             for (String permName : request.getPermissions()) {
                 permissionRepository.findByName(permName)
-                        .ifPresent(permissions::add);
+                        .map(permissions::add)
+                        .orElseThrow(() -> new ResourceNotFoundException("Permission", "name", permName));
             }
             role.setPermissions(permissions);
         }

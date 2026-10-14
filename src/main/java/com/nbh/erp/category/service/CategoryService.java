@@ -72,7 +72,7 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
-        SecurityUtils.enforceCanEdit("PRODUCT", "Category: " + category.getName());
+        SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
 
         categoryRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -98,7 +98,7 @@ public class CategoryService {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
 
-        SecurityUtils.enforceCanEdit("PRODUCT", "Category: " + category.getName());
+        SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
 
         category.setIsActive(!category.getIsActive());
         categoryRepository.save(category);

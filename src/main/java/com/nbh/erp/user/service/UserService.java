@@ -89,7 +89,13 @@ public class UserService {
 
         SecurityUtils.enforceCanEdit("USER", "Employee: " + user.getUsername());
         SecurityUtils.protectUser(user);
-        user.setTokenVersion(user.getTokenVersion() + 1);
+
+        // Roles are reloaded on every authenticated request; profile/role edits
+        // should not log the employee out. Credential changes still revoke sessions.
+        if (StringUtils.hasText(request.getPassword()) ||
+                (Boolean.FALSE.equals(request.getIsActive()) && Boolean.TRUE.equals(user.getIsActive()))) {
+            user.setTokenVersion(user.getTokenVersion() + 1);
+        }
 
         userRepository.findByEmail(request.getEmail())
                 .ifPresent(existing -> {
@@ -119,7 +125,7 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+        if (request.getRoles() != null && (!isSuperAdmin || !request.getRoles().isEmpty())) {
             if (isSuperAdmin) {
                 boolean hasSuperAdminRole = request.getRoles().stream().anyMatch(r ->
                         "ROLE_SUPER_ADMIN".equalsIgnoreCase(r != null ? r.trim() : "") || "SUPER_ADMIN".equalsIgnoreCase(r != null ? r.trim() : ""));
@@ -138,9 +144,7 @@ public class UserService {
                     roles.add(role);
                 }
             }
-            if (!roles.isEmpty()) {
-                user.setRoles(roles);
-            }
+            user.setRoles(roles);
         } else if (isSuperAdmin) {
             // Keep existing super admin roles intact if empty roles passed
             log.info("Preserving Super Admin roles for user: {}", user.getUsername());
@@ -166,6 +170,7 @@ public class UserService {
         }
 
         user.setIsActive(!user.getIsActive());
+        if (!Boolean.TRUE.equals(user.getIsActive())) user.setTokenVersion(user.getTokenVersion() + 1);
         userRepository.save(user);
 
         auditLogService.log("USER_STATUS", "EMPLOYEES", "User", user.getUsername(),
@@ -291,18 +296,8 @@ public class UserService {
     public java.util.List<UserDto> getPosStaff() {
         return userRepository.findAll().stream()
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && "APPROVED".equalsIgnoreCase(u.getApprovalStatus()))
-                .filter(u -> {
-                    boolean isPrivileged = u.getRoles().stream().anyMatch(r -> {
-                        String name = r.getName().toUpperCase();
-                        return name.contains("ADMIN") || name.contains("SUPER") || name.contains("MANAGER") || name.contains("DIRECTOR") || name.contains("CASHIER") || name.contains("POS") || name.contains("SALES");
-                    });
-                    if (isPrivileged) return true;
-                    return u.getRoles().stream().anyMatch(r ->
-                            r.getPermissions() != null && r.getPermissions().stream().anyMatch(p ->
-                                    "SALES_CREATE".equalsIgnoreCase(p.getName()) || "SALES".equalsIgnoreCase(p.getModule())
-                            )
-                    );
-                })
+                .filter(u -> com.nbh.erp.security.UserPrincipal.create(u).getAuthorities().stream().anyMatch(authority ->
+                        Set.of("ROLE_ADMIN", "ROLE_SUPER_ADMIN", "SALES_CREATE").contains(authority.getAuthority())))
                 .map(UserDto::from)
                 .toList();
     }

@@ -38,7 +38,7 @@ public class InvoiceController {
     private final InvoiceService invoiceService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Search sales invoices with date, warehouse, customer, and cashier filters")
     public ResponseEntity<ApiResponse<PagedResponse<InvoiceDto>>> searchInvoices(
             @RequestParam(required = false) Long warehouseId,
@@ -58,7 +58,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/held")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Get list of held sales invoices (isolated per cashier for regular sales staff)")
     public ResponseEntity<ApiResponse<List<InvoiceDto>>> getHeldInvoices(
             @RequestParam(required = false) String cashier
@@ -78,14 +78,14 @@ public class InvoiceController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Get invoice by ID")
     public ResponseEntity<ApiResponse<InvoiceDto>> getInvoiceById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoiceById(id)));
     }
 
     @GetMapping("/number/{number}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_VIEW','SALES_VIEW_ALL','SALES_CREATE')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Get invoice by invoice number (e.g. INV-2026-000001)")
     public ResponseEntity<ApiResponse<InvoiceDto>> getInvoiceByNumber(@PathVariable String number) {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoiceByNumber(number)));

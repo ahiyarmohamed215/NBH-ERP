@@ -1,15 +1,14 @@
 import React from 'react';
-import { RotateCcw, CheckCircle, Edit2, UserRound, Calendar, MessageSquare } from 'lucide-react';
+import { RotateCcw, Edit2, UserRound, Calendar, MessageSquare } from 'lucide-react';
 import PurchaseInspectionModal from './PurchaseInspectionModal';
 
-export default function GrnDetailsModal({ grn, onClose, onPrint, onCancel, onEdit, onProcess, canManage = false, processing = false }) {
+export default function GrnDetailsModal({ grn, onClose, onPrint, onCancel, onEdit, canManage = false, processing = false }) {
   const actions = [];
   if (canManage) {
     if (grn.status !== 'CANCELLED') actions.push({ label: 'Edit GRN', icon: Edit2, onClick: onEdit, disabled: processing });
-    if (grn.status === 'CANCELLED') actions.push({ label: processing ? 'Processing…' : grn.status === 'CANCELLED' ? 'Reprocess GRN' : 'Process GRN', icon: CheckCircle, onClick: onProcess, disabled: processing, tone: 'success' });
     if (grn.status !== 'CANCELLED') actions.push({ label: 'Cancel GRN', icon: RotateCcw, onClick: onCancel, disabled: processing, tone: 'danger' });
   }
-  return <PurchaseInspectionModal type="GRN" number={grn.grnNumber} status={grn.status} rows={grn.items || []} detailActions={[...actions.filter(action=>action.icon!==CheckCircle),...actions.filter(action=>action.icon===CheckCircle)]} onPrint={onPrint} onClose={onClose} actionsPosition="bottom" detailsPosition="header" showHeaderClose closeLabel="Close" tableToolbar
+  return <PurchaseInspectionModal type="GRN" number={grn.grnNumber} status={grn.status} rows={grn.items || []} detailActions={actions} onPrint={onPrint} onClose={onClose} actionsPosition="bottom" detailsPosition="header" showHeaderClose closeLabel="Close" tableToolbar
     details={[
       { label: 'Supplier name', value: grn.supplierName, icon: UserRound },
       { label: 'GRN date', value: grn.receivedDate, icon: Calendar },

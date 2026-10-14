@@ -1,3 +1,4 @@
+import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import {newestFirst} from '../utils/recordOrder';
 import SupplierEditorModal from '../components/SupplierEditorModal';
 import MasterWorkspace from '../components/MasterWorkspace';
@@ -5,6 +6,8 @@ import MasterDirectoryTable from '../components/MasterDirectoryTable';
 import './InventoryTheme.css';
 import {supplierErrors,normalizePhone,phoneCountry} from '../utils/purchasingValidation';
 import SupplierDetailsModal from '../components/SupplierDetailsModal';
+import SupplierRecycleBin from '../components/SupplierRecycleBin';
+import SupplierDeleteDialog from '../components/SupplierDeleteDialog';
 import FilterSelect from '../components/FilterSelect';
 import {printCurrentDirectory} from '../utils/printDirectory';
 import '../components/PurchasingAppearance.css';
@@ -45,6 +48,7 @@ import {
   Award,
   Phone,
   Mail,
+  Trash2,
 } from 'lucide-react';
 
 const supplierActionStyle = {
@@ -77,6 +81,9 @@ const MastersView = React.forwardRef(function MastersView({
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [showSupplierBin, setShowSupplierBin] = useState(false);
+  const [deletingSupplier, setDeletingSupplier] = useState(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
 
   const getBrandForProduct = (p) => {
@@ -106,9 +113,11 @@ const MastersView = React.forwardRef(function MastersView({
   const getTabModule = (tab) => {
     switch (tab) {
       case 'products':
-      case 'brands':
-      case 'categories':
         return 'PRODUCT';
+      case 'brands':
+        return 'BRAND';
+      case 'categories':
+        return 'CATEGORY';
       case 'warehouses':
         return 'WAREHOUSE';
       case 'suppliers':
@@ -216,6 +225,16 @@ const MastersView = React.forwardRef(function MastersView({
   };
 
   const supplierStatus=item=>item?.status || (isItemActive(item)?'ACTIVE':'INACTIVE');
+  const handleDeleteSupplier = async () => {
+    if (!deletingSupplier || deletingBusy || !canEditCurrentTab) return;
+    setDeletingBusy(true);
+    try {
+      await supplierApi.delete(deletingSupplier.id);
+      setDeletingSupplier(null); setViewingItem(null);
+      await loadTabData(); addToast('Supplier moved to recycle bin', 'success');
+    } catch (error) { addToast(error.response?.data?.message || error.message || 'Unable to delete supplier', 'error'); }
+    finally { setDeletingBusy(false); }
+  };
   const handleSupplierStatus=(supplier,target)=>requestStatusChange({type:'Supplier',number:supplier.name || supplier.supplierCode,current:supplierStatus(supplier),target,onConfirm:async reason=>{const response=await supplierApi.changeStatus(supplier.id,target,reason);setViewingItem(previous=>previous?.id===supplier.id?{...previous,...(response.data?.data || response.data),status:target,isActive:target==='ACTIVE'}:previous);await loadTabData();addToast('Supplier status updated','success');}});
   const isItemActive = (item) => Boolean(item?.isActive ?? item?.active ?? false);
 
@@ -668,6 +687,8 @@ const MastersView = React.forwardRef(function MastersView({
   if(showModal && ['products','brands','warehouses','categories'].includes(activeTab))return <MasterWorkspace type={activeTab} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} brands={brands} categories={categories} warehouses={warehouses} onClose={()=>setShowModal(false)} onSave={handleSave}/>;
   if(showModal && activeTab==='suppliers')return <SupplierEditorModal key={editingItem?.id || 'new-supplier'} form={modalForm} setForm={setModalForm} editing={Boolean(editingItem)} saving={saving} onClose={()=>setShowModal(false)} onSubmit={handleSave}/>;
 
+  if (showSupplierBin && activeTab === 'suppliers' && canEditCurrentTab) return <SupplierRecycleBin onBack={() => setShowSupplierBin(false)} onChanged={loadTabData}/>;
+
   return (
     <div ref={directoryRef} className={(activeTab === 'suppliers' ? 'purchasing-no-shadows' : ['products','brands','warehouses','categories'].includes(activeTab) ? 'inventory-theme purchasing-no-shadows' : '') + (isStandalone || hideHeader ? '' : ' erp-page')}
       style={{
@@ -728,22 +749,22 @@ const MastersView = React.forwardRef(function MastersView({
       {/* Directory Tabs (only if more than 1 tab visible) */}
       {visibleTabs.length > 1 && (
         <div style={{ flexShrink: 0 }}>
-          <div className="glass-pill-bar">
+          <ErpTabs>
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
-                <button
+                <ErpTab
                   key={tab.id}
                   type="button"
-                  className={`glass-pill-btn ${isActive ? 'active' : ''}`}
+                  active={isActive}
                   onClick={() => handleTabChange(tab.id)}
                 >
                   <Icon size={16} /> {tab.label} ({tab.count})
-                </button>
+                </ErpTab>
               );
             })}
-          </div>
+          </ErpTabs>
         </div>
       )}
 
@@ -834,6 +855,7 @@ const MastersView = React.forwardRef(function MastersView({
 
         {/* Right Controls: Status Filter, Reset, Export CSV (icon only), & Refresh (icon only) */}
         <div className={activeTab === 'suppliers' ? 'purchase-date-controls' : undefined} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          {activeTab === 'suppliers' && canEditCurrentTab && <button className="btn btn-glass erp-button" onClick={() => { setStatusFilter('ALL'); setShowSupplierBin(true); }}><Trash2 size={15}/> Recycle bin</button>}
           {/* Status Filter Dropdown */}
           <ToolbarFilter
             value={statusFilter}
@@ -980,7 +1002,7 @@ const MastersView = React.forwardRef(function MastersView({
       </div>
 
       {/* Master Data Tables (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-      <div
+      <div className="erp-table-frame"
         style={{
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
@@ -996,7 +1018,7 @@ const MastersView = React.forwardRef(function MastersView({
           flexDirection: 'column',
         }}
       >
-        <div style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+        <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
               Loading {activeTab} data...
@@ -1016,7 +1038,7 @@ const MastersView = React.forwardRef(function MastersView({
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CREDIT LIMIT</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CURRENT BALANCE</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                  <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1052,42 +1074,14 @@ const MastersView = React.forwardRef(function MastersView({
                           Rs. {Number(c.currentBalance || c.currentCredit || 0).toFixed(2)}
                         </td>
                         <td className="erp-table-cell">
-                          <button
-                            type="button"
-                            onClick={(e) => {
+                          <StatusBadge status={active ? 'Active' : 'Inactive'} onClick={(e) => {
                               e.stopPropagation();
                               handleToggleActive(c.id, active);
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: 0,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: 'var(--erp-text-body)',
-                              fontWeight: 600,
-                              color: active ? '#16a34a' : '#dc2626',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                backgroundColor: active ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {active ? 'Active' : 'Inactive'}
-                          </button>
+                            }} title={`Status: ${active ? 'Active' : 'Inactive'} (Click to toggle)`}/>
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
+                            <button aria-label="Edit Customer" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1140,7 +1134,7 @@ const MastersView = React.forwardRef(function MastersView({
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                  <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -1181,22 +1175,24 @@ const MastersView = React.forwardRef(function MastersView({
                         <td className="erp-table-cell">
                           <StatusBadge status={supplierStatus(s)} title={`Status: ${supplierStatus(s)}`} />
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button type="button" title="Edit Supplier" aria-label="Edit Supplier"
+                            <button className="erp-table-icon-action" type="button" title="Edit Supplier" aria-label="Edit Supplier"
+                              disabled={!canEditCurrentTab}
                               onClick={event=>{event.stopPropagation();handleOpenEdit({...s,code});}}
                               style={supplierActionStyle}
                               onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f0f9ff';}}
                               onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#ffffff';}}>
                               <Edit2 size={13} />
                             </button>
-                            <button type="button" title="Print Supplier Details (A4)" aria-label="Print Supplier Details (A4)"
+                            <button className="erp-table-icon-action" type="button" title="Print Supplier Details (A4)" aria-label="Print Supplier Details (A4)"
                               onClick={event=>{event.stopPropagation();handlePrintSuppliers(s);}}
                               style={supplierActionStyle}
                               onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f0f9ff';}}
                               onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#ffffff';}}>
                               <Printer size={13} />
                             </button>
+                            {canEditCurrentTab && <button className="erp-table-icon-action" data-tone="danger" type="button" title="Delete Supplier" aria-label="Delete Supplier" onClick={event => { event.stopPropagation(); setDeletingSupplier(s); }}><Trash2 size={13}/></button>}
                           </div>
                         </td>
                       </tr>
@@ -1210,6 +1206,7 @@ const MastersView = React.forwardRef(function MastersView({
       </div>
 
       {/* View Details Modal */}
+      {deletingSupplier && <SupplierDeleteDialog supplier={deletingSupplier} busy={deletingBusy} onClose={() => setDeletingSupplier(null)} onConfirm={handleDeleteSupplier}/>}
       {viewingItem?.type === 'suppliers' && <SupplierDetailsModal supplier={viewingItem} active={isItemActive(viewingItem)} canManage={canEditCurrentTab}
         onClose={()=>setViewingItem(null)} onPrint={()=>handlePrintSuppliers(viewingItem)} onStatusChange={target=>handleSupplierStatus(viewingItem,target)}
         onEdit={()=>{const item=viewingItem;setViewingItem(null);handleOpenEdit(item);}}/>}

@@ -48,7 +48,7 @@ public class GrnDto {
                 .purchaseOrderId(grn.getPurchaseOrderId())
                 .supplierId(grn.getSupplier().getId())
                 .supplierCode(grn.getSupplier().getSupplierCode())
-                .supplierName(grn.getSupplier().getName())
+                .supplierName(grn.getSupplier().getDisplayName())
                 .warehouseId(grn.getWarehouse().getId())
                 .warehouseCode(grn.getWarehouse().getCode())
                 .warehouseName(grn.getWarehouse().getName())

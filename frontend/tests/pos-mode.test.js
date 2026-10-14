@@ -11,6 +11,8 @@ test('POS opens from invoicing, loads products, adds a priced item and exits',as
  try {
   const apis=await server.ssrLoadModule('/src/api/apiClient.js');
   for(const [name,api] of Object.entries(apis))if(name.endsWith('Api') && api && typeof api==='object')for(const method of Object.keys(api))if(typeof api[method]==='function')api[method]=async()=>({data:[]});
+  localStorage.setItem('nbh_token',`test.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.sig`);
+  apis.authApi.getMe=async()=>({data:{username:'cashier',roles:['ROLE_CASHIER'],permissions:['SALES_CREATE']}});
   apis.warehouseApi.getActive=async()=>({data:[{id:1,code:'WH-1',name:'Main'}]});
   apis.customerApi.getActive=async()=>({data:[{id:1,name:'Walk-in customer',customerCode:'CUST-0001',creditLimit:0,currentBalance:0}]});
   apis.inventoryApi.getBalances=async()=>({data:{content:[{productId:1,warehouseId:1,quantity:10,availableQuantity:10}]}});

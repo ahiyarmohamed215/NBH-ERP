@@ -16,8 +16,9 @@ import DeliveryHub from './views/DeliveryHub';
 import SidebarProfile from './components/SidebarProfile';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
+import {canAccessModule,canAccessTab,resolveModuleTab} from './utils/moduleAccess';
 
-import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, Maximize, Minimize, PanelLeftClose, ShoppingCart, CreditCard, WifiOff } from 'lucide-react';
+import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, PanelLeftClose, ShoppingCart, CreditCard, WifiOff } from 'lucide-react';
 import ErrorState from './components/ErrorState';
 
 export default function App() {
@@ -249,19 +250,17 @@ export default function App() {
   const accessibleModules = useMemo(() => {
     return moduleDefinitions
       .filter((mod) => {
-        if (isSuperAdmin) return true;
-        if (!mod.permissions || mod.permissions.length === 0) return true;
-        return mod.permissions.some((p) => userPermissions.includes(p));
+        return canAccessModule(user,mod.id);
       })
       .map((mod) => {
         if (isSuperAdmin) return mod;
         if (!mod.subItems) return mod;
         const allowedSubs = mod.subItems.filter(
-          (sub) => !sub.permission || userPermissions.includes(sub.permission)
+          (sub) => canAccessTab(user,mod.id,sub.id)
         );
         return { ...mod, subItems: allowedSubs };
       });
-  }, [moduleDefinitions, isSuperAdmin, userPermissions]);
+  }, [moduleDefinitions, isSuperAdmin, userPermissions,user]);
 
   const allowedModuleIds = useMemo(
     () => accessibleModules.map((m) => m.id),
@@ -275,6 +274,7 @@ export default function App() {
 
   // Seamless navigation helper supporting legacy and restructured routes
   const navigateTo = useCallback((view, sub = '', action = '') => {
+    if((view==='pos' || (view==='invoicing' && sub==='pos')) && !canAccessTab(user,'invoicing','pos'))return;
     setPurchaseCreateRequest(view==='purchasing' && sub==='gtn' && action==='create' ? {tab:'gtn',id:++purchaseCreateSequence.current} : null);
     if (!sub && Object.prototype.hasOwnProperty.call(rememberedTabs.current, view)) {
       setCurrentView(view);
@@ -389,16 +389,19 @@ export default function App() {
       setCurrentView(view);
       setSubTab(sub || '');
     }
-  }, []);
+  }, [user]);
 
   // Redirect to first permitted module if current view is not accessible
   useEffect(() => {
     if (user && allowedModuleIds.length > 0) {
       if (!allowedModuleIds.includes(currentView)) {
         navigateTo(allowedModuleIds[0]);
+      } else if (currentView !== 'dashboard') {
+        const allowedTab=resolveModuleTab(user,currentView,subTab);
+        if(allowedTab!==subTab)setSubTab(allowedTab || '');
       }
     }
-  }, [user, allowedModuleIds, currentView, navigateTo]);
+  }, [user, allowedModuleIds, currentView,subTab, navigateTo]);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -552,19 +555,8 @@ export default function App() {
               )}
             </div>
 
-            {/* Fullscreen is part of the sidebar, clear of workspace actions. */}
-            {!isPosMode && <button type="button" onClick={toggleFullscreen}
-              title={isFullscreen?'Exit Full Screen (F11 or Alt+Enter)':'Enter Full Screen (F11 or Alt+Enter)'}
-              aria-label={isFullscreen?'Exit full screen':'Enter full screen'}
-              style={{display:'flex',alignItems:'center',justifyContent:isSidebarCompact?'center':'flex-start',gap:8,width:'100%',minHeight:34,marginBottom:12,padding:isSidebarCompact?'7px':'7px 10px',border:'1px solid #e2e8f0',borderRadius:6,background:'#fff',color:'#475569',fontFamily:'inherit',fontSize:'.77rem',cursor:'pointer',flexShrink:0,boxShadow:'none'}}
-              onMouseEnter={event=>{event.currentTarget.style.backgroundColor='#f8fafc';event.currentTarget.style.borderColor='#cbd5e1';}}
-              onMouseLeave={event=>{event.currentTarget.style.backgroundColor='#fff';event.currentTarget.style.borderColor='#e2e8f0';}}>
-              {isFullscreen?<Minimize size={15}/>:<Maximize size={15}/>}
-              {!isSidebarCompact && (isFullscreen?'Exit full screen':'Full screen')}
-            </button>}
-
             {/* Standard Navigation Buttons */}
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <nav className="erp-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {accessibleModules.map((mod) => {
                 const Icon = mod.icon;
                 const isCurrentModule = currentView === mod.id;
@@ -639,12 +631,14 @@ export default function App() {
             )}
           </div>
 
-          {/* Sidebar Footer: Profile & Connected Status Fixed to Bottom */}
-          <SidebarProfile
-            isCollapsed={isSidebarCompact}
-            onNavigate={navigateTo}
-            onOpenShortcuts={() => setShowShortcutsModal(true)}
-          />
+          {/* Sidebar Footer: Profile & Connected Status */}
+          <div style={{flexShrink:0}}>
+            <SidebarProfile
+              isCollapsed={isSidebarCompact}
+              onNavigate={navigateTo}
+              onOpenShortcuts={() => setShowShortcutsModal(true)}
+            />
+          </div>
         </aside>
       )}
 

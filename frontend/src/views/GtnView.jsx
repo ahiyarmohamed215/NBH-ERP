@@ -1,3 +1,5 @@
+import {useAuth} from '../context/AuthContext';
+import {hasPermission} from '../utils/moduleAccess';
 import {newestFirst} from '../utils/recordOrder';
 import {documentErrors,numberError} from '../utils/purchasingValidation';
 import FilterSelect from '../components/FilterSelect';
@@ -31,6 +33,8 @@ import {
 } from 'lucide-react';
 
 const GtnView = React.forwardRef(function GtnView(props, ref) {
+  const auth=useAuth();
+  const canManage=hasPermission(auth?.user,'GTN_PROCESS');
   const [showCreateForm, setShowCreateForm] = useState(false);
   useEffect(() => { props.onFormModeChange?.(showCreateForm); }, [showCreateForm, props.onFormModeChange]);
   const [gtns, setGtns] = useState([]);
@@ -518,7 +522,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
           </div>
 
           {/* GTN Table (Fixed Table Frame, Sticky Header - Exact CustomerHub Look) */}
-          <div
+          <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -533,7 +537,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
               flexDirection: 'column',
             }}
           >
-            <div style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+            <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
               <table className="erp-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
@@ -555,7 +559,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       REMARKS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ACTIONS
                     </th>
                   </tr>
@@ -588,7 +592,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                         title="Click row to view transfer details"
                       >
                         <td className="erp-table-cell">
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                          <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
                             {g.gtnNumber}
                           </span>
                         </td>
@@ -609,9 +613,9 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                         <td className="erp-table-cell" style={{ color: '#64748b', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {g.notes || g.remarks || '—'}
                         </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            {['DRAFT', 'PENDING', 'TRANSFERRED'].includes(g.status) && (<button
+                            {['DRAFT', 'PENDING', 'TRANSFERRED'].includes(g.status) && (<button disabled={!canManage} aria-label="Edit GTN Transfer" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -636,7 +640,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                             >
                               <Edit2 size={13} />
                             </button>)}
-                            <button
+                            <button aria-label="Print GTN PDF" className="erp-table-icon-action"
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -830,11 +834,12 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
           { label: 'Remarks', value: selectedGtn.notes || selectedGtn.remarks, wide: true },
         ]}
         onClose={() => setSelectedGtn(null)} onPrint={() => pdfApi.printGtn(selectedGtn.id)}
-        actions={[
+        actions={canManage ? ([
           ...(['DRAFT','PENDING','TRANSFERRED'].includes(selectedGtn.status) ? [{ label: 'Edit GTN', icon: Edit2, disabled: saving, onClick:()=>handleEditGtn(selectedGtn) }] : []),
-          ...(['PENDING','CANCELLED'].includes(selectedGtn.status) ? [{ label: 'Mark Transferred', icon: CheckCircle, tone: 'success', disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
+          ...(selectedGtn.status === 'PENDING' ? [{ label: 'Mark Transferred', icon: CheckCircle, tone: 'success', disabled: saving, onClick:()=>openStatusChange('TRANSFERRED') }] : []),
+          ...(selectedGtn.status === 'TRANSFERRED' ? [{ label: 'Mark Pending', icon: RotateCw, disabled: saving, onClick:()=>openStatusChange('PENDING') }] : []),
           ...(selectedGtn.status !== 'CANCELLED' ? [{ label: 'Cancel GTN', icon: Ban, tone: 'danger', disabled: saving, onClick:()=>openStatusChange('CANCELLED') }] : []),
-        ]}
+        ]) : []}
         columns={[
           { label: 'Product code', value: item => item.productSku || '—' },
           { label: 'Product name', value: item => item.productName },

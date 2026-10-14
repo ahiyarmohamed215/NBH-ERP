@@ -267,7 +267,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
       <div
         onClick={() => setMenuOpen(!menuOpen)}
         style={{
-          padding: isCollapsed ? '12px 0' : '10px 10px',
+          padding: isCollapsed ? '12px 0' : '10px 18px 10px 10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
@@ -419,6 +419,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                   style={{
                     fontSize: 'var(--erp-text-badge)',
                     color: '#64748b',
+                    marginLeft: 'auto',
                     fontWeight: 600,
                     padding: '1px 5px',
                     borderRadius: '4px',

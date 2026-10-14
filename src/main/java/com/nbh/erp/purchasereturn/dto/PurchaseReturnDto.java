@@ -45,7 +45,7 @@ public class PurchaseReturnDto {
                 .originalGrnNumber(prn.getItems().stream().filter(item -> item.getSourceGrn() != null).map(item -> item.getSourceGrn().getGrnNumber()).distinct().collect(Collectors.joining(", ")))
                 .supplierId(prn.getItems().stream().map(item -> item.getReturnSupplier().getId()).distinct().count() <= 1 ? prn.getSupplier().getId() : null)
                 .supplierCode(prn.getItems().stream().map(item -> item.getReturnSupplier().getId()).distinct().count() <= 1 ? prn.getSupplier().getSupplierCode() : null)
-                .supplierName(prn.getItems().stream().map(item -> item.getReturnSupplier().getName()).distinct().collect(Collectors.joining(", ")))
+                .supplierName(prn.getItems().stream().map(item -> item.getReturnSupplier().getDisplayName()).distinct().collect(Collectors.joining(", ")))
                 .warehouseId(prn.getItems().stream().map(item -> item.getReturnWarehouse().getId()).distinct().count() <= 1 ? prn.getWarehouse().getId() : null)
                 .warehouseCode(prn.getItems().stream().map(item -> item.getReturnWarehouse().getId()).distinct().count() <= 1 ? prn.getWarehouse().getCode() : null)
                 .warehouseName(prn.getItems().stream().map(item -> item.getReturnWarehouse().getName()).distinct().collect(Collectors.joining(", ")))
@@ -100,7 +100,7 @@ public class PurchaseReturnDto {
                     .remarks(item.getRemarks())
                     .sourceGrnId(item.getOriginalGrnId())
                     .originalGrnNumber(item.getSourceGrn() != null ? item.getSourceGrn().getGrnNumber() : null)
-                    .supplierId(item.getReturnSupplier().getId()).supplierName(item.getReturnSupplier().getName())
+                    .supplierId(item.getReturnSupplier().getId()).supplierName(item.getReturnSupplier().getDisplayName())
                     .warehouseId(item.getReturnWarehouse().getId()).warehouseName(item.getReturnWarehouse().getName())
                     .build();
         }

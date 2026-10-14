@@ -16,6 +16,8 @@ test('Purchasing popups share compact details, table controls and status workflo
       if (!name.endsWith('Api') || !api || typeof api !== 'object') continue;
       for (const method of Object.keys(api)) if (typeof api[method] === 'function') api[method] = async () => ({ data: [] });
     }
+    localStorage.setItem('nbh_token',`test.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.sig`);
+    apis.authApi.getMe=async()=>({data:{username:'admin',roles:['ROLE_ADMIN'],permissions:[]}});
     apis.productApi.getProducts=async()=>({data:{content:[{id:1,sku:'TEST-1',name:'Test product',defaultWarehouseId:1,costPrice:5}]}});
     apis.warehouseApi.getActive=async()=>({data:[{id:1,name:'North'},{id:2,name:'South'}]});
     apis.inventoryApi.getWarehouseStock=async()=>({data:[{productId:1,quantity:0,reservedQuantity:0}]});
@@ -39,9 +41,21 @@ test('Purchasing popups share compact details, table controls and status workflo
     window.open = () => ({ document: { open() {}, write(html) { printed = html; }, close() {} } });
     apis.pdfApi.printGtn = () => { printed = 'GTN-1'; };
     const { ToastProvider } = await server.ssrLoadModule('/src/context/ToastContext.jsx');
+    const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
+    const { default: GrnDetailsModal } = await server.ssrLoadModule('/src/components/GrnDetailsModal.jsx');
+    for (const status of ['DRAFT', 'PROCESSED', 'CANCELLED']) {
+      await act(async () => root.render(React.createElement(GrnDetailsModal, {
+        grn: { grnNumber: 'GRN-1', status, items: [item] }, canManage: true,
+        onClose() {}, onPrint() {}, onEdit() {}, onCancel() {},
+      })));
+      const labels = [...host.querySelectorAll('.purchase-inspection-detail-actions button')].map(button => button.textContent.trim());
+      assert.deepEqual(labels, status === 'CANCELLED' ? [] : ['Edit GRN', 'Cancel GRN']);
+      assert.ok(host.querySelector('[aria-label="Print GRN"]'), 'Cancelled GRNs remain printable');
+      assert.ok(host.querySelector('[aria-label="Close GRN details"]'));
+    }
     for (const [type, name] of [['GTN', 'GtnView'], ['PRN', 'PrnView'], ['PO', 'PurchaseOrdersView']]) {
       const { default: View } = await server.ssrLoadModule(`/src/views/${name}.jsx`);
-      await act(async () => root.render(React.createElement(ToastProvider, null, React.createElement(View, { key: type }))));
+      await act(async () => root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider, null, React.createElement(View, { key: type })))));
       const printList = host.querySelector(`[aria-label="Print ${type} list"]`);
       assert.ok(printList, `${type}: list print control is available`);
       if(type==='PO') {
@@ -138,13 +152,16 @@ test('Purchasing popups share compact details, table controls and status workflo
           assert.ok(host.querySelector('.purchase-inspection-header').textContent.includes(status));
           assert.ok(host.querySelector('.purchase-inspection-details').textContent.includes('Warehouse correction'));
         };
-        assert.equal(actionByText('Change to Pending'),undefined);
+        assert.ok(actionByText('Mark Pending'));
+        await transition('Mark Pending','PENDING');
+        assert.equal(actionByText('Mark Pending'),undefined);
+        await transition('Mark Transferred','TRANSFERRED');
+        assert.ok(actionByText('Mark Pending'));
         await transition('Cancel GTN','CANCELLED');
         assert.equal(actionByText('Edit GTN'),undefined);
-        assert.ok(actionByText('Mark Transferred'));assert.equal(actionByText('Change to Pending'),undefined);
-        await transition('Mark Transferred','TRANSFERRED');
-        await transition('Cancel GTN','CANCELLED');
-        await transition('Mark Transferred','TRANSFERRED');
+        assert.equal(actionByText('Mark Transferred'),undefined);assert.equal(actionByText('Change to Pending'),undefined);
+        assert.equal(actionByText('Mark Pending'),undefined);
+        assert.equal(host.querySelector('.purchase-inspection-detail-actions button'),null,'Cancelled GTNs have no management actions');
         assert.equal(host.querySelector('.purchase-inspection-items').closest('[role="dialog"]').querySelector('.purchase-inspection-header').querySelector('select, input, textarea'),null);
       } else {
         const changeStatus=async(label)=>{
@@ -163,10 +180,10 @@ test('Purchasing popups share compact details, table controls and status workflo
           assert.ok(actionByText('Edit PO'));assert.ok(host.querySelector('[title="Edit Purchase Order"]'));
           await changeStatus('Cancel PO');assert.equal(docs.PO.status,'CANCELLED');
           assert.equal(actionByText('Edit PO'),undefined);assert.equal(host.querySelector('[title="Edit Purchase Order"]'),null);
-          await changeStatus('Inform to Order');assert.equal(docs.PO.status,'INFORM_TO_ORDER');
+          assert.equal(docs.PO.status,'CANCELLED');
           assert.equal(actionByText('Return to Draft'),undefined);
           assert.equal(actionByText('Inform to Order'),undefined);
-          assert.ok(actionByText('Edit PO'));assert.ok(actionByText('Cancel PO'));
+          assert.equal(host.querySelector('.purchase-inspection-detail-actions button'),null,'Cancelled POs have no management actions');
           await act(async()=>host.querySelector('.modern-filter-trigger').click());assert.deepEqual([...document.querySelectorAll('.modern-filter-options [role="option"]')].map(option=>option.textContent),['All Statuses','Draft','Inform to Order','Cancelled']);await act(async()=>document.querySelector('.modern-filter-popup').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
           await act(async()=>host.querySelector('[aria-label="Close PO details"]').click());
           printed='';await act(async()=>host.querySelector('[title="Print PO"]').click());
@@ -177,12 +194,16 @@ test('Purchasing popups share compact details, table controls and status workflo
         assert.ok(host.querySelector('.purchase-inspection-header').textContent.includes('CANCELLED'));
         assert.equal(actionByText(`Cancel ${type}`),undefined);
         if(type==='PRN') assert.equal(actionByText('Edit PRN'),undefined,'Cancelled PRNs are locked in the popup');
-        assert.ok(actionByText(`Reprocess ${type}`));
+        assert.equal(actionByText(`Reprocess ${type}`),undefined);
         assert.equal(host.querySelector('[title="Edit GTN Transfer"], [title="Edit PRN"], [title="Edit Purchase Order"]'),null);
-        await changeStatus(`Reprocess ${type}`);
-        assert.ok(!host.querySelector('.purchase-inspection-header').textContent.includes('CANCELLED'));
-        assert.ok(actionByText(`Cancel ${type}`));
+        assert.equal(host.querySelector('.purchase-inspection-detail-actions button'),null,'Cancelled PRNs have no management actions');
       }
+      assert.ok(host.querySelector(`[aria-label="Print ${type}"]`),'Cancelled records remain printable');
+      // Load a separate active fixture to retain coverage of editing processed records.
+      await act(async()=>host.querySelector(`[aria-label="Close ${type} details"]`).click());
+      docs[type]={...docs[type],status:type==='GTN'?'TRANSFERRED':'PROCESSED'};
+      await act(async()=>host.querySelector('[aria-label="Refresh records"]').click());
+      await act(async()=>[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes(type+'-')).click());
       if(type==='GTN') {
         await act(async()=>actionByText('Edit GTN').click());
         assert.equal(host.querySelector('.purchase-inspection'),null);

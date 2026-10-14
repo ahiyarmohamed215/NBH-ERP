@@ -48,6 +48,7 @@ public class PurchaseOrderService {
   if(req.expectedDate()!=null && req.expectedDate().isBefore(po.getOrderDate())) throw new BusinessException("Expected date precedes creation date");
   if(id==null) po.setPoNumber(sequence.getNextNumber("PO"));
   po.setExpectedDate(req.expectedDate()); po.setTerms(req.terms()); po.setNotes(req.notes());
+  var historicalSuppliers=po.getItems().stream().map(i -> i.getOrderingSupplier().getId()).collect(java.util.stream.Collectors.toSet());
   po.getItems().clear(); var seen=new java.util.HashSet<String>(); BigDecimal total=BigDecimal.ZERO;
   for(var line:req.items()) {
    Long supplierId=line.supplierId()!=null ? line.supplierId() : req.supplierId();
@@ -55,7 +56,7 @@ public class PurchaseOrderService {
    if(!seen.add(line.productId()+":"+supplierId)) throw new BusinessException("Duplicate product line for the same supplier");
    var item=new PurchaseOrderItem(); item.setPurchaseOrder(po); item.setProduct(products.findById(line.productId()).orElseThrow(() -> new BusinessException("Unknown product")));
    item.setSupplier(suppliers.findById(supplierId).orElseThrow(()->new BusinessException("Unknown supplier")));
-   if(!Boolean.TRUE.equals(item.getSupplier().getIsActive())) throw new BusinessException("Supplier must be active");
+   if(!Boolean.TRUE.equals(item.getSupplier().getIsActive()) && !(item.getSupplier().isDeleted() && historicalSuppliers.contains(supplierId))) throw new BusinessException("Supplier must be active");
    if(!Boolean.TRUE.equals(item.getProduct().getIsActive())) throw new BusinessException("Inactive product");
    Long warehouseId=line.warehouseId()!=null ? line.warehouseId() : req.warehouseId()!=null ? req.warehouseId() : item.getProduct().getDefaultWarehouse()==null ? null : item.getProduct().getDefaultWarehouse().getId();
    if(warehouseId==null) throw new BusinessException("Set a delivery warehouse for product "+item.getProduct().getSku()+" in Inventory first");
