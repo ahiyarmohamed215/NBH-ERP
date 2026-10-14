@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
+public interface ProductRepository extends com.nbh.erp.common.repository.RecyclableRepository<Product> {
 
     Optional<Product> findBySku(String sku);
 
@@ -30,13 +30,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByCategoryIdAndIsActiveTrue(Long categoryId);
 
-    @Query("SELECT p FROM Product p WHERE p.isActive = true AND (" +
+    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND p.isActive = true AND (" +
             "LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR p.barcode = :query)")
     List<Product> searchActiveProducts(@Param("query") String query);
 
-    @Query("SELECT p FROM Product p WHERE " +
+    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND " +
             "(:query IS NULL OR :query = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR p.barcode LIKE CONCAT('%', :query, '%')) " +
             "AND (:categoryId IS NULL OR p.category.id = :categoryId)")

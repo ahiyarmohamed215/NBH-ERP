@@ -17,6 +17,10 @@ public interface CustomerMonthlySummaryRepository extends JpaRepository<Customer
 
     Optional<CustomerMonthlySummary> findByCustomerIdAndYearMonth(Long customerId, String yearMonth);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM CustomerMonthlySummary s WHERE s.customer.id = :customerId AND s.yearMonth = :yearMonth")
+    Optional<CustomerMonthlySummary> findForUpdate(@Param("customerId") Long customerId, @Param("yearMonth") String yearMonth);
+
     List<CustomerMonthlySummary> findByCustomerIdOrderByYearMonthDesc(Long customerId);
 
     @Query("SELECT COUNT(s) FROM CustomerMonthlySummary s WHERE s.customer.isActive = true AND s.yearMonth = :yearMonth AND s.currentRange.id = :rangeId")

@@ -20,7 +20,7 @@ public interface BrandRepository extends com.nbh.erp.common.repository.Recyclabl
 
     boolean existsByCodeAndIdNot(String code, Long id);
 
-    @Query("SELECT b FROM Brand b WHERE b.deletedAt IS NULL AND (" +
+    @Query("SELECT b FROM Brand b WHERE b.deletedAt IS NULL AND b.isActive = true AND (" +
            "LOWER(b.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(b.code) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Brand> searchBrands(@Param("query") String query);

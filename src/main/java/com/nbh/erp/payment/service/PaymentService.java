@@ -91,12 +91,24 @@ public class PaymentService {
             customer=customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow(() -> new BusinessException("Unknown customer"));
         }
         if(!Boolean.TRUE.equals(customer.getIsActive())) throw new BusinessException("Customer is inactive");
-        String pType=invoice==null ? "ADVANCE" : "INVOICE_PAYMENT";
-        if(request.getPaymentType()!=null && !pType.equalsIgnoreCase(request.getPaymentType())) throw new BusinessException("Payment type does not match invoice selection");
+        String pType;
+        if ("REFUND".equalsIgnoreCase(request.getPaymentType())) {
+            pType = "REFUND";
+        } else {
+            pType = invoice == null ? "ADVANCE" : "INVOICE_PAYMENT";
+            if (request.getPaymentType() != null && !pType.equalsIgnoreCase(request.getPaymentType())) {
+                throw new BusinessException("Payment type does not match invoice selection");
+            }
+        }
 
-        String paymentNumber = "ADVANCE".equals(pType)
-                ? sequenceService.generateAdvanceVoucherNumber()
-                : sequenceService.generatePaymentNumber();
+        String paymentNumber;
+        if ("REFUND".equals(pType)) {
+            paymentNumber = sequenceService.generateRefundNumber();
+        } else if ("ADVANCE".equals(pType)) {
+            paymentNumber = sequenceService.generateAdvanceVoucherNumber();
+        } else {
+            paymentNumber = sequenceService.generatePaymentNumber();
+        }
 
         LocalDate paymentDate = request.getPaymentDate() != null ? request.getPaymentDate() : LocalDate.now();
         String method = request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()
@@ -121,13 +133,15 @@ public class PaymentService {
         customerBalances.reconcile(customer.getId());
 
         String username = SecurityUtils.getCurrentUsername().orElse("system");
+        String auditAction = "REFUND".equals(pType) ? "PAYMENT_REFUND" : "PAYMENT_RECEIVE";
         auditLogService.log(
-                "PAYMENT_RECEIVE",
+                auditAction,
                 "Payment",
                 saved.getPaymentNumber(),
-                String.format("Payment %s of %s received for customer '%s'%s via %s by %s",
+                String.format("Payment %s of %s (%s) processed for customer '%s'%s via %s by %s",
                         saved.getPaymentNumber(),
                         saved.getAmount(),
+                        pType,
                         customer.getName(),
                         invoice != null ? " (Invoice: " + invoice.getInvoiceNumber() + ")" : "",
                         saved.getPaymentMethod(),

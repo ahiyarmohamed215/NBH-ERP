@@ -20,7 +20,7 @@ public class Category extends com.nbh.erp.common.entity.RecyclableEntity {
     @Column(nullable = false, unique = true, length = 20)
     private String code;
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String name;
 
     @Column(columnDefinition = "TEXT")
@@ -29,4 +29,11 @@ public class Category extends com.nbh.erp.common.entity.RecyclableEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    @Column(name = "category_status", length = 20)
+    private String status;
+
+    public String getStatus() {
+        return status != null ? status : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE";
+    }
 }

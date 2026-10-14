@@ -12,15 +12,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateWarehouseRequest {
 
-    @NotBlank(message = "Warehouse code is required")
-    @Size(min = 2, max = 20)
+    @Size(max = 20)
     private String code;
 
-    @NotBlank(message = "Warehouse name is required")
-    @Size(min = 2, max = 100)
+    @Size(max = 100)
     private String name;
 
     private String address;
+
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
+    private String status;
 
     @JsonAlias({"contactNumber", "phone"})
     private String phone;

@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import com.nbh.erp.common.validation.MasterRecordLifecycle;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProductService {
+    @org.springframework.beans.factory.annotation.Autowired private com.nbh.erp.recyclebin.RecycleBinService recycleBin;
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -66,17 +68,33 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public ProductDto getProductByBarcode(String barcode) {
-        Product product = productRepository.findByBarcode(barcode)
+        Product product = productRepository.findByBarcode(barcode).filter(matched -> !matched.isDeleted())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "barcode", barcode));
         return ProductDto.from(product);
     }
 
     @Transactional
     public ProductDto createProduct(CreateProductRequest request) {
+        String status = request.getStatus() != null ? request.getStatus() : "ACTIVE";
+        if (!java.util.Set.of("DRAFT", "ACTIVE").contains(status)) {
+            throw new BusinessException("New products must be draft or active");
+        }
+        if (!"DRAFT".equals(status)) {
+            if (!StringUtils.hasText(request.getName())) {
+                throw new BusinessException("Product name is required before activation");
+            }
+            if (request.getCategoryId() == null) {
+                throw new BusinessException("Category is required before activation");
+            }
+        } else {
+            if (!StringUtils.hasText(request.getName()) && !StringUtils.hasText(request.getSku()) && request.getCategoryId() == null && request.getBrandId() == null && request.getEffectiveWarehouseId() == null && !StringUtils.hasText(request.getDescription())) {
+                throw new BusinessException("Fill at least one input before saving a draft");
+            }
+        }
+
         String sku = request.getSku();
         if (!StringUtils.hasText(sku)) {
-            long count = productRepository.count() + 1;
-            sku = String.format("PRD-%05d", count);
+            sku = MasterRecordLifecycle.code(null, "PRD", productRepository.count(), productRepository::existsBySku);
         } else {
             sku = sku.trim().toUpperCase();
         }
@@ -89,8 +107,11 @@ public class ProductService {
             throw new DuplicateResourceException("Product", "barcode", request.getBarcode());
         }
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
+        Category category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
+        }
 
         Brand brand = null;
         if (request.getBrandId() != null) {
@@ -114,7 +135,7 @@ public class ProductService {
         Product product = Product.builder()
                 .sku(sku)
                 .barcode(StringUtils.hasText(request.getBarcode()) ? request.getBarcode().trim() : null)
-                .name(request.getName().trim())
+                .name(MasterRecordLifecycle.clean(request.getName()))
                 .description(request.getDescription())
                 .category(category)
                 .brand(brand)
@@ -126,13 +147,14 @@ public class ProductService {
                 .useBrandMarkup(request.getUseBrandMarkup() != null ? request.getUseBrandMarkup()
                         : request.getSellingPrice() == null || request.getSellingPrice().signum() == 0)
                 .minStockLevel(request.getMinStockLevel() != null ? request.getMinStockLevel() : 5)
-                .isActive(true)
+                .isActive("ACTIVE".equals(status))
+                .status(status)
                 .build();
 
         Product saved = productRepository.save(product);
 
         auditLogService.log("PRODUCT_CREATE", "INVENTORY", "Product", saved.getSku(),
-                String.format("Created product '%s' (SKU: %s, Selling Price: Rs. %s)", saved.getName(), saved.getSku(), saved.getSellingPrice()));
+                String.format("Created product '%s' (SKU: %s, Status: %s)", saved.getName(), saved.getSku(), saved.getStatus()));
 
         return ProductDto.from(saved);
     }
@@ -143,6 +165,10 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
         SecurityUtils.enforceCanEdit("PRODUCT", "Product: " + product.getName());
+        product.requireNotDeleted();
+
+        MasterRecordLifecycle.validate("Product", product.getStatus(), request.getName(), request.getSku(), request.getDescription(), request.getCategoryId(), request.getBrandId(), request.getEffectiveWarehouseId());
+        if (!"DRAFT".equals(product.getStatus()) && request.getCategoryId() == null) throw new BusinessException("Category is required before activation");
 
         if (StringUtils.hasText(request.getSku())) {
             String newSku = request.getSku().trim().toUpperCase();
@@ -166,7 +192,7 @@ public class ProductService {
             product.setBarcode(null);
         }
 
-        Category category = categoryRepository.findById(request.getCategoryId())
+        Category category = request.getCategoryId() == null ? null : categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
 
         Brand brand = null;
@@ -182,13 +208,14 @@ public class ProductService {
         }
 
         Long targetWarehouseId = request.getEffectiveWarehouseId();
+        if (targetWarehouseId == null && "DRAFT".equals(product.getStatus())) product.setDefaultWarehouse(null);
         if (targetWarehouseId != null) {
             Warehouse warehouse = warehouseRepository.findById(targetWarehouseId)
                     .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", targetWarehouseId));
             product.setDefaultWarehouse(warehouse);
         }
 
-        product.setName(request.getName().trim());
+        product.setName(MasterRecordLifecycle.clean(request.getName()));
         product.setDescription(request.getDescription());
         product.setCategory(category);
         product.setBrand(brand);
@@ -217,21 +244,43 @@ public class ProductService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
+    public ProductDto changeStatus(Long id, String target, String reason) {
+        reason = com.nbh.erp.common.dto.StatusChangeRequest.requireReason(reason);
+        target = MasterRecordLifecycle.targetStatus(target);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        SecurityUtils.enforceCanEdit("PRODUCT", "Product: " + product.getSku());
+        product.requireNotDeleted();
 
-        SecurityUtils.enforceCanEdit("PRODUCT", "Product: " + product.getName());
-
-        product.setIsActive(!product.getIsActive());
-        productRepository.save(product);
-
+        String previous = product.getStatus();
+        if ("ACTIVE".equals(target)) {
+            if (!StringUtils.hasText(product.getName())) throw new BusinessException("Product name is required before activation");
+            if (product.getCategory() == null) throw new BusinessException("Category is required before activation");
+        }
+        product.setStatus(target);
+        product.setIsActive("ACTIVE".equals(target));
+        Product saved = productRepository.save(product);
         auditLogService.log("PRODUCT_STATUS", "INVENTORY", "Product", product.getSku(),
-                String.format("Set product '%s' (SKU: %s) active status to %s", product.getName(), product.getSku(), product.getIsActive()));
+                previous + " -> " + target + ": " + reason);
+        return ProductDto.from(saved);
+    }
+
+    @Transactional
+    public void toggleActive(Long id) {
+        toggleActive(id, null);
+    }
+
+    @Transactional
+    public void toggleActive(Long id, String reason) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        String target = "ACTIVE".equals(product.getStatus()) ? "INACTIVE" : "ACTIVE";
+        String effectiveReason = StringUtils.hasText(reason) ? reason : ("ACTIVE".equals(target) ? "Activated product" : "Deactivated product");
+        changeStatus(id, target, effectiveReason);
     }
 
     @Transactional
     public void deleteProduct(Long id) {
-        SecurityUtils.enforceNoDelete("Product", id);
+        recycleBin.delete("PRODUCT", id);
     }
 }

@@ -26,7 +26,7 @@ export const moduleTabs={
   inventory:{'inventory-list':['INVENTORY_VIEW'],adjustments:['INVENTORY_VIEW'],'pos-quotas':['INVENTORY_VIEW'],products:['PRODUCT_VIEW'],warehouses:['WAREHOUSE_VIEW'],brands:['BRAND_VIEW'],categories:['CATEGORY_VIEW']},
   purchasing:{suppliers:['SUPPLIER_VIEW'],grn:['GRN_VIEW'],gtn:['GTN_VIEW'],prn:['PRN_VIEW'],'purchase-orders':['SUPPLIER_MANAGE']},
   invoicing:{sales:['SALES_VIEW'],'hold-bills':['SALES_CREATE','SALES_EDIT'],refunds:['SALES_RETURN'],quotations:['QUOTATION_VIEW'],pos:['SALES_CREATE']},
-  payments:{payments:['PAYMENT_VIEW'],'advance-payments':['PAYMENT_VIEW'],'outstanding-payments':['SALES_VIEW','PAYMENT_CREATE']},
+  payments:{payments:['PAYMENT_VIEW'],'advance-payments':['PAYMENT_VIEW'],refunds:['PAYMENT_VIEW'],'outstanding-payments':['SALES_VIEW','PAYMENT_CREATE']},
   delivery:{deliveries:['DELIVERY_VIEW'],routes:['DELIVERY_VIEW'],vehicles:['DELIVERY_VIEW']},
   reports:{'customer-reports':['REPORT_VIEW'],'sales-reports':['REPORT_VIEW'],'inventory-reports':['REPORT_VIEW'],'purchase-reports':['REPORT_VIEW'],'day-summary':['REPORT_VIEW','AUDIT_VIEW']},
 };

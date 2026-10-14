@@ -12,7 +12,7 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "customer_monthly_summaries", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_cust_month", columnNames = {"customer_id", "year_month"})
+        @UniqueConstraint(name = "uk_cust_month", columnNames = {"customer_id", "`year_month`"})
 })
 @Getter
 @Setter
@@ -29,7 +29,7 @@ public class CustomerMonthlySummary extends BaseEntity {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    @Column(name = "year_month", nullable = false, length = 7)
+    @Column(name = "`year_month`", nullable = false, length = 7)
     private String yearMonth; // Format: 'YYYY-MM', e.g. '2026-10'
 
     @Column(name = "qualifying_purchases", nullable = false, precision = 38, scale = 2)

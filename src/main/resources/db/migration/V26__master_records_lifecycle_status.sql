@@ -1,0 +1,16 @@
+ALTER TABLE products ADD COLUMN product_status VARCHAR(20) NULL;
+UPDATE products SET product_status = CASE WHEN is_active = TRUE THEN 'ACTIVE' ELSE 'INACTIVE' END;
+ALTER TABLE products MODIFY COLUMN category_id BIGINT NULL;
+ALTER TABLE products MODIFY COLUMN name VARCHAR(200) NULL;
+
+ALTER TABLE brands ADD COLUMN brand_status VARCHAR(20) NULL;
+UPDATE brands SET brand_status = CASE WHEN is_active = TRUE THEN 'ACTIVE' ELSE 'INACTIVE' END;
+ALTER TABLE brands MODIFY COLUMN name VARCHAR(150) NULL;
+
+ALTER TABLE categories ADD COLUMN category_status VARCHAR(20) NULL;
+UPDATE categories SET category_status = CASE WHEN is_active = TRUE THEN 'ACTIVE' ELSE 'INACTIVE' END;
+ALTER TABLE categories MODIFY COLUMN name VARCHAR(100) NULL;
+
+ALTER TABLE warehouses ADD COLUMN warehouse_status VARCHAR(20) NULL;
+UPDATE warehouses SET warehouse_status = CASE WHEN is_active = TRUE THEN 'ACTIVE' ELSE 'INACTIVE' END;
+ALTER TABLE warehouses MODIFY COLUMN name VARCHAR(100) NULL;

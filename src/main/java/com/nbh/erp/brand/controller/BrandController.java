@@ -71,6 +71,13 @@ public class BrandController {
         return ResponseEntity.ok(ApiResponse.ok("Brand updated successfully", updated));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_MANAGE') or hasAuthority('PRODUCT_MANAGE')")
+    public ResponseEntity<ApiResponse<BrandDto>> changeStatus(@PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.common.dto.RecordStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(brandService.changeStatus(id, request.status(), request.reason())));
+    }
+
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('BRAND_MANAGE') or hasAuthority('PRODUCT_MANAGE')")
     @Operation(summary = "Toggle brand active status")

@@ -37,6 +37,7 @@ public class ProductDto {
     private Boolean useBrandMarkup;
     private Integer minStockLevel;
     private Boolean isActive;
+    private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -74,6 +75,7 @@ public class ProductDto {
                 .useBrandMarkup(p.isBrandMarkupPricing())
                 .minStockLevel(p.getMinStockLevel())
                 .isActive(p.getIsActive())
+                .status(p.getStatus())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

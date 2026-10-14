@@ -60,12 +60,16 @@ export default function CustomerMonthlyRangeHub({
   // =========================================================================
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardError,setDashboardError]=useState('');
+  const [syncingMonth,setSyncingMonth]=useState(false);
   const [dashSearch, setDashSearch] = useState('');
   const [dashRangeFilter, setDashRangeFilter] = useState('ALL');
   const [dashStaffFilter, setDashStaffFilter] = useState('ALL');
   const [dashNearTargetOnly, setDashNearTargetOnly] = useState(false);
   const [dashPage, setDashPage] = useState(0);
   const [dashPageSize, setDashPageSize] = useState(25);
+
+  useEffect(()=>{setDashPage(0);},[selectedMonth,dashSearch,dashRangeFilter,dashStaffFilter]);
 
   // Customer History Modal
   const [historyCustomer, setHistoryCustomer] = useState(null);
@@ -125,6 +129,7 @@ export default function CustomerMonthlyRangeHub({
   // =========================================================================
   const loadDashboard = useCallback(async () => {
     setLoadingDashboard(true);
+    setDashboardError('');
     try {
       const params = {
         yearMonth: selectedMonth,
@@ -140,7 +145,7 @@ export default function CustomerMonthlyRangeHub({
       setDashboardData(data);
     } catch (err) {
       console.error('Error loading range dashboard:', err);
-      if (addToast) addToast('Failed to load customer range dashboard', 'error');
+      setDashboardError(err.response?.data?.message || err.message || 'Unable to load customer ranges. Please retry.');
     } finally {
       setLoadingDashboard(false);
     }
@@ -358,13 +363,15 @@ export default function CustomerMonthlyRangeHub({
   };
 
   const handleSyncMonth = async () => {
+    if(syncingMonth)return;
+    setSyncingMonth(true);
     try {
       await customerMonthlyRangeApi.syncMonth(selectedMonth);
       if (addToast) addToast(`Month ${selectedMonth} ranges synchronized!`, 'success');
       loadDashboard();
     } catch (err) {
-      if (addToast) addToast('Failed to synchronize monthly ranges', 'error');
-    }
+      if (addToast) addToast(err.response?.data?.message || err.message || 'Failed to synchronize monthly ranges', 'error');
+    } finally {setSyncingMonth(false);}
   };
 
   // Client-side filtering for Near Target toggle
@@ -1054,8 +1061,8 @@ export default function CustomerMonthlyRangeHub({
               {/* Sync / Refresh Month (Icon Only) */}
               <button
                 type="button"
-                onClick={handleSyncMonth}
-                disabled={loadingDashboard}
+                onClick={canEdit?handleSyncMonth:loadDashboard}
+                disabled={loadingDashboard || syncingMonth}
                 style={{
                   height: '32px',
                   width: '32px',
@@ -1071,7 +1078,7 @@ export default function CustomerMonthlyRangeHub({
                   cursor: 'pointer',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                 }}
-                title="Synchronize & Recalculate Month"
+                title={canEdit?"Synchronize & Recalculate Month":"Refresh customer ranges"}
               >
                 <RefreshCw size={13} className={loadingDashboard ? 'spin' : ''} />
               </button>
@@ -1258,6 +1265,8 @@ export default function CustomerMonthlyRangeHub({
                         Loading customer monthly ranges...
                       </td>
                     </tr>
+                  ) : dashboardError ? (
+                    <tr><td colSpan={7}><div role="alert" style={{padding:'24px',textAlign:'center'}}><p>{dashboardError}</p><button type="button" className="btn btn-glass erp-button" onClick={loadDashboard}>Retry loading customer ranges</button></div></td></tr>
                   ) : displayedCustomers.length === 0 ? (
                     <tr>
                       <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#94a3b8' }}>

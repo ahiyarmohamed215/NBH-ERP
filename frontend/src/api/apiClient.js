@@ -311,6 +311,7 @@ export const warehouseApi = {
   getById: (id) => api.get(`/warehouses/${id}`),
   create: (data) => api.post('/warehouses', data),
   update: (id, data) => api.put(`/warehouses/${id}`, data),
+  changeStatus: (id,status,reason) => api.patch(`/warehouses/${id}/status`, {status,reason}),
   toggleActive: (id) => api.patch(`/warehouses/${id}/toggle-active`),
   delete: (id) => api.delete(`/warehouses/${id}`),
 };
@@ -320,6 +321,7 @@ export const categoryApi = {
   getActive: () => api.get('/categories/active'),
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),
+  changeStatus: (id,status,reason) => api.patch(`/categories/${id}/status`, {status,reason}),
   toggleActive: (id) => api.patch(`/categories/${id}/toggle-active`),
   delete: (id) => api.delete(`/categories/${id}`),
 };
@@ -331,6 +333,7 @@ export const brandApi = {
   getById: (id) => api.get(`/brands/${id}`),
   create: (data) => api.post('/brands', data),
   update: (id, data) => api.put(`/brands/${id}`, data),
+  changeStatus: (id,status,reason) => api.patch(`/brands/${id}/status`, {status,reason}),
   toggleActive: (id) => api.patch(`/brands/${id}/toggle-active`),
   delete: (id) => api.delete(`/brands/${id}`),
 };
@@ -342,6 +345,7 @@ export const productApi = {
   getById: (id) => api.get(`/products/${id}`),
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
+  changeStatus: (id,status,reason) => api.patch(`/products/${id}/status`, {status,reason}),
   toggleActive: (id) => api.patch(`/products/${id}/toggle-active`),
   delete: (id) => api.delete(`/products/${id}`),
 };
@@ -488,6 +492,7 @@ export const paymentApi = {
   getById: (id) => api.get(`/payments/${id}`),
   create: (data) => api.post('/payments', data),
   createAdvance: (data) => api.post('/payments', { ...data, paymentType: 'ADVANCE' }),
+  createRefund: (data) => api.post('/payments', { ...data, paymentType: 'REFUND' }),
   allocate: (id, data) => api.post(`/payments/${id}/allocations`, data),
   void: (id, reason) => api.post(`/payments/${id}/void`, null, { params: { reason } }),
 };

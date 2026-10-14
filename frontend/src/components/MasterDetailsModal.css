@@ -1,0 +1,26 @@
+.master-details-backdrop {padding:12px;z-index:1100;}
+.master-details-modal.purchase-inspection {width:min(760px,calc(100vw - 24px));max-width:760px;height:auto;max-height:calc(100dvh - 24px);border:1px solid #e2e8f0;border-radius:12px;background:#fff;}
+.master-details-modal .purchase-inspection-header {padding:20px 24px;align-items:flex-start;}
+.master-details-modal .purchase-inspection-header h2 {margin:0;overflow-wrap:anywhere;line-height:1.35;}
+.master-details-modal .purchase-inspection-title {display:block;min-width:0;}
+.master-details-meta {display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:var(--erp-text-small);color:#64748b;overflow-wrap:anywhere;}
+.master-details-meta > span {font-variant-numeric:tabular-nums;}
+.master-details-close {display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;border:1px solid #e2e8f0;border-radius:6px;background:white;color:#64748b;cursor:pointer;}
+.master-details-close:hover {color:var(--erp-accent,#0284c7);border-color:var(--erp-accent,#0284c7);}
+.master-details-close:focus-visible {outline:2px solid var(--erp-accent,#0284c7);outline-offset:2px;}
+.master-details-body {min-height:0;overflow:auto;overscroll-behavior:contain;}
+.master-details-modal .master-details-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 32px;max-height:none;overflow:visible;margin:0;padding:24px;border-top:0;border-bottom:0;background:white;}
+.master-details-modal .master-details-grid dt {margin-bottom:6px;font-size:var(--erp-text-small);color:#64748b;}
+.master-details-modal .master-details-grid dd {font-size:var(--erp-text-body);font-weight:500;color:#334155;line-height:1.6;}
+.master-details-wide {grid-column:1/-1;padding-top:18px;border-top:1px solid #edf0f4;}
+.master-details-wide:first-child {padding-top:0;border-top:0;}
+.master-details-modal .master-details-wide dd {font-weight:400;white-space:pre-wrap;}
+.master-details-modal .master-details-management {display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;flex-shrink:0;gap:8px;width:auto;max-width:none;margin:0 24px;padding:16px 0 20px;border-top:1px solid #edf0f4;}
+.master-details-modal .master-details-management .btn {width:auto;min-height:36px;justify-content:center;}
+.master-details-footer {display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #e2e8f0;flex-shrink:0;background:#fff;}
+@media(max-width:560px){
+ .master-details-modal .purchase-inspection-header {padding:18px 16px;}
+ .master-details-modal .master-details-grid {grid-template-columns:minmax(0,1fr);padding:20px 16px;gap:16px;}
+ .master-details-modal .master-details-management {margin:0 16px;}
+ .master-details-footer {padding:12px 16px;}
+}

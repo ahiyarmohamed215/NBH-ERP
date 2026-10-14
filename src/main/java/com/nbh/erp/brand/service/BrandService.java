@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.nbh.erp.security.SecurityUtils;
 
+import com.nbh.erp.common.validation.MasterRecordLifecycle;
+import com.nbh.erp.common.dto.StatusChangeRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -68,6 +70,9 @@ public class BrandService {
 
     @Transactional
     public BrandDto createBrand(CreateBrandRequest request) {
+        String status = MasterRecordLifecycle.initialStatus(request.getStatus());
+        MasterRecordLifecycle.validate("Brand", status, request.getName(), request.getDescription(), request.getCode());
+        request.setCode(MasterRecordLifecycle.code(request.getCode(), "BR", brandRepository.count(), brandRepository::existsByCode));
         String cleanCode = request.getCode().trim().toUpperCase();
         if (brandRepository.existsByCode(cleanCode)) {
             throw new DuplicateResourceException("Brand", "code", cleanCode);
@@ -75,10 +80,11 @@ public class BrandService {
 
         Brand brand = Brand.builder()
                 .code(cleanCode)
-                .name(request.getName().trim())
+                .name(MasterRecordLifecycle.clean(request.getName()))
                 .description(request.getDescription())
                 .markupPercent(request.getMarkupPercent() != null ? request.getMarkupPercent() : java.math.BigDecimal.ZERO)
-                .isActive(true)
+                .isActive("ACTIVE".equals(status))
+                .status(status)
                 .build();
 
         Brand saved = brandRepository.save(brand);
@@ -96,8 +102,9 @@ public class BrandService {
 
         SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
         brand.requireNotDeleted();
+        MasterRecordLifecycle.validate("Brand", brand.getStatus(), request.getName(), request.getDescription(), brand.getCode());
 
-        brand.setName(request.getName().trim());
+        brand.setName(MasterRecordLifecycle.clean(request.getName()));
         brand.setDescription(request.getDescription());
         if (request.getMarkupPercent() != null) brand.setMarkupPercent(request.getMarkupPercent());
 
@@ -110,18 +117,27 @@ public class BrandService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
+    public BrandDto changeStatus(Long id, String target, String reason) {
+        target = MasterRecordLifecycle.targetStatus(target);
+        reason = StatusChangeRequest.requireReason(reason);
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
-
-        SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getName());
+        SecurityUtils.enforceCanEdit("BRAND", "Brand: " + brand.getCode());
         brand.requireNotDeleted();
+        MasterRecordLifecycle.validate("Brand", target, brand.getName(), brand.getCode());
+        String previous = brand.getStatus();
+        brand.setStatus(target);
+        brand.setIsActive("ACTIVE".equals(target));
+        Brand saved = brandRepository.save(brand);
+        auditLogService.log("BRAND_STATUS", "INVENTORY", "Brand", brand.getCode(), previous + " -> " + target + ": " + reason);
+        return BrandDto.from(saved);
+    }
 
-        brand.setIsActive(!brand.getIsActive());
-        brandRepository.save(brand);
-        log.info("Brand ID {} active status toggled to {}", id, brand.getIsActive());
-        auditLogService.log("BRAND_TOGGLE", "Brand", brand.getCode(),
-                String.format("Brand '%s' active status set to %s by %s", brand.getName(), brand.getIsActive(), getCurrentUsername()));
+    @Transactional
+    public void toggleActive(Long id) {
+        Brand record = brandRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
+        changeStatus(id, "ACTIVE".equals(record.getStatus()) ? "INACTIVE" : "ACTIVE", "Changed from legacy status control");
     }
 
     @Transactional

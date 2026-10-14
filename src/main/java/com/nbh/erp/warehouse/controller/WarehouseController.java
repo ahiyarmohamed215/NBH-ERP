@@ -63,6 +63,13 @@ public class WarehouseController {
         return ResponseEntity.ok(ApiResponse.ok("Warehouse updated successfully", updated));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_MANAGE')")
+    public ResponseEntity<ApiResponse<WarehouseDto>> changeStatus(@PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.common.dto.RecordStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(warehouseService.changeStatus(id, request.status(), request.reason())));
+    }
+
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('WAREHOUSE_MANAGE')")
     @Operation(summary = "Toggle warehouse active status")

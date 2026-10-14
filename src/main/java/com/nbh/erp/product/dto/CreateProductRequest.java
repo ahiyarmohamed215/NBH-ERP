@@ -19,14 +19,15 @@ public class CreateProductRequest {
 
     private String barcode;
 
-    @NotBlank(message = "Product name is required")
-    @Size(min = 2, max = 200)
+    @Size(max = 200)
     private String name;
 
     private String description;
 
-    @NotNull(message = "Category ID is required")
     private Long categoryId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
+    private String status;
 
     private Long brandId;
 

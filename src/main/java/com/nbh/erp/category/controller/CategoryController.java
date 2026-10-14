@@ -63,6 +63,13 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.ok("Category updated successfully", updated));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
+    public ResponseEntity<ApiResponse<CategoryDto>> changeStatus(@PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.common.dto.RecordStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(categoryService.changeStatus(id, request.status(), request.reason())));
+    }
+
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CATEGORY_MANAGE')")
     @Operation(summary = "Toggle category active status")

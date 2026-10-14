@@ -18,6 +18,7 @@ public class CategoryDto {
     private String name;
     private String description;
     private Boolean isActive;
+    private String status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -32,6 +33,7 @@ public class CategoryDto {
                 .name(c.getName())
                 .description(c.getDescription())
                 .isActive(c.getIsActive())
+                .status(c.getStatus())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

@@ -151,7 +151,7 @@ public class CustomerRangeController {
     @PostMapping("/sync-month")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('CUSTOMER_MANAGE') or hasAuthority('CUSTOMER_TARGET_MANAGE') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> syncMonth(@RequestParam(required = false) String yearMonth) {
-        customerRangeService.ensureSummariesForMonth(yearMonth);
+        customerRangeService.synchronizeMonth(yearMonth);
         return ResponseEntity.ok(ApiResponse.ok("Monthly customer ranges synchronized", null));
     }
 }

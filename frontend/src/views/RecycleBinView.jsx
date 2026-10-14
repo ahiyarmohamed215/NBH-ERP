@@ -5,7 +5,7 @@ import {useToast} from '../context/ToastContext';
 import FilterSelect from '../components/FilterSelect';
 import RecordDeleteDialog from '../components/RecordDeleteDialog';
 import {useDataSync} from '../hooks/useDataSync';
-const labels={SUPPLIER:'Supplier',BRAND:'Brand',WAREHOUSE:'Warehouse',CATEGORY:'Category',ALLOCATION:'Inventory allocation',USER:'Employee',CUSTOMER:'Customer'};
+const labels={PRODUCT:'Product',SUPPLIER:'Supplier',BRAND:'Brand',WAREHOUSE:'Warehouse',CATEGORY:'Category',ALLOCATION:'Inventory allocation',USER:'Employee',CUSTOMER:'Customer'};
 export default function RecycleBinView() {
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState(''),[type,setType]=useState('ALL'),[deleting,setDeleting]=useState(null);const {addToast}=useToast();
  const load=async()=>{setLoading(true);setError('');try{const res=await recycleBinApi.getAll();setItems(res.data || []);}catch(error){setError(error.response?.data?.message || error.message || 'Unable to load recycle bin');}finally{setLoading(false);}};

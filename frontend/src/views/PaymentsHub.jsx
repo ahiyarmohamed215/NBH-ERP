@@ -24,6 +24,7 @@ import {
   FileText,
   Calendar,
   Filter,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange }) {
@@ -34,6 +35,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   const PAYMENT_TABS = [
     { id: 'payments', label: 'Payments', icon: DollarSign },
     { id: 'advance-payments', label: 'Advance Payment', icon: Tag },
+    { id: 'refunds', label: 'Refunds', icon: RotateCcw },
     { id: 'outstanding-payments', label: 'Outstanding Payments', icon: AlertCircle },
   ];
 
@@ -96,6 +98,27 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
     amount: '',
     paymentMethod: 'Bank Transfer',
     paymentDate: formatBusinessDate(),
+    notes: '',
+  });
+
+  // -------------------------------------------------------------
+  // STATE: REFUNDS DATA & FILTERS
+  // -------------------------------------------------------------
+  const [refunds, setRefunds] = useState([]);
+  const [loadingRefunds, setLoadingRefunds] = useState(false);
+  const [refundSearchQuery, setRefundSearchQuery] = useState('');
+  const [refundMethodFilter, setRefundMethodFilter] = useState('ALL');
+  const [showRecordRefundModal, setShowRecordRefundModal] = useState(false);
+  const [isSavingRefund, setIsSavingRefund] = useState(false);
+  const [customersList, setCustomersList] = useState([]);
+  const [refundForm, setRefundForm] = useState({
+    customerId: '',
+    customerName: '',
+    advanceVoucherId: '',
+    amount: '',
+    paymentMethod: 'Cash',
+    paymentDate: formatBusinessDate(),
+    referenceNumber: '',
     notes: '',
   });
 
@@ -184,10 +207,47 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
     }
   };
 
+  const loadBackendRefunds = async () => {
+    try {
+      setLoadingRefunds(true);
+      const res = await paymentApi.search({ paymentType: 'REFUND', size: 100 });
+      const liveList = res.data?.content || res.data || [];
+      const formatted = liveList.map((p) => ({
+        id: p.id,
+        refundNo: p.receiptNo || p.paymentNumber,
+        paymentNumber: p.paymentNumber,
+        customerName: p.customerName || 'Customer',
+        customerId: p.customerId,
+        paymentDate: p.paymentDate || (p.createdAt ? p.createdAt.split('T')[0] : ''),
+        paymentMethod: p.paymentMethod || 'Cash',
+        referenceNumber: p.referenceNumber || '—',
+        amount: Number(p.amount || 0),
+        status: p.status || 'COMPLETED',
+        notes: p.notes || '',
+      }));
+      setRefunds(formatted);
+    } catch (err) {
+      console.error('Failed to load backend refunds:', err);
+    } finally {
+      setLoadingRefunds(false);
+    }
+  };
+
+  const loadCustomers = async () => {
+    try {
+      const res = await customerApi.getAll();
+      setCustomersList(res.data || []);
+    } catch {
+      // silent fallback
+    }
+  };
+
   useEffect(() => {
     loadBackendPayments();
     loadBackendAdvances();
+    loadBackendRefunds();
     loadBackendInvoices();
+    loadCustomers();
   }, []);
 
   const resolveCustomerId = async (name) => {
@@ -378,6 +438,120 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
   };
 
   // -------------------------------------------------------------
+  // ACTIONS: REFUNDS
+  // -------------------------------------------------------------
+  const handleSaveRefund = async (e) => {
+    e.preventDefault();
+    if (isSavingRefund) return;
+    if (!refundForm.customerName || !refundForm.amount) {
+      addToast('Please provide customer name and refund amount', 'error');
+      return;
+    }
+    const amt = parseFloat(refundForm.amount) || 0;
+    if (amt <= 0) {
+      addToast('Refund amount must be greater than zero', 'error');
+      return;
+    }
+    setIsSavingRefund(true);
+    try {
+      const cId = refundForm.customerId || (await resolveCustomerId(refundForm.customerName));
+      const payload = {
+        customerId: cId,
+        customerName: refundForm.customerName,
+        amount: amt,
+        paymentMethod: refundForm.paymentMethod || 'Cash',
+        paymentDate: refundForm.paymentDate || formatBusinessDate(),
+        referenceNumber: refundForm.referenceNumber || (refundForm.advanceVoucherId ? `Adv: ${refundForm.advanceVoucherId}` : ''),
+        notes: refundForm.notes || 'Customer refund for advance / invoice return',
+      };
+      const res = await paymentApi.createRefund(payload);
+      const created = res.data?.data || res.data;
+      addToast(`Customer refund ${created?.paymentNumber || created?.receiptNo || 'voucher'} processed successfully!`, 'success');
+      setShowRecordRefundModal(false);
+      setRefundForm({
+        customerId: '',
+        customerName: '',
+        advanceVoucherId: '',
+        amount: '',
+        paymentMethod: 'Cash',
+        paymentDate: formatBusinessDate(),
+        referenceNumber: '',
+        notes: '',
+      });
+      await Promise.all([loadBackendRefunds(), loadBackendAdvances(), loadBackendPayments()]);
+    } catch (err) {
+      console.error('Failed to process refund:', err);
+      addToast(err.response?.data?.message || err.message || 'Unable to process refund. Please try again.', 'error');
+    } finally {
+      setIsSavingRefund(false);
+    }
+  };
+
+  const handleVoidRefund = async (refund) => {
+    if (!canEditPayment) {
+      addToast('You do not have permission to void refunds.', 'error');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to void refund voucher ${refund.refundNo || refund.paymentNumber}?`)) {
+      return;
+    }
+    try {
+      if (refund.id) {
+        await paymentApi.void(refund.id, 'User voided via UI');
+      }
+      addToast(`Refund ${refund.refundNo || refund.paymentNumber} voided successfully!`, 'success');
+      await Promise.all([loadBackendRefunds(), loadBackendAdvances(), loadBackendPayments()]);
+    } catch (err) {
+      console.error('Failed to void refund:', err);
+      addToast(err.response?.data?.message || 'Failed to void refund', 'error');
+    }
+  };
+
+  const filteredRefunds = useMemo(() => {
+    return refunds.filter((r) => {
+      if (refundMethodFilter !== 'ALL' && r.paymentMethod !== refundMethodFilter) return false;
+      if (refundSearchQuery.trim()) {
+        const query = refundSearchQuery.toLowerCase();
+        return (
+          (r.refundNo || '').toLowerCase().includes(query) ||
+          (r.customerName || '').toLowerCase().includes(query) ||
+          (r.referenceNumber || '').toLowerCase().includes(query) ||
+          (r.notes || '').toLowerCase().includes(query)
+        );
+      }
+      return true;
+    });
+  }, [refunds, refundSearchQuery, refundMethodFilter]);
+
+  const totalRefundsAmount = useMemo(() => {
+    return filteredRefunds
+      .filter((r) => r.status !== 'VOIDED')
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  }, [filteredRefunds]);
+
+  const handleExportRefundsCSV = () => {
+    const headers = ['Refund #', 'Customer', 'Date', 'Method', 'Reference #', 'Amount', 'Status', 'Notes'];
+    const rows = filteredRefunds.map((r) => [
+      `"${r.refundNo || ''}"`,
+      `"${r.customerName || ''}"`,
+      `"${r.paymentDate || ''}"`,
+      `"${r.paymentMethod || ''}"`,
+      `"${r.referenceNumber || ''}"`,
+      r.amount,
+      `"${r.status || ''}"`,
+      `"${(r.notes || '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const link = document.createElement('a');
+    link.setAttribute('href', encodeURI(csvContent));
+    link.setAttribute('download', `Refunds_Export_${formatBusinessDate()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('Refund records exported to CSV', 'success');
+  };
+
+  // -------------------------------------------------------------
   // ACTIONS: OUTSTANDING PAYMENTS
   // -------------------------------------------------------------
   const outstandingInvoices = useMemo(() => {
@@ -481,6 +655,32 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
             }}
           >
             <Plus size={17} /> Record Advance
+          </button>
+        ) : currentTab === 'refunds' ? (
+          <button disabled={!canWriteTab(user,'payments',currentTab)} className="erp-button erp-button-primary"
+            type="button"
+            onClick={() => {
+              setRefundForm({
+                customerId: '',
+                customerName: '',
+                advanceVoucherId: '',
+                amount: '',
+                paymentMethod: 'Cash',
+                paymentDate: formatBusinessDate(),
+                referenceNumber: '',
+                notes: '',
+              });
+              setShowRecordRefundModal(true);
+            }}
+            style={{
+              padding: '9px 18px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <RotateCcw size={17} /> Process Refund
           </button>
         ) : (
           <button disabled={!canWriteTab(user,'payments',currentTab)} className="erp-button erp-button-primary"
@@ -963,7 +1163,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                       <td className="erp-table-cell" style={{ textAlign: 'center' }}>
                         <StatusBadge status={a.status} />
                       </td>
-                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         <button aria-label="Print Advance Voucher"
                           type="button"
                           className="btn btn-glass btn-sm erp-button erp-table-icon-action"
@@ -974,6 +1174,25 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                           style={{ padding: '4px 8px' }}
                           title="Print Advance Voucher"
                         ><Printer size={13} /></button>
+                        <button aria-label="Refund Advance Deposit"
+                          type="button"
+                          className="btn btn-glass btn-sm erp-button erp-table-icon-action"
+                          onClick={() => {
+                            setRefundForm({
+                              customerId: a.customerId || '',
+                              customerName: a.customerName || '',
+                              advanceVoucherId: a.voucherNo || a.paymentNumber || '',
+                              amount: String(a.balance || a.amount || ''),
+                              paymentMethod: 'Cash',
+                              paymentDate: formatBusinessDate(),
+                              referenceNumber: a.voucherNo || a.paymentNumber || '',
+                              notes: `Refund payout for advance voucher ${a.voucherNo}`,
+                            });
+                            setShowRecordRefundModal(true);
+                          }}
+                          style={{ padding: '4px 8px', color: '#dc2626' }}
+                          title="Issue refund from this customer advance deposit"
+                        ><RotateCcw size={13} /></button>
                       </td>
                     </tr>
                   ))}
@@ -981,6 +1200,278 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                     <tr>
                       <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#64748b' }}>
                         No advance records found matching your search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 3: REFUNDS (Customer Advance & Invoice Return Refunds) */}
+      {/* ------------------------------------------------------------- */}
+      {currentTab === 'refunds' && (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+          {/* KPI Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', flexShrink: 0 }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Total Refunds Issued
+              </div>
+              <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#dc2626', marginTop: '4px', fontFamily: 'monospace' }}>
+                Rs. {totalRefundsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Refund Transactions
+              </div>
+              <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                {filteredRefunds.length}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '16px' }}>
+              <div style={{ fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Customer Advance Deposits Pool
+              </div>
+              <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#059669', marginTop: '4px', fontFamily: 'monospace' }}>
+                Rs. {advances.reduce((s, a) => s + Number(a.balance || a.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Toolbar Card */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              flexWrap: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {/* Left Control: Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+              <Search
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '11px',
+                  color: '#94a3b8',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input className="erp-field"
+                type="text"
+                placeholder="Search refunds by voucher #, customer, or reference number..."
+                value={refundSearchQuery}
+                onChange={(e) => setRefundSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '38px',
+                  padding: '0 32px 0 38px',
+                  border: '1px solid #cbd5e1',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                  color: '#0f172a',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#0284c7';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }}
+              />
+              {refundSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setRefundSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '2px',
+                  }}
+                  title="Clear search text"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Method & Export */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Filter size={15} color="#64748b" />
+                <select className="erp-field"
+                  value={refundMethodFilter}
+                  onChange={(e) => setRefundMethodFilter(e.target.value)}
+                  style={{
+                    height: '38px',
+                    padding: '0 8px',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="ALL">All Methods</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Online">Online</option>
+                </select>
+              </div>
+
+              {refundSearchQuery && (
+                <button className="erp-button"
+                  type="button"
+                  onClick={() => setRefundSearchQuery('')}
+                  style={{
+                    height: '38px',
+                    padding: '0 12px',
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#f1f5f9',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  title="Reset search"
+                >
+                  <X size={13} /> Reset
+                </button>
+              )}
+
+              {/* Export CSV */}
+              <button
+                type="button"
+                onClick={handleExportRefundsCSV}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: 0,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                title="Export refunds to CSV"
+              >
+                <Download size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="erp-table-frame"
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
+              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REFUND VOUCHER #</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SOURCE / REFERENCE</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REFUND AMOUNT</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>METHOD</th>
+                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>NOTES / REASON</th>
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRefunds.map((r) => (
+                    <tr
+                      key={r.id}
+                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>
+                        {r.refundNo}
+                      </td>
+                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{r.customerName}</td>
+                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
+                        {r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="erp-table-cell" style={{ color: '#334155', fontFamily: 'monospace', fontSize: 'var(--erp-text-small)' }}>
+                        {r.referenceNumber || 'Direct Refund'}
+                      </td>
+                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace' }}>
+                        LKR {Number(r.amount || 0).toFixed(2)}
+                      </td>
+                      <td className="erp-table-cell" style={{ color: '#334155' }}>{r.paymentMethod}</td>
+                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="erp-table-cell" style={{ color: '#64748b', fontSize: 'var(--erp-text-small)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.notes}>
+                        {r.notes || '—'}
+                      </td>
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <button aria-label="Print Refund Voucher"
+                          type="button"
+                          className="btn btn-glass btn-sm erp-button erp-table-icon-action"
+                          onClick={() => {
+                            addToast(`Refund voucher ${r.refundNo} preview printed`, 'info');
+                            window.print();
+                          }}
+                          style={{ padding: '4px 8px' }}
+                          title="Print Refund Voucher"
+                        ><Printer size={13} /></button>
+                        {r.status !== 'VOIDED' && canEditPayment && (
+                          <button aria-label="Void Refund"
+                            type="button"
+                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
+                            onClick={() => handleVoidRefund(r)}
+                            style={{ padding: '4px 8px', color: '#dc2626' }}
+                            title="Void Refund Voucher"
+                          ><X size={13} /></button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredRefunds.length === 0 && (
+                    <tr>
+                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#64748b', padding: '36px 12px' }}>
+                        {loadingRefunds ? 'Loading customer refunds...' : 'No refund records found matching your search.'}
                       </td>
                     </tr>
                   )}
@@ -1501,6 +1992,243 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
                   style={{ borderColor: '#0284c7' }}
                 >
                   Save Advance Voucher
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: Process Customer Refund */}
+      {/* ------------------------------------------------------------- */}
+      {showRecordRefundModal && (
+        <div
+          className="modal-backdrop"
+          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+        >
+          <div
+            className="glass-modal"
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              padding: '24px',
+              borderRadius: '12px',
+              backgroundColor: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <RotateCcw size={18} color="#dc2626" /> Process Customer Refund
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
+                  Refund customer advance payments or returned invoice credit to cash/bank
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecordRefundModal(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRefund} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Refund Voucher #</label>
+                  <input className="erp-field"
+                    type="text"
+                    readOnly
+                    value="[Auto-generated: RFD-...]"
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Refund Date</label>
+                  <input className="erp-field"
+                    type="date"
+                    value={refundForm.paymentDate}
+                    onChange={(e) => setRefundForm({ ...refundForm, paymentDate: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              {/* Customer selection */}
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Select Customer *</label>
+                {customersList.length > 0 ? (
+                  <select
+                    className="erp-field"
+                    required
+                    value={refundForm.customerName}
+                    onChange={(e) => {
+                      const selCust = customersList.find((c) => c.name === e.target.value);
+                      const custName = e.target.value;
+                      const cId = selCust ? selCust.id : '';
+                      const customerAdvs = advances.filter(
+                        (a) => (cId && a.customerId === cId) || (a.customerName && a.customerName.toLowerCase() === custName.toLowerCase())
+                      );
+                      const advSum = customerAdvs.reduce((sum, a) => sum + Number(a.balance || a.amount || 0), 0);
+                      setRefundForm({
+                        ...refundForm,
+                        customerName: custName,
+                        customerId: cId,
+                        amount: advSum > 0 ? String(advSum) : refundForm.amount,
+                        referenceNumber: customerAdvs[0]?.voucherNo || refundForm.referenceNumber,
+                        advanceVoucherId: customerAdvs[0]?.voucherNo || '',
+                      });
+                    }}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  >
+                    <option value="">-- Choose Customer --</option>
+                    {customersList.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name} ({c.code || c.customerCode || `#${c.id}`})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="erp-field"
+                    type="text"
+                    required
+                    placeholder="Enter customer name..."
+                    value={refundForm.customerName}
+                    onChange={(e) => setRefundForm({ ...refundForm, customerName: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  />
+                )}
+              </div>
+
+              {/* Customer Available Advances Box */}
+              {refundForm.customerName && (() => {
+                const customerAdvs = advances.filter(
+                  (a) => (refundForm.customerId && a.customerId === refundForm.customerId) || (a.customerName && a.customerName.toLowerCase() === refundForm.customerName.toLowerCase())
+                );
+                const totalAdv = customerAdvs.reduce((sum, a) => sum + Number(a.balance || a.amount || 0), 0);
+                return (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: totalAdv > 0 ? '#f0fdf4' : '#f8fafc',
+                      border: `1px solid ${totalAdv > 0 ? '#bbf7d0' : '#e2e8f0'}`,
+                      fontSize: 'var(--erp-text-small)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, color: totalAdv > 0 ? '#166534' : '#475569' }}>
+                        Customer Available Advance Deposits:
+                      </span>
+                      <strong style={{ color: totalAdv > 0 ? '#15803d' : '#64748b', fontSize: 'var(--erp-text-field)' }}>
+                        LKR {totalAdv.toFixed(2)}
+                      </strong>
+                    </div>
+                    {customerAdvs.length > 0 && (
+                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Active vouchers for this customer:</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {customerAdvs.map((adv) => (
+                            <button
+                              key={adv.id}
+                              type="button"
+                              className="btn btn-sm btn-glass erp-button"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '2px 8px',
+                                border: refundForm.advanceVoucherId === adv.voucherNo ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                                background: refundForm.advanceVoucherId === adv.voucherNo ? '#e0f2fe' : '#ffffff',
+                              }}
+                              onClick={() => {
+                                setRefundForm({
+                                  ...refundForm,
+                                  advanceVoucherId: adv.voucherNo,
+                                  referenceNumber: adv.voucherNo,
+                                  amount: String(adv.balance || adv.amount || ''),
+                                  notes: `Refund from advance voucher ${adv.voucherNo}`,
+                                });
+                              }}
+                            >
+                              {adv.voucherNo} (LKR {Number(adv.balance || adv.amount || 0).toFixed(2)})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Refund Amount (LKR) *</label>
+                  <input className="erp-field"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={refundForm.amount}
+                    onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', fontWeight: 700, color: '#dc2626', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Refund Payout Method</label>
+                  <select className="erp-field"
+                    value={refundForm.paymentMethod}
+                    onChange={(e) => setRefundForm({ ...refundForm, paymentMethod: e.target.value })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Online">Online / Gateway</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Original Reference / Return #</label>
+                <input className="erp-field"
+                  type="text"
+                  placeholder="e.g. ADV-2026-0001 or RTN-2026-0001 or Cheque #"
+                  value={refundForm.referenceNumber}
+                  onChange={(e) => setRefundForm({ ...refundForm, referenceNumber: e.target.value })}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Refund Notes / Reason</label>
+                <textarea className="erp-field"
+                  rows={2}
+                  placeholder="Reason for refund (e.g. Customer returned items from invoice or requested advance payout)..."
+                  value={refundForm.notes}
+                  onChange={(e) => setRefundForm({ ...refundForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-glass erp-button"
+                  onClick={() => setShowRecordRefundModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingRefund}
+                  className="btn btn-primary erp-button erp-button-primary"
+                  style={{ backgroundColor: '#dc2626', borderColor: '#b91c1c' }}
+                >
+                  {isSavingRefund ? 'Processing...' : 'Complete Refund Payout'}
                 </button>
               </div>
             </form>

@@ -28,6 +28,7 @@ export default function SalesReturnsView({ embedded = false }) {
   const [lookingUp, setLookingUp] = useState(false);
   const [formData, setFormData] = useState({
     invoiceId: null,
+    returnType: 'ADVANCE',
     reason: 'Customer return / exchange',
     remarks: '',
     items: [],
@@ -47,6 +48,7 @@ export default function SalesReturnsView({ embedded = false }) {
     setMatchedInvoice(null);
     setFormData({
       invoiceId: null,
+      returnType: 'ADVANCE',
       reason: 'Customer return / exchange',
       remarks: '',
       items: [],
@@ -387,6 +389,86 @@ export default function SalesReturnsView({ embedded = false }) {
                 </div>
               </div>
 
+              {/* Return Settlement Selection */}
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
+                  REFUND & CREDIT SETTLEMENT METHOD
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: 'var(--erp-text-small)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: formData.returnType === 'ADVANCE' ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                      background: formData.returnType === 'ADVANCE' ? '#f0f9ff' : '#ffffff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="returnType"
+                      value="ADVANCE"
+                      checked={formData.returnType === 'ADVANCE'}
+                      onChange={() => setFormData({ ...formData, returnType: 'ADVANCE' })}
+                    />
+                    <strong style={{ color: '#0369a1' }}>Credit to Customer Advance</strong>
+                  </label>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: 'var(--erp-text-small)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: formData.returnType === 'CREDIT_NOTE' ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                      background: formData.returnType === 'CREDIT_NOTE' ? '#f0f9ff' : '#ffffff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="returnType"
+                      value="CREDIT_NOTE"
+                      checked={formData.returnType === 'CREDIT_NOTE'}
+                      onChange={() => setFormData({ ...formData, returnType: 'CREDIT_NOTE' })}
+                    />
+                    <span>Issue Credit Note</span>
+                  </label>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: 'var(--erp-text-small)',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: formData.returnType === 'REFUND' ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                      background: formData.returnType === 'REFUND' ? '#f0f9ff' : '#ffffff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="returnType"
+                      value="REFUND"
+                      checked={formData.returnType === 'REFUND'}
+                      onChange={() => setFormData({ ...formData, returnType: 'REFUND' })}
+                    />
+                    <span>Direct Cash/Bank Refund</span>
+                  </label>
+                </div>
+                {formData.returnType === 'ADVANCE' && (
+                  <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: '#0369a1' }}>
+                    Refund amount will be credited to the customer's Advance Payments balance, ready to apply to future invoices or refund to cash/bank from <strong>Payments &gt; Refunds</strong>.
+                  </p>
+                )}
+              </div>
+
               {/* Grand Total Credit Bar */}
               <div
                 style={{
@@ -414,7 +496,11 @@ export default function SalesReturnsView({ embedded = false }) {
                 disabled={saving || totalCredit <= 0}
               >
                 <CheckCircle size={16} />
-                {saving ? 'Processing...' : 'Issue Credit Note & Process Return'}
+                {saving
+                  ? 'Processing...'
+                  : formData.returnType === 'ADVANCE'
+                  ? 'Process Return & Credit Customer Advance'
+                  : 'Issue Credit Note & Process Return'}
               </button>
             </>
           ) : (

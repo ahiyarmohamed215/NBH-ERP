@@ -11,13 +11,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateCategoryRequest {
 
-    @NotBlank(message = "Category code is required")
-    @Size(min = 2, max = 20)
+    @Size(max = 20)
     private String code;
 
-    @NotBlank(message = "Category name is required")
-    @Size(min = 2, max = 100)
+    @Size(max = 100)
     private String name;
 
     private String description;
+
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
+    private String status;
 }

@@ -95,5 +95,10 @@ public class DocumentSequenceService {
     public String generateTargetNumber() {
         return getNextNumber("TGT");
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String generateRefundNumber() {
+        return getNextNumber("RFD");
+    }
 }
 

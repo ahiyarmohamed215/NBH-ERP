@@ -47,6 +47,7 @@ public class SalesReturnService {
     private final com.nbh.erp.customer.service.CustomerBalanceService customerBalances;
     private final com.nbh.erp.audit.service.AuditLogService auditLogService;
     private final com.nbh.erp.customerrange.service.CustomerRangeService customerRangeService;
+    private final com.nbh.erp.payment.repository.PaymentRepository paymentRepository;
 
     private String getCurrentUsername() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -169,6 +170,18 @@ public class SalesReturnService {
             creditNoteRepository.save(CreditNote.builder().creditNoteNumber(sequenceService.generateCreditNoteNumber())
                 .salesReturn(savedReturn).customer(savedReturn.getCustomer()).amount(refund).status("ISSUED").issueDate(retDate)
                 .createdBy(getCurrentUsername()).updatedBy(getCurrentUsername()).build());
+        } else if("ADVANCE".equalsIgnoreCase(savedReturn.getReturnType()) && refund.signum()>0) {
+            paymentRepository.save(com.nbh.erp.payment.entity.Payment.builder()
+                .paymentNumber(sequenceService.generateAdvanceVoucherNumber())
+                .paymentType("ADVANCE")
+                .customer(savedReturn.getCustomer())
+                .amount(refund)
+                .paymentMethod("CASH")
+                .referenceNumber(savedReturn.getReturnNumber())
+                .paymentDate(retDate)
+                .status("COMPLETED")
+                .notes("Advance deposit credited from Sales Return " + returnNumber + " (Invoice: " + invoice.getInvoiceNumber() + ")")
+                .build());
         }
         customerBalances.reconcile(invoice.getCustomer().getId());
         auditLogService.log("SALES_RETURN","SalesReturn",returnNumber,"Returned "+grandTotal+", refund/credit "+refund);

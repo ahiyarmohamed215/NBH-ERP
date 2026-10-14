@@ -643,6 +643,16 @@ public class CustomerRangeService {
     }
 
     @Transactional
+    public void synchronizeMonth(String yearMonth) {
+        String targetMonth = (yearMonth != null && !yearMonth.isBlank()) ? yearMonth.trim() : getCurrentYearMonth();
+        try { YearMonth.parse(targetMonth); }
+        catch (java.time.format.DateTimeParseException e) { throw new BusinessException("Select a valid calculation month"); }
+        for (Customer customer : customerRepository.findByIsActiveTrue()) {
+            recalculateSummary(customer, targetMonth, null);
+        }
+    }
+
+    @Transactional
     public void ensureSummariesForMonth(String yearMonth) {
         String targetMonth = (yearMonth != null && !yearMonth.isBlank()) ? yearMonth.trim() : getCurrentYearMonth();
         YearMonth ym;
@@ -661,6 +671,11 @@ public class CustomerRangeService {
 
         for (Customer c : allCustomers) {
             Optional<CustomerMonthlySummary> existing = summaryRepository.findByCustomerIdAndYearMonth(c.getId(), targetMonth);
+            if (existing.isEmpty()) {
+                // Serialize first-time creation when two dashboard requests arrive together.
+                if (customerRepository.findAnyByIdForUpdate(c.getId()).filter(customer -> Boolean.TRUE.equals(customer.getIsActive())).isEmpty()) continue;
+                existing = summaryRepository.findForUpdate(c.getId(), targetMonth);
+            }
             if (existing.isEmpty()) {
                 BigDecimal gross = invoiceRepository.getCustomerSalesBetween(c.getId(), start, end);
                 if (gross == null) gross = BigDecimal.ZERO;

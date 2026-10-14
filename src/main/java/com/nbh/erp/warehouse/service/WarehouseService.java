@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nbh.erp.common.validation.MasterRecordLifecycle;
+import com.nbh.erp.common.dto.StatusChangeRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,17 +55,21 @@ public class WarehouseService {
 
     @Transactional
     public WarehouseDto createWarehouse(CreateWarehouseRequest request) {
+        String status = MasterRecordLifecycle.initialStatus(request.getStatus());
+        MasterRecordLifecycle.validate("Warehouse", status, request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode());
+        request.setCode(MasterRecordLifecycle.code(request.getCode(), "WH", warehouseRepository.count(), warehouseRepository::existsByCode));
         if (warehouseRepository.existsByCode(request.getCode())) {
             throw new DuplicateResourceException("Warehouse", "code", request.getCode());
         }
 
         Warehouse warehouse = Warehouse.builder()
                 .code(request.getCode().trim().toUpperCase())
-                .name(request.getName().trim())
+                .name(MasterRecordLifecycle.clean(request.getName()))
                 .address(request.getAddress())
                 .phone(request.getPhone())
                 .contactPerson(request.getContactPerson())
-                .isActive(true)
+                .isActive("ACTIVE".equals(status))
+                .status(status)
                 .build();
 
         Warehouse saved = warehouseRepository.save(warehouse);
@@ -81,6 +87,9 @@ public class WarehouseService {
 
         SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
         warehouse.requireNotDeleted();
+        MasterRecordLifecycle.validate("Warehouse", warehouse.getStatus(), request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode());
+
+        request.setCode(org.springframework.util.StringUtils.hasText(request.getCode()) ? request.getCode().trim().toUpperCase() : warehouse.getCode());
 
         warehouseRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -90,7 +99,7 @@ public class WarehouseService {
                 });
 
         warehouse.setCode(request.getCode().trim().toUpperCase());
-        warehouse.setName(request.getName().trim());
+        warehouse.setName(MasterRecordLifecycle.clean(request.getName()));
         warehouse.setAddress(request.getAddress());
         warehouse.setPhone(request.getPhone());
         warehouse.setContactPerson(request.getContactPerson());
@@ -104,18 +113,27 @@ public class WarehouseService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
+    public WarehouseDto changeStatus(Long id, String target, String reason) {
+        target = MasterRecordLifecycle.targetStatus(target);
+        reason = StatusChangeRequest.requireReason(reason);
         Warehouse warehouse = warehouseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
-
-        SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
+        SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getCode());
         warehouse.requireNotDeleted();
+        MasterRecordLifecycle.validate("Warehouse", target, warehouse.getName(), warehouse.getCode());
+        String previous = warehouse.getStatus();
+        warehouse.setStatus(target);
+        warehouse.setIsActive("ACTIVE".equals(target));
+        Warehouse saved = warehouseRepository.save(warehouse);
+        auditLogService.log("WAREHOUSE_STATUS", "INVENTORY", "Warehouse", warehouse.getCode(), previous + " -> " + target + ": " + reason);
+        return WarehouseDto.from(saved);
+    }
 
-        warehouse.setIsActive(!warehouse.getIsActive());
-        warehouseRepository.save(warehouse);
-
-        auditLogService.log("WAREHOUSE_STATUS", "INVENTORY", "Warehouse", warehouse.getCode(),
-                String.format("Set warehouse '%s' active status to %s", warehouse.getName(), warehouse.getIsActive()));
+    @Transactional
+    public void toggleActive(Long id) {
+        Warehouse record = warehouseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+        changeStatus(id, "ACTIVE".equals(record.getStatus()) ? "INACTIVE" : "ACTIVE", "Changed from legacy status control");
     }
 
     @Transactional

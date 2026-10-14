@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nbh.erp.common.validation.MasterRecordLifecycle;
+import com.nbh.erp.common.dto.StatusChangeRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,15 +51,19 @@ public class CategoryService {
 
     @Transactional
     public CategoryDto createCategory(CreateCategoryRequest request) {
+        String status = MasterRecordLifecycle.initialStatus(request.getStatus());
+        MasterRecordLifecycle.validate("Category", status, request.getName(), request.getDescription(), request.getCode());
+        request.setCode(MasterRecordLifecycle.code(request.getCode(), "CAT", categoryRepository.count(), categoryRepository::existsByCode));
         if (categoryRepository.existsByCode(request.getCode().trim().toUpperCase())) {
             throw new DuplicateResourceException("Category", "code", request.getCode());
         }
 
         Category category = Category.builder()
                 .code(request.getCode().trim().toUpperCase())
-                .name(request.getName().trim())
+                .name(MasterRecordLifecycle.clean(request.getName()))
                 .description(request.getDescription())
-                .isActive(true)
+                .isActive("ACTIVE".equals(status))
+                .status(status)
                 .build();
 
         Category saved = categoryRepository.save(category);
@@ -75,6 +81,9 @@ public class CategoryService {
 
         SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
         category.requireNotDeleted();
+        MasterRecordLifecycle.validate("Category", category.getStatus(), request.getName(), request.getDescription(), request.getCode());
+
+        request.setCode(org.springframework.util.StringUtils.hasText(request.getCode()) ? request.getCode().trim().toUpperCase() : category.getCode());
 
         categoryRepository.findByCode(request.getCode().trim().toUpperCase())
                 .ifPresent(existing -> {
@@ -84,7 +93,7 @@ public class CategoryService {
                 });
 
         category.setCode(request.getCode().trim().toUpperCase());
-        category.setName(request.getName().trim());
+        category.setName(MasterRecordLifecycle.clean(request.getName()));
         category.setDescription(request.getDescription());
 
         Category saved = categoryRepository.save(category);
@@ -96,18 +105,27 @@ public class CategoryService {
     }
 
     @Transactional
-    public void toggleActive(Long id) {
+    public CategoryDto changeStatus(Long id, String target, String reason) {
+        target = MasterRecordLifecycle.targetStatus(target);
+        reason = StatusChangeRequest.requireReason(reason);
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
-
-        SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getName());
+        SecurityUtils.enforceCanEdit("CATEGORY", "Category: " + category.getCode());
         category.requireNotDeleted();
+        MasterRecordLifecycle.validate("Category", target, category.getName(), category.getCode());
+        String previous = category.getStatus();
+        category.setStatus(target);
+        category.setIsActive("ACTIVE".equals(target));
+        Category saved = categoryRepository.save(category);
+        auditLogService.log("CATEGORY_STATUS", "INVENTORY", "Category", category.getCode(), previous + " -> " + target + ": " + reason);
+        return CategoryDto.from(saved);
+    }
 
-        category.setIsActive(!category.getIsActive());
-        categoryRepository.save(category);
-
-        auditLogService.log("CATEGORY_STATUS", "INVENTORY", "Category", category.getCode(),
-                String.format("Set category '%s' active status to %s", category.getName(), category.getIsActive()));
+    @Transactional
+    public void toggleActive(Long id) {
+        Category record = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+        changeStatus(id, "ACTIVE".equals(record.getStatus()) ? "INACTIVE" : "ACTIVE", "Changed from legacy status control");
     }
 
     @Transactional

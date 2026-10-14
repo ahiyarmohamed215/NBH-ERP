@@ -20,7 +20,7 @@ public class Brand extends com.nbh.erp.common.entity.RecyclableEntity {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(nullable = false, length = 150)
+    @Column(length = 150)
     private String name;
 
     @Column(columnDefinition = "TEXT")
@@ -33,4 +33,11 @@ public class Brand extends com.nbh.erp.common.entity.RecyclableEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    @Column(name = "brand_status", length = 20)
+    private String status;
+
+    public String getStatus() {
+        return status != null ? status : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE";
+    }
 }

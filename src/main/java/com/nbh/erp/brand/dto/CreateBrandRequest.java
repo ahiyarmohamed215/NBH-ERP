@@ -13,15 +13,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CreateBrandRequest {
 
-    @NotBlank(message = "Brand code is required")
     @Size(max = 50, message = "Brand code must not exceed 50 characters")
     private String code;
 
-    @NotBlank(message = "Brand name is required")
     @Size(max = 150, message = "Brand name must not exceed 150 characters")
     private String name;
 
     private String description;
+
+    @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
+    private String status;
 
     @jakarta.validation.constraints.DecimalMin(value = "0", message = "MP% cannot be negative")
     @jakarta.validation.constraints.DecimalMax(value = "99999", message = "MP% must not exceed 99999")

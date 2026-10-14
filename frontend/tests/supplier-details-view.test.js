@@ -56,9 +56,8 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     assert.ok(modal.querySelector('.purchase-inspection-details-card'), 'purchase-inspection-details-card exists');
     assert.ok(modal.querySelector('.purchase-inspection-detail-actions'), 'purchase-inspection-detail-actions exists');
 
-    // Avatar initials
-    const avatar = modal.querySelector('.supplier-card-avatar');
-    assert.equal(avatar.textContent.trim(), 'AI');
+    assert.equal(modal.querySelector('.supplier-card-avatar'), null);
+    assert.equal(modal.querySelector('[title^="Copy"], [aria-label^="Copy"]'), null);
 
     // Name + code
     assert.ok(modal.querySelector('.supplier-card-name').textContent.includes('Acme Industrial Solutions'));

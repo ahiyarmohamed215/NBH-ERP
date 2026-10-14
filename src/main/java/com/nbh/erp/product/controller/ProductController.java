@@ -80,6 +80,13 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.ok("Product updated successfully", updated));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
+    public ResponseEntity<ApiResponse<ProductDto>> changeStatus(@PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.common.dto.RecordStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(productService.changeStatus(id, request.status(), request.reason())));
+    }
+
     @PatchMapping("/{id}/toggle-active")
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('PRODUCT_MANAGE')")
     @Operation(summary = "Toggle product active status")
