@@ -16,9 +16,11 @@ public class UpdateBrandRequest {
     @Size(max = 150, message = "Brand name must not exceed 150 characters")
     private String name;
 
+    @jakarta.validation.constraints.Size(max=5000)
     private String description;
 
     @jakarta.validation.constraints.DecimalMin(value = "0", message = "MP% cannot be negative")
     @jakarta.validation.constraints.DecimalMax(value = "99999", message = "MP% must not exceed 99999")
+    @jakarta.validation.constraints.Digits(integer=5,fraction=4)
     private java.math.BigDecimal markupPercent;
 }

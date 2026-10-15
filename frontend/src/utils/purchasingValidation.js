@@ -33,10 +33,14 @@ export function supplierErrors(form,{draft=false}={}) {
   const phone=phoneError(form.phone,form.phoneCountry || phoneCountry(form.phone));if(phone)errors.phone=phone;
   if(email && (email.length>100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))errors.email='Enter a valid email address (up to 100 characters).';
   if(String(form.address || '').length>MAX_NOTES) errors.address=`Address must be ${MAX_NOTES} characters or fewer.`;
+  if(String(form.remarks || '').length>MAX_NOTES) errors.remarks=`Remarks must be ${MAX_NOTES} characters or fewer.`;
   return errors;
 }
 export function documentErrors(type,form) {
   const errors=[];
+  const validId=value=>/^\d+$/.test(String(value)) && Number.isSafeInteger(Number(value)) && Number(value)>0;
+  for(const key of ['supplierId','warehouseId','sourceWarehouseId','destinationWarehouseId','responsibleStaffId','purchaseOrderId'])if(form[key] && !validId(form[key]))errors.push('Select a valid record from the list.');
+  if(String(form.supplierInvoiceNumber || '').length>100)errors.push('Supplier invoice number must be 100 characters or fewer.');
   if(String(form.notes ?? form.remarks ?? '').length>MAX_NOTES)errors.push(`Remarks must be ${MAX_NOTES} characters or fewer.`);
   if(type==='GRN') {
     if(!form.supplierId)errors.push('Select a supplier.');
@@ -47,6 +51,7 @@ export function documentErrors(type,form) {
   if(!form.items?.length)errors.push('Add at least one product.');
   for(const [index,item] of (form.items || []).entries()) {
     const prefix=`Item ${index+1}: `;
+    for(const key of ['productId','supplierId','warehouseId','sourceWarehouseId','destinationWarehouseId','sourceGrnId'])if(item[key] && !validId(item[key]))errors.push(prefix+'Select a valid record from the list.');
     if(!item.productId)errors.push(prefix+'Select a product.');
     const quantity=item.quantityReceived ?? item.quantityTransferred ?? item.quantityReturned ?? item.quantity;
     const quantityError=numberError(quantity,'Quantity',{positive:true,decimals:type==='PO'?3:2,max:type==='PO'?999999999999.999:Number.MAX_SAFE_INTEGER});if(quantityError)errors.push(prefix+quantityError);
@@ -61,4 +66,26 @@ export function documentErrors(type,form) {
     if(String(item.remarks ?? item.notes ?? '').length>MAX_NOTES)errors.push(prefix+'Notes are too long.');
   }
   return errors;
+}
+
+export function masterErrors(type,form,{draft=false}={}) {
+ const errors={},product=type==='products',brand=type==='brands',warehouse=type==='warehouses';
+ const code=product?'sku':'code',name=String(form.name || '').trim(),codeValue=String(form[code] || '').trim();
+ const maxName=product?200:brand?150:100,maxCode=product || brand?50:20;
+ if(!draft && !codeValue)errors[code]='Enter a code.';
+ else if(codeValue.length>maxCode)errors[code]=`Code must be ${maxCode} characters or fewer.`;
+ if(!name && !draft)errors.name='Enter a name.';
+ else if(name && (name.length<2 || name.length>maxName))errors.name=`Name must contain 2–${maxName} characters.`;
+ const remarksField=warehouse?'remarks':'description';
+ if(String(form[remarksField] || '').length>MAX_NOTES)errors[remarksField]=`Remarks must be ${MAX_NOTES} characters or fewer.`;
+ if(warehouse){
+  if(String(form.address || '').length>MAX_NOTES)errors.address=`Address must be ${MAX_NOTES} characters or fewer.`;
+  const phone=phoneError(form.contactNumber || form.phone,phoneCountry(form.contactNumber || form.phone));if(phone)errors.contactNumber=phone;
+ }
+ if(product){
+  for(const key of ['brandId','categoryId','warehouseId'])if(!draft && !form[key])errors[key]='Select an option.';
+  if(!draft || String(form.minStockLevel ?? '').trim()){const error=numberError(form.minStockLevel,'Minimum stock level',{decimals:0,max:2147483647});if(error)errors.minStockLevel=error;}
+ }
+ if(brand && (!draft || String(form.markupPercent ?? '').trim())){const error=numberError(form.markupPercent,'MP%',{decimals:4,max:99999});if(error)errors.markupPercent=error;}
+ return errors;
 }

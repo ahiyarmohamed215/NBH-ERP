@@ -72,6 +72,21 @@ class MasterRecordLifecycleTest {
         bin.restore(type,id);em.flush();assertEquals("DRAFT",status(type,id));
         complete(type,id);transition(type,id,"ACTIVE","Approved");bin.delete(type,id);bin.restore(type,id);assertEquals("ACTIVE",status(type,id));
     }
+    @Test void warehouseRemarksPersistThroughEditingAndRecycleRestore() {
+        var request=new CreateWarehouseRequest();request.setStatus("DRAFT");request.setRemarks("Use the loading entrance");
+        var created=warehouses.createWarehouse(request);em.flush();em.clear();
+        assertEquals("Use the loading entrance",warehouses.getWarehouseById(created.getId()).getRemarks());
+        request.setRemarks("Call before unloading");
+        assertEquals(request.getRemarks(),warehouses.updateWarehouse(created.getId(),request).getRemarks());
+        bin.delete("WAREHOUSE",created.getId());bin.restore("WAREHOUSE",created.getId());em.flush();em.clear();
+        assertEquals("Call before unloading",warehouses.getWarehouseById(created.getId()).getRemarks());
+        request.setRemarks("");request.setName("Completed warehouse");
+        assertEquals("",warehouses.updateWarehouse(created.getId(),request).getRemarks());
+        request.setRemarks("x".repeat(5001));assertThrows(BusinessException.class,()->warehouses.createWarehouse(request));
+        request.setRemarks("Clear on permanent deletion");warehouses.updateWarehouse(created.getId(),request);
+        bin.delete("WAREHOUSE",created.getId());bin.purge("WAREHOUSE",created.getId());em.flush();em.clear();
+        assertNull(em.find(com.nbh.erp.warehouse.entity.Warehouse.class,created.getId()).getRemarks());
+    }
     @Test void emptyDraftsAreRejected() {
         var p=new CreateProductRequest();p.setStatus("DRAFT");assertThrows(BusinessException.class,()->products.createProduct(p));
         assertThrows(BusinessException.class,()->brands.createBrand(CreateBrandRequest.builder().status("DRAFT").build()));

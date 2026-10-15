@@ -34,6 +34,21 @@ class SupplierRecycleBinTest {
     }
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
+    @Test void remarksAreSavedUpdatedAndRestoredAndClearedOnPermanentRemoval() {
+        var input=new CreateSupplierRequest();input.setName("Supplier with remarks");input.setRemarks("Deliver before noon");
+        var created=service.createSupplier(input);entityManager.flush();entityManager.clear();
+        assertEquals("Deliver before noon",service.getSupplierById(created.getId()).getRemarks());
+        input.setRemarks("Call before dispatch");service.updateSupplier(created.getId(),input);entityManager.flush();entityManager.clear();
+        assertEquals("Call before dispatch",service.getSupplierById(created.getId()).getRemarks());
+        service.deleteSupplier(created.getId());assertEquals("Call before dispatch",service.restoreSupplier(created.getId()).getRemarks());
+        input.setRemarks("");assertEquals("",service.updateSupplier(created.getId(),input).getRemarks());
+        var draft=new CreateSupplierRequest();draft.setStatus("DRAFT");draft.setRemarks("Finish supplier details tomorrow");
+        var saved=service.createSupplier(draft);assertEquals("DRAFT",saved.getStatus());assertEquals(draft.getRemarks(),saved.getRemarks());
+        service.deleteSupplier(saved.getId());service.permanentlyDeleteSupplier(saved.getId());entityManager.flush();entityManager.clear();
+        assertNull(suppliers.findById(saved.getId()).orElseThrow().getRemarks());
+        input.setRemarks("x".repeat(5001));assertThrows(BusinessException.class,()->service.createSupplier(input));
+    }
+
     Supplier supplier(String status) {
         return suppliers.saveAndFlush(Supplier.builder().supplierCode("BIN-" + java.util.UUID.randomUUID().toString().substring(0,8)).name("Lanka Trading").status(status).isActive("ACTIVE".equals(status)).contactPerson("Nimal").phone("0771234567").email("test@example.test").address("Colombo").build());
     }

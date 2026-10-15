@@ -32,6 +32,9 @@ public class CreateSupplierRequest {
     @Size(max=5000,message="Address must be 5000 characters or fewer")
     private String address;
 
+    @Size(max=5000,message="Remarks must be 5000 characters or fewer")
+    private String remarks;
+
     @jakarta.validation.constraints.Pattern(regexp="DRAFT|ACTIVE|INACTIVE")
     private String status;
 }

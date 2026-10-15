@@ -24,34 +24,48 @@ test('all four master directories save partial drafts, filter them and require r
   }
   const {default:Masters}=await server.ssrLoadModule('/src/views/MastersView.jsx');const {AuthProvider}=await server.ssrLoadModule('/src/context/AuthContext.jsx');const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');
   const click=async button=>{assert.ok(button);await act(async()=>button.click());};
-  const findButton=(text,scope=host)=>[...scope.querySelectorAll('button')].find(button=>button.textContent.trim()===text);
+  const findButton=(text,scope=host)=>[...scope.querySelectorAll('button')].find(button=>(button.getAttribute('aria-label') || button.textContent.trim())===text);
   const enter=async(input,value)=>act(async()=>{Object.getOwnPropertyDescriptor(input.tagName==='TEXTAREA'?window.HTMLTextAreaElement.prototype:window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});
   for(const [type,name] of Object.entries({products:'Product',warehouses:'Warehouse',brands:'Brand',categories:'Category'})){
    await act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider,null,React.createElement(Masters,{key:type,activeSubTab:type,isStandalone:true})))));
    await click(findButton(`New ${name}`));
    const form=host.querySelector('.master-workspace');assert.ok(form);
-   if(type==='warehouses')await enter(form.querySelector('[name="address"]'),'Complete warehouse later');
-   else await enter(form.querySelector('[name="description"]'),'Complete record later');
-   await click(findButton('Save draft',form));assert.equal(lists[type].find(row=>row.id===99).status,'DRAFT');assert.equal(host.querySelector('.master-workspace'),null);
-   let row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes('DRAFT-99'));assert.ok(row);assert.equal(row.querySelector('.erp-status-badge').textContent.trim(),'DRAFT');
+   assert.equal(form.querySelector('[aria-label="Description / notes"]'),null);
+   await enter(form.querySelector('[aria-label="Remarks"]'),'Complete record later');
+   assert.ok(form.querySelector('.allocation-receipt-notes').textContent.includes('Complete record later'));
+   await click(findButton('Save draft',form));assert.equal(lists[type].find(row=>row.id===99).status,'DRAFT');assert.equal(lists[type].find(row=>row.id===99)[type==='warehouses'?'remarks':'description'],'Complete record later');assert.equal(host.querySelector('.master-workspace'),null);
+   assert.ok(host.querySelector('tbody tr').textContent.includes('DRAFT-99'),'New drafts appear first');
+   let row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes('DRAFT-99'));assert.ok(row);assert.ok(row.querySelector(`[aria-label="Print ${name}"]`),'Draft table rows have print actions');assert.equal(row.querySelector('.erp-status-badge').textContent.trim(),'DRAFT');
    const filter=host.querySelector('[title="Filter records by status"]');assert.ok(filter);await click(filter);await click([...document.querySelectorAll('[role="option"]')].find(option=>option.textContent.trim()==='Draft'));
    assert.equal(host.querySelectorAll('tbody tr').length,1);
    await click(row.querySelector(`[title="Edit ${name}"]`));await enter(host.querySelector('[name="name"]'),`Completed ${name}`);
    await act(async()=>host.querySelector('.master-workspace').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
    assert.equal(lists[type].find(row=>row.id===99).status,'DRAFT');
    row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes(`Completed ${name}`));await click(row);
-   for(const [action,target] of [[`Activate ${name}`,'ACTIVE'],[`Deactivate ${name}`,'INACTIVE'],[`Reactivate ${name}`,'ACTIVE'],['Return to draft','DRAFT']]){
+   const remarks=[...host.querySelectorAll('.master-details-grid>div')].find(row=>row.querySelector('dt').textContent==='Remarks');assert.ok(remarks);assert.equal(remarks.querySelector('dd').textContent,'Complete record later');
+   assert.equal(host.querySelector('[role="dialog"]').textContent.includes('Description / notes'),false);
+   assert.equal(findButton(`Activate ${name}`),undefined,'Drafts cannot change status');
+   assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),[`Edit ${name}`,`Delete ${name}`]);
+   assert.equal(findButton('Print'),undefined,'Drafts have only edit and delete record actions');
+   await click(findButton('Close'));
+   // Existing active records still support deactivation and reactivation.
+   Object.assign(lists[type].find(row=>row.id===99),{status:'ACTIVE',isActive:true});
+   await click(host.querySelector('[title="Filter records by status"]'));await click(document.querySelector('[role="option"][data-value="ALL"]'));
+   await click(host.querySelector('[title="Refresh records"]'));
+   row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes(`Completed ${name}`));await click(row);
+   for(const [action,target] of [[`Deactivate ${name}`,'INACTIVE'],[`Reactivate ${name}`,'ACTIVE']]){
     await click(findButton(action));const dialog=host.querySelector('[aria-label="Change '+name+' status"]');assert.ok(dialog);
     const confirm=dialog.querySelector('[aria-label="Confirm status change"]');assert.equal(confirm.disabled,true);
     await enter(dialog.querySelector('textarea'),'Details reviewed');assert.equal(confirm.disabled,false);await click(confirm);
     assert.equal(changes.at(-1).target ?? changes.at(-1).status,target);assert.equal(lists[type].find(row=>row.id===99).status,target);
    }
    assert.equal(findButton('Return to draft'),undefined);await click(findButton('Close'));
+   await click(host.querySelector('[title="Filter records by status"]'));await click(document.querySelector('[role="option"][data-value="ALL"]'));
    if(type==='products'){
     await click(host.querySelector('[title="Delete Product"]'));const dialog=host.querySelector('[aria-label="Delete product"]');assert.ok(dialog);assert.equal(deleted,undefined);await click(findButton('Move to recycle bin',dialog));assert.deepEqual(deleted,{type:'PRODUCT',id:99});assert.equal(host.querySelector('[title="Delete Product"]'),null);
    }
    lists[type]=lists[type].filter(row=>row.id!==99);
   }
-  assert.equal(changes.length,16);
+  assert.equal(changes.length,8);
  } finally {await act(async()=>new Promise(resolve=>setTimeout(resolve,5100)));await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}
 });

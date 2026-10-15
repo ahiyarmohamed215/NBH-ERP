@@ -21,6 +21,7 @@ public class SupplierDto {
     private String phone;
     private String email;
     private String address;
+    private String remarks;
     private Boolean isActive;
     private String status;
     private LocalDateTime createdAt;
@@ -41,6 +42,7 @@ public class SupplierDto {
                 .phone(s.getPhone())
                 .email(s.getEmail())
                 .address(s.getAddress())
+                .remarks(s.getRemarks())
                 .isActive(s.getIsActive())
                 .status(s.getStatus())
                 .createdAt(s.getCreatedAt())

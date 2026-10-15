@@ -21,7 +21,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   apis.categoryApi.getAll=apis.categoryApi.getActive=async()=>({data:[{id:1,code:'CAT-1',name:'Test category',isActive:true}]});
   apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,minStockLevel:0,reservedQuantity:3,availableQuantity:17,costPrice:product.costPrice,sellingPrice:0}))}};};
   apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]},{id:31,adjustmentNumber:'ADJ-OLD',adjustmentDate:'2026-10-09',warehouseName:'South',items:[{productId:2,productSku:'SKU-SECOND',productName:products[1].name,differenceQuantity:2,reason:'Opening stock'}]}]}});
-  apis.staffQuotaApi.search=async()=>({data:{content:[{id:40,productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
+  apis.staffQuotaApi.search=async()=>({data:{content:[{id:41,createdAt:'2026-10-09T08:00:00',productSku:'SKU-SECOND',productName:'Older allocation',userFullName:'Test staff',allocatedQuantity:1,totalStockAvailable:20,isActive:true},{id:40,createdAt:'2026-10-12T09:00:00',productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
   apis.staffQuotaApi.getSummary=async()=>({data:null});
   let printed='';window.open=()=>({document:{open(){},write(html){printed=html;},close(){}}});
   const {AuthProvider}=await server.ssrLoadModule('/src/context/AuthContext.jsx');const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');const {default:Inventory}=await server.ssrLoadModule('/src/views/InventoryHub.jsx');
@@ -29,6 +29,44 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    await act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider,null,React.createElement(Inventory,{key:tab,activeSubTab:tab})))));
    const toolbar=host.querySelector('.inventory-toolbar,.master-toolbar');assert.ok(toolbar);
    assert.equal(toolbar.querySelector('[title^="Export"]'),null,`${tab}: print replaces CSV export`);
+   const cellCount=host.querySelector('tbody tr').cells.length;
+   for(let index=0;index<cellCount;index++){
+    const cell=host.querySelector('tbody tr').cells[index];
+    // Include badge/text clicks and the empty area around action buttons.
+    const target=cell.querySelector('.erp-status-badge') || (index===cellCount-1?cell:cell.firstElementChild || cell);
+    await act(async()=>target.click());
+    const dialog=host.querySelector('[role="dialog"]');assert.ok(dialog,`${tab}: clicking column ${index+1} opens the record`);
+    await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.trim()==='Close').click());
+   }
+   const expectedHeaders={
+    'inventory-list':['Code / Product name','Brand / Category','Warehouse','Qty','Selling price','Status','Actions'],
+    'pos-quotas':['Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'],
+    products:['Code / Product name','Brand / Category','Warehouse','Min stock','Status','Remarks','Actions'],
+    brands:['Brand code','Brand name','MP%','Status','Remarks','Actions'],
+    warehouses:['Warehouse code','Warehouse name','Address','Contact number','Status','Remarks','Actions'],
+    categories:['Category code','Category name','Status','Remarks','Actions'],
+   };
+   if(expectedHeaders[tab])assert.deepEqual([...host.querySelectorAll('thead th')].map(th=>th.textContent),expectedHeaders[tab],`${tab}: requested column order`);
+   if(tab==='pos-quotas'){
+    assert.equal(host.querySelectorAll('tbody tr').length,2);
+    const selectDate=async()=>{
+     await act(async()=>host.querySelector('[aria-label="Inventory allocation date range"]').click());
+     const calendar=document.querySelector('[aria-label="Choose Inventory allocation date range"]');assert.ok(calendar);
+     const now=new Date(),offset=(2026-now.getFullYear())*12+9-now.getMonth();
+     for(let step=0;step<Math.abs(offset);step++)await act(async()=>calendar.querySelector(`[aria-label="${offset<0?'Previous':'Next'} month"]`).click());
+     await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
+     await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
+    };
+    await selectDate();assert.equal(host.querySelectorAll('tbody tr').length,1);
+    assert.equal(host.querySelector('tbody tr td:nth-child(5)').textContent,'2026-10-12');
+    const identity=host.querySelector('tbody tr td').textContent;assert.ok(identity.includes('SKU-FIRST') && identity.includes('First item'));
+    await act(async()=>host.querySelector('[title="Reset allocation filters"]').click());assert.equal(host.querySelectorAll('tbody tr').length,2);
+    await selectDate();
+   }
+   if(tab==='products'){
+    assert.ok(host.querySelector('tbody tr td').textContent.includes('SKU-SECOND') && host.querySelector('tbody tr td').textContent.includes('Second item'),'Code and name share the first cell');
+    assert.ok(!host.querySelector('table').textContent.includes('Selling price:'),'Product directory omits the selling price');
+   }
    if(tab==='inventory-list') {
     assert.ok(!host.querySelector('thead').textContent.includes('COST PRICE'));
     assert.equal(toolbar.querySelectorAll('.inventory-full-label-filter').length,2,'Both inventory filters show full labels');
@@ -36,7 +74,13 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
     await act(async()=>toolbar.querySelector('[aria-label="Filter by warehouse"]').click());
     await act(async()=>[...document.querySelectorAll('.modern-filter-options [role="option"]')].find(option=>option.textContent==='North').click());
     assert.equal(host.querySelectorAll('tbody tr').length,1);
-    assert.match(host.querySelector('tbody tr td:nth-child(7)').textContent,/35\.00/,'A zero balance price falls back to the product selling price');
+    assert.match(host.querySelector('tbody tr td:nth-child(5)').textContent,/35\.00/,'A zero balance price falls back to the product selling price');
+    const rowActions=host.querySelector('tbody tr td:last-child');
+    assert.deepEqual([...rowActions.querySelectorAll('button')].map(button=>button.getAttribute('aria-label')),['Print Inventory']);
+    assert.ok(rowActions.querySelector('button').classList.contains('erp-table-icon-action'));
+    await act(async()=>rowActions.querySelector('button').click());
+    assert.equal(host.querySelector('[role="dialog"]'),null,'Printing a row does not open its detail view');
+    assert.ok(printed.includes('SKU-FIRST') && !printed.includes('SKU-SECOND') && !printed.includes('999991'),'Row print includes only the selected visible record');
     await act(async()=>host.querySelector('tbody tr').click());
     const popup=host.querySelector('[role="dialog"]');assert.ok(popup.classList.contains('purchase-inspection'));
     assert.ok(popup.textContent.includes('LKR 35.00'));
@@ -57,6 +101,17 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
     assert.equal(bottomClose.closest('footer').parentElement,popup,'Close footer is outside the flexible summary content');
     await act(async()=>bottomClose.click());
     assert.equal(host.querySelector('[role="dialog"]'),null);
+   }
+   if(tab==='adjustments') {
+    await act(async()=>host.querySelector('tbody tr').click());
+    const view=host.querySelector('[aria-label="Stock adjustment details"]');assert.ok(view);
+    assert.ok(view.classList.contains('record-details-compact'));
+    const detail=label=>[...view.querySelectorAll('dl>div')].find(row=>row.querySelector('dt').textContent===label)?.querySelector('dd').textContent;
+    assert.equal(detail('Record number'),'ADJ-30');assert.equal(detail('Quantity adjusted'),'+3');assert.equal(detail('Reason'),'Count correction');
+    assert.equal(view.querySelector('[aria-label="Edit Adjustment"]'),null,'Read-only users cannot edit adjustments');
+    await act(async()=>[...view.querySelectorAll('button')].find(button=>button.textContent.trim()==='Print').click());
+    assert.ok(printed.includes('ADJ-30') && printed.includes('Count correction') && !printed.includes('<unsafe>'));
+    await act(async()=>view.querySelector('[aria-label="Close stock adjustment details"]').click());
    }
    if(tab==='adjustments') {
     assert.ok(!toolbar.textContent.includes('All Reasons'));

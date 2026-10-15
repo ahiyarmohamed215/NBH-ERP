@@ -17,6 +17,7 @@ public class WarehouseDto {
     private String code;
     private String name;
     private String address;
+    private String remarks;
     private String phone;
     private String contactNumber;
     private String contactPerson;
@@ -35,6 +36,7 @@ public class WarehouseDto {
                 .code(w.getCode())
                 .name(w.getName())
                 .address(w.getAddress())
+                .remarks(w.getRemarks())
                 .phone(w.getPhone())
                 .contactNumber(w.getPhone())
                 .contactPerson(w.getContactPerson())

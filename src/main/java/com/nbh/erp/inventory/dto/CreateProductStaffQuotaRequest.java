@@ -16,13 +16,17 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class CreateProductStaffQuotaRequest {
 
+    @jakarta.validation.constraints.Positive
     private Long productId;
 
+    @jakarta.validation.constraints.Positive
     private Long userId;
 
+    @jakarta.validation.constraints.Positive
     private Long warehouseId; // Optional: null means all warehouses
 
     @Positive(message = "Allowed quantity must be greater than zero")
+    @jakarta.validation.constraints.Digits(integer=10,fraction=2)
     private BigDecimal allocatedQuantity;
 
     private LocalDate validFrom;

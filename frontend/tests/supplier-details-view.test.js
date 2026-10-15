@@ -29,9 +29,10 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
       email: 'jane@acme.com',
       address: '123 Galle Road, Colombo 03',
       status: 'ACTIVE',
+      remarks: 'Deliveries before noon',
     };
 
-    let printCalls = 0, closeCalls = 0, editCalls = 0, statusTarget = null;
+    let printCalls = 0, closeCalls = 0, editCalls = 0, deleteCalls=0, statusTarget = null;
 
     await act(async () => {
       root.render(
@@ -41,6 +42,7 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
           onPrint: () => printCalls++,
           onClose: () => closeCalls++,
           onEdit: () => editCalls++,
+          onDelete: () => deleteCalls++,
           onStatusChange: (s) => (statusTarget = s),
           canManage: true,
         })
@@ -53,19 +55,25 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     assert.ok(modal.classList.contains('supplier-inspection'), 'Has supplier-inspection class');
 
     // Test-required selectors
-    assert.ok(modal.querySelector('.purchase-inspection-details-card'), 'purchase-inspection-details-card exists');
+    assert.ok(modal.querySelector('.master-details-body'), 'purchase-inspection-details-card exists');
     assert.ok(modal.querySelector('.purchase-inspection-detail-actions'), 'purchase-inspection-detail-actions exists');
 
     assert.equal(modal.querySelector('.supplier-card-avatar'), null);
     assert.equal(modal.querySelector('[title^="Copy"], [aria-label^="Copy"]'), null);
 
     // Name + code
-    assert.ok(modal.querySelector('.supplier-card-name').textContent.includes('Acme Industrial Solutions'));
-    assert.ok(modal.querySelector('.supplier-card-code').textContent.includes('SUP-001'));
+    assert.ok(modal.querySelector('.master-details-heading h2').textContent.includes('Acme Industrial Solutions'));
+    assert.ok(modal.querySelector('.master-details-meta').textContent.includes('SUP-001'));
 
     // Status badge
     const badge = modal.querySelector('.erp-status-badge');
     assert.ok(badge);
+    assert.equal(modal.querySelector('.master-details-heading h2').nextElementSibling,badge);
+    assert.equal(modal.querySelector('.master-details-heading [aria-label="Delete Supplier"]'),null);
+    const deleteButton=[...modal.querySelectorAll('.supplier-card-actions button')].find(button=>button.textContent.includes('Delete Supplier'));assert.ok(deleteButton);
+    assert.ok(deleteButton.previousElementSibling.textContent.includes('Deactivate Supplier'));
+    await act(async()=>deleteButton.click());assert.equal(deleteCalls,1);
+    assert.ok(modal.textContent.includes('Deliveries before noon'));
 
     // Contact details are readable
     assert.ok(modal.textContent.includes('Jane Doe'));
@@ -77,8 +85,8 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     assert.ok(modal.querySelector('a[href="tel:+94 77 123 4567"]'));
     assert.ok(modal.querySelector('a[href="mailto:jane@acme.com"]'));
 
-    // Vertical row layout (not grid cells)
-    const rows = modal.querySelectorAll('.supplier-card-row');
+    // Details use the same compact grid as the product popup
+    const rows = modal.querySelectorAll('.master-details-grid>div');
     assert.ok(rows.length >= 4, 'At least 4 detail rows');
 
     // Print action
@@ -98,6 +106,7 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     const cancelBtn = [...modal.querySelectorAll('.purchase-inspection-detail-actions button')]
       .find(b => b.textContent.includes('Deactivate Supplier'));
     assert.ok(cancelBtn);
+    assert.ok(cancelBtn.classList.contains('purchase-inspection-warning'));
     await act(async () => cancelBtn.click());
     assert.equal(statusTarget, 'INACTIVE');
 
@@ -127,6 +136,12 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     assert.ok(processBtn);
     await act(async () => processBtn.click());
     assert.equal(statusTarget, 'ACTIVE');
+    await act(async()=>root.render(React.createElement(SupplierDetailsModal,{
+      supplier:{...supplier,status:'DRAFT'},canManage:true,onClose:()=>{},onEdit:()=>{},onDelete:()=>{},onStatusChange:()=>{},onPrint:()=>{},
+    })));
+    assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),['Edit Supplier','Delete Supplier']);
+    assert.equal(host.querySelector('[title="Print Supplier Details (A4)"]'),null);
+
   } finally {
     await act(async () => root.unmount());
     await server.close();

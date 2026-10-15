@@ -1063,8 +1063,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                         <td className="erp-table-cell" style={{ color: '#334155' }}>
                           {getTotalProducts(g)}
                         </td>
-                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                          {g.receivedDate || (g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—')}
+                        <td className="erp-table-cell erp-table-date">
+                          {g.receivedDate || g.createdAt?.slice(0,10) || '—'}
                         </td>
                         <td className="erp-table-cell">
                           <StatusBadge status={g.status} />

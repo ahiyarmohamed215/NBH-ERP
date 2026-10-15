@@ -16,6 +16,7 @@ import java.time.LocalDate;
 public class UpdateProductStaffQuotaRequest {
 
     @PositiveOrZero(message = "Allowed quantity cannot be negative")
+    @jakarta.validation.constraints.Digits(integer=10,fraction=2)
     private BigDecimal allocatedQuantity;
 
     @PositiveOrZero(message = "Sold quantity cannot be negative")
@@ -23,7 +24,9 @@ public class UpdateProductStaffQuotaRequest {
 
     private Boolean isActive;
 
+    @jakarta.validation.constraints.Positive
     private Long productId;
+    @jakarta.validation.constraints.Positive
     private Long userId;
     private Boolean replaceDraftFields;
 

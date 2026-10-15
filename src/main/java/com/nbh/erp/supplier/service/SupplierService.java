@@ -36,7 +36,7 @@ public class SupplierService {
         if(request.getName()!=null && request.getName().isBlank())request.setName(null);
         if(!"DRAFT".equals(status) && !StringUtils.hasText(request.getName())) throw new BusinessException("Supplier name is required before activation");
         if(request.getName()!=null && request.getName().length()<2)throw new BusinessException("Supplier name must contain 2–150 characters");
-        if("DRAFT".equals(status) && !java.util.stream.Stream.of(request.getName(),request.getContactPerson(),request.getPhone(),request.getEmail(),request.getAddress()).anyMatch(StringUtils::hasText))throw new BusinessException("Fill at least one input before saving a supplier draft");
+        if("DRAFT".equals(status) && !java.util.stream.Stream.of(request.getName(),request.getContactPerson(),request.getPhone(),request.getEmail(),request.getAddress(),request.getRemarks()).anyMatch(StringUtils::hasText))throw new BusinessException("Fill at least one input before saving a supplier draft");
         var violations=validator.validate(request);
         if(!violations.isEmpty())throw new BusinessException(violations.stream().map(jakarta.validation.ConstraintViolation::getMessage).sorted().collect(java.util.stream.Collectors.joining("; ")));
     }
@@ -91,6 +91,7 @@ public class SupplierService {
                 .phone(request.getPhone())
                 .email(request.getEmail())
                 .address(request.getAddress())
+                .remarks(request.getRemarks())
                 .isActive("ACTIVE".equals(status))
                 .status(status)
                 .build();
@@ -118,6 +119,7 @@ public class SupplierService {
         supplier.setPhone(request.getPhone());
         supplier.setEmail(request.getEmail());
         supplier.setAddress(request.getAddress());
+        supplier.setRemarks(request.getRemarks());
 
         Supplier saved = supplierRepository.save(supplier);
 
@@ -141,7 +143,7 @@ public class SupplierService {
         SecurityUtils.enforceCanEdit("SUPPLIER","Supplier: "+supplier.getSupplierCode());
         ensureNotDeleted(supplier);
         String previous=supplier.getStatus();
-        var input=new CreateSupplierRequest();input.setName(supplier.getName());input.setContactPerson(supplier.getContactPerson());input.setPhone(supplier.getPhone());input.setEmail(supplier.getEmail());input.setAddress(supplier.getAddress());
+        var input=new CreateSupplierRequest();input.setName(supplier.getName());input.setContactPerson(supplier.getContactPerson());input.setPhone(supplier.getPhone());input.setEmail(supplier.getEmail());input.setAddress(supplier.getAddress());input.setRemarks(supplier.getRemarks());
         if(!"INACTIVE".equals(target))validateInput(input,target);
         supplier.setStatus(target);supplier.setIsActive("ACTIVE".equals(target));
         Supplier saved=supplierRepository.save(supplier);
@@ -197,7 +199,7 @@ public class SupplierService {
         supplier.setContactPerson(null);
         supplier.setPhone(null);
         supplier.setEmail(null);
-        supplier.setAddress(null);
+        supplier.setAddress(null);supplier.setRemarks(null);
         supplierRepository.save(supplier);
         auditLogService.log("SUPPLIER_PURGE", "PURCHASING", "Supplier", supplier.getSupplierCode(), "Permanently removed supplier; historical identity retained for linked records");
     }

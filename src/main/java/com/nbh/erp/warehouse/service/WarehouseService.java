@@ -56,7 +56,8 @@ public class WarehouseService {
     @Transactional
     public WarehouseDto createWarehouse(CreateWarehouseRequest request) {
         String status = MasterRecordLifecycle.initialStatus(request.getStatus());
-        MasterRecordLifecycle.validate("Warehouse", status, request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode());
+        MasterRecordLifecycle.validate("Warehouse", status, request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode(), request.getRemarks());
+        validateRemarks(request.getRemarks());
         request.setCode(MasterRecordLifecycle.code(request.getCode(), "WH", warehouseRepository.count(), warehouseRepository::existsByCode));
         if (warehouseRepository.existsByCode(request.getCode())) {
             throw new DuplicateResourceException("Warehouse", "code", request.getCode());
@@ -66,6 +67,7 @@ public class WarehouseService {
                 .code(request.getCode().trim().toUpperCase())
                 .name(MasterRecordLifecycle.clean(request.getName()))
                 .address(request.getAddress())
+                .remarks(request.getRemarks())
                 .phone(request.getPhone())
                 .contactPerson(request.getContactPerson())
                 .isActive("ACTIVE".equals(status))
@@ -87,7 +89,8 @@ public class WarehouseService {
 
         SecurityUtils.enforceCanEdit("WAREHOUSE", "Warehouse: " + warehouse.getName());
         warehouse.requireNotDeleted();
-        MasterRecordLifecycle.validate("Warehouse", warehouse.getStatus(), request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode());
+        MasterRecordLifecycle.validate("Warehouse", warehouse.getStatus(), request.getName(), request.getAddress(), request.getPhone(), request.getContactPerson(), request.getCode(), request.getRemarks());
+        validateRemarks(request.getRemarks());
 
         request.setCode(org.springframework.util.StringUtils.hasText(request.getCode()) ? request.getCode().trim().toUpperCase() : warehouse.getCode());
 
@@ -101,6 +104,7 @@ public class WarehouseService {
         warehouse.setCode(request.getCode().trim().toUpperCase());
         warehouse.setName(MasterRecordLifecycle.clean(request.getName()));
         warehouse.setAddress(request.getAddress());
+        warehouse.setRemarks(request.getRemarks());
         warehouse.setPhone(request.getPhone());
         warehouse.setContactPerson(request.getContactPerson());
 
@@ -134,6 +138,10 @@ public class WarehouseService {
         Warehouse record = warehouseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
         changeStatus(id, "ACTIVE".equals(record.getStatus()) ? "INACTIVE" : "ACTIVE", "Changed from legacy status control");
+    }
+
+    private void validateRemarks(String remarks) {
+        if (remarks != null && remarks.length() > 5000) throw new BusinessException("Remarks must be 5000 characters or fewer");
     }
 
     @Transactional

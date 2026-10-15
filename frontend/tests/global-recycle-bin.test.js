@@ -30,7 +30,7 @@ test('profile opens a global bin with type filtering and isolated restore and pe
   const {default:Supplier}=await server.ssrLoadModule('/src/components/SupplierDetailsModal.jsx');
   for(const status of ['DRAFT','ACTIVE','INACTIVE']) {
    await render(React.createElement(Supplier,{supplier:{id:2,supplierCode:'SUPP-2',status,name:null},canManage:true,onClose(){},onEdit(){},onPrint(){},onStatusChange(){},onDelete(){}}));
-   const actions=[...host.querySelectorAll('.purchase-inspection-detail-actions button')].map(button=>button.textContent.trim());assert.ok(actions.includes('Edit Supplier'));assert.ok(actions.includes('Delete Supplier'));assert.ok(actions.includes(status==='ACTIVE'?'Deactivate Supplier':status==='INACTIVE'?'Reactivate Supplier':'Activate Supplier'));assert.equal(host.querySelector('.erp-dialog-title').textContent,'—');
+   const actions=[...host.querySelectorAll('button')].map(button=>button.getAttribute('aria-label') || button.textContent.trim());assert.ok(actions.includes('Edit Supplier'));assert.ok(actions.includes('Delete Supplier'));assert.ok(actions.includes(status==='ACTIVE'?'Deactivate Supplier':status==='INACTIVE'?'Reactivate Supplier':'Activate Supplier'));assert.equal(host.querySelector('.erp-dialog-title').textContent,'—');
   }
   const {default:Directory}=await server.ssrLoadModule('/src/components/MasterDirectoryTable.jsx');
   for(const type of ['products','brands','warehouses','categories']) {

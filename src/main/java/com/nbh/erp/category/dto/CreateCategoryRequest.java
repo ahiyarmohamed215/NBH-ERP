@@ -17,6 +17,7 @@ public class CreateCategoryRequest {
     @Size(max = 100)
     private String name;
 
+    @jakarta.validation.constraints.Size(max=5000)
     private String description;
 
     @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")

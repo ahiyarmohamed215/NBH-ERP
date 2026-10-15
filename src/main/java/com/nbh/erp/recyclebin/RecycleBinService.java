@@ -95,7 +95,7 @@ public class RecycleBinService {
         if(!record.isDeleted() || record.getPurgedAt()!=null) throw new BusinessException("Only records in the recycle bin can be permanently deleted");
         record.setPurgedAt(LocalDateTime.now());record.setActiveBeforeDelete(null);record.setStatusBeforeDelete(null);
         if(record instanceof com.nbh.erp.customer.entity.Customer customer){customer.setContactPerson(null);customer.setEmail(null);customer.setPhone(null);customer.setAddress(null);}
-        if(record instanceof com.nbh.erp.warehouse.entity.Warehouse warehouse){warehouse.setContactPerson(null);warehouse.setPhone(null);warehouse.setAddress(null);}
+        if(record instanceof com.nbh.erp.warehouse.entity.Warehouse warehouse){warehouse.setContactPerson(null);warehouse.setPhone(null);warehouse.setAddress(null);warehouse.setRemarks(null);}
         if(record instanceof com.nbh.erp.brand.entity.Brand brand)brand.setDescription(null);
         if(record instanceof com.nbh.erp.category.entity.Category category)category.setDescription(null);
         if(record instanceof ProductStaffQuota allocation)allocation.setNotes(null);

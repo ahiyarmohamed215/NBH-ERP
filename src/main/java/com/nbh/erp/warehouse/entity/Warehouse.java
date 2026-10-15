@@ -26,6 +26,9 @@ public class Warehouse extends com.nbh.erp.common.entity.RecyclableEntity {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    @Column(columnDefinition = "TEXT")
+    private String remarks;
+
     @Column(length = 30)
     private String phone;
 

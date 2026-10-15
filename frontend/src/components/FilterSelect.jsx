@@ -8,7 +8,7 @@ import './PurchasingAppearance.css';
 const optionText=node=>Array.isArray(node) ? node.map(optionText).join('') : React.isValidElement(node) ? optionText(node.props.children) : String(node ?? '');
 const readOptions=children=>React.Children.toArray(children).flatMap(child=>!React.isValidElement(child) ? [] : child.type===React.Fragment ? readOptions(child.props.children) : [{value:String(child.props.value ?? optionText(child.props.children)),label:optionText(child.props.children),disabled:child.props.disabled}]);
 
-export default function FilterSelect({value,onChange,children,style={},title,onFocus,onBlur,variant='filter',className='',disabled=false,required=false,name:fieldName,id:fieldId,'aria-label':ariaLabel}) {
+export default function FilterSelect({value,onChange,children,selectedLabel,style={},title,onFocus,onBlur,variant='filter',className='',disabled=false,required=false,name:fieldName,id:fieldId,'aria-label':ariaLabel}) {
   const options=readOptions(children), selected=options.find(option=>option.value===String(value));
   const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0),[position,setPosition]=useState({});
   const trigger=useRef(null),popup=useRef(null),list=useRef(null),search=useRef(null),id=useId();
@@ -43,7 +43,7 @@ export default function FilterSelect({value,onChange,children,style={},title,onF
     <button ref={trigger} id={fieldId} disabled={disabled} aria-required={required || undefined} type="button" role="combobox" aria-label={name} aria-haspopup="listbox" aria-expanded={open} aria-controls={id} title={title || name}
       data-filter-active={String(value)!==options[0]?.value} className={`modern-filter-trigger${variant==='field'?' modern-select-field':''}${open?' is-open':''} ${className}`} style={variant==='field' ? {width:'100%',minWidth:0,...style} : {width:style.width || 140,maxWidth:'100%',minWidth:Math.min(Number.parseInt(style.minWidth)||120,140)}}
       onClick={toggle} onFocus={onFocus} onBlur={onBlur} onKeyDown={event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(!open)toggle();}}}>
-      <span className="modern-filter-value">{selected?.label || (variant==='field' ? 'Select an option' : 'Select filter')}</span><ChevronDown size={14}/>
+      <span className="modern-filter-value">{selectedLabel ?? (selected?.label || (variant==='field' ? 'Select an option' : 'Select filter'))}</span><ChevronDown size={14}/>
     </button>
     {variant==='field' && <select className="modern-select-native erp-field" aria-hidden="true" tabIndex={-1} value={value} onChange={onChange} required={required} disabled={disabled} name={fieldName} onInvalid={event=>{event.preventDefault();trigger.current?.focus();if(!open)toggle();}}>{children}</select>}
     {open && createPortal(<div ref={popup} className="modern-filter-popup purchasing-no-shadows" style={position} onKeyDown={keydown}>

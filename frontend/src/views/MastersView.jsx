@@ -5,7 +5,7 @@ import MasterWorkspace from '../components/MasterWorkspace';
 import MasterDirectoryTable from '../components/MasterDirectoryTable';
 import MasterDetailsModal from '../components/MasterDetailsModal';
 import './InventoryTheme.css';
-import {supplierErrors,normalizePhone,phoneCountry} from '../utils/purchasingValidation';
+import {supplierErrors,normalizePhone,phoneCountry,masterErrors} from '../utils/purchasingValidation';
 import SupplierDetailsModal from '../components/SupplierDetailsModal';
 import useRecordDeletion from '../hooks/useRecordDeletion';
 import SupplierDeleteDialog from '../components/SupplierDeleteDialog';
@@ -268,13 +268,13 @@ const MastersView = React.forwardRef(function MastersView({
     } else if (activeTab === 'brands') {
       setModalForm({ code: '', name: '', description: '', markupPercent: 0 });
     } else if (activeTab === 'warehouses') {
-      setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '' });
+      setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '', remarks: '' });
     } else if (activeTab === 'categories') {
       setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'customers') {
       setModalForm({ code: '', name: '', contactPerson: '', phone: '', email: '', address: '', creditLimit: '0' });
     } else if (activeTab === 'suppliers') {
-      setModalForm({ code: '', name: '', contactPerson: '', phone: '', phoneCountry:'LK', email: '', address: '' });
+      setModalForm({ code: '', name: '', contactPerson: '', phone: '', phoneCountry:'LK', email: '', address: '', remarks: '' });
     }
     setShowModal(true);
   };
@@ -318,6 +318,7 @@ const MastersView = React.forwardRef(function MastersView({
     const savedStatus=editingItem ? recordStatus(editingItem) : masterDraft?'DRAFT':'ACTIVE';
     if(masterDraft && !hasMasterDraftInput(activeTab,modalForm)){e.preventDefault();addToast('Fill at least one input before saving a draft.','error');return;}
     e.preventDefault();
+    if(masterTypes.includes(activeTab)){const errors=masterErrors(activeTab,modalForm,{draft:masterDraft});if(Object.keys(errors).length){addToast(Object.values(errors)[0],'error');return;}}
     if (editingItem && !canEditCurrentTab) {
       addToast('Permission denied: Only authorized staff can edit existing records.', 'error');
       return;
@@ -381,8 +382,8 @@ const MastersView = React.forwardRef(function MastersView({
         const payload = {
           ...modalForm,
           status:savedStatus,
-          contactNumber: modalForm.contactNumber || modalForm.phone || '',
-          phone: modalForm.contactNumber || modalForm.phone || '',
+          contactNumber: normalizePhone(modalForm.contactNumber || modalForm.phone,phoneCountry(modalForm.contactNumber || modalForm.phone)),
+          phone: normalizePhone(modalForm.contactNumber || modalForm.phone,phoneCountry(modalForm.contactNumber || modalForm.phone)),
         };
         if (editingItem) {
           await warehouseApi.update(editingItem.id, payload);
@@ -416,7 +417,7 @@ const MastersView = React.forwardRef(function MastersView({
         const payload = {
           status:editingItem ? supplierStatus(editingItem) : supplierDraft?'DRAFT':'ACTIVE',
           name:modalForm.name?.trim() || null,contactPerson:modalForm.contactPerson?.trim() || '',
-          phone:normalizePhone(modalForm.phone,modalForm.phoneCountry || phoneCountry(modalForm.phone)),email:modalForm.email?.trim() || '',address:modalForm.address?.trim() || '',
+          phone:normalizePhone(modalForm.phone,modalForm.phoneCountry || phoneCountry(modalForm.phone)),email:modalForm.email?.trim() || '',address:modalForm.address?.trim() || '',remarks:modalForm.remarks?.trim() || '',
         };
         if (editingItem) {
           await supplierApi.update(editingItem.id, payload);
@@ -496,12 +497,12 @@ const MastersView = React.forwardRef(function MastersView({
     });
   };
 
-  const filteredProducts = filterList(products, ['name', 'sku', 'categoryName', 'description']);
-  const filteredBrands = filterList(brands, ['code', 'name', 'description']);
-  const filteredWarehouses = filterList(warehouses, ['name', 'code', 'contactNumber', 'phone', 'address']);
-  const filteredCategories = filterList(categories, ['code', 'name', 'description']);
+  const filteredProducts = filterList(newestFirst(products), ['name', 'sku', 'categoryName', 'description']);
+  const filteredBrands = filterList(newestFirst(brands), ['code', 'name', 'description']);
+  const filteredWarehouses = filterList(newestFirst(warehouses), ['name', 'code', 'contactNumber', 'phone', 'address', 'remarks']);
+  const filteredCategories = filterList(newestFirst(categories), ['code', 'name', 'description']);
   const filteredCustomers = filterList(customers, ['name', 'code', 'customerCode', 'phone', 'contactPerson', 'email']);
-  const filteredSuppliers = filterList(newestFirst(suppliers), ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email']);
+  const filteredSuppliers = filterList(newestFirst(suppliers), ['name', 'code', 'supplierCode', 'contactPerson', 'phone', 'email', 'remarks']);
 
   const handlePrintSuppliers = (supplier = null) => {
     const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -515,6 +516,7 @@ const MastersView = React.forwardRef(function MastersView({
       email: escapeText(item.email),
       address: escapeText(item.address),
       status: supplierStatus(item),
+      remarks:escapeText(item.remarks),
     });
     if (supplier) {
       const details = supplierDetails(supplier);
@@ -532,6 +534,7 @@ const MastersView = React.forwardRef(function MastersView({
           { field: 'Email', value: details.email },
           { field: 'Address', value: details.address },
           { field: 'Status', value: details.status },
+          { field: 'Remarks', value: details.remarks },
         ],
       });
       return;
@@ -550,6 +553,7 @@ const MastersView = React.forwardRef(function MastersView({
         { header: 'Email', accessor: 'email' },
         { header: 'Address', accessor: 'address' },
         { header: 'Status', accessor: 'status' },
+        { header: 'Remarks', accessor: 'remarks' },
       ],
       data: filteredSuppliers.map(supplierDetails),
       summaryItems: [{ label: 'Total Suppliers', value: String(filteredSuppliers.length) }],
@@ -639,7 +643,7 @@ const MastersView = React.forwardRef(function MastersView({
       downloadCSV(headers, rows, filename);
     } else if (activeTab === 'suppliers') {
       itemsToExport = filteredSuppliers;
-      headers = ['Code', 'Name', 'Contact Person', 'Phone', 'Email', 'Status'];
+      headers = ['Code', 'Name', 'Contact Person', 'Phone', 'Email', 'Status', 'Remarks'];
       if (itemsToExport.length === 0) {
         addToast('No suppliers to export', 'error');
         return;
@@ -650,7 +654,8 @@ const MastersView = React.forwardRef(function MastersView({
         `"${(s.contactPerson || '').replace(/"/g, '""')}"`,
         `"${s.phone || ''}"`,
         `"${s.email || ''}"`,
-        isItemActive(s) ? 'Active' : 'Inactive',
+        supplierStatus(s),
+        `"${(s.remarks || '').replace(/"/g, '""')}"`,
       ]);
       downloadCSV(headers, rows, filename);
     }
@@ -826,7 +831,7 @@ const MastersView = React.forwardRef(function MastersView({
                 : activeTab === 'warehouses'
                 ? 'Search warehouses by code, name, address, contact...'
                 : activeTab === 'categories'
-                ? 'Search categories by code, name, description...'
+                ? 'Search categories by code, name, remarks...'
                 : `Search ${activeTab} by name, code, contact...`
             }
             value={searchTerm}
@@ -1122,13 +1127,14 @@ const MastersView = React.forwardRef(function MastersView({
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PHONE / EMAIL</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ADDRESS</th>
                   <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th className="erp-table-heading">REMARKS</th>
                   <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
+                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
                       No suppliers found matching current criteria.
                     </td>
                   </tr>
@@ -1163,6 +1169,7 @@ const MastersView = React.forwardRef(function MastersView({
                         <td className="erp-table-cell">
                           <StatusBadge status={supplierStatus(s)} title={`Status: ${supplierStatus(s)}`} />
                         </td>
+                        <td className="erp-table-cell" style={{color:'#64748b',maxWidth:280,whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{s.remarks || '—'}</td>
                         <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             <button className="erp-table-icon-action" type="button" title="Edit Supplier" aria-label="Edit Supplier"

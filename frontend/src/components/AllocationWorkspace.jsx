@@ -47,7 +47,7 @@ export default function AllocationWorkspace({form,onChange,editing,products,staf
             {!staffResults.length && <p>No matching POS staff found.</p>}
           </div>}
         </div>
-        <label>Allocated quantity *<div className="allocation-quantity-input"><input className="erp-field" type="text" inputMode="decimal" aria-label="Allocated quantity" required value={form.allocatedQuantity} placeholder="Enter quantity" onChange={event=>change('allocatedQuantity',event.target.value)} onBlur={()=>setTouched(true)} aria-invalid={Boolean(exceeds || touched && error)}/><span>{unit}</span></div>{(exceeds || touched && error) && <small className="allocation-field-error">{error || `Only ${available.toLocaleString()} ${unit} are available.`}</small>}</label>
+        <label>Allocated quantity *<div className="allocation-quantity-input"><input className="erp-field" type="number" min="0.01" max="9999999999.99" step="0.01" inputMode="decimal" aria-label="Allocated quantity" required value={form.allocatedQuantity} placeholder="Enter quantity" onChange={event=>change('allocatedQuantity',event.target.value)} onBlur={()=>setTouched(true)} aria-invalid={Boolean(exceeds || touched && error)}/><span>{unit}</span></div>{(exceeds || touched && error) && <small className="allocation-field-error">{error || `Only ${available.toLocaleString()} ${unit} are available.`}</small>}</label>
         <label>Remarks / notes<textarea className="erp-field" aria-label="Allocation notes" rows={4} maxLength={255} value={form.notes} placeholder="Optional notes for this allocation" onChange={event=>change('notes',event.target.value)}/><small className="allocation-notes-count">{(form.notes || '').length}/255</small></label>
         {identityLocked && <p className="allocation-input-hint">Product and staff remain assigned when editing this allocation.</p>}
       </section>
@@ -60,7 +60,7 @@ export default function AllocationWorkspace({form,onChange,editing,products,staf
           <div><dt>Available quantity</dt><dd>{available.toLocaleString()} {unit}</dd></div>
         </dl></div>
         <div className="allocation-receipt-section"><h4>Allocated to</h4><strong>{staffName || 'Select staff'}</strong><dl>
-          <div><dt>Staff code</dt><dd>{staffCode(person || {id:form.userId})}</dd></div>
+          <div><dt>Staff code</dt><dd>{form.userId?staffCode(person || {id:form.userId}):'—'}</dd></div>
           <div><dt>Contact</dt><dd>{person?.phone || person?.email || '—'}</dd></div>
         </dl></div>
         <div className="allocation-receipt-quantity"><span>Quantity to allocate</span><strong>{form.allocatedQuantity || '—'} <small>{unit}</small></strong></div>

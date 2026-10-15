@@ -58,6 +58,14 @@ test('Purchasing popups share compact details, table controls and status workflo
       await act(async () => root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider, null, React.createElement(View, { key: type })))));
       const printList = host.querySelector(`[aria-label="Print ${type} list"]`);
       assert.ok(printList, `${type}: list print control is available`);
+      const cells=host.querySelector('tbody tr').cells.length;
+      for(let index=0;index<cells;index++){
+        const cell=host.querySelector('tbody tr').cells[index];
+        await act(async()=>(cell.querySelector('.erp-status-badge') || cell).click());
+        const popup=host.querySelector('.purchase-inspection');assert.ok(popup,`${type}: column ${index+1} opens its details`);
+        await act(async()=>popup.querySelector(`[aria-label="Close ${type} details"]`).click());
+      }
+
       if(type==='PO') {
         assert.deepEqual([...host.querySelectorAll('thead th')].map(cell=>cell.textContent),['PO NUMBER','SUPPLIER','DESTINATION WAREHOUSE','TOTAL PRODUCTS','DATE','STATUS','REMARKS','ACTIONS']);
       }

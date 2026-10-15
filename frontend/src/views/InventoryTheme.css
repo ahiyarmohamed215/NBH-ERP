@@ -32,15 +32,21 @@
 .allocation-list-table td{color:#334155;font-size:var(--erp-text-body)}
 .allocation-list-table tbody tr{cursor:pointer;background:#fff;transition:background-color .1s ease}
 .allocation-list-code{display:block;font-family:monospace;font-weight:700;color:#0284c7;margin-bottom:3px}
-.allocation-list-name{display:block;font-size:var(--erp-text-field);font-weight:600;color:#0f172a;overflow-wrap:anywhere}
+.allocation-list-name{display:block;font-weight:600;color:#0f172a;overflow-wrap:anywhere}
 .allocation-list-secondary{display:block;margin-top:3px;font-size:var(--erp-text-caption);color:#64748b}
 .allocation-list-quantity{font-variant-numeric:tabular-nums;white-space:nowrap}.allocation-list-quantity small{font-size:var(--erp-text-caption);color:#64748b}
 .allocation-list-stock-empty{color:#be123c}
 .allocation-list-actions{text-align:right}.allocation-list-row-actions{display:inline-flex;gap:6px;justify-content:flex-end}
 .inventory-theme .allocation-list-table .allocation-list-empty{text-align:center;padding:48px 20px!important;color:#64748b;cursor:default}.allocation-list-empty>svg{color:#94a3b8}.allocation-list-empty p{margin:8px 0 14px}
 
-.master-directory-table{text-align:left;min-width:650px}.master-directory-products{min-width:1100px}
+.master-directory-table{text-align:left;min-width:650px}.master-directory-products{min-width:850px}
 .master-directory-table th{position:sticky;top:0;z-index:1;white-space:nowrap}
 .master-directory-table td{font-size:var(--erp-text-body);color:#334155;max-width:260px;overflow-wrap:anywhere}
 .master-directory-table tbody tr{cursor:pointer;transition:background-color .1s ease}
 .inventory-theme .master-directory-empty{text-align:center;padding:48px 20px!important;color:#64748b;cursor:default}
+
+.inventory-balance-table{min-width:850px;text-align:left;}
+.inventory-balance-table tbody tr{cursor:pointer;}
+.inventory-balance-table tbody tr:hover{background:#f8fafc;}
+.inventory-balance-table .inventory-stock-quantity{font-weight:600;font-variant-numeric:tabular-nums;}
+.inventory-balance-table .inventory-stock-empty{color:#dc2626;}

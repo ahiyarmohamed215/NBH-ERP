@@ -73,6 +73,17 @@
 
 /* Shared table styling lives in ErpTables.css. */
 
+/* Flat buttons, including portal dialogs, hover effects and older inline styles. */
+:root :is(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"],.btn,.erp-button),
+:root :is(button,[role="button"],.btn,.erp-button)::before,
+:root :is(button,[role="button"],.btn,.erp-button)::after,
+:root :is(button,[role="button"],.btn,.erp-button) :where(*) {
+  box-shadow:none !important;
+  -webkit-box-shadow:none !important;
+  text-shadow:none !important;
+  filter:none !important;
+}
+
 /* All modules share Purchasing's flat surfaces. Status colours remain semantic. */
 .erp-application, .erp-application :where(*) { box-shadow:none !important; text-shadow:none !important; }
 .erp-application :where(button,input,select,textarea) { font-family:var(--font-sans); }

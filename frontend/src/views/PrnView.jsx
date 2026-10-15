@@ -613,7 +613,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
                         <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
                           {new Set((p.items || []).map(item=>item.productId)).size}
                         </td>
-                        <td className="erp-table-cell" style={{ color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <td className="erp-table-cell erp-table-date">
                           {p.returnDate || p.createdAt?.slice(0,10) || '—'}
                         </td>
                         <td className="erp-table-cell">

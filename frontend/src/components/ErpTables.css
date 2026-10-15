@@ -54,6 +54,14 @@
   padding:var(--erp-table-cell-padding) !important; font-size:var(--erp-text-body);
   background:var(--erp-table-header-bg); border-top:1px solid var(--erp-border);
 }
+/* GRN date appearance shared by Purchasing and Inventory directories. */
+.erp-table.erp-table > tbody > tr > td.erp-table-date {
+  color:var(--erp-muted) !important;
+  font-family:var(--font-sans); font-size:var(--erp-text-body) !important;
+  font-weight:400; font-variant-numeric:tabular-nums; text-align:left;
+}
+/* Record names inherit GRN's table body size, including stacked identity cells. */
+.erp-table.erp-table .allocation-list-name { font-size:inherit; font-weight:600; color:var(--erp-heading); }
 .erp-table.erp-table .erp-table-code { font-family:monospace; font-weight:700; color:var(--erp-accent) !important; }
 .erp-table.erp-table .erp-table-actions { text-align:right !important; white-space:nowrap; }
 .erp-table.erp-table .erp-table-actions > div { justify-content:flex-end !important; gap:6px !important; }

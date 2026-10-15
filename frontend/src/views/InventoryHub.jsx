@@ -1,3 +1,8 @@
+import AdjustmentWorkspace from '../components/AdjustmentWorkspace';
+import AdjustmentDetailsModal from '../components/AdjustmentDetailsModal';
+import InventoryBalanceTable from '../components/InventoryBalanceTable';
+import {newestFirst} from '../utils/recordOrder';
+import AllocationDetailsModal from '../components/AllocationDetailsModal';
 import {canWriteTab,hasPermission} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
@@ -80,7 +85,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const canEditInventory = canEditModule(user, 'INVENTORY');
   const canSeeCost = canViewCostPrice(user);
   const { addToast } = useToast();
-  const allocationDeletion=useRecordDeletion('ALLOCATION','Inventory allocation',()=>loadQuotas());
+  const allocationDeletion=useRecordDeletion('ALLOCATION','Inventory allocation',()=>{setShowViewQuotaModal(false);return loadQuotas();});
   const mastersRef = useRef(null);
   const directoryRef=useRef(null);
 
@@ -180,6 +185,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [loadingQuotas, setLoadingQuotas] = useState(false);
   const [quotaSearch, setQuotaSearch] = useState('');
   const [quotaStatusFilter, setQuotaStatusFilter] = useState('ALL');
+  const [quotaFrom,setQuotaFrom]=useState('');
+  const [quotaTo,setQuotaTo]=useState('');
 
   // Quota Modal State
   const [showQuotaModal, setShowQuotaModal] = useState(false);
@@ -295,39 +302,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     setLoadingQuotas(true);
     try {
       const [quotasRes, summaryRes, staffRes] = await Promise.all([
-        staffQuotaApi.search({ size: 100 }).catch(() => ({ data: { data: { content: [] } } })),
+        staffQuotaApi.search({ size: 100, sort: 'createdAt,desc' }).catch(() => ({ data: { data: { content: [] } } })),
         staffQuotaApi.getSummary().catch(() => ({ data: { data: null } })),
-        salesmanApi.getPosStaff().catch(() => salesmanApi.getActive()).catch(() => ({ data: { data: [] } })),
+        salesmanApi.getPosStaff().catch(() => {addToast('Unable to load assigning staff. Refresh inventory allocations and try again.','error');return {data:[]};}),
       ]);
       setQuotas(quotasRes.data?.data?.content || quotasRes.data?.content || []);
       setQuotaSummary(summaryRes.data?.data || summaryRes.data || null);
 
       const rawStaff = staffRes.data?.data || staffRes.data || [];
-      // Filter strictly to staff with POS module access
-      const posAllowedStaff = rawStaff.filter((u) => {
-        if (!u) return false;
-        const roles = (u.roles || []).map((r) => String(r).toUpperCase());
-        const perms = (u.permissions || []).map((p) => String(p).toUpperCase());
-        return (
-          roles.some(
-            (r) =>
-              r === 'ROLE_ADMIN' ||
-              r === 'ROLE_SUPER_ADMIN' ||
-              r === 'ROLE_MANAGER' ||
-              r === 'ROLE_DIRECTOR' ||
-              r.includes('CASHIER') ||
-              r.includes('POS') ||
-              r.includes('SALES')
-          ) ||
-          perms.some(
-            (p) =>
-              p.includes('SALES_CREATE') ||
-              p.includes('SALES') ||
-              p.includes('POS')
-          )
-        );
-      });
-      setSalesStaff(posAllowedStaff);
+      // The reference endpoint already checks approval and POS access on the server.
+      setSalesStaff(Array.isArray(rawStaff)?rawStaff.filter(person=>person && person.isActive!==false):[]);
     } catch (err) {
       console.error('Failed to load staff quotas:', err);
     } finally {
@@ -440,7 +424,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   };
 
   const filteredQuotas = useMemo(() => {
-    return quotas.filter((q) => {
+    return newestFirst(quotas).filter((q) => {
+      if(!matchesDateRange(q.createdAt,quotaFrom,quotaTo))return false;
       if(quotaStatusFilter!=='ALL' && quotaStatus(q)!==quotaStatusFilter)return false;
       if (quotaSearch.trim()) {
         const qLower = quotaSearch.toLowerCase();
@@ -450,7 +435,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }
       return true;
     });
-  }, [quotas, quotaStatusFilter, quotaSearch]);
+  }, [quotas, quotaStatusFilter, quotaSearch, quotaFrom, quotaTo]);
 
   // -------------------------------------------------------------
   // INVENTORY LIST (LIVE BALANCES) TAB STATE & LOGIC
@@ -683,6 +668,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
   const handleSaveRecord = async (e) => {
     e.preventDefault();
+    if(submittingRecord)return;
     if (!createForm.type) {
       addToast('Please choose whether to Add stock or Reduce stock', 'error');
       return;
@@ -695,11 +681,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       addToast('Please select a product', 'error');
       return;
     }
-    const qtyNum = parseFloat(createForm.quantity);
-    if (!qtyNum || qtyNum <= 0) {
-      addToast('Please enter a valid positive quantity', 'error');
-      return;
-    }
+    const quantityError=numberError(createForm.quantity,'Quantity',{positive:true,decimals:0,max:9999999999});
+    if(quantityError){addToast(quantityError,'error');return;}
+    const qtyNum=Number(createForm.quantity);
+    if((createForm.remarks || '').length>5000){addToast('Remarks must be 5000 characters or fewer.','error');return;}
     if (!createForm.reason) {
       addToast('Please select a valid reason', 'error');
       return;
@@ -717,6 +702,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         (b) => String(b.productId) === String(prdId) && String(b.warehouseId) === String(whId)
       );
       const currentPhysical = sysBal ? Number(sysBal.quantity || 0) : 0;
+      if(createForm.type==='Reduction' && qtyNum>currentPhysical){addToast(`Only ${currentPhysical} units are in stock. Reduce by that quantity or less.`,'error');return;}
       const targetPhysical = createForm.type === 'Reduction'
         ? Math.max(0, currentPhysical - Math.abs(qtyNum))
         : currentPhysical + Math.abs(qtyNum);
@@ -749,7 +735,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   };
 
   return (
-    <div ref={directoryRef} className={(`inventory-theme purchasing-no-shadows${showQuotaModal || masterFormOpen ? ' inventory-allocation-focus' : ''}`) + ' erp-page'}
+    <div ref={directoryRef} className={(`inventory-theme purchasing-no-shadows${showQuotaModal || showCreateModal || masterFormOpen ? ' inventory-allocation-focus' : ''}`) + ' erp-page'}
       style={{
         flex: 1,
         height: '100%',
@@ -871,7 +857,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 1. INVENTORY LIST TAB (Live Stock Balances with Qty, Cost, Selling, Valuation) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'inventory-list' && !showQuotaModal && (
+      {currentTab === 'inventory-list' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           {/* Search Bar & Action Buttons (Matched with Products Table Layout) */}
           <div className="inventory-toolbar"
@@ -1098,108 +1084,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CODE / SKU</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BRAND</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CATEGORY</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUANTITY</th>
-                    {canSeeCost && (
-                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>COST PRICE</th>
-                    )}
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SELLING PRICE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inventoryLoading ? (
-                    <tr>
-                      <td className="erp-table-cell" colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', color: '#64748b' }}>
-                        Loading live inventory balances...
-                      </td>
-                    </tr>
-                  ) : filteredInventory.length === 0 ? (
-                    <tr>
-                      <td className="erp-table-cell" colSpan={canSeeCost ? 9 : 8} style={{ textAlign: 'center', color: '#64748b' }}>
-                        No inventory records found matching current criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredInventory.map((item) => (
-                      <tr
-                        key={item.id}
-                        onClick={() => setViewingStockItem(item)}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.1s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        title="Click row to view full stock details"
-                      >
-                        <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
-                          {item.sku}
-                        </td>
-                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
-                          {item.productName}
-                        </td>
-                        <td className="erp-table-cell">
-                          <span
-                            style={{
-                              backgroundColor: '#f8fafc',
-                              color: '#334155',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: 'var(--erp-text-small)',
-                              fontWeight: 600,
-                              border: '1px solid #e2e8f0',
-                              display: 'inline-block',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {item.brandName || 'General'}
-                          </span>
-                        </td>
-                        <td className="erp-table-cell" style={{ color: '#475569', fontWeight: 500 }}>
-                          {item.warehouseName}
-                        </td>
-                        <td className="erp-table-cell">
-                          <span
-                            style={{
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: 'var(--erp-text-small)',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {item.categoryName}
-                          </span>
-                        </td>
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: item.quantity > 0 ? '#0f172a' : '#dc2626' }}>
-                          {item.quantity.toLocaleString()} <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', fontWeight: 500 }}>{item.unitOfMeasure}</span>
-                        </td>
-                        {canSeeCost && (
-                          <td className="erp-table-cell" style={{ color: '#475569', fontWeight: 600 }}>
-                            Rs. {Number(item.costPrice || 0).toFixed(2)}
-                          </td>
-                        )}
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a' }}>
-                          Rs. {Number(item.sellingPrice || 0).toFixed(2)}
-                        </td>
-                        <td className="erp-table-cell">
-                          <StatusBadge status={item.isOutOfStock ? 'OUT_OF_STOCK' : item.isLowStock ? 'LOW_STOCK' : 'IN_STOCK'} />
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <InventoryBalanceTable rows={filteredInventory} loading={inventoryLoading} canSeeCost={canSeeCost} onView={setViewingStockItem}/>
             </div>
           </div>
         </div>
@@ -1208,7 +1093,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 2. PRODUCTS TAB (Master Product Directory) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'products' && !showQuotaModal && (
+      {currentTab === 'products' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1225,7 +1110,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 2b. BRANDS TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'brands' && !showQuotaModal && (
+      {currentTab === 'brands' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1242,7 +1127,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 3. WAREHOUSES TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'warehouses' && !showQuotaModal && (
+      {currentTab === 'warehouses' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1259,7 +1144,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 4. CATEGORIES TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'categories' && !showQuotaModal && (
+      {currentTab === 'categories' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1276,7 +1161,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 5. STOCK ADJUSTMENT TAB (Last Navigation Item) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'adjustments' && !showQuotaModal && (
+      {currentTab === 'adjustments' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
           {/* Search Bar & Filter Controls (Matched with Products Table Layout) */}
@@ -1547,19 +1432,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                           <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
                             {rec.recordNo}
                           </td>
-                          <td className="erp-table-cell" style={{ color: '#475569' }}>
+                          <td className="erp-table-cell erp-table-date">
                             {rec.date}
                           </td>
                           <td className="erp-table-cell">
-                            <span
-                              style={{
-                                color: isAddition ? '#16a34a' : '#dc2626',
-                                fontWeight: 700,
-                                fontSize: 'var(--erp-text-body)',
-                              }}
-                            >
-                              {rec.type}
-                            </span>
+                            <StatusBadge status={isAddition?'ADDITION':'REDUCTION'} label={rec.type}/>
                           </td>
                           <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
                             {rec.warehouse}
@@ -1628,7 +1505,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 6. INVENTORY ALLOCATION TAB (Product Quantity Allocated per Staff Member) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'pos-quotas' && !showQuotaModal && (
+      {currentTab === 'pos-quotas' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
           {/* Search Bar & Filter Controls */}          <div className="inventory-toolbar"
@@ -1710,6 +1587,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
             {/* Right Controls: Status Filter, Reset, Print (Icon only), Refresh (Icon only) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <DateRangePicker documentType="Inventory allocation" from={quotaFrom} to={quotaTo} onChange={(from,to)=>{setQuotaFrom(from);setQuotaTo(to);}}/>
               {/* Status Filter */}
               <FilterSelect
                 value={quotaStatusFilter}
@@ -1724,12 +1602,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               </FilterSelect>
 
               {/* Reset Filters button */}
-              {(quotaSearch || quotaStatusFilter !== 'ALL') && (
+              {(quotaSearch || quotaStatusFilter !== 'ALL' || quotaFrom || quotaTo) && (
                 <button className="erp-button"
                   type="button"
                   onClick={() => {
                     setQuotaSearch('');
                     setQuotaStatusFilter('ALL');
+                    setQuotaFrom('');setQuotaTo('');
                   }}
                   style={{
                     height: '34px',
@@ -1843,815 +1722,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Inventory Allocation Details Popup */}
       {/* ------------------------------------------------------------- */}
-      {showViewQuotaModal && viewingQuota && (
-        <div
-          className="modal-backdrop"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            zIndex: 1200,
-          }}
-          onClick={() => setShowViewQuotaModal(false)}
-        >
-          <div role="dialog" aria-modal="true" aria-label="Inventory allocation details"
-            style={{
-              width: '100%',
-              maxWidth: '540px',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: 'none',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div
-              style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: '#f8fafc',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0284c7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
-                    Inventory Allocation Details
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                    Staff product limit and available inventory
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowViewQuotaModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '6px',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {showViewQuotaModal && viewingQuota && <AllocationDetailsModal allocation={viewingQuota} status={quotaStatus(viewingQuota)} canManage={canEditInventory} busy={savingQuota}
+        onClose={()=>setShowViewQuotaModal(false)} onEdit={()=>{setShowViewQuotaModal(false);handleOpenQuotaModal(null,viewingQuota);}}
+        onStatusChange={target=>openQuotaStatus(viewingQuota,target)} onDelete={()=>allocationDeletion.requestDeletion(viewingQuota)}/>}
 
-            {/* Modal Body */}
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Key Metrics: Total Stock Available vs Given to Staff */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Total Stock Available
-                  </span>
-                  {Number(viewingQuota.totalStockAvailable ?? viewingQuota.currentStockInWarehouse ?? 0) <= 0 ? (
-                    <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <AlertCircle size={18} color="#ef4444" />
-                      0 (Out of Stock)
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#15803d' }}>
-                      {Number(viewingQuota.totalStockAvailable ?? viewingQuota.currentStockInWarehouse ?? 0).toLocaleString()}{' '}
-                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#166534', fontWeight: 500 }}>{viewingQuota.productUnit || 'Units'}</span>
-                    </div>
-                  )}
-                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8' }}>Total enterprise inventory</span>
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    borderRadius: '8px',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Given to Staff
-                  </span>
-                  <div style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#0284c7' }}>
-                    {Number(viewingQuota.allocatedQuantity || 0).toLocaleString()}{' '}
-                    <span style={{ fontSize: 'var(--erp-text-body)', color: '#0284c7', fontWeight: 600 }}>{viewingQuota.productUnit || 'Units'}</span>
-                  </div>
-                  <span style={{ fontSize: 'var(--erp-text-caption)', color: '#0284c7' }}>Allocated selling limit</span>
-                </div>
-              </div>
-
-              {/* Details List */}
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
-              >
-                {/* Product */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Product</span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>{viewingQuota.productName || 'Product not selected'}</div>
-                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', fontFamily: 'monospace' }}>SKU: {viewingQuota.productSku || '—'}</div>
-                  </div>
-                </div>
-
-                <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
-
-                {/* Staff Member */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Staff Member</span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
-                      {viewingQuota.userFullName || viewingQuota.username || 'Staff not selected'}
-                    </div>
-                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                      @{viewingQuota.username} {viewingQuota.userEmployeeCode ? `• ${viewingQuota.userEmployeeCode}` : ''}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
-
-                {/* Status with Toggle */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Status</span>
-                  <StatusBadge status={quotaStatus(viewingQuota)}/>
-
-                </div>
-
-                {viewingQuota.notes && (
-                  <>
-                    <div style={{ height: '1px', backgroundColor: '#f1f5f9' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 500 }}>Notes</span>
-                      <span style={{ fontSize: 'var(--erp-text-body)', color: '#334155', maxWidth: '65%', textAlign: 'right' }}>
-                        {viewingQuota.notes}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div
-              style={{
-                padding: '14px 20px',
-                borderTop: '1px solid #e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                backgroundColor: '#f8fafc',
-              }}
-            >
-              <button className="erp-button"
-                type="button"
-                onClick={() => setShowViewQuotaModal(false)}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-              {canEditInventory && <>
-                {['DRAFT','INACTIVE'].includes(quotaStatus(viewingQuota)) && <button type="button" className="allocation-primary" disabled={savingQuota || !viewingQuota.productId || !viewingQuota.userId || Number(viewingQuota.allocatedQuantity || 0)<=0} onClick={()=>openQuotaStatus(viewingQuota,'ACTIVE')}>Allocate</button>}
-                {quotaStatus(viewingQuota)!=='INACTIVE' && <button type="button" className="allocation-cancel-status" disabled={savingQuota} onClick={()=>openQuotaStatus(viewingQuota,'INACTIVE')}>Make inactive</button>}
-                {quotaStatus(viewingQuota)!=='DRAFT' && Number(viewingQuota.soldQuantity || 0)===0 && <button type="button" className="allocation-secondary" disabled={savingQuota} onClick={()=>openQuotaStatus(viewingQuota,'DRAFT')}>Return to draft</button>}
-              </>}
-              {canEditInventory && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowViewQuotaModal(false);
-                    handleOpenQuotaModal(null, viewingQuota);
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#0284c7',
-                    color: '#ffffff',
-                    fontSize: 'var(--erp-text-field)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <Edit2 size={14} />
-                  <span>Edit Allocation</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: New Stock Adjustment Record (Exact Matching User Screenshots) */}
       {/* ------------------------------------------------------------- */}
-      {showCreateModal && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '680px',
-              padding: '16px 20px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              boxShadow: 'none',
-              maxHeight: '96vh',
-              overflow: 'hidden',
-              boxSizing: 'border-box',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a' }}>
-                  {editingRecord ? `Edit Stock Adjustment (${editingRecord.recordNo})` : 'New Stock Adjustment'}
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                  Adjust warehouse inventory quantities and record reason for audit compliance.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px', borderRadius: '4px' }}
-                title="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveRecord} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Action Selector */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <label style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#334155' }}>
-                    Adjustment Action *
-                  </label>
-                  {createForm.type && (
-                    <span style={{ fontSize: 'var(--erp-text-caption)', color: createForm.type === 'Addition' ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                      {createForm.type === 'Addition' ? '✓ Adds new units to available inventory' : '✓ Deducts units from existing inventory'}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {/* Add stock button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        type: 'Addition',
-                        reason: prev.reason || 'Opening stock correction',
-                      }));
-                    }}
-                    style={{
-                      border: createForm.type === 'Addition' ? '2px solid #22c55e' : '1px solid #e2e8f0',
-                      backgroundColor: createForm.type === 'Addition' ? '#f0fdf4' : '#ffffff',
-                      borderRadius: '8px',
-                      padding: '7px 12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      transition: 'all 0.15s ease',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      backgroundColor: createForm.type === 'Addition' ? '#22c55e' : '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: createForm.type === 'Addition' ? '#ffffff' : '#64748b',
-                      flexShrink: 0,
-                    }}>
-                      <Plus size={13} strokeWidth={2.5} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: createForm.type === 'Addition' ? '#16a34a' : '#0f172a' }}>
-                        Add Stock
-                      </div>
-                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                        Increase physical on-hand units
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Reduce stock button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        type: 'Reduction',
-                        reason: prev.reason || 'Stock count variance',
-                      }));
-                    }}
-                    style={{
-                      border: createForm.type === 'Reduction' ? '2px solid #ef4444' : '1px solid #e2e8f0',
-                      backgroundColor: createForm.type === 'Reduction' ? '#fef2f2' : '#ffffff',
-                      borderRadius: '8px',
-                      padding: '7px 12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      transition: 'all 0.15s ease',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      backgroundColor: createForm.type === 'Reduction' ? '#ef4444' : '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: createForm.type === 'Reduction' ? '#ffffff' : '#64748b',
-                      flexShrink: 0,
-                    }}>
-                      <Minus size={13} strokeWidth={2.5} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: createForm.type === 'Reduction' ? '#dc2626' : '#0f172a' }}>
-                        Reduce Stock
-                      </div>
-                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                        Deduct damage, variance, or losses
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Notice when no action selected */}
-              {!createForm.type && (
-                <div
-                  style={{
-                    backgroundColor: '#fffbeb',
-                    border: '1px solid #fef3c7',
-                    borderRadius: '6px',
-                    padding: '8px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    color: '#92400e',
-                    fontSize: 'var(--erp-text-small)',
-                  }}
-                >
-                  <AlertTriangle size={14} color="#d97706" style={{ flexShrink: 0 }} />
-                  <span>Please choose whether to Add Stock or Reduce Stock above to continue.</span>
-                </div>
-              )}
-
-              {/* Form Content only shown when type is selected */}
-              {createForm.type && (
-                <>
-                  {/* Row 1: Warehouse, Product, Quantity */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr 0.8fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
-                        Warehouse *
-                      </label>
-                      <select className="erp-field"
-                        value={createForm.warehouseId}
-                        onChange={(e) => setCreateForm({ ...createForm, warehouseId: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '34px',
-                          padding: '0 8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: createForm.warehouseId ? '#0f172a' : '#94a3b8',
-                          outline: 'none',
-                        }}
-                        required
-                      >
-                        <option value="">Select warehouse</option>
-                        {warehousesList.map((w) => (
-                          <option key={w.id} value={w.id} style={{ color: '#0f172a' }}>
-                            {w.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
-                        Product *
-                      </label>
-                      <select className="erp-field"
-                        value={createForm.productId}
-                        onChange={(e) => {
-                          const prod = productsList.find((p) => String(p.id) === e.target.value);
-                          setCreateForm({
-                            ...createForm,
-                            productId: e.target.value,
-                            costPrice: prod?.costPrice ? String(prod.costPrice) : (createForm.costPrice || '0.00'),
-                          });
-                        }}
-                        style={{
-                          width: '100%',
-                          height: '34px',
-                          padding: '0 8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: createForm.productId ? '#0f172a' : '#94a3b8',
-                          outline: 'none',
-                        }}
-                        required
-                      >
-                        <option value="">Select product</option>
-                        {productsList.map((p) => (
-                          <option key={p.id} value={p.id} style={{ color: '#0f172a' }}>
-                            {p.name} {p.sku ? `(${p.sku})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
-                        Quantity *
-                      </label>
-                      <input className="erp-field"
-                        type="number"
-                        min="1"
-                        step="1"
-                        placeholder="0"
-                        value={createForm.quantity}
-                        onChange={(e) => setCreateForm({ ...createForm, quantity: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '34px',
-                          padding: '0 8px',
-                          border: '1px solid #cbd5e1',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                        }}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 2: Reason & Cost price per unit */}
-                  <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? '1.4fr 1fr' : '1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
-                        Reason *
-                      </label>
-                      <select className="erp-field"
-                        value={createForm.reason}
-                        onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '34px',
-                          padding: '0 8px',
-                          border: '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          color: createForm.reason ? '#0f172a' : '#94a3b8',
-                          outline: 'none',
-                        }}
-                        required
-                      >
-                        <option value="">Select a valid reason</option>
-                        {createForm.type === 'Addition' ? (
-                          <>
-                            <option value="Opening stock correction" style={{ color: '#0f172a' }}>Opening stock correction</option>
-                            <option value="Found stock" style={{ color: '#0f172a' }}>Found stock</option>
-                            <option value="Stock count variance" style={{ color: '#0f172a' }}>Stock count variance</option>
-                            <option value="Physical cycle audit" style={{ color: '#0f172a' }}>Physical cycle audit</option>
-                            <option value="Other adjustment" style={{ color: '#0f172a' }}>Other adjustment</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="Stock count variance" style={{ color: '#0f172a' }}>Stock count variance</option>
-                            <option value="Damaged stock" style={{ color: '#0f172a' }}>Damaged stock</option>
-                            <option value="Expired stock" style={{ color: '#0f172a' }}>Expired stock</option>
-                            <option value="Internal consumption" style={{ color: '#0f172a' }}>Internal consumption</option>
-                            <option value="Physical cycle audit" style={{ color: '#0f172a' }}>Physical cycle audit</option>
-                            <option value="Other adjustment" style={{ color: '#0f172a' }}>Other adjustment</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    {canSeeCost ? (
-                      <div>
-                        <label style={{ display: 'block', fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#334155', marginBottom: '3px' }}>
-                          Cost price per unit *
-                        </label>
-                        <input className="erp-field"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={createForm.costPrice}
-                          onChange={(e) => setCreateForm({ ...createForm, costPrice: e.target.value })}
-                          style={{
-                            width: '100%',
-                            height: '34px',
-                            padding: '0 8px',
-                            border: '1px solid #cbd5e1',
-                            boxSizing: 'border-box',
-                            outline: 'none',
-                          }}
-                          required
-                        />
-                      </div>
-                    ) : (
-                      <input type="hidden" value={createForm.costPrice || '0.00'} />
-                    )}
-                  </div>
-
-                  {/* Compact 1-line Adjustment summary strip */}
-                  {(() => {
-                    const selWh = warehousesList.find((w) => String(w.id) === String(createForm.warehouseId));
-                    const selProd = productsList.find((p) => String(p.id) === String(createForm.productId));
-                    const qtyNum = parseFloat(createForm.quantity) || 0;
-                    const costNum = parseFloat(createForm.costPrice) || (selProd?.costPrice || 0);
-                    const totalVal = qtyNum * costNum;
-                    const isAddition = createForm.type === 'Addition';
-
-                    return (
-                      <div
-                        style={{
-                          backgroundColor: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          padding: '7px 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                          fontSize: 'var(--erp-text-small)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                          <span
-                            style={{
-                              backgroundColor: isAddition ? '#dcfce7' : '#fee2e2',
-                              color: isAddition ? '#15803d' : '#dc2626',
-                              fontSize: 'var(--erp-text-badge)',
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              textTransform: 'uppercase',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {isAddition ? '+ Add' : '- Reduce'}
-                          </span>
-                          <span style={{ color: '#475569', flexShrink: 0 }}>
-                            Wh: <strong style={{ color: '#0f172a' }}>{selWh?.name || '—'}</strong>
-                          </span>
-                          <span style={{ color: '#cbd5e1', flexShrink: 0 }}>|</span>
-                          <span style={{ color: '#475569', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selProd?.name}>
-                            Prod: <strong style={{ color: '#0f172a' }}>{selProd?.name || '—'}</strong>
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          <span style={{ color: '#475569' }}>
-                            Qty: <strong style={{ color: isAddition ? '#16a34a' : '#dc2626' }}>{isAddition ? `+${qtyNum}` : `-${qtyNum}`}</strong>
-                          </span>
-                          {canSeeCost && (
-                            <>
-                              <span style={{ color: '#cbd5e1' }}>|</span>
-                              <span style={{ color: '#475569' }}>
-                                Total: <strong style={{ color: '#0f172a' }}>LKR {totalVal.toFixed(2)}</strong>
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </>
-              )}
-
-              {/* Actions Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    padding: '0 14px',
-                    height: '34px',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                {!createForm.type ? (
-                  <button className="erp-button"
-                    type="button"
-                    disabled
-                    style={{
-                      backgroundColor: '#f1f5f9',
-                      color: '#94a3b8',
-                      border: 'none',
-                      padding: '0 16px',
-                      height: '34px',
-                      cursor: 'not-allowed',
-                    }}
-                  >
-                    Select Action First
-                  </button>
-                ) : createForm.type === 'Addition' ? (
-                  <button className="erp-button"
-                    type="submit"
-                    disabled={submittingRecord}
-                    style={{
-                      backgroundColor: '#16a34a',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '0 18px',
-                      height: '34px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                    }}
-                  >
-                    <Plus size={15} /> Add Stock
-                  </button>
-                ) : (
-                  <button className="erp-button"
-                    type="submit"
-                    disabled={submittingRecord}
-                    style={{
-                      backgroundColor: '#dc2626',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '0 18px',
-                      height: '34px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                    }}
-                  >
-                    <Minus size={15} /> Reduce Stock
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {showCreateModal && <AdjustmentWorkspace form={createForm} onChange={setCreateForm} warehouses={warehousesList} products={productsList} balances={inventoryBalances} canSeeCost={canSeeCost} editing={editingRecord} busy={submittingRecord} onSave={handleSaveRecord} onClose={()=>setShowCreateModal(false)}/>}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Adjustment Record Details */}
       {/* ------------------------------------------------------------- */}
-      {viewingRecord && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              padding: '28px',
-              borderRadius: '14px',
-              backgroundColor: '#ffffff',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <SlidersHorizontal size={18} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a' }}>{viewingRecord.recordNo}</h3>
-                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Date: {viewingRecord.date}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingRecord(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: 'var(--erp-text-button)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>Adjustment Type</span>
-                <span style={{ fontWeight: 700, color: viewingRecord.type === 'Addition' ? '#16a34a' : '#dc2626' }}>
-                  {viewingRecord.type}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>Product</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingRecord.productName}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>SKU</span>
-                <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{viewingRecord.sku}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>Warehouse</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingRecord.warehouse}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>Batch Number</span>
-                <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#0284c7' }}>{viewingRecord.batch}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>Quantity Adjusted</span>
-                <span style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: viewingRecord.quantity > 0 ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
-                  {viewingRecord.quantity > 0 ? `+${viewingRecord.quantity}` : viewingRecord.quantity}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                <span style={{ color: '#64748b' }}>Reason</span>
-                <span style={{ fontWeight: 600, color: '#334155' }}>{viewingRecord.reason}</span>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '22px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="btn btn-primary erp-button erp-button-primary"
-                onClick={() => setViewingRecord(null)}
-                style={{ borderColor: '#0284c7', padding: '7px 20px' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {viewingRecord && <AdjustmentDetailsModal record={viewingRecord} canManage={canEditInventory} onClose={()=>setViewingRecord(null)} onEdit={()=>{const record=viewingRecord;setViewingRecord(null);handleOpenEditRecord(record);}}/>}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Stock Item Details (Wide, Scroll-Free Executive View) */}

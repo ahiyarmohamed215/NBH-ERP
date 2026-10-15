@@ -20,7 +20,12 @@ test('supplier workspace saves partial drafts and preserves draft status when ed
   const enter=async(name,value)=>act(async()=>{const field=host.querySelector(`[name="${name}"]`);Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(field,value);field.dispatchEvent(new window.Event('input',{bubbles:true}));});
   const button=text=>[...host.querySelectorAll('button')].find(button=>button.textContent.trim()===text);
   await enter('contactPerson','Nimal');await act(async()=>button('Save draft').click());assert.equal(created.status,'DRAFT');assert.equal(created.name,null);assert.equal(created.contactPerson,'Nimal');assert.equal(host.querySelector('.supplier-workspace'),null);assert.equal(modes.at(-1),false);
-  const row=host.querySelector('tbody tr');assert.ok(row.textContent.includes('DRAFT'));assert.equal(row.querySelector('[title="Status: DRAFT"]').tagName,'SPAN');
+  const row=host.querySelector('tbody tr');assert.ok(row.textContent.includes('DRAFT'));assert.ok(row.querySelector('[aria-label="Print Supplier Details (A4)"]'),'Draft supplier can be printed from its table');assert.equal(row.querySelector('[title="Status: DRAFT"]').tagName,'SPAN');
+  for(const cell of row.cells){
+   await act(async()=>(cell.querySelector('.erp-status-badge') || cell).click());
+   const dialog=host.querySelector('[aria-label="Supplier details"]');assert.ok(dialog,'Every supplier cell opens the view');
+   await act(async()=>dialog.querySelector('[aria-label="Close supplier details"]').click());
+  }
   await act(async()=>row.querySelector('[aria-label="Edit Supplier"]').click());await enter('name','Lanka Trading');await act(async()=>button('Save draft').click());assert.equal(updated.status,'DRAFT');assert.equal(updated.name,'Lanka Trading');assert.ok(host.querySelector('tbody').textContent.includes('Lanka Trading'));
  } finally {await act(async()=>new Promise(resolve=>setTimeout(resolve,5100)));await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}
 });

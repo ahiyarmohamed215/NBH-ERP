@@ -35,6 +35,9 @@ public class Supplier extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    @Column(columnDefinition = "TEXT")
+    private String remarks;
+
     @Column(name = "supplier_status", length = 20)
     private String status;
 

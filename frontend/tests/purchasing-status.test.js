@@ -27,9 +27,9 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     assert.equal(viewing.querySelector('.erp-status-badge').tagName,'SPAN','Supplier status is displayed without changing it');
     await act(async()=>viewing.querySelector('.erp-status-badge').click());assert.equal(host.querySelector('[aria-label="Change Supplier status"]'),null);
     const supplierAction=text=>[...viewing.querySelectorAll('.purchase-inspection-detail-actions button')].find(button=>button.textContent.trim()===text);
-    await act(async()=>supplierAction('Cancel Supplier').click());let dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-deactivate'));assert.equal(toggleCalls,0);assert.equal(confirmButton(dialog).disabled,true);
+    await act(async()=>supplierAction('Deactivate Supplier').click());let dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-deactivate'));assert.equal(toggleCalls,0);assert.equal(confirmButton(dialog).disabled,true);
     await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent==='Close').click());assert.equal(toggleCalls,0);assert.equal(supplier.isActive,true);
-    assert.ok(viewing.classList.contains('supplier-inspection'));assert.ok(viewing.querySelector('.purchase-inspection-details-card'));
+    assert.ok(viewing.classList.contains('supplier-inspection'));assert.ok(viewing.querySelector('.master-details-body'));
     for(const text of ['Supplier contact','0771234567','supplier@example.com','Colombo']) assert.ok(viewing.textContent.includes(text));
     assert.ok(viewing.querySelector('[aria-label="Close supplier details"]'));
     assert.ok([...viewing.querySelectorAll('.purchase-inspection-detail-actions button')].some(button=>button.textContent.includes('Edit Supplier')));
@@ -37,23 +37,23 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     await act(async()=>viewing.querySelector('[title="Print Supplier Details (A4)"]').click());
     assert.ok(supplierPrint.includes('SUP-1'));assert.ok(supplierPrint.includes('supplier@example.com'));
 
-    await act(async()=>supplierAction('Cancel Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');
+    await act(async()=>supplierAction('Deactivate Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');
     await enterReason(dialog,'   ');assert.equal(confirmButton(dialog).disabled,true);
-    await enterReason(dialog,'Account paused for review');await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,1);assert.equal(supplier.isActive,true);assert.ok(host.querySelector('[aria-label="Change Supplier status"]'));assert.ok(supplierAction('Cancel Supplier'));
-    fail=false;await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,2);assert.equal(supplier.isActive,false);assert.equal(host.querySelector('[aria-label="Change Supplier status"]'),null);assert.ok(supplierAction('Process Supplier'));
-    await act(async()=>supplierAction('Process Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-activate'));assert.equal(confirmButton(dialog).disabled,true);
+    await enterReason(dialog,'Account paused for review');await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,1);assert.equal(supplier.isActive,true);assert.ok(host.querySelector('[aria-label="Change Supplier status"]'));assert.ok(supplierAction('Deactivate Supplier'));
+    fail=false;await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,2);assert.equal(supplier.isActive,false);assert.equal(host.querySelector('[aria-label="Change Supplier status"]'),null);assert.ok(supplierAction('Reactivate Supplier'));
+    await act(async()=>supplierAction('Reactivate Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-activate'));assert.equal(confirmButton(dialog).disabled,true);
     await act(async()=>dialog.querySelector('[aria-label="Close status change"]').click());assert.equal(toggleCalls,2);assert.equal(supplier.isActive,false);
     let grn={id:5,grnNumber:'GRN-5',status:'DRAFT',supplierName:'Test supplier',receivedDate:'2026-10-12',items:[{productId:1,productSku:'P-1',productName:'Product',quantityReceived:2,unitCost:4}]},processCalls=0;
     apis.grnApi.search=async()=>({data:{content:[grn]}});apis.grnApi.getById=async()=>({data:grn});
     apis.grnApi.process=async(id,reason)=>{assert.equal(id,5);assert.equal(reason,'Delivery verified');processCalls++;grn={...grn,status:'PROCESSED'};return {data:grn};};
     apis.grnApi.cancel=async(id,data)=>{assert.equal(data.reason,'Incorrect receipt');grn={...grn,status:'CANCELLED'};return {data:grn};};
     const {default:Grn}=await server.ssrLoadModule('/src/views/GrnView.jsx');await render(Grn);
-    await act(async()=>host.querySelector('tbody tr').click());const action=text=>[...host.querySelectorAll('.purchase-inspection-header-actions button, .purchase-inspection-detail-actions button, .purchase-inspection-actions button')].find(button=>button.textContent.trim()===text);
+    await act(async()=>host.querySelector('tbody tr .erp-status-badge').click());const action=text=>[...host.querySelectorAll('.purchase-inspection-header-actions button, .purchase-inspection-detail-actions button, .purchase-inspection-actions button')].find(button=>button.textContent.trim()===text);
     assert.equal(action('Process GRN'),undefined);assert.ok(action('Edit GRN'));assert.ok(action('Cancel GRN'));
     await act(async()=>action('Cancel GRN').click());const cancellation=host.querySelector('textarea[placeholder^="Enter cancellation reason"]');assert.ok(cancellation);
     await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(cancellation,'Incorrect receipt');cancellation.dispatchEvent(new window.Event('input',{bubbles:true}));});
     await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Confirm Cancellation').click());assert.equal(grn.status,'CANCELLED');
-    await act(async()=>action('Reprocess GRN').click());dialog=host.querySelector('[aria-label="Change GRN status"]');assert.ok(dialog);assert.equal(confirmButton(dialog).disabled,true);
-    await enterReason(dialog,'Delivery verified');await act(async()=>confirmButton(dialog).click());assert.equal(processCalls,1);assert.equal(grn.status,'PROCESSED');
+    assert.equal(action('Reprocess GRN'),undefined,'Cancelled receipts cannot be reprocessed');
+    assert.equal(action('Process GRN'),undefined);
   } finally {await act(async()=>new Promise(resolve=>setTimeout(resolve,5100)));await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT']) delete globalThis[key];}
 });

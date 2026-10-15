@@ -16,7 +16,7 @@ test('inventory allocations create and edit inline with direct save and stock va
   apis.productApi.getProducts=async()=>({data:{content:[{id:1,sku:'ALLOC-1',name:'Allocation product',unitOfMeasure:'PCS'},{id:2,sku:'EMPTY-2',name:'Empty product'}]}});
   apis.warehouseApi.getAll=async()=>({data:[{id:10,code:'WH-10',name:'North'}]});
   apis.inventoryApi.getBalances=async()=>({data:{content:[{productId:1,warehouseId:10,quantity:20,reservedQuantity:2,availableQuantity:18}]}});
-  apis.salesmanApi.getPosStaff=async()=>({data:{data:[{id:7,username:'cashier',fullName:'Test cashier',employeeCode:null,roles:['ROLE_CASHIER']},{id:8,username:'viewer',fullName:'View only staff',roles:['ROLE_USER']}]}});
+  apis.salesmanApi.getPosStaff=async()=>({data:{data:[{id:7,username:'cashier',fullName:'Test cashier',employeeCode:null,isActive:true},{id:8,username:'viewer',fullName:'View only staff',isActive:false}]}});
   apis.staffQuotaApi.getProductStock=async()=>({data:{data:{availableStock:18,productName:'Allocation product'}}});
   let rows=[],created=null,updated=null;
   apis.staffQuotaApi.search=async()=>({data:{content:rows}});
@@ -57,7 +57,7 @@ test('inventory allocations create and edit inline with direct save and stock va
 
   await act(async()=>host.querySelector('tbody tr').click());
   let view=host.querySelector('[aria-label="Inventory allocation details"]');
-  await act(async()=>[...view.querySelectorAll('button')].find(button=>button.textContent.trim()==='Make inactive').click());
+  await act(async()=>[...view.querySelectorAll('button')].find(button=>button.textContent.trim()==='Deactivate Allocation').click());
   let status=document.querySelector('[aria-label="Change Allocation status"]');assert.ok(status);assert.equal(status.querySelector('[aria-label="Confirm status change"]').disabled,true);
   await change(status.querySelector('[aria-label="Status change reason"]'),'Assigned in error');
   await act(async()=>status.querySelector('[aria-label="Confirm status change"]').click());
@@ -74,21 +74,19 @@ test('inventory allocations create and edit inline with direct save and stock va
   await change(workspace.querySelector('[aria-label="Allocated quantity"]'),'40');
   const draft=[...workspace.querySelectorAll('button')].find(button=>button.textContent==='Save draft');assert.equal(draft.disabled,false);assert.equal(workspace.querySelector('[type="submit"]').disabled,true);
   await act(async()=>draft.click());assert.equal(created.status,'DRAFT');assert.equal(created.allocatedQuantity,40);
-  assert.ok(host.querySelector('[data-status="DRAFT"]'));
+  assert.ok(host.querySelector('[data-status="DRAFT"]'));assert.ok(host.querySelector('tbody [aria-label="Print Allocation"]'),'Draft allocation has table print action');
   await act(async()=>host.querySelector('tbody tr').click());
   view=host.querySelector('[aria-label="Inventory allocation details"]');
-  await act(async()=>[...view.querySelectorAll('button')].find(button=>button.textContent.trim()==='Allocate').click());
-  status=document.querySelector('[aria-label="Change Allocation status"]');assert.ok(status);
-  await change(status.querySelector('[aria-label="Status change reason"]'),'Stock verified');
-  await act(async()=>status.querySelector('[aria-label="Confirm status change"]').click());
-  assert.equal(updated.status,'ACTIVE');assert.equal(updated.statusReason,'Stock verified');
+  assert.deepEqual([...view.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),['Edit Allocation','Delete Allocation']);
+  assert.equal(view.querySelector('[aria-label="Activate Allocation"]'),null);
+  assert.equal([...view.querySelectorAll('button')].some(button=>button.textContent.trim()==='Print'),false);
   view=host.querySelector('[aria-label="Inventory allocation details"]');await act(async()=>[...view.querySelectorAll('button')].find(button=>button.textContent.trim()==='Close').click());
   await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('New Allocation')).click());
   workspace=host.querySelector('.allocation-workspace');
   const onlyDraft=[...workspace.querySelectorAll('button')].find(button=>button.textContent==='Save draft');assert.equal(onlyDraft.disabled,true);
   await change(workspace.querySelector('[aria-label="Allocation notes"]'),'Prepare staff allocation');assert.equal(onlyDraft.disabled,false);
   await act(async()=>onlyDraft.click());assert.equal(created.status,'DRAFT');assert.equal(created.productId,null);assert.equal(created.userId,null);assert.equal(created.allocatedQuantity,null);
-  assert.ok(host.querySelector('[data-status="DRAFT"]'));
+  assert.ok(host.querySelector('[data-status="DRAFT"]'));assert.ok(host.querySelector('tbody [aria-label="Print Allocation"]'),'Draft allocation has table print action');
   await act(async()=>host.querySelector('[title="Edit Allocation"]').click());
   workspace=host.querySelector('.allocation-workspace');assert.equal(workspace.querySelector('[aria-label="Search allocation products"]').disabled,false);
   await act(async()=>workspace.querySelector('[aria-label="Search allocation products"]').focus());await act(async()=>workspace.querySelector('[aria-label="Select product ALLOC-1"]').click());

@@ -18,14 +18,21 @@ public class CreateWarehouseRequest {
     @Size(max = 100)
     private String name;
 
+    @Size(max=5000)
     private String address;
+
+    @Size(max = 5000)
+    private String remarks;
 
     @jakarta.validation.constraints.Pattern(regexp = "DRAFT|ACTIVE|INACTIVE")
     private String status;
 
     @JsonAlias({"contactNumber", "phone"})
+    @Size(max=30)
+    @com.nbh.erp.common.validation.ValidPhone
     private String phone;
 
+    @Size(max=100)
     private String contactPerson;
 
     public String getContactNumber() {

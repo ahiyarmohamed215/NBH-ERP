@@ -604,7 +604,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                         <td className="erp-table-cell" style={{ fontWeight: 600, color: '#334155' }}>
                           {new Set((g.items || []).map(item=>item.productId)).size}
                         </td>
-                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
+                        <td className="erp-table-cell erp-table-date">
                           {g.dispatchDate || g.createdAt?.slice(0, 10) || '—'}
                         </td>
                         <td className="erp-table-cell">

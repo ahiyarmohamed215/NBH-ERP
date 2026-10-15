@@ -449,7 +449,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                       {po.warehouseName}
                     </td>
                     <td className="erp-table-cell">{new Set((po.items || []).map(item=>item.productId)).size}</td>
-                    <td className="erp-table-cell" style={{ color:'#64748b' }}>{purchaseOrderDate(po)}</td>
+                    <td className="erp-table-cell erp-table-date">{purchaseOrderDate(po)}</td>
                     <td className="erp-table-cell"><StatusBadge status={po.status}/></td>
                     <td className="erp-table-cell" style={{ color:'#475569', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={po.notes || ''}>{po.notes || '—'}</td>
                     <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>

@@ -18,6 +18,13 @@ test('supplier workspace blocks invalid saves, focuses errors and validates corr
       return React.createElement(Editor,{form,setForm,saving,onClose:()=>closes++,onSubmit:(event,status)=>{saves++;lastStatus=status;}});
     }
     await act(async()=>root.render(React.createElement(Harness)));
+    assert.equal(document.activeElement.name,'name');
+    const country=host.querySelector('[aria-label="Phone country"]');assert.equal(country.textContent.trim(),'+94');
+    await act(async()=>country.click());
+    const india=document.querySelector('[role="option"][data-value="IN"]');assert.ok(india.textContent.includes('India (+91)'));
+    await act(async()=>india.click());assert.equal(country.textContent.trim(),'+91');
+    await act(async()=>country.click());await act(async()=>document.querySelector('[role="option"][data-value="LK"]').click());
+    assert.equal(country.textContent.trim(),'+94');
     const field=name=>host.querySelector(`[name="${name}"]`);
     const enter=async(name,value)=>act(async()=>{
       const input=field(name);
@@ -25,7 +32,7 @@ test('supplier workspace blocks invalid saves, focuses errors and validates corr
       input.dispatchEvent(new window.Event('input',{bubbles:true}));
     });
     const submit=async()=>act(async()=>host.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
-    assert.equal(document.activeElement.name,'name');assert.equal(field('code'),null);assert.equal(host.querySelector('.supplier-auto-code'),null);assert.equal(host.querySelector('.modal-backdrop'),null);assert.ok(host.querySelector('[aria-label="Supplier summary"]'));
+    assert.equal(field('code'),null);assert.equal(host.querySelector('.supplier-auto-code'),null);assert.equal(host.querySelector('.modal-backdrop'),null);assert.ok(host.querySelector('[aria-label="Supplier summary"]'));
     assert.equal(host.querySelector('[role="alert"]'),null);
     assert.equal([...host.querySelectorAll('button')].find(button=>button.textContent==='Save draft').disabled,true);
     await enter('contactPerson','Nimal');
