@@ -27,6 +27,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final com.nbh.erp.realtime.RealtimeChanges realtimeChanges;
 
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
@@ -113,6 +114,8 @@ public class RoleService {
         }
 
         Role updated = roleRepository.save(role);
+        // Join-table-only permission changes need a hint even when scalar fields did not change.
+        realtimeChanges.changed("roles", null);
         log.info("Updated role: {}", updated.getName());
         return RoleDto.from(updated);
     }

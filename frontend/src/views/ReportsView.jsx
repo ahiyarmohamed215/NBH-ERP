@@ -95,7 +95,7 @@ export default function ReportsView({ activeSubTab = 'customer-reports', onSubTa
     loadOutstandingReport();
   }, []);
 
-  useDataSync(loadOutstandingReport, ['erp:data_changed', 'erp:sales_updated', 'erp:customers_updated']);
+  useDataSync(loadOutstandingReport, ['erp:data_changed', 'erp:sales_updated', 'erp:customers_updated'], [], ['reports','sales','payments','customers']);
 
   // Sync subTab
   useEffect(() => {

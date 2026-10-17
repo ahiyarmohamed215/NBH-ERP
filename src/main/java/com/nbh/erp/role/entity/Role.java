@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "roles")
 @Getter
 @Setter

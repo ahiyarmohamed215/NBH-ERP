@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import {newestFirst} from '../utils/recordOrder';
 import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
 import {GRN_SHEET_HEADERS,parseCsvRows,importGrnRows,readGrnWorkbook,createGrnTemplate} from '../utils/grnSpreadsheet';
@@ -192,6 +193,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     }
   };
 
+  useDataSync(() => loadData(), ['erp:purchasing_updated','erp:inventory_updated'], [], ['grn','orders','suppliers','inventory']);
   const loadData = async () => {
     try {
       setLoading(true);

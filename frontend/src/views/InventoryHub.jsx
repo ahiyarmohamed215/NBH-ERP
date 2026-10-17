@@ -1,3 +1,5 @@
+import {adjustmentStatus} from '../utils/stockAdjustmentPresentation';
+import AdjustmentTable from '../components/AdjustmentTable';
 import AdjustmentWorkspace from '../components/AdjustmentWorkspace';
 import AdjustmentDetailsModal from '../components/AdjustmentDetailsModal';
 import InventoryBalanceTable from '../components/InventoryBalanceTable';
@@ -19,8 +21,8 @@ import {numberError} from '../utils/purchasingValidation';
 import {printCurrentDirectory} from '../utils/printDirectory';
 import './InventoryTheme.css';
 import '../components/PurchasingAppearance.css';
-import StatusBadge from '../components/StatusBadge';
 import { formatBusinessDate } from '../utils/invoiceMapping';
+import SearchBar from '../components/SearchBar';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -33,6 +35,7 @@ import {
   adjustmentApi,
   inventoryApi,
   categoryApi,
+  brandApi,
   staffQuotaApi,
   salesmanApi,
 } from '../api/apiClient';
@@ -123,6 +126,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   // STOCK ADJUSTMENTS TAB STATE & LOGIC (Backed by real REST API)
   // -------------------------------------------------------------
   const [adjustmentRecords, setAdjustmentRecords] = useState([]);
+  const [adjustmentStatusFilter,setAdjustmentStatusFilter]=useState('ALL');
+  const [adjustmentTransition,setAdjustmentTransition]=useState(null);
+  const [adjustmentTransitionReason,setAdjustmentTransitionReason]=useState('');
+  const [adjustmentTransitionBusy,setAdjustmentTransitionBusy]=useState(false);
 
   const loadAdjustments = async () => {
     try {
@@ -131,6 +138,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       const formatted = content.flatMap((adj) =>
         (adj.items || []).map((it) => ({
           id: String(adj.id) + '-' + (it.id || it.productId),
+          adjustmentId: adj.id,
+          productId: it.productId,
           recordNo: adj.adjustmentNumber,
           date: adj.adjustmentDate,
           type: Number(it.differenceQuantity || 0) >= 0 ? 'Addition' : 'Reduction',
@@ -139,9 +148,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           sku: it.productSku,
           productName: it.productName,
           batch: adj.adjustmentNumber,
+          sourceGrnNumber: it.sourceGrnNumber,
+          sourceGrnId: it.sourceGrnId,
           quantity: Number(it.differenceQuantity || 0),
           reason: it.reason || adj.reason,
-          status: adj.status || 'COMPLETED',
+          remarks: it.reason && adj.reason?.startsWith(it.reason+': ')?adj.reason.slice(it.reason.length+2):'',
+          status: adj.status || 'DRAFT',
         }))
       );
       setAdjustmentRecords(formatted);
@@ -156,7 +168,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   // Filters matching screenshot
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'Addition' | 'Reduction'
-  const [filterWarehouse, setFilterWarehouse] = useState('ALL');
   const [adjustmentFrom,setAdjustmentFrom]=useState('');
   const [adjustmentTo,setAdjustmentTo]=useState('');
 
@@ -340,6 +351,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         userId: String(existingQuota.userId || ''),
         allocatedQuantity: String(existingQuota.allocatedQuantity || ''),
         notes: existingQuota.notes || '',
+        items: [],
       });
     } else {
       setEditingQuota(null);
@@ -348,6 +360,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         userId: '',
         allocatedQuantity: '',
         notes: '',
+        items: [],
       });
     }
     setShowQuotaModal(true);
@@ -356,29 +369,35 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const handleSaveQuota = async (e, requestedStatus) => {
     e.preventDefault();
     const targetStatus=requestedStatus || (editingQuota && quotaStatus(editingQuota)==='DRAFT'?'DRAFT':'ACTIVE');
-    const hasInput=Boolean(quotaForm.productId || quotaForm.userId || String(quotaForm.allocatedQuantity || '').trim() || (quotaForm.notes || '').trim());
+    const hasItems = Array.isArray(quotaForm.items) && quotaForm.items.length > 0;
+    const hasInput = Boolean(hasItems || quotaForm.productId || quotaForm.userId || String(quotaForm.allocatedQuantity || '').trim() || (quotaForm.notes || '').trim());
     if(targetStatus==='DRAFT' && !hasInput){addToast('Fill at least one input before saving a draft.','error');return;}
-    if(targetStatus!=='DRAFT' && (!quotaForm.productId || !quotaForm.userId || !quotaForm.allocatedQuantity)){addToast('Select product, staff and allocated quantity.','error');return;}
-    const allocationError=quotaForm.allocatedQuantity!==''?numberError(quotaForm.allocatedQuantity,'Allocated quantity',{positive:true,decimals:2,max:9999999999.99}):'';
-    if(allocationError){addToast(allocationError,'error');return;}
+    if(targetStatus!=='DRAFT' && !hasItems && (!quotaForm.productId || !quotaForm.userId || !quotaForm.allocatedQuantity)){addToast('Select product, staff and allocated quantity.','error');return;}
+    if(targetStatus!=='DRAFT' && hasItems && !quotaForm.userId){addToast('Select staff member to allocate products to.','error');return;}
     if((quotaForm.notes || '').length>255){addToast('Allocation notes must be 255 characters or fewer.','error');return;}
-    const allocQty=quotaForm.allocatedQuantity===''?null:Number(quotaForm.allocatedQuantity);
 
-    const availableStock = selectedProductStock != null
-      ? Number(selectedProductStock.availableStock ?? 0)
-      : Number(getProductStockInfo(quotaForm.productId).available ?? 0);
-    const isOutOfStock = selectedProductStock != null
-      ? Boolean(selectedProductStock.outOfStock || availableStock <= 0)
-      : availableStock <= 0;
+    const allocQty = quotaForm.allocatedQuantity==='' || quotaForm.allocatedQuantity==null ? null : Number(quotaForm.allocatedQuantity);
 
-    if (targetStatus!=='DRAFT' && (isOutOfStock || availableStock <= 0)) {
-      addToast('Selected product is out of stock (0 available). Cannot allocate inventory.', 'error');
-      return;
-    }
+    if (!hasItems) {
+      const allocationError = quotaForm.allocatedQuantity!=='' && quotaForm.allocatedQuantity!=null ? numberError(quotaForm.allocatedQuantity,'Allocated quantity',{positive:true,decimals:2,max:9999999999.99}):'';
+      if(allocationError){addToast(allocationError,'error');return;}
 
-    if (targetStatus!=='DRAFT' && allocQty > availableStock) {
-      addToast(`Cannot allocate ${allocQty} units. Only ${availableStock} units available in inventory stock.`, 'error');
-      return;
+      const availableStock = selectedProductStock != null
+        ? Number(selectedProductStock.availableStock ?? 0)
+        : Number(getProductStockInfo(quotaForm.productId).available ?? 0);
+      const isOutOfStock = selectedProductStock != null
+        ? Boolean(selectedProductStock.outOfStock || availableStock <= 0)
+        : availableStock <= 0;
+
+      if (targetStatus!=='DRAFT' && (isOutOfStock || availableStock <= 0)) {
+        addToast('Selected product is out of stock (0 available). Cannot allocate inventory.', 'error');
+        return;
+      }
+
+      if (targetStatus!=='DRAFT' && allocQty > availableStock) {
+        addToast(`Cannot allocate ${allocQty} units. Only ${availableStock} units available in inventory stock.`, 'error');
+        return;
+      }
     }
 
     setSavingQuota(true);
@@ -390,12 +409,22 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           ...(targetStatus==='DRAFT'?{status:'DRAFT',replaceDraftFields:true,productId:quotaForm.productId?Number(quotaForm.productId):null,userId:quotaForm.userId?Number(quotaForm.userId):null}:{}),
         });
         addToast('Inventory allocation updated successfully', 'success');
+      } else if (hasItems && quotaForm.items.length > 1) {
+        await Promise.all(quotaForm.items.map(item => staffQuotaApi.create({
+          productId: item.productId ? Number(item.productId) : null,
+          userId: quotaForm.userId ? Number(quotaForm.userId) : null,
+          allocatedQuantity: item.allocatedQuantity ? Number(item.allocatedQuantity) : null,
+          notes: item.notes || quotaForm.notes,
+          ...(targetStatus==='DRAFT'?{status:'DRAFT'}:{}),
+        })));
+        addToast(`Successfully created ${quotaForm.items.length} inventory allocations`, 'success');
       } else {
+        const single = hasItems ? quotaForm.items[0] : null;
         await staffQuotaApi.create({
-          productId: quotaForm.productId?Number(quotaForm.productId):null,
+          productId: single ? Number(single.productId) : quotaForm.productId?Number(quotaForm.productId):null,
           userId: quotaForm.userId?Number(quotaForm.userId):null,
-          allocatedQuantity: allocQty,
-          notes: quotaForm.notes,
+          allocatedQuantity: single ? Number(single.allocatedQuantity) : allocQty,
+          notes: single?.notes || quotaForm.notes,
           ...(targetStatus==='DRAFT'?{status:'DRAFT'}:{}),
         });
         addToast('Inventory allocation saved successfully', 'success');
@@ -442,35 +471,43 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   // -------------------------------------------------------------
   const [inventoryBalances, setInventoryBalances] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [brandsList, setBrandsList] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [invSearchQuery, setInvSearchQuery] = useState('');
   const [invWarehouseFilter, setInvWarehouseFilter] = useState('ALL');
+  const [invBrandFilter, setInvBrandFilter] = useState('ALL');
   const [invCategoryFilter, setInvCategoryFilter] = useState('ALL');
   const [invStatusFilter, setInvStatusFilter] = useState('ALL'); // 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
   const [viewingStockItem, setViewingStockItem] = useState(null);
   const inventoryLoadGeneration=useRef(0);
 
-  // Load warehouses, products, categories, and inventory balances
+  const activeCategories = useMemo(() => (Array.isArray(categoriesList) ? categoriesList : []).filter(c => c && c.isActive !== false), [categoriesList]);
+  const activeBrands = useMemo(() => (Array.isArray(brandsList) ? brandsList : []).filter(b => b && b.isActive !== false), [brandsList]);
+
+  // Load warehouses, products, categories, brands, and inventory balances
   const loadInventoryBalances = async () => {
     const generation=++inventoryLoadGeneration.current;
     try {
       setInventoryLoading(true);
-      const [balRes, prodRes, whRes, catRes] = await Promise.allSettled([
+      const [balRes, prodRes, whRes, catRes, brandRes] = await Promise.allSettled([
         inventoryApi.getBalances({ size: 300 },{force:true}),
         productApi.getProducts({ size: 300 },{force:true}),
         warehouseApi.getAll(),
         categoryApi.getActive(),
+        brandApi.getActive(),
       ]);
       if(generation!==inventoryLoadGeneration.current)return;
 
-      const fetchedBalances = balRes.status === 'fulfilled' ? (balRes.value.data?.content || balRes.value.data || []) : [];
-      const fetchedProducts = prodRes.status === 'fulfilled' ? (prodRes.value.data?.content || prodRes.value.data || []) : [];
-      const fetchedWarehouses = whRes.status === 'fulfilled' ? (whRes.value.data || []) : [];
-      const fetchedCategories = catRes.status === 'fulfilled' ? (catRes.value.data || []) : [];
+      const fetchedBalances = balRes.status === 'fulfilled' ? (balRes.value.data?.content || (Array.isArray(balRes.value.data) ? balRes.value.data : balRes.value.data?.data || [])) : [];
+      const fetchedProducts = prodRes.status === 'fulfilled' ? (prodRes.value.data?.content || (Array.isArray(prodRes.value.data) ? prodRes.value.data : prodRes.value.data?.data || [])) : [];
+      const fetchedWarehouses = whRes.status === 'fulfilled' ? (whRes.value.data?.data || (Array.isArray(whRes.value.data) ? whRes.value.data : [])) : [];
+      const fetchedCategories = catRes.status === 'fulfilled' ? (catRes.value.data?.data || (Array.isArray(catRes.value.data) ? catRes.value.data : catRes.value.data?.content || [])) : [];
+      const fetchedBrands = brandRes.status === 'fulfilled' ? (brandRes.value.data?.data || (Array.isArray(brandRes.value.data) ? brandRes.value.data : brandRes.value.data?.content || [])) : [];
 
       if (whRes.status === 'fulfilled') setWarehousesList(fetchedWarehouses);
       if (prodRes.status === 'fulfilled') setProductsList(fetchedProducts);
       if (catRes.status === 'fulfilled') setCategoriesList(fetchedCategories);
+      if (brandRes.status === 'fulfilled') setBrandsList(fetchedBrands);
 
 
 
@@ -531,15 +568,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   }, []);
 
   useDataSync(() => {
-    loadInventoryBalances();
-    loadAdjustments();
-    loadQuotas();
+    return Promise.allSettled([loadInventoryBalances(),loadAdjustments(),loadQuotas()]);
   }, ['erp:data_changed', 'erp:inventory_updated']);
 
   // Filtered inventory balances
   const filteredInventory = useMemo(() => {
     return inventoryBalances.filter((item) => {
-      if (invWarehouseFilter !== 'ALL' && String(item.warehouseId) !== String(invWarehouseFilter) && item.warehouseName !== invWarehouseFilter) {
+      if (invBrandFilter !== 'ALL' && item.brandName !== invBrandFilter) {
+        return false;
+      }
+      if (invCategoryFilter !== 'ALL' && item.categoryName !== invCategoryFilter) {
         return false;
       }
       if (invStatusFilter === 'IN_STOCK' && (item.quantity <= 0 || item.isLowStock)) {
@@ -565,11 +603,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }
       return true;
     });
-  }, [inventoryBalances, invWarehouseFilter, invStatusFilter, invSearchQuery]);
+  }, [inventoryBalances, invBrandFilter, invCategoryFilter, invStatusFilter, invSearchQuery]);
 
   const handleClearInvFilters = () => {
     setInvSearchQuery('');
-    setInvWarehouseFilter('ALL');
+    setInvBrandFilter('ALL');
     setInvCategoryFilter('ALL');
     setInvStatusFilter('ALL');
   };
@@ -588,7 +626,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     const now = new Date();
     const batchNo = `BN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Math.floor(10 + Math.random() * 90)}`;
     setCreateForm({
-      type: 'Addition',
+      type: '',
       warehouseId: String(item.warehouseId || warehousesList[0]?.id || ''),
       productId: String(item.productId || ''),
       batch: batchNo,
@@ -604,8 +642,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   // Filtered adjustments
   const filteredAdjustments = useMemo(() => {
     return adjustmentRecords.filter((rec) => {
+      if(adjustmentStatusFilter!=='ALL' && adjustmentStatus(rec)!==adjustmentStatusFilter)return false;
       if (filterType !== 'ALL' && rec.type !== filterType) return false;
-      if (filterWarehouse !== 'ALL' && rec.warehouse !== filterWarehouse && rec.warehouseId !== filterWarehouse) return false;
       if(!matchesDateRange(rec.date,adjustmentFrom,adjustmentTo))return false;
 
       if (searchQuery.trim()) {
@@ -622,12 +660,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       }
       return true;
     });
-  }, [adjustmentRecords, filterType, filterWarehouse, adjustmentFrom, adjustmentTo, searchQuery]);
+  }, [adjustmentRecords, adjustmentStatusFilter, filterType, adjustmentFrom, adjustmentTo, searchQuery]);
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setFilterType('ALL');
-    setFilterWarehouse('ALL');
+    setAdjustmentStatusFilter('ALL');
     setAdjustmentFrom('');setAdjustmentTo('');
   };
 
@@ -645,84 +683,104 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       costPrice: '',
       reason: '',
       remarks: '',
+      items: [],
     });
     setShowCreateModal(true);
   };
 
-  const handleOpenEditRecord = (rec) => {
+  const handleOpenEditRecord = async (rec) => {
     setEditingRecord(rec);
     const prod = productsList.find((p) => p.name === rec.productName || p.sku === rec.sku);
     const wh = warehousesList.find((w) => w.name === rec.warehouse || String(w.id) === String(rec.warehouseId));
     setCreateForm({
       type: rec.type || 'Addition',
       warehouseId: String(wh?.id || rec.warehouseId || ''),
-      productId: String(prod?.id || ''),
+      productId: String(rec.productId || prod?.id || ''),
       batch: rec.batch || '',
       quantity: String(Math.abs(rec.quantity || 1)),
       costPrice: String(rec.costPrice || prod?.costPrice || '0.00'),
       reason: rec.reason || '',
       remarks: rec.remarks || '',
+      items: (rec.items && rec.items.length > 0)
+        ? rec.items.map((it) => ({
+            productId: String(it.productId),
+            productName: it.productName,
+            productCode: it.productCode || it.sku,
+            warehouseId: String(rec.warehouseId || wh?.id || ''),
+            warehouseName: rec.warehouse || wh?.name || '',
+            availableStock: it.availableStock != null ? it.availableStock : '',
+            quantity: String(Math.abs(it.quantity || 1)),
+            reason: it.reason || rec.reason,
+            unitCost: it.unitCost,
+            after: it.quantity,
+          }))
+        : [],
     });
     setShowCreateModal(true);
+    try {
+      const response=await adjustmentApi.searchProducts(rec.sku || '');
+      const selected=(response.data?.data || response.data || []).find(p=>String(p.productId)===String(rec.productId || prod?.id) && String(p.warehouseId)===String(rec.warehouseId));
+      if(selected)setCreateForm(previous=>({...previous,selectedProduct:selected}));
+    }catch(error){addToast('Search the product again to check available stock.','error');}
   };
 
-  const handleSaveRecord = async (e) => {
+  const handleSaveRecord = async (e, saveDraft=false) => {
     e.preventDefault();
     if(submittingRecord)return;
     if (!createForm.type) {
       addToast('Please choose whether to Add stock or Reduce stock', 'error');
       return;
     }
-    if (!createForm.warehouseId) {
-      addToast('Please select a warehouse', 'error');
-      return;
-    }
-    if (!createForm.productId) {
+
+    const hasMultiItems = Array.isArray(createForm.items) && createForm.items.length > 0;
+    if (!hasMultiItems && !createForm.productId) {
       addToast('Please select a product', 'error');
       return;
     }
-    const quantityError=numberError(createForm.quantity,'Quantity',{positive:true,decimals:0,max:9999999999});
-    if(quantityError){addToast(quantityError,'error');return;}
-    const qtyNum=Number(createForm.quantity);
-    if((createForm.remarks || '').length>5000){addToast('Remarks must be 5000 characters or fewer.','error');return;}
-    if (!createForm.reason) {
-      addToast('Please select a valid reason', 'error');
+    if (!hasMultiItems && !createForm.warehouseId) {
+      addToast('Please select a warehouse', 'error');
       return;
     }
-    if(canSeeCost && createForm.type!=='Reduction') {
-      const error=numberError(createForm.costPrice,'Unit cost',{decimals:6});
-      if(error){addToast(error,'error');return;}
+
+    let itemsPayload = [];
+    let whId;
+
+    if (hasMultiItems) {
+      whId = Number(createForm.items[0].warehouseId || createForm.warehouseId);
+      itemsPayload = createForm.items.map((it) => ({
+        productId: Number(it.productId),
+        quantity: Number(it.quantity),
+        reason: it.reason || createForm.reason,
+      }));
+    } else {
+      const quantityError = numberError(createForm.quantity, 'Quantity', { positive: true, decimals: 2, max: 9999999999 });
+      if (quantityError) { addToast(quantityError, 'error'); return; }
+      if (!createForm.reason) { addToast('Please select a valid reason', 'error'); return; }
+      whId = Number(createForm.warehouseId);
+      itemsPayload = [
+        {
+          productId: Number(createForm.productId),
+          quantity: Number(createForm.quantity),
+          reason: createForm.reason,
+        },
+      ];
     }
+
+    if ((createForm.remarks || '').length > 5000) { addToast('Remarks must be 5000 characters or fewer.', 'error'); return; }
 
     try {
       setSubmittingRecord(true);
-      const whId = Number(createForm.warehouseId);
-      const prdId = Number(createForm.productId);
-      const sysBal = inventoryBalances.find(
-        (b) => String(b.productId) === String(prdId) && String(b.warehouseId) === String(whId)
-      );
-      const currentPhysical = sysBal ? Number(sysBal.quantity || 0) : 0;
-      if(createForm.type==='Reduction' && qtyNum>currentPhysical){addToast(`Only ${currentPhysical} units are in stock. Reduce by that quantity or less.`,'error');return;}
-      const targetPhysical = createForm.type === 'Reduction'
-        ? Math.max(0, currentPhysical - Math.abs(qtyNum))
-        : currentPhysical + Math.abs(qtyNum);
-
       const payload = {
         warehouseId: whId,
-        adjustmentDate: formatBusinessDate(),
-        reason: createForm.reason + (createForm.remarks ? `: ${createForm.remarks}` : ''),
-        items: [
-          {
-            productId: prdId,
-            physicalQuantity: targetPhysical,
-            ...(canSeeCost && createForm.type!=='Reduction' ? {unitCost:Number(createForm.costPrice)} : {}),
-            reason: createForm.reason,
-          },
-        ],
+        adjustmentType: createForm.type === 'Reduction' ? 'REDUCTION' : 'ADDITION',
+        adjustmentDate: editingRecord?.status === 'DRAFT' ? editingRecord.date : formatBusinessDate(),
+        reason: (createForm.reason || itemsPayload[0]?.reason || '') + (createForm.remarks ? `: ${createForm.remarks}` : ''),
+        items: itemsPayload,
       };
 
-      await adjustmentApi.create(payload, true);
-      addToast('Stock adjustment successfully submitted and processed to inventory!', 'success');
+      if (editingRecord && adjustmentStatus(editingRecord) === 'DRAFT') await adjustmentApi.update(editingRecord.adjustmentId, payload, !saveDraft);
+      else await adjustmentApi.create(payload, !saveDraft);
+      addToast(saveDraft ? 'Adjustment saved as draft.' : 'Stock adjustment applied.', 'success');
       setShowCreateModal(false);
       setEditingRecord(null);
       await Promise.all([loadAdjustments(), loadInventoryBalances()]);
@@ -733,6 +791,21 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       setSubmittingRecord(false);
     }
   };
+
+  const confirmAdjustmentTransition=async()=>{
+    if(adjustmentTransitionBusy)return;
+    setAdjustmentTransitionBusy(true);
+    try{
+      const record=adjustmentTransition.record;
+      if(adjustmentTransition.target==='CANCELLED')await adjustmentApi.cancel(record.adjustmentId,adjustmentTransitionReason.trim());
+      else await adjustmentApi.process(record.adjustmentId,adjustmentTransitionReason.trim());
+      setAdjustmentTransition(null);setViewingRecord(null);
+      await Promise.all([loadAdjustments(),loadInventoryBalances()]);
+      addToast('Adjustment status updated.','success');
+    }catch(error){addToast(error.response?.data?.message || error.message || 'Unable to update adjustment.','error');}
+    finally{setAdjustmentTransitionBusy(false);}
+  };
+  const requestAdjustmentTransition=(record,target)=>{setAdjustmentTransition({record,target});setAdjustmentTransitionReason('');};
 
   return (
     <div ref={directoryRef} className={(`inventory-theme purchasing-no-shadows${showQuotaModal || showCreateModal || masterFormOpen ? ' inventory-allocation-focus' : ''}`) + ' erp-page'}
@@ -879,77 +952,41 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             {/* Left Control: Search Input matching table width */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '9px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search inventory by SKU, product name, brand, warehouse..."
-                value={invSearchQuery}
-                onChange={(e) => setInvSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '34px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: 'none',
-                  transition: 'border-color 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-              {invSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setInvSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '8px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+            <SearchBar
+              value={invSearchQuery}
+              onChange={(e) => setInvSearchQuery(e.target.value)}
+              onClear={() => setInvSearchQuery('')}
+              placeholder="Search inventory by SKU, product name, brand, warehouse..."
+            />
 
             {/* Right Controls: Filters, Reset Filters, Print, & Refresh */}
             <div className="inventory-list-filter-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              {/* Warehouse selector */}
+              {/* Brand Filter */}
               <FilterSelect
-                value={invWarehouseFilter}
-                onChange={(e) => setInvWarehouseFilter(e.target.value)}
+                value={invBrandFilter}
+                onChange={(e) => setInvBrandFilter(e.target.value)}
                 className="inventory-full-label-filter"
-                title="Filter by warehouse"
+                title="Filter by brand"
               >
-                <option value="ALL">All Warehouses</option>
-                {warehousesList.map((w) => (
-                  <option key={w.id} value={String(w.id)}>
-                    {w.name}
+                <option value="ALL">All Brands</option>
+                {activeBrands.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </FilterSelect>
+
+              {/* Category Filter */}
+              <FilterSelect
+                value={invCategoryFilter}
+                onChange={(e) => setInvCategoryFilter(e.target.value)}
+                className="inventory-full-label-filter"
+                title="Filter by category"
+              >
+                <option value="ALL">All Categories</option>
+                {activeCategories.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
                   </option>
                 ))}
               </FilterSelect>
@@ -968,12 +1005,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               </FilterSelect>
 
               {/* Reset Filters button */}
-              {(invSearchQuery || invStatusFilter !== 'ALL' || invWarehouseFilter !== 'ALL') && (
+              {(invSearchQuery || invStatusFilter !== 'ALL' || invBrandFilter !== 'ALL' || invCategoryFilter !== 'ALL') && (
                 <button className="erp-button"
                   type="button"
                   onClick={handleClearInvFilters}
                   style={{
-                    height: '34px',
+                    height: '38px',
                     padding: '0 12px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
@@ -997,10 +1034,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 type="button"
                 onClick={()=>handlePrintDirectory('Inventory List')}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
                   color: '#334155',
@@ -1033,10 +1071,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 type="button"
                 onClick={loadInventoryBalances}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
                   color: '#334155',
@@ -1060,8 +1099,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   e.currentTarget.style.color = '#334155';
                 }}
                 title="Refresh inventory balances"
+                aria-label="Refresh inventory balances"
               >
-                <RefreshCw size={14} className={inventoryLoading ? 'animate-spin' : ''} />
+                <RefreshCw size={15} className={inventoryLoading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1183,63 +1223,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             {/* Left Control: Search Input matching table width */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
-              <Search
-                size={16}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '9px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search adjustments by #, product, SKU, batch, warehouse, reason..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '34px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: 'none',
-                  transition: 'border-color 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '8px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+            <SearchBar
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery('')}
+              placeholder="Search adjustment code, product code or name, warehouse, reason..."
+            />
 
             {/* Right Controls: Filters, Reset, Print, & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -1255,29 +1244,16 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <option value="Reduction">Reduction</option>
               </FilterSelect>
 
-              {/* Warehouse filter */}
-              <FilterSelect
-                value={filterWarehouse}
-                onChange={(e) => setFilterWarehouse(e.target.value)}
-                className="inventory-full-label-filter"
-                title="Filter stock adjustments by warehouse"
-                style={{width:'auto'}}
-              >
-                <option value="ALL">All Warehouses</option>
-                {warehousesList.map((w) => (
-                  <option key={w.id} value={w.name}>
-                    {w.name}
-                  </option>
-                ))}
+              <FilterSelect value={adjustmentStatusFilter} onChange={event=>setAdjustmentStatusFilter(event.target.value)} title="Filter stock adjustments by status" style={{width:140}}>
+                <option value="ALL">All Statuses</option><option value="DRAFT">Draft</option><option value="CANCELLED">Cancelled</option><option value="ADJUSTED">Adjusted</option>
               </FilterSelect>
-
               {/* Reset Filters button */}
-              {(filterType !== 'ALL' || filterWarehouse !== 'ALL' || adjustmentFrom || adjustmentTo || searchQuery) && (
+              {(adjustmentStatusFilter !== 'ALL' || filterType !== 'ALL' || adjustmentFrom || adjustmentTo || searchQuery) && (
                 <button className="erp-button"
                   type="button"
                   onClick={handleClearFilters}
                   style={{
-                    height: '34px',
+                    height: '38px',
                     padding: '0 12px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
@@ -1301,10 +1277,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 type="button"
                 onClick={()=>handlePrintDirectory('Stock Adjustments')}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
                   color: '#334155',
@@ -1324,7 +1301,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
                 title="Print Stock Adjustments (A4)" aria-label="Print Stock Adjustments (A4)"
@@ -1339,10 +1316,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   addToast('Stock adjustments refreshed', 'info');
                 }}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
                   color: '#334155',
@@ -1362,144 +1340,18 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
                 title="Refresh records"
+                aria-label="Refresh records"
               >
-                <RefreshCw size={14} />
+                <RefreshCw size={15} />
               </button>
             </div>
           </div>
 
-          {/* Adjustment Records Table (Fixed Frame, Sticky Header, Internal Scroll for Data Rows Only) */}
-          <div className="erp-table-frame"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              boxShadow: 'none',
-              flex: 1,
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>RECORD #</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TYPE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>WAREHOUSE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>SKU</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PRODUCT NAME</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BATCH</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'right' }}>QUANTITY</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>REASON</th>
-                    <th className="erp-table-heading erp-table-actions" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0', textAlign: 'center' }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAdjustments.length === 0 ? (
-                    <tr>
-                      <td className="erp-table-cell" colSpan={10} style={{ textAlign: 'center', color: '#64748b' }}>
-                        No adjustment records found matching selected filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredAdjustments.map((rec) => {
-                      const isAddition = rec.type === 'Addition';
-
-                      return (
-                        <tr
-                          key={rec.id}
-                          onClick={() => setViewingRecord(rec)}
-                          style={{
-                            borderBottom: '1px solid #f1f5f9',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.1s ease',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                          title="Click row to view record details"
-                        >
-                          <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
-                            {rec.recordNo}
-                          </td>
-                          <td className="erp-table-cell erp-table-date">
-                            {rec.date}
-                          </td>
-                          <td className="erp-table-cell">
-                            <StatusBadge status={isAddition?'ADDITION':'REDUCTION'} label={rec.type}/>
-                          </td>
-                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
-                            {rec.warehouse}
-                          </td>
-                          <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', color: '#64748b' }}>
-                            {rec.sku}
-                          </td>
-                          <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
-                            {rec.productName}
-                          </td>
-                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', color: '#475569' }}>
-                            {rec.batch}
-                          </td>
-                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
-                            {rec.quantity > 0 ? `+${rec.quantity}` : rec.quantity}
-                          </td>
-                          <td className="erp-table-cell" style={{ color: '#475569' }}>
-                            {rec.reason}
-                          </td>
-                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                              <button aria-label={canEditInventory ? "Edit Adjustment" : "View Only (Edit Restricted)"} className="erp-table-icon-action"
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditRecord(rec);
-                                }}
-                                style={{
-                                  width: '30px',
-                                  height: '30px',
-                                  background: '#ffffff',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  color: '#0284c7',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'all 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#f0f9ff';
-                                  e.currentTarget.style.borderColor = '#0284c7';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#ffffff';
-                                  e.currentTarget.style.borderColor = '#cbd5e1';
-                                }}
-                                title={canEditInventory ? "Edit Adjustment" : "View Only (Edit Restricted)"}
-                                disabled={!canEditInventory}
-                              >
-                                <Edit2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <AdjustmentTable rows={filteredAdjustments} canEdit={canEditInventory} onView={setViewingRecord} onEdit={handleOpenEditRecord}/>
         </div>
       )}
       {/* ------------------------------------------------------------- */}
@@ -1527,63 +1379,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             }}
           >
             {/* Search */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '9px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search allocation by product SKU, name, or staff member..."
-                value={quotaSearch}
-                onChange={(e) => setQuotaSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '34px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: 'none',
-                  transition: 'border-color 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-              {quotaSearch && (
-                <button
-                  type="button"
-                  onClick={() => setQuotaSearch('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '8px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+            <SearchBar
+              value={quotaSearch}
+              onChange={(e) => setQuotaSearch(e.target.value)}
+              onClear={() => setQuotaSearch('')}
+              placeholder="Search allocation by product SKU, name, or staff member..."
+            />
 
             {/* Right Controls: Status Filter, Reset, Print (Icon only), Refresh (Icon only) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -1611,7 +1412,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                     setQuotaFrom('');setQuotaTo('');
                   }}
                   style={{
-                    height: '34px',
+                    height: '38px',
                     padding: '0 12px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
@@ -1635,13 +1436,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 type="button"
                 onClick={()=>handlePrintDirectory('Inventory Allocation')}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
-                  color: '#334155',
+                  color: '#64748b',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1659,7 +1460,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
+                  e.currentTarget.style.color = '#64748b';
                 }}
                 title="Print Inventory Allocation (A4)" aria-label="Print Inventory Allocation (A4)"
               >
@@ -1672,13 +1473,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onClick={loadQuotas}
                 disabled={loadingQuotas}
                 style={{
-                  height: '34px',
-                  width: '36px',
+                  height: '38px',
+                  width: '38px',
                   backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px',
                   padding: 0,
-                  color: '#334155',
+                  color: '#64748b',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1696,11 +1497,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
+                  e.currentTarget.style.color = '#64748b';
                 }}
                 title="Refresh inventory allocations"
               >
-                <RefreshCw size={14} />
+                <RefreshCw size={15} className={loadingQuotas ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1730,12 +1531,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* MODAL: New Stock Adjustment Record (Exact Matching User Screenshots) */}
       {/* ------------------------------------------------------------- */}
-      {showCreateModal && <AdjustmentWorkspace form={createForm} onChange={setCreateForm} warehouses={warehousesList} products={productsList} balances={inventoryBalances} canSeeCost={canSeeCost} editing={editingRecord} busy={submittingRecord} onSave={handleSaveRecord} onClose={()=>setShowCreateModal(false)}/>}
+      {showCreateModal && <AdjustmentWorkspace form={createForm} onChange={setCreateForm} warehouses={warehousesList} products={productsList} balances={inventoryBalances} canSeeCost={canSeeCost} editing={editingRecord} busy={submittingRecord} onSave={handleSaveRecord} onSaveDraft={event=>handleSaveRecord(event,true)} onClose={()=>setShowCreateModal(false)}/>}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Adjustment Record Details */}
       {/* ------------------------------------------------------------- */}
-      {viewingRecord && <AdjustmentDetailsModal record={viewingRecord} canManage={canEditInventory} onClose={()=>setViewingRecord(null)} onEdit={()=>{const record=viewingRecord;setViewingRecord(null);handleOpenEditRecord(record);}}/>}
+      {adjustmentTransition && <PurchasingStatusDialog title={adjustmentTransition.target==='CANCELLED'?'Cancel adjustment':'Apply adjustment'} confirmLabel={adjustmentTransition.target==='CANCELLED'?'Cancel adjustment':'Adjust stock'} pending={{type:'Adjustment',number:adjustmentTransition.record.recordNo,current:adjustmentStatus(adjustmentTransition.record),target:adjustmentTransition.target,description:adjustmentTransition.target==='CANCELLED'?'Cancelling an adjusted record reverses its stock movement. Reserved stock is protected.':'Apply this draft adjustment to current warehouse stock.'}} reason={adjustmentTransitionReason} onReasonChange={setAdjustmentTransitionReason} busy={adjustmentTransitionBusy} onClose={()=>!adjustmentTransitionBusy && setAdjustmentTransition(null)} onConfirm={confirmAdjustmentTransition}/>}
+      {viewingRecord && <AdjustmentDetailsModal record={viewingRecord} canManage={canEditInventory} busy={adjustmentTransitionBusy} onCancel={()=>requestAdjustmentTransition(viewingRecord,'CANCELLED')} onAdjust={()=>requestAdjustmentTransition(viewingRecord,'ADJUSTED')} onClose={()=>setViewingRecord(null)} onEdit={()=>{const record=viewingRecord;setViewingRecord(null);handleOpenEditRecord(record);}}/>}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: View Stock Item Details (Wide, Scroll-Free Executive View) */}

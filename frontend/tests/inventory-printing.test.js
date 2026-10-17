@@ -13,13 +13,13 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   for(const [name,api] of Object.entries(apis)) if(name.endsWith('Api') && api && typeof api==='object') for(const method of Object.keys(api)) if(typeof api[method]==='function') api[method]=async()=>({data:[]});
   localStorage.setItem('nbh_token',`test.${Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.sig`);
   apis.authApi.getMe=async()=>({data:{username:'inventory-clerk',roles:['ROLE_USER'],permissions:['INVENTORY_VIEW','PRODUCT_VIEW','WAREHOUSE_VIEW','BRAND_VIEW','CATEGORY_VIEW']}});
-  const products=[{id:1,sku:'SKU-FIRST',name:'First item <unsafe>',costPrice:999991,sellingPrice:35,isActive:true,defaultWarehouseId:10,defaultWarehouseName:'North'},
-    {id:2,sku:'SKU-SECOND',name:'Second item',costPrice:999992,sellingPrice:45,isActive:true,defaultWarehouseId:20,defaultWarehouseName:'South'}];
+  const products=[{id:1,sku:'SKU-FIRST',name:'First item <unsafe>',costPrice:999991,sellingPrice:35,brandName:'Brand 1',isActive:true,defaultWarehouseId:10,defaultWarehouseName:'North'},
+    {id:2,sku:'SKU-SECOND',name:'Second item',costPrice:999992,sellingPrice:45,brandName:'Brand 2',isActive:true,defaultWarehouseId:20,defaultWarehouseName:'South'}];
   apis.productApi.getProducts=async()=>({data:{content:products}});
   apis.warehouseApi.getAll=async()=>({data:[{id:10,code:'WH-10',name:'North',isActive:true},{id:20,code:'WH-20',name:'South',isActive:true}]});
-  apis.brandApi.getAll=async()=>({data:[{id:1,code:'BRAND-1',name:'Test brand',markupPercent:25,isActive:true}]});
+  apis.brandApi.getAll=apis.brandApi.getActive=async()=>({data:[{id:1,code:'BRAND-1',name:'Brand 1',markupPercent:25,isActive:true},{id:2,code:'BRAND-2',name:'Brand 2',isActive:true}]});
   apis.categoryApi.getAll=apis.categoryApi.getActive=async()=>({data:[{id:1,code:'CAT-1',name:'Test category',isActive:true}]});
-  apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,minStockLevel:0,reservedQuantity:3,availableQuantity:17,costPrice:product.costPrice,sellingPrice:0}))}};};
+  apis.inventoryApi.getBalances=async(params,config)=>{assert.equal(config.force,true,'Inventory refresh bypasses stale cached prices');return {data:{content:products.map(product=>({productId:String(product.id),productSku:product.sku,productName:product.name,brandName:product.brandName,warehouseId:product.defaultWarehouseId,warehouseName:product.defaultWarehouseName,quantity:20,minStockLevel:0,reservedQuantity:3,availableQuantity:17,costPrice:product.costPrice,sellingPrice:0}))}};};
   apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]},{id:31,adjustmentNumber:'ADJ-OLD',adjustmentDate:'2026-10-09',warehouseName:'South',items:[{productId:2,productSku:'SKU-SECOND',productName:products[1].name,differenceQuantity:2,reason:'Opening stock'}]}]}});
   apis.staffQuotaApi.search=async()=>({data:{content:[{id:41,createdAt:'2026-10-09T08:00:00',productSku:'SKU-SECOND',productName:'Older allocation',userFullName:'Test staff',allocatedQuantity:1,totalStockAvailable:20,isActive:true},{id:40,createdAt:'2026-10-12T09:00:00',productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
   apis.staffQuotaApi.getSummary=async()=>({data:null});
@@ -40,7 +40,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    }
    const expectedHeaders={
     'inventory-list':['Code / Product name','Brand / Category','Warehouse','Qty','Selling price','Status','Actions'],
-    'pos-quotas':['Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'],
+    'pos-quotas':['Allocation code','Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'],
     products:['Code / Product name','Brand / Category','Warehouse','Min stock','Status','Remarks','Actions'],
     brands:['Brand code','Brand name','MP%','Status','Remarks','Actions'],
     warehouses:['Warehouse code','Warehouse name','Address','Contact number','Status','Remarks','Actions'],
@@ -58,8 +58,8 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
      await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
     };
     await selectDate();assert.equal(host.querySelectorAll('tbody tr').length,1);
-    assert.equal(host.querySelector('tbody tr td:nth-child(5)').textContent,'2026-10-12');
-    const identity=host.querySelector('tbody tr td').textContent;assert.ok(identity.includes('SKU-FIRST') && identity.includes('First item'));
+    assert.equal(host.querySelector('tbody tr td:nth-child(6)').textContent,'2026-10-12');
+    const identity=host.querySelector('tbody tr td:nth-child(2)').textContent;assert.ok(identity.includes('SKU-FIRST') && identity.includes('First item'));
     await act(async()=>host.querySelector('[title="Reset allocation filters"]').click());assert.equal(host.querySelectorAll('tbody tr').length,2);
     await selectDate();
    }
@@ -69,10 +69,10 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    }
    if(tab==='inventory-list') {
     assert.ok(!host.querySelector('thead').textContent.includes('COST PRICE'));
-    assert.equal(toolbar.querySelectorAll('.inventory-full-label-filter').length,2,'Both inventory filters show full labels');
-    assert.ok(toolbar.textContent.includes('All Warehouses') && toolbar.textContent.includes('All Stock Levels'));
-    await act(async()=>toolbar.querySelector('[aria-label="Filter by warehouse"]').click());
-    await act(async()=>[...document.querySelectorAll('.modern-filter-options [role="option"]')].find(option=>option.textContent==='North').click());
+    assert.equal(toolbar.querySelectorAll('.inventory-full-label-filter').length,3,'Three inventory filters show full labels');
+    assert.ok(toolbar.textContent.includes('All Brands') && toolbar.textContent.includes('All Categories') && toolbar.textContent.includes('All Stock Levels'));
+    await act(async()=>toolbar.querySelector('[title="Filter by brand"]').click());
+    await act(async()=>[...document.querySelectorAll('.modern-filter-options [role="option"]')].find(option=>option.textContent==='Brand 1').click());
     assert.equal(host.querySelectorAll('tbody tr').length,1);
     assert.match(host.querySelector('tbody tr td:nth-child(5)').textContent,/35\.00/,'A zero balance price falls back to the product selling price');
     const rowActions=host.querySelector('tbody tr td:last-child');

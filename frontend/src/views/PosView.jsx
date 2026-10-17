@@ -1,9 +1,26 @@
+import {useDataSync} from '../hooks/useDataSync';
 import { useWorkspaceActive } from '../components/RetainedWorkspaces';
-import React, { useState, useEffect, useRef } from 'react';
-import { productApi, warehouseApi, customerApi, salesApi, inventoryApi, pdfApi, staffQuotaApi, customerTargetApi, customerMonthlyRangeApi } from '../api/apiClient';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  productApi,
+  warehouseApi,
+  customerApi,
+  salesApi,
+  inventoryApi,
+  categoryApi,
+  brandApi,
+  staffQuotaApi,
+  customerTargetApi,
+  customerMonthlyRangeApi,
+  printPdfDocument,
+} from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import confetti from 'canvas-confetti';
+import './PosView.css';
+import PosRangeProgress, {RangeMeter, posMoney} from '../components/PosRangeProgress';
+import PosHeldBills from '../components/PosHeldBills';
+import PosLineEditor from '../components/PosLineEditor';
+import {numberError} from '../utils/purchasingValidation';
 import {
   Search,
   Plus,
@@ -19,7 +36,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   X,
-  Download,
   Building2,
   Package,
   Percent,
@@ -41,170 +57,152 @@ import {
   Users,
   BarChart2,
   Eye,
-  ChevronRight,
   Target,
   Sparkles,
   Zap,
+  Filter,
+  Trash2,
+  Receipt,
+  RotateCcw,
+  Edit3,
 } from 'lucide-react';
 
 export default function PosView({ onExitPos, initialHeldInvoice }) {
   const workspaceActive = useWorkspaceActive();
   const { addToast } = useToast();
   const { user } = useAuth();
-  const isSupervisor = user?.roles?.includes('ROLE_ADMIN') || user?.permissions?.includes('SALES_VIEW_ALL');
+  const isSupervisor = user?.roles?.includes('ROLE_SUPER_ADMIN') || user?.roles?.includes('ROLE_ADMIN') || user?.permissions?.includes('SALES_VIEW_ALL');
 
+  const draftKey=`nbh_pos_working_bill_${user?.username || 'cashier'}`;
+  const restoredDraft=useMemo(()=>{try{return JSON.parse(localStorage.getItem(draftKey) || 'null');}catch{return null;}},[draftKey]);
+  const [activeBillId,setActiveBillId]=useState(restoredDraft?.invoiceId || null);
+  const activeBillRef=useRef(restoredDraft?.invoiceId || null),savingBillRef=useRef(false);
+  const [savingBill,setSavingBill]=useState(false);
+  const [checkingBill,setCheckingBill]=useState(Boolean(restoredDraft?.invoiceId));
+  const [billCheckFailed,setBillCheckFailed]=useState(false);
+  const billVersionRef=useRef(restoredDraft?.recordVersion ?? null);
+  const [customerRanges,setCustomerRanges]=useState({});
+  const refreshSequence=useRef(0);
+  const initialHeldHandled=useRef(null);
+  const savedHeaderRef=useRef(null);
   // Master Data
   const [warehouses, setWarehouses] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [stockBalances, setStockBalances] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Operation States
   const [isHoldingCart, setIsHoldingCart] = useState(false);
 
   // Staff Motivation / KPI Data
   const [cashierStats, setCashierStats] = useState([]);
-  const [allInvoices, setAllInvoices] = useState([]);
   const [activeCircleModal, setActiveCircleModal] = useState(null); // 'my' | 'max' | 'all'
   const [selectedStaffForBills, setSelectedStaffForBills] = useState(null);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
-  const [staffModalSearch, setStaffModalSearch] = useState('');
 
-  // Flow Step 1: Customer Selection & Financial Summary
-  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  // Top Bar: Customer Selection & Details
+  const [selectedCustomerId, setSelectedCustomerId] = useState(restoredDraft?.customerId || null);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [customerHighlightedIndex, setCustomerHighlightedIndex] = useState(0);
+  const customerSearchInputRef = useRef(null);
 
-  // Flow Step 2 & 3: Product Search & Staging
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  // Left Column: Catalog Filters, Search & Keyboard Navigation
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState('');
+  const [inStockOnlyFilter, setInStockOnlyFilter] = useState(false);
+  const [productHighlightedIndex, setProductHighlightedIndex] = useState(0);
+  const catalogSearchInputRef = useRef(null);
+  const catalogListRef = useRef(null);
+
+  // Right Column: Staging Quick-Input Workstation & Input Refs
   const [stagedItem, setStagedItem] = useState(null);
-  const searchInputRef = useRef(null);
+  const qtyInputRef = useRef(null);
+  const discPercentInputRef = useRef(null);
+  const discAmountInputRef = useRef(null);
 
-  // Flow Step 4: Sales Order Table
-  const [cart, setCart] = useState([]);
-  const subtotal = cart.reduce((sum,item)=>sum+Number(item.total || 0),0);
-  const [discountAmount, setDiscountAmount] = useState(0);
+  // Right Column: Cart Table & Totals
+  const [cart, setCart] = useState(restoredDraft?.cart || []);
+  const [editingCartItem, setEditingCartItem] = useState(null);
+  const subtotal = cart.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const [discountAmount, setDiscountAmount] = useState(restoredDraft?.discountAmount || 0);
 
   // Held Bills
   const [heldInvoices, setHeldInvoices] = useState([]);
   const [showHeldModal, setShowHeldModal] = useState(false);
   const [heldTab, setHeldTab] = useState('mine');
 
-  // Customer Monthly Range & Targets State in POS (V6 Monthly Spend Milestones)
+  // Customer Monthly Range & Targets State (Real-time live milestone projection)
   const [monthlyRangeProgress, setMonthlyRangeProgress] = useState(null);
   const [loadingMonthlyRange, setLoadingMonthlyRange] = useState(false);
   const [showMonthlyRangesModal, setShowMonthlyRangesModal] = useState(false);
-  const [allRangeConfigs, setAllRangeConfigs] = useState([]);
 
-  // Promotional Campaign Targets State (V5)
-  const [customerTargets, setCustomerTargets] = useState([]);
-  const [loadingTargets, setLoadingTargets] = useState(false);
+  // Promotional Campaign Targets (V5)
   const [showTargetRangesModal, setShowTargetRangesModal] = useState(false);
   const [activeTargetForModal, setActiveTargetForModal] = useState(null);
 
-  // Fetch Customer Monthly Range Progress (with live cart projection) whenever selected customer or cart subtotal changes
-  useEffect(() => {
-    if (!selectedCustomerId) {
-      setMonthlyRangeProgress(null);
-      setCustomerTargets([]);
-      return;
-    }
-    let isCurrent = true;
-    setLoadingMonthlyRange(true);
-    setLoadingTargets(true);
+  // Net calculations
+  const discountVal = Math.min(subtotal, Math.max(0, Number(discountAmount) || 0));
+  const netTotal = Math.max(0, subtotal - discountVal);
 
-    // 1. Fetch Monthly Range Progress with live bill subtotal
-    customerMonthlyRangeApi
-      .getCustomerProgress(selectedCustomerId, subtotal > 0 ? subtotal : undefined)
-      .then((res) => {
-        if (!isCurrent) return;
-        const data = res?.data?.data || res?.data || null;
-        setMonthlyRangeProgress(data);
-      })
-      .catch((err) => {
-        console.error('Error loading customer monthly range in POS:', err);
-      })
-      .finally(() => {
-        if (isCurrent) setLoadingMonthlyRange(false);
-      });
-
-    // 2. Also fetch promotional campaign targets (V5) if any
-    customerTargetApi
-      .getCustomerProgress(selectedCustomerId)
-      .then((res) => {
-        if (!isCurrent) return;
-        const list = res?.data?.data || res?.data || [];
-        setCustomerTargets(Array.isArray(list) ? list : []);
-      })
-      .catch((err) => {
-        console.error('Error loading promotional targets in POS:', err);
-      })
-      .finally(() => {
-        if (isCurrent) setLoadingTargets(false);
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedCustomerId, subtotal]);
-
-  // Sync targets on event bus updates
-  useEffect(() => {
-    const handleSync = () => {
-      if (selectedCustomerId) {
-        customerMonthlyRangeApi
-          .getCustomerProgress(selectedCustomerId, subtotal > 0 ? subtotal : undefined)
-          .then((res) => {
-            const data = res?.data?.data || res?.data || null;
-            setMonthlyRangeProgress(data);
-          })
-          .catch(() => {});
-
-        customerTargetApi
-          .getCustomerProgress(selectedCustomerId)
-          .then((res) => {
-            const list = res?.data?.data || res?.data || [];
-            setCustomerTargets(Array.isArray(list) ? list : []);
-          })
-          .catch(() => {});
-      }
-    };
-    window.addEventListener('erp:targets_updated', handleSync);
-    window.addEventListener('erp:sales_updated', handleSync);
-    return () => {
-      window.removeEventListener('erp:targets_updated', handleSync);
-      window.removeEventListener('erp:sales_updated', handleSync);
-    };
-  }, [selectedCustomerId, subtotal]);
-
-  const handleOpenMonthlyRangeModal = () => {
-    customerMonthlyRangeApi
-      .getAllRanges()
-      .then((res) => {
-        const list = res?.data?.data || res?.data || [];
-        setAllRangeConfigs(Array.isArray(list) ? list : []);
-      })
-      .catch(() => {});
-    setShowMonthlyRangesModal(true);
-  };
-
+  // Initial Load
   useEffect(() => {
     loadInitialData();
     loadHeldInvoices();
     loadStaffPerformance();
   }, []);
 
+  // Auto-focus on initial mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (selectedCustomerId) {
+        catalogSearchInputRef.current?.focus();
+      } else {
+        customerSearchInputRef.current?.focus();
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-resume held bill if passed from Hold Bills nav
   useEffect(() => {
-    if (initialHeldInvoice && warehouses.length > 0) {
-      handleResumeInvoice(initialHeldInvoice);
+    if (initialHeldInvoice && warehouses.length > 0 && initialHeldHandled.current!==initialHeldInvoice.id) {
+      initialHeldHandled.current=initialHeldInvoice.id;handleResumeInvoice(initialHeldInvoice);
     }
   }, [initialHeldInvoice, warehouses]);
 
+  // The backend supplies month boundaries, saved-bill totals and milestone projections.
+  const [progressVersion,setProgressVersion]=useState(0);
+  useEffect(()=>{
+    if(!selectedCustomerId){setMonthlyRangeProgress(null);return;}
+    let alive=true;
+    const load=async()=>{
+      setLoadingMonthlyRange(true);
+      try{
+        const response=await salesApi.getPosProgress({customerId:selectedCustomerId,billId:activeBillId || undefined});
+        const data=response.data?.data || response.data;
+        if(alive){setMonthlyRangeProgress(data);if(data)setCustomerRanges(previous=>({...previous,[selectedCustomerId]:data}));}
+      }catch{if(alive)setMonthlyRangeProgress(null);}
+      finally{if(alive)setLoadingMonthlyRange(false);}
+    };
+    const timer=setTimeout(load,150);
+    return()=>{alive=false;clearTimeout(timer);};
+  },[selectedCustomerId,activeBillId,progressVersion]);
+
   const loadInitialData = async () => {
+    setLoadingData(true);
     try {
-      const [whRes, custRes, balancesRes] = await Promise.all([
-        warehouseApi.getActive(),
-        customerApi.getActive(),
+      const [whRes, custRes, balancesRes, catRes, brandRes, prodRes] = await Promise.all([
+        warehouseApi.getActive().catch(() => ({ data: [] })),
+        customerApi.getActive().catch(() => ({ data: [] })),
         inventoryApi.getBalances({ size: 1000 }).catch(() => ({ data: [] })),
+        categoryApi.getActive().catch(() => ({ data: [] })),
+        brandApi.getActive().catch(() => ({ data: [] })),
+        productApi.searchActive('').catch(() => ({ data: [] })),
       ]);
 
       const whList = whRes.data || [];
@@ -214,13 +212,24 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       setCustomers(custList);
       const defaultCust = custList.find((c) => c.customerCode === 'CUST-0001') || custList[0];
       if (defaultCust) {
-        setSelectedCustomerId(defaultCust.id);
+        setSelectedCustomerId(previous=>previous || defaultCust.id);
       }
 
       const balancesList = balancesRes.data?.content || balancesRes.data || [];
       setStockBalances(balancesList);
+
+      const catList = catRes.data?.data || catRes.data || [];
+      setCategories(Array.isArray(catList) ? catList : []);
+
+      const brandList = brandRes.data?.data || brandRes.data || [];
+      setBrands(Array.isArray(brandList) ? brandList : []);
+
+      const prodList = prodRes.data?.data || prodRes.data || [];
+      setAllProducts(Array.isArray(prodList) ? prodList : []);
     } catch (err) {
       addToast('Error loading master data: ' + err.message, 'error');
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -228,7 +237,7 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     try {
       const res = await salesApi.getHeld().catch(() => ({ data: [] }));
       const apiHeld = res.data || [];
-      setHeldInvoices(apiHeld);
+      setHeldInvoices(apiHeld.filter(invoice=>String(invoice.id)!==String(activeBillRef.current)));
     } catch (e) {
       console.error('Failed to load held bills:', e);
     }
@@ -236,126 +245,242 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
   const loadStaffPerformance = async () => {
     try {
-      const [summaryRes, invoicesRes] = await Promise.all([
-        salesApi.getCashierSalesSummary().catch(() => ({ data: [] })),
-        salesApi.search({ size: 200 }).catch(() => ({ data: [] })),
-      ]);
-
-      const cList = summaryRes.data || [];
+      const summaryRes=await salesApi.getCashierSalesSummary();
+      const cList=summaryRes.data || [];
       setCashierStats(cList);
-
-      const invList = invoicesRes.data?.content || invoicesRes.data || [];
-      setAllInvoices(invList);
     } catch (err) {
       console.error('Failed to load cashier performance data', err);
     }
   };
 
+  const refreshStock=async()=>{
+    const sequence=++refreshSequence.current;
+    const response=await inventoryApi.getBalances({size:1000},{skipCache:true});
+    if(sequence===refreshSequence.current)setStockBalances(response.data?.content || response.data || []);
+  };
+  useDataSync(() => Promise.allSettled([refreshStock(),loadHeldInvoices(),loadStaffPerformance()]),
+    ['erp:inventory_updated','erp:sales_updated'], [], ['inventory','sales','grn','gtn','prn']);
+  useDataSync(() => loadInitialData(), ['erp:customers_updated'], [], ['customers','inventory']);
+  useDataSync(() => setProgressVersion(value=>value+1), ['erp:targets_updated','erp:sales_updated'], [], ['targets','sales','customers']);
+  useEffect(()=>{
+    localStorage.setItem(draftKey,JSON.stringify({invoiceId:activeBillId,recordVersion:billVersionRef.current,cart,customerId:selectedCustomerId,discountAmount}));
+  },[draftKey,activeBillId,cart,selectedCustomerId,discountAmount]);
+  useEffect(()=>{
+    if(!restoredDraft?.invoiceId)return;
+    salesApi.getById(restoredDraft.invoiceId).then(response=>{
+      const invoice=response.data?.data || response.data;
+      if(invoice?.status==='HELD'){
+        billVersionRef.current=invoice.recordVersion;
+        savedHeaderRef.current={customerId:invoice.customerId,discountAmount:Number(invoice.discountAmount || 0)};
+        if(invoice.recordVersion!==restoredDraft.recordVersion){setSelectedCustomerId(invoice.customerId);setDiscountAmount(Number(invoice.discountAmount || 0));}
+        setCart((invoice.items || []).map((line,index)=>({id:`${line.productId}_${invoice.warehouseId}_${index}`,productId:line.productId,sku:line.productSku,name:line.productName,unitOfMeasure:line.unitOfMeasure,warehouseId:invoice.warehouseId,warehouseCode:invoice.warehouseCode,warehouseName:invoice.warehouseName,quantity:Number(line.quantity),unitPrice:Number(line.unitPrice),discountRate:Number(line.discountRate || 0),discountAmount:Number(line.discountAmount || 0),total:Number(line.totalPrice)})));
+      } else if(invoice){setCart([]);setActiveBillId(null);activeBillRef.current=null;}
+
+    }).catch(()=>{setBillCheckFailed(true);addToast('The saved bill could not be checked. Refresh before billing.','error');}).finally(()=>setCheckingBill(false));
+  },[]);
+  const billPayload=(lines,hold=true)=>({warehouseId:lines[0]?.warehouseId,customerId:selectedCustomerId,hold,reserveStock:true,expectedVersion:billVersionRef.current,taxRate:0,
+    discountAmount:Math.min(lines.reduce((sum,line)=>sum+Number(line.total),0),Math.max(0,Number(discountAmount)||0)),
+    items:lines.map(line=>({productId:line.productId,quantity:Number(line.quantity),unitPrice:Number(line.unitPrice),discountRate:Number(line.discountRate || 0),discountAmount:Number(line.discountAmount || 0)}))});
+  const commitCart=async lines=>{
+    if(savingBillRef.current || checkingBill || billCheckFailed)return false;
+    savingBillRef.current=true;setSavingBill(true);
+    try{
+      if(lines.length){
+        if(lines.some(line=>String(line.warehouseId)!==String(lines[0].warehouseId)))throw new Error('Use one warehouse per bill. Start another bill for a different warehouse.');
+        const response=activeBillRef.current?await salesApi.savePosDraft(activeBillRef.current,billPayload(lines)):await salesApi.create(billPayload(lines));
+        const invoice=response.data?.data || response.data;
+        if(!invoice?.id)throw new Error('The server did not confirm the saved bill.');
+        setProgressVersion(previous=>previous+1);activeBillRef.current=invoice.id;billVersionRef.current=invoice.recordVersion;savedHeaderRef.current={customerId:invoice.customerId ?? selectedCustomerId,discountAmount:Number(invoice.discountAmount || 0)};setActiveBillId(invoice.id);
+        const confirmed=lines.map(line=>{const saved=invoice.items?.find(item=>String(item.productId)===String(line.productId));return saved?{...line,quantity:Number(saved.quantity),unitPrice:Number(saved.unitPrice),discountRate:Number(saved.discountRate || 0),discountAmount:Number(saved.discountAmount || 0),total:Number(saved.totalPrice)}:line;});
+        localStorage.setItem(draftKey,JSON.stringify({invoiceId:invoice.id,recordVersion:invoice.recordVersion,cart:confirmed,customerId:selectedCustomerId,discountAmount}));setCart(confirmed);
+      }else{
+        if(activeBillRef.current)await salesApi.cancelHeld(activeBillRef.current);
+        activeBillRef.current=null;setActiveBillId(null);setCart([]);setDiscountAmount(0);
+      }
+      await refreshStock().catch(()=>{});await loadHeldInvoices();return true;
+    }catch(error){const message=error.response?.data?.message || error.message || 'Unable to save the bill.';if(message.includes('another session') || message.includes('Only held POS'))setBillCheckFailed(true);addToast(message,'error');await refreshStock().catch(()=>{});return false;}
+    finally{savingBillRef.current=false;setSavingBill(false);}
+  };
+  useEffect(()=>{
+    if(!activeBillId || !cart.length || savingBill || checkingBill || billCheckFailed)return;
+    const saved=savedHeaderRef.current;
+    if(saved && String(saved.customerId)===String(selectedCustomerId) && Number(saved.discountAmount)===discountVal)return;
+    const timer=setTimeout(()=>commitCart(cart),500);
+    return()=>clearTimeout(timer);
+  },[selectedCustomerId,discountVal,activeBillId,cart,checkingBill]);
+  const resetWorkingBill=()=>{activeBillRef.current=null;setActiveBillId(null);setCart([]);setDiscountAmount(0);setStagedItem(null);localStorage.removeItem(draftKey);};
+
   // Helper to find stock for a product in a given warehouse
   const getProductStockInWarehouse = (productId, warehouseId) => {
     const record = stockBalances.find(
-      (b) => b.productId === productId && b.warehouseId === warehouseId
+      (b) => String(b.productId ?? b.product?.id) === String(productId) &&
+             String(b.warehouseId ?? b.warehouse?.id) === String(warehouseId)
     );
-    return record ? Number(record.availableQuantity || 0) : 0;
+    return record ? Number(record.availableQuantity ?? record.quantity ?? 0) : 0;
   };
 
-  // Selected Customer
+  useEffect(()=>{
+    setStagedItem(previous=>{
+      if(!previous)return previous;
+      const available=getProductStockInWarehouse(previous.product.id,previous.warehouseId);
+      return available===previous.realQuantity?previous:{...previous,realQuantity:available};
+    });
+    setEditingCartItem(previous=>{
+      if(!previous)return previous;
+      const own=cart.find(line=>line.id===previous.id);
+      const available=getProductStockInWarehouse(previous.productId,previous.warehouseId)+Number(own?.quantity || 0);
+      return available===previous.availableQty?previous:{...previous,availableQty:available};
+    });
+  },[stockBalances]);
+
+  // Helper for total product stock across all warehouses
+  const getProductTotalStock = (productId) => {
+    return warehouses.reduce((sum, wh) => sum + getProductStockInWarehouse(productId, wh.id), 0);
+  };
+
+  // Selected Customer & Filtered Search
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || null;
   const filteredCustomers = customerSearchQuery
     ? customers.filter(
         (c) =>
           c.name?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-          c.customerCode?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+          c.address?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
           c.phone?.includes(customerSearchQuery)
       )
-    : customers.slice(0, 10);
+    : customers.slice(0, 15);
 
-  // Customer Financial Metrics Calculations (Compact details)
+  useEffect(()=>{
+    if(!showCustomerSearch)return;let alive=true;
+    const timer=setTimeout(()=>{Promise.all(filteredCustomers.slice(0,15).filter(customer=>!customerRanges[customer.id]).map(async customer=>{
+      try{const response=await customerMonthlyRangeApi.getCustomerProgress(customer.id);const data=response.data?.data || response.data;if(alive && data)setCustomerRanges(previous=>({...previous,[customer.id]:data}));}catch{}
+    }));},250);
+    return()=>{alive=false;clearTimeout(timer);};
+  },[showCustomerSearch,customerSearchQuery,customers]);
+  // Customer Financial Metrics
   const custOutstanding = Number(selectedCustomer?.currentBalance || 0);
   const custCreditLimit = Number(selectedCustomer?.creditLimit || 0);
   const custAvailableCredit = Math.max(0, custCreditLimit - custOutstanding);
   const custCreditUsagePct =
     custCreditLimit > 0 ? Math.min(100, Math.round((custOutstanding / custCreditLimit) * 100)) : 0;
 
-  let creditStatusBadge = { text: 'Healthy', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' };
-  if (custOutstanding > custCreditLimit && custCreditLimit > 0) {
-    creditStatusBadge = { text: 'Exceeded', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
-  } else if (custCreditUsagePct >= 80 && custCreditLimit > 0) {
-    creditStatusBadge = { text: 'Near Limit', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' };
-  }
-
-  // -------------------------------------------------------------
-  // Motivation Circles Calculations
-  // -------------------------------------------------------------
+  // Motivation & Cashier Calculations
   const currentUsername = user?.username || 'admin';
   const myStat = cashierStats.find((c) => c.username === currentUsername) || null;
-  const myInvoices = allInvoices.filter((inv) => inv.createdBy === currentUsername);
 
   const myBillsCount = myStat
-    ? Number(myStat.completedInvoicesCount || 0)
-    : myInvoices.length;
+    ? Number(myStat.heldInvoicesCount || 0)
+    : 0;
   const myTotalAmount = myStat
-    ? Number(myStat.totalSalesAmount || 0)
-    : myInvoices.reduce((sum, inv) => sum + Number(inv.netTotal || 0), 0);
-  const myAvgBill = myBillsCount > 0 ? myTotalAmount / myBillsCount : 0;
-  const myHeldCount = heldInvoices.filter((h) => h.createdBy === currentUsername).length;
+    ? Number(myStat.totalHeldAmount || 0)
+    : 0;
+  const myAvgBill = Number(myStat?.averageHeldAmount || 0);
 
-  // Max / Top record calculation
-  let maxBillsCount = 0;
-  let maxSalesAmount = 0;
-  let topCashierName = 'Top Cashier';
+  // Left Column: Filtered Products Catalog
+  const filteredProducts = useMemo(() => {
+    return allProducts.filter((product) => {
+      // 1. Search Query (SKU, Name, Barcode)
+      if (catalogSearch.trim()) {
+        const q = catalogSearch.toLowerCase().trim();
+        const matchesName = product.name?.toLowerCase().includes(q);
+        const matchesSku = product.sku?.toLowerCase().includes(q);
+        const matchesBarcode = product.barcode?.toLowerCase().includes(q);
+        if (!matchesName && !matchesSku && !matchesBarcode) return false;
+      }
 
-  if (cashierStats.length > 0) {
-    cashierStats.forEach((c) => {
-      const sales = Number(c.totalSalesAmount || 0);
-      const bills = Number(c.completedInvoicesCount || 0);
-      if (sales > maxSalesAmount) {
-        maxSalesAmount = sales;
-        topCashierName = c.fullName || c.username;
+      // 2. Category Filter
+      if (selectedCategoryFilter) {
+        if (String(product.categoryId) !== String(selectedCategoryFilter)) return false;
       }
-      if (bills > maxBillsCount) {
-        maxBillsCount = bills;
+
+      // 3. Brand Filter
+      if (selectedBrandFilter) {
+        if (String(product.brandId) !== String(selectedBrandFilter)) return false;
       }
+
+      // 4. In-Stock Filter
+      if (inStockOnlyFilter) {
+        const totalStock = getProductTotalStock(product.id);
+        if (totalStock <= 0) return false;
+      }
+
+      return true;
     });
-  } else if (allInvoices.length > 0) {
-    maxBillsCount = allInvoices.length;
-    maxSalesAmount = allInvoices.reduce((s, it) => s + Number(it.netTotal || 0), 0);
-    topCashierName = user?.fullName || 'Cashier';
-  } else {
-    maxBillsCount = Math.max(1, myBillsCount);
-    maxSalesAmount = Math.max(1000, myTotalAmount);
-  }
+  }, [allProducts, catalogSearch, selectedCategoryFilter, selectedBrandFilter, inStockOnlyFilter, stockBalances, warehouses]);
 
-  // All Staff Team calculation
-  const totalTeamBills = cashierStats.length > 0
-    ? cashierStats.reduce((s, c) => s + Number(c.completedInvoicesCount || 0), 0)
-    : allInvoices.length;
-  const totalTeamAmount = cashierStats.length > 0
-    ? cashierStats.reduce((s, c) => s + Number(c.totalSalesAmount || 0), 0)
-    : allInvoices.reduce((s, it) => s + Number(it.netTotal || 0), 0);
-  const staffCount = Math.max(1, cashierStats.length);
+  // Reset highlight index when products change
+  useEffect(() => {
+    setProductHighlightedIndex(0);
+  }, [catalogSearch, selectedCategoryFilter, selectedBrandFilter]);
 
-  // Flow Step 2: Product Search by Code or Name
-  const handleProductSearch = async (query) => {
-    setSearchQuery(query);
-    if (!query || query.trim().length < 1) {
-      setSearchResults([]);
-      return;
-    }
-    try {
-      const res = await productApi.searchActive(query.trim());
-      setSearchResults(res.data || []);
-    } catch (err) {
-      console.error(err);
+  // Reset customer highlight index when query changes
+  useEffect(() => {
+    setCustomerHighlightedIndex(0);
+  }, [customerSearchQuery]);
+
+  // Customer Search Keyboard Navigation
+  const handleCustomerSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!showCustomerSearch) setShowCustomerSearch(true);
+      setCustomerHighlightedIndex((prev) => Math.min(filteredCustomers.length - 1, prev + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setCustomerHighlightedIndex((prev) => Math.max(0, prev - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const custToSelect = filteredCustomers[customerHighlightedIndex] || filteredCustomers[0];
+      if (custToSelect) {
+        setSelectedCustomerId(custToSelect.id);
+        setShowCustomerSearch(false);
+        setCustomerSearchQuery('');
+
+        // Auto jump focus to Product Search input
+        setTimeout(() => {
+          catalogSearchInputRef.current?.focus();
+          catalogSearchInputRef.current?.select();
+        }, 50);
+      }
+    } else if (e.key === 'Escape') {
+      setShowCustomerSearch(false);
     }
   };
 
-  // Flow Step 3: When clicking a product, activate Per-Product Staging Workstation
-  const handleSelectProductForStaging = async (product) => {
-    // 1. Filter warehouses that have available stock for this product
-    const whsWithStock = warehouses.filter((wh) => getProductStockInWarehouse(product.id, wh.id) > 0);
+  // Product Search Keyboard Navigation
+  const handleCatalogSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setProductHighlightedIndex((prev) => {
+        const nextIdx = Math.min(filteredProducts.length - 1, prev + 1);
+        const itemEl = catalogListRef.current?.children[nextIdx];
+        itemEl?.scrollIntoView({ block: 'nearest' });
+        return nextIdx;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setProductHighlightedIndex((prev) => {
+        const nextIdx = Math.max(0, prev - 1);
+        const itemEl = catalogListRef.current?.children[nextIdx];
+        itemEl?.scrollIntoView({ block: 'nearest' });
+        return nextIdx;
+      });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const prodToSelect = filteredProducts[productHighlightedIndex] || filteredProducts[0];
+      if (prodToSelect) {
+        const totalStock = getProductTotalStock(prodToSelect.id);
+        if (totalStock <= 0) {
+          addToast(`Cannot select ${prodToSelect.name}: Out of Stock`, 'warning');
+          return;
+        }
+        handleSelectProductForStaging(prodToSelect);
+      }
+    }
+  };
 
-    // 2. If product has warehouses with stock, use those; otherwise fallback to assigned warehouse or first warehouse
+  // Handle Product Selection for Staging Workstation (Auto-defaults warehouse and auto-focuses Qty)
+  const handleSelectProductForStaging = async (product) => {
+    const whsWithStock = warehouses.filter((wh) => (!cart.length || String(wh.id)===String(cart[0].warehouseId)) && getProductStockInWarehouse(product.id, wh.id) > 0);
+
     const availableWhs = whsWithStock.length > 0
       ? whsWithStock
       : (product.warehouseId
@@ -391,46 +516,18 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       warehouseName: autoWarehouse ? autoWarehouse.name : 'Main Warehouse',
       realQuantity: Math.max(0, realQty),
       quotaInfo: quotaInfo,
-      salesPrice: price, // Non-editable, locked from GRN/Inventory
+      salesPrice: price,
       salesQty: qty,
       discountRate: 0,
       discountAmount: 0,
       subtotal: price * qty,
     });
 
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const handleStagedWarehouseChange = async (whId) => {
-    if (!stagedItem) return;
-    const wh = (stagedItem.availableWarehouses || warehouses).find((w) => w.id === Number(whId)) || warehouses.find((w) => w.id === Number(whId));
-    if (!wh) return;
-
-    const realStock = getProductStockInWarehouse(stagedItem.product.id, wh.id);
-    let quotaInfo = stagedItem.quotaInfo;
-    try {
-      if (user?.id) {
-        const qRes = await staffQuotaApi.check({
-          productId: stagedItem.product.id,
-          userId: user.id,
-          warehouseId: wh.id,
-          requestedQuantity: stagedItem.salesQty || 1,
-        });
-        quotaInfo = qRes.data?.data || qRes.data || null;
-      }
-    } catch (e) {
-      console.error('Failed to recheck staff quota:', e);
-    }
-
-    setStagedItem((prev) => ({
-      ...prev,
-      warehouseId: wh.id,
-      warehouseCode: wh.code,
-      warehouseName: wh.name,
-      realQuantity: realStock,
-      quotaInfo: quotaInfo,
-    }));
+    // Auto-focus Quantity input so user can type qty and hit Enter immediately
+    setTimeout(() => {
+      qtyInputRef.current?.focus();
+      qtyInputRef.current?.select();
+    }, 50);
   };
 
   const handleStagedDiscountRateChange = (rateVal) => {
@@ -486,292 +583,161 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
     }));
   };
 
-  const handleAddStagedToTable = () => {
-    if (!stagedItem) return;
-
-    if (stagedItem.salesQty <= 0) {
-      addToast('Please enter a valid quantity greater than 0', 'error');
-      return;
-    }
-
-    if (stagedItem.realQuantity <= 0) {
-      addToast(`Cannot add product: zero stock available in ${stagedItem.warehouseCode}`, 'error');
-      return;
-    }
-
-    // Inventory allocation check
-    if (stagedItem.quotaInfo?.quotaRestricted && stagedItem.quotaInfo?.remainingQuantity !== undefined) {
-      const rem = Number(stagedItem.quotaInfo.remainingQuantity);
-      if (rem <= 0) {
-        addToast(`Inventory Allocation Limit Reached: You have sold all ${stagedItem.quotaInfo.allocatedQuantity} allocated items for ${stagedItem.product.name}. Cannot add.`, 'error');
-        return;
-      }
-      if (stagedItem.salesQty > rem) {
-        addToast(`Exceeds your inventory allocation (${rem} items left). Please enter a lower quantity.`, 'error');
-        return;
-      }
-    }
-
-    if (stagedItem.salesQty > stagedItem.realQuantity) {
-      addToast(
-        `Quantity (${stagedItem.salesQty}) cannot exceed available stock (${stagedItem.realQuantity}) in ${stagedItem.warehouseCode}`,
-        'error'
-      );
-      return;
-    }
-
-    setCart((prev) => {
-      const existingIdx = prev.findIndex(
-        (item) => item.productId === stagedItem.product.id && item.warehouseId === stagedItem.warehouseId
-      );
-
-      if (existingIdx !== -1) {
-        const existing = prev[existingIdx];
-        let maxLimit = stagedItem.realQuantity;
-        if (stagedItem.quotaInfo?.quotaRestricted) {
-          const rem = Number(stagedItem.quotaInfo.remainingQuantity ?? 999999);
-          maxLimit = Math.min(maxLimit, rem);
-        }
-        if (existing.quantity + stagedItem.salesQty > maxLimit) {
-          addToast(
-            `Cannot add: total quantity (${existing.quantity + stagedItem.salesQty}) exceeds your inventory allocation of ${maxLimit}`,
-            'error'
-          );
-          return prev;
-        }
-        const newQty = Math.min(maxLimit, existing.quantity + stagedItem.salesQty);
-        const gross = newQty * existing.unitPrice;
-        const newDiscAmt = existing.discountRate > 0
-          ? (gross * existing.discountRate) / 100
-          : existing.discountAmount + stagedItem.discountAmount;
-        const newTotal = Math.max(0, gross - newDiscAmt);
-
-        const updated = [...prev];
-        updated[existingIdx] = {
-          ...existing,
-          quantity: newQty,
-          discountAmount: newDiscAmt,
-          total: newTotal,
-          quotaInfo: stagedItem.quotaInfo || existing.quotaInfo,
-        };
-        return updated;
-      }
-
-      const newLineItem = {
-        id: `${stagedItem.product.id}_${stagedItem.warehouseId}_${Date.now()}`,
-        productId: stagedItem.product.id,
-        sku: stagedItem.product.sku,
-        name: stagedItem.product.name,
-        unitOfMeasure: stagedItem.product.unitOfMeasure,
-        warehouseId: stagedItem.warehouseId,
-        warehouseCode: stagedItem.warehouseCode,
-        warehouseName: stagedItem.warehouseName,
-        unitPrice: stagedItem.salesPrice,
-        quantity: stagedItem.salesQty,
-        discountRate: stagedItem.discountRate,
-        discountAmount: stagedItem.discountAmount,
-        total: stagedItem.subtotal,
-        availableQty: stagedItem.realQuantity,
-        quotaInfo: stagedItem.quotaInfo,
-      };
-
-      return [...prev, newLineItem];
-    });
-
-    addToast(`Added ${stagedItem.product.name} to sales table`, 'success');
-    setStagedItem(null);
-    searchInputRef.current?.focus();
-  };
-
-  const updateTableItemQty = (lineId, delta) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.id === lineId) {
-          let maxAvail = item.availableQty || 999999;
-          if (item.quotaInfo?.quotaRestricted) {
-            const rem = Number(item.quotaInfo.remainingQuantity ?? 999999);
-            maxAvail = Math.min(maxAvail, rem);
-          }
-          const candidate = item.quantity + delta;
-          if (candidate > maxAvail) {
-            addToast(
-              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Your Inventory Allocation)' : ' (Warehouse Stock)'}`,
-              'warning'
-            );
-            return item;
-          }
-          const newQty = Math.max(1, candidate);
-          const gross = newQty * item.unitPrice;
-          const disc = item.discountRate > 0 ? (gross * item.discountRate) / 100 : item.discountAmount;
-          return {
-            ...item,
-            quantity: newQty,
-            total: Math.max(0, gross - disc),
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  const setTableItemQtyDirect = (lineId, val) => {
-    let parsed = parseFloat(val);
-    if (isNaN(parsed) || parsed < 1) parsed = 1;
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.id === lineId) {
-          let maxAvail = item.availableQty || 999999;
-          if (item.quotaInfo?.quotaRestricted) {
-            const rem = Number(item.quotaInfo.remainingQuantity ?? 999999);
-            maxAvail = Math.min(maxAvail, rem);
-          }
-          const finalQty = Math.min(maxAvail, parsed);
-          if (parsed > maxAvail) {
-            addToast(
-              `Quantity cannot exceed limit of ${maxAvail}${item.quotaInfo?.quotaRestricted ? ' (Your Inventory Allocation)' : ' (Warehouse Stock)'}`,
-              'warning'
-            );
-          }
-          const gross = finalQty * item.unitPrice;
-          const disc = item.discountRate > 0 ? (gross * item.discountRate) / 100 : item.discountAmount;
-          return {
-            ...item,
-            quantity: finalQty,
-            total: Math.max(0, gross - disc),
-          };
-        }
-        return item;
-      })
-    );
+  const handleAddStagedToTable = async () => {
+    if(!stagedItem || savingBillRef.current)return;
+    const error=numberError(stagedItem.salesQty,'Quantity',{positive:true,decimals:2});if(error){addToast(error,'error');return;}
+    const available=getProductStockInWarehouse(stagedItem.product.id,stagedItem.warehouseId);
+    if(Number(stagedItem.salesQty)>available){addToast(`Only ${available} units are available. Refresh and lower the quantity.`,'error');return;}
+    if(cart.length && String(cart[0].warehouseId)!==String(stagedItem.warehouseId)){addToast('Select the bill’s warehouse, or start a separate bill for this warehouse.','error');return;}
+    const existing=cart.find(line=>String(line.productId)===String(stagedItem.product.id));
+    const quantity=Number(stagedItem.salesQty)+Number(existing?.quantity || 0);
+    if(stagedItem.quotaInfo?.quotaRestricted && quantity>Number(stagedItem.quotaInfo.remainingQuantity)){addToast('The quantity exceeds your remaining allocation.','error');return;}
+    const item=existing?{...existing,quantity,discountRate:0,discountAmount:existing.discountAmount+stagedItem.discountAmount,total:Math.max(0,quantity*existing.unitPrice-existing.discountAmount-stagedItem.discountAmount)}:
+      {id:`${stagedItem.product.id}_${stagedItem.warehouseId}`,productId:stagedItem.product.id,sku:stagedItem.product.sku,name:stagedItem.product.name,unitOfMeasure:stagedItem.product.unitOfMeasure,warehouseId:stagedItem.warehouseId,warehouseCode:stagedItem.warehouseCode,warehouseName:stagedItem.warehouseName,unitPrice:stagedItem.salesPrice,quantity,discountRate:stagedItem.discountRate,discountAmount:stagedItem.discountAmount,total:stagedItem.subtotal,availableQty:stagedItem.realQuantity,quotaInfo:stagedItem.quotaInfo};
+    const next=existing?cart.map(line=>line.id===existing.id?item:line):[...cart,item];
+    if(await commitCart(next)){setStagedItem(null);setCatalogSearch('');catalogSearchInputRef.current?.focus();}
   };
 
   const removeFromCart = (lineId) => {
-    setCart((prev) => prev.filter((item) => item.id !== lineId));
+    commitCart(cart.filter(item=>item.id!==lineId));
   };
 
-  const discountVal = Math.min(subtotal, Number(discountAmount) || 0);
-  const netTotal = Math.max(0, subtotal - discountVal);
-
-  const uniqueWarehouseIds = [...new Set(cart.map((i) => i.warehouseId))];
-  const warehouseBreakdown = uniqueWarehouseIds.map((whId) => {
-    const items = cart.filter((i) => i.warehouseId === whId);
-    const wh = warehouses.find((w) => w.id === whId) || {
-      id: whId,
-      code: items[0]?.warehouseCode || 'WH',
-      name: items[0]?.warehouseName || 'Warehouse',
-    };
-    const whSubtotal = items.reduce((s, it) => s + it.total, 0);
-    return { warehouse: wh, items, subtotal: whSubtotal };
-  });
-
-  // Hold Bill Only (Single Action Button)
-  const handleHoldCart = async () => {
-    if (isHoldingCart) return;
-    if (cart.length === 0) {
-      addToast('Cart is empty. Add products first.', 'error');
-      return;
-    }
-    setIsHoldingCart(true);
-    try {
-      const headerWhId = cart[0]?.warehouseId || warehouses[0]?.id;
-      const payload = {
-        warehouseId: headerWhId,
-        customerId: selectedCustomerId,
-        discountAmount: discountVal,
-        taxRate: 0,
-        hold: true,
-        items: cart.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-          discountAmount: i.discountAmount,
-        })),
-      };
-
-      const res = await salesApi.create(payload);
-      const heldInvoice = res.data?.data || res.data;
-      addToast(`Hold Bill ${heldInvoice?.invoiceNumber || ''} saved successfully!`, 'success');
-
-      if (monthlyRangeProgress?.willAchieveNewRange) {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-        addToast(
-          `🎉 Range Milestone! ${monthlyRangeProgress.customerName} will achieve ${monthlyRangeProgress.projectedRangeName}!`,
-          'success'
-        );
-      }
-
-      setCart([]);
-      await loadHeldInvoices();
-      loadStaffPerformance();
-    } catch (err) {
-      if (err.isUnknownStatus) {
-        addToast("We couldn't confirm whether the invoice was saved. Please check the invoice list before trying again.", 'warning');
-      } else {
-        addToast('Unable to save the invoice. Please try again.', 'error');
-      }
-    } finally {
-      setIsHoldingCart(false);
-    }
+  // Small Edit Popup Handlers for added product table
+  const handleOpenEditCartItem = (item) => {
+    setEditingCartItem({
+      ...item,
+      availableQty:Number(item.quantity)+getProductStockInWarehouse(item.productId,item.warehouseId),
+      editQty: item.quantity,
+      editDiscRate: item.discountRate || 0,
+      editDiscAmt: item.discountAmount || 0,
+      editTotal: item.total || 0,
+    });
   };
 
-  const handleResumeInvoice = async (heldInv) => {
-    setSelectedCustomerId(heldInv.customerId);
-    setDiscountAmount(heldInv.discountAmount || 0);
+  const handleEditCartItemQtyChange = (val) => {
+    if (!editingCartItem) return;
+    let maxStock = editingCartItem.availableQty || 999999;
+    if (editingCartItem.quotaInfo?.quotaRestricted) {
+      const rem = Number(editingCartItem.quotaInfo.remainingQuantity ?? 999999);
+      maxStock = Math.min(maxStock, rem);
+    }
+    const newQty = val === '' ? '' : Math.min(maxStock, Math.max(0.01, parseFloat(val) || 0.01));
+    const gross = newQty * editingCartItem.unitPrice;
+    const disc = editingCartItem.editDiscRate > 0
+      ? parseFloat(((gross * editingCartItem.editDiscRate) / 100).toFixed(2))
+      : Math.min(gross, editingCartItem.editDiscAmt);
+    const total = Math.max(0, gross - disc);
 
-    const invWh = warehouses.find((w) => w.id === heldInv.warehouseId) || {
-      id: heldInv.warehouseId,
-      code: heldInv.warehouseCode || 'WH-01',
-      name: heldInv.warehouseName || 'Warehouse',
-    };
-
-    const reconstructedCart = (heldInv.items || []).map((i, idx) => ({
-      id: `${i.productId}_${invWh.id}_${Date.now()}_${idx}`,
-      productId: i.productId,
-      sku: i.productSku,
-      name: i.productName,
-      unitOfMeasure: i.unitOfMeasure,
-      warehouseId: invWh.id,
-      warehouseCode: invWh.code,
-      warehouseName: invWh.name,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      discountRate: i.discountRate || 0,
-      discountAmount: i.discountAmount || 0,
-      total: i.totalPrice,
-      availableQty: getProductStockInWarehouse(i.productId, invWh.id) || 99,
+    setEditingCartItem((prev) => ({
+      ...prev,
+      editQty: newQty,
+      editDiscAmt: disc,
+      editTotal: total,
     }));
-
-    setCart(reconstructedCart);
-    try {
-      await salesApi.cancelHeld(heldInv.id);
-    } catch (e) {
-      console.error('Failed to cancel held bill on resume:', e);
-    }
-    await loadHeldInvoices();
-    setShowHeldModal(false);
-    addToast(`Resumed held bill ${heldInv.invoiceNumber}`, 'success');
   };
 
+  const handleEditCartItemDiscRateChange = (val) => {
+    if (!editingCartItem) return;
+    const rate = Math.max(0, Math.min(100, parseFloat(val) || 0));
+    const gross = editingCartItem.editQty * editingCartItem.unitPrice;
+    const discAmt = parseFloat(((gross * rate) / 100).toFixed(2));
+    const total = Math.max(0, gross - discAmt);
+
+    setEditingCartItem((prev) => ({
+      ...prev,
+      editDiscRate: rate,
+      editDiscAmt: discAmt,
+      editTotal: total,
+    }));
+  };
+
+  const handleEditCartItemDiscAmtChange = (val) => {
+    if (!editingCartItem) return;
+    const gross = editingCartItem.editQty * editingCartItem.unitPrice;
+    const discAmt = Math.max(0, Math.min(gross, parseFloat(val) || 0));
+    const rate = gross > 0 ? parseFloat(((discAmt / gross) * 100).toFixed(2)) : 0;
+    const total = Math.max(0, gross - discAmt);
+
+    setEditingCartItem((prev) => ({
+      ...prev,
+      editDiscRate: rate,
+      editDiscAmt: discAmt,
+      editTotal: total,
+    }));
+  };
+
+  const handleSaveEditCartItem = async () => {
+    if(!editingCartItem)return;
+    const error=numberError(editingCartItem.editQty,'Quantity',{positive:true,decimals:2});if(error){addToast(error,'error');return;}
+    const next=cart.map(item=>item.id===editingCartItem.id?{...item,quantity:editingCartItem.editQty,discountRate:editingCartItem.editDiscRate,discountAmount:editingCartItem.editDiscAmt,total:editingCartItem.editTotal}:item);
+    if(await commitCart(next))setEditingCartItem(null);
+  };
+  const clearCart=async()=>{if(cart.length && window.confirm('Clear this bill and release its reserved stock?')){if(await commitCart([]))setStagedItem(null);}};
+
+  // Hold Bill Handler (Primary Action in Flow)
+  const handleHoldCart=async()=>{
+    if(!cart.length || savingBillRef.current)return;
+    setIsHoldingCart(true);
+    try{if(await commitCart(cart)){resetWorkingBill();await loadHeldInvoices();catalogSearchInputRef.current?.focus();}}
+    finally{setIsHoldingCart(false);}
+  };
+
+  // Resume Held Invoice
+  const handleResumeInvoice = async (heldInv) => {
+    if(savingBillRef.current)return;
+    if(cart.length && String(activeBillRef.current)!==String(heldInv.id)){addToast('Hold or clear the current bill before resuming another.','error');return;}
+    savingBillRef.current=true;setSavingBill(true);
+    try {
+      const fetched=await salesApi.getById(heldInv.id), fresh=fetched.data?.data || fetched.data;
+      if(fresh?.status!=='HELD')throw new Error('This bill is no longer held.');
+      const response=await salesApi.savePosDraft(fresh.id,{warehouseId:fresh.warehouseId,customerId:fresh.customerId,hold:true,reserveStock:true,expectedVersion:fresh.recordVersion,discountAmount:Number(fresh.discountAmount || 0),taxRate:Number(fresh.taxRate || 0),items:fresh.items.map(line=>({productId:line.productId,quantity:Number(line.quantity),unitPrice:Number(line.unitPrice),discountRate:Number(line.discountRate || 0),discountAmount:Number(line.discountAmount || 0)}))});
+      const invoice=response.data?.data || response.data;
+      const lines=invoice.items.map((line,index)=>({id:`${line.productId}_${invoice.warehouseId}_${index}`,productId:line.productId,sku:line.productSku,name:line.productName,unitOfMeasure:line.unitOfMeasure,warehouseId:invoice.warehouseId,warehouseCode:invoice.warehouseCode,warehouseName:invoice.warehouseName,quantity:Number(line.quantity),unitPrice:Number(line.unitPrice),discountRate:Number(line.discountRate || 0),discountAmount:Number(line.discountAmount || 0),total:Number(line.totalPrice)}));
+      setProgressVersion(previous=>previous+1);activeBillRef.current=invoice.id;billVersionRef.current=invoice.recordVersion;savedHeaderRef.current={customerId:invoice.customerId ?? selectedCustomerId,discountAmount:Number(invoice.discountAmount || 0)};setActiveBillId(invoice.id);setCart(lines);setSelectedCustomerId(invoice.customerId);setDiscountAmount(Number(invoice.discountAmount || 0));
+      await refreshStock().catch(()=>{});await loadHeldInvoices();setShowHeldModal(false);catalogSearchInputRef.current?.focus();
+    }catch(error){addToast(error.response?.data?.message || error.message || 'Unable to resume bill.','error');}
+    finally{savingBillRef.current=false;setSavingBill(false);}
+  };
+
+  const handleOpenMonthlyRangeModal = () => setShowMonthlyRangesModal(true);
+
+  // Keyboard Shortcuts Handler
   useEffect(() => {
     const handlePosKeys = (e) => {
       if (!workspaceActive) return;
+
+      // F2: Focus catalog search
       if (e.key === 'F2') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        catalogSearchInputRef.current?.focus();
+        catalogSearchInputRef.current?.select();
         return;
       }
 
-      // F5 or F12 triggers Hold Bill
-      if (e.key === 'F5' || e.key === 'F12' || (e.altKey && (e.key === 'h' || e.key === 'H'))) {
-        if (cart.length > 0 && !activeCircleModal && !showHeldModal) {
+      // F1: Focus customer search
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setShowCustomerSearch(true);
+        customerSearchInputRef.current?.focus();
+        return;
+      }
+
+      // F12 or F5: Hold Bill
+      // F12, F5 or F9: Hold Bill (All bills are saved to held bills table)
+      if (e.key === 'F12' || e.key === 'F5' || e.key === 'F9') {
+        if (cart.length > 0 && !showHeldModal && !activeCircleModal) {
           e.preventDefault();
           handleHoldCart();
         }
         return;
       }
 
+      // Escape: Close active modals or unstage or exit POS
       if (e.key === 'Escape') {
+        if (editingCartItem) {
+          setEditingCartItem(null);
+          return;
+        }
         if (selectedInvoiceDetail) {
           setSelectedInvoiceDetail(null);
           return;
@@ -780,20 +746,25 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
           setActiveCircleModal(null);
           return;
         }
-        if (stagedItem) {
-          setStagedItem(null);
+        if (showHeldModal) {
+          setShowHeldModal(false);
           return;
         }
-        if (searchResults.length > 0) {
-          setSearchResults([]);
+        if (showMonthlyRangesModal) {
+          setShowMonthlyRangesModal(false);
+          return;
+        }
+        if (showTargetRangesModal) {
+          setShowTargetRangesModal(false);
+          return;
+        }
+        if (stagedItem) {
+          setStagedItem(null);
+          catalogSearchInputRef.current?.focus();
           return;
         }
         if (showCustomerSearch) {
           setShowCustomerSearch(false);
-          return;
-        }
-        if (showHeldModal) {
-          setShowHeldModal(false);
           return;
         }
         if (onExitPos) {
@@ -805,1265 +776,1021 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
 
     window.addEventListener('keydown', handlePosKeys);
     return () => window.removeEventListener('keydown', handlePosKeys);
-  }, [workspaceActive, cart, stagedItem, searchResults, showCustomerSearch, activeCircleModal, showHeldModal, selectedInvoiceDetail, onExitPos]);
+  }, [
+    workspaceActive,
+    cart,
+    editingCartItem,
+    stagedItem,
+    showCustomerSearch,
+    activeCircleModal,
+    showHeldModal,
+    selectedInvoiceDetail,
+    showMonthlyRangesModal,
+    showTargetRangesModal,
+    selectedCustomerId,discountVal,savingBill,checkingBill,billCheckFailed,
+    onExitPos,
+  ]);
 
   return (
-    <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '100vh', boxSizing: 'border-box' }}>
+    <div className="pos-view purchasing-no-shadows"
+      style={{
+        height: '100vh',
+        maxHeight: '100vh',
+        width: '100%',
+        maxWidth: '100vw',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#f1f5f9',
+        boxSizing: 'border-box',
+        position: 'relative',
+      }}
+    >
+      {/* Remove number input spinner arrows across textboxes */}
+      <style>{`
+        input.no-spin-arrows::-webkit-inner-spin-button,
+        input.no-spin-arrows::-webkit-outer-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
+        }
+        input.no-spin-arrows {
+          -moz-appearance: textfield !important;
+          appearance: textfield !important;
+        }
+      `}</style>
 
       {/* ─────────────────────────────────────────────────────────────
-          TOP BAR: "POS" Brand + 3 Motivation Circles in Right Above Corner + Exit
+          TOP BAR: CUSTOMER SELECTOR + PERFECTLY ALIGNED RANGE/TARGET CARD + ACTIONS
+          (No labels hanging out, single 64px line)
          ───────────────────────────────────────────────────────────── */}
-      <div
-        className="glass-card"
+      <header
         style={{
-          padding: '8px 16px',
+          height: '64px',
+          flexShrink: 0,
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '6px 14px',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          background: '#ffffff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          justifyContent: 'space-between',
+          gap: '10px',
+          zIndex: 40,
         }}
       >
-        {/* Left Side: Clean "POS" Heading Title Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ShoppingCart size={17} />
-          </div>
-          <span style={{ fontWeight: 900, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', letterSpacing: '0.04em' }}>
-            POS
-          </span>
-        </div>
-
-        {/* Right Above Corner: 3 Staff Motivation Circles + ONLY ONE Exit Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-
-          {/* Motivation Circles Group - Minimalist & Displays Names */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-            {/* CIRCLE 1: Staff Name / My Total */}
-            <div
-              onClick={() => setActiveCircleModal('my')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '4px 12px 4px 5px',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease',
-              }}
-              title={`Click to see billing details for ${user?.fullName || user?.username || 'You'}`}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.backgroundColor = '#f8fafc';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.backgroundColor = '#ffffff';
-              }}
-            >
-              <div
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: '#eff6ff',
-                  color: '#2563eb',
-                  border: '1px solid #dbeafe',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 'var(--erp-text-caption)',
-                  flexShrink: 0,
-                }}
-              >
-                {((user?.fullName || user?.username || 'M').charAt(0)).toUpperCase()}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#475569' }}>
-                  {user?.fullName || user?.username || 'Cashier'}
-                </span>
-                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
-                  {myBillsCount} bills • Rs. {myTotalAmount >= 1000 ? `${(myTotalAmount / 1000).toFixed(1)}k` : myTotalAmount.toFixed(0)}
-                </span>
-              </div>
-            </div>
-
-            {/* CIRCLE 2: Max / Top Record Staff */}
-            <div
-              onClick={() => setActiveCircleModal('max')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '4px 12px 4px 5px',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease',
-              }}
-              title={`Click to view top benchmark by ${topCashierName}`}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.backgroundColor = '#f8fafc';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.backgroundColor = '#ffffff';
-              }}
-            >
-              <div
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fef3c7',
-                  color: '#d97706',
-                  border: '1px solid #fde68a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 'var(--erp-text-caption)',
-                  flexShrink: 0,
-                }}
-              >
-                <Trophy size={13} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#92400e' }}>
-                  {topCashierName} (Max)
-                </span>
-                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
-                  {maxBillsCount} bills • Rs. {maxSalesAmount >= 1000 ? `${(maxSalesAmount / 1000).toFixed(1)}k` : maxSalesAmount.toFixed(0)}
-                </span>
-              </div>
-            </div>
-
-            {/* CIRCLE 3: All Staff / Team */}
-            <div
-              onClick={() => {
-                setSelectedStaffForBills(null);
-                setActiveCircleModal('all');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '4px 12px 4px 5px',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '24px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease',
-              }}
-              title="Click to see all staff members and their bills"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#cbd5e1';
-                e.currentTarget.style.backgroundColor = '#f8fafc';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.backgroundColor = '#ffffff';
-              }}
-            >
-              <div
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: '#f3e8ff',
-                  color: '#7c3aed',
-                  border: '1px solid #e9d5ff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 'var(--erp-text-caption)',
-                  flexShrink: 0,
-                }}
-              >
-                <Users size={13} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#5b21b6' }}>
-                  All Staff ({staffCount})
-                </span>
-                <span style={{ fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#0f172a' }}>
-                  {totalTeamBills} bills • Rs. {totalTeamAmount >= 1000 ? `${(totalTeamAmount / 1000).toFixed(1)}k` : totalTeamAmount.toFixed(0)}
-                </span>
-              </div>
-            </div>
-
-          </div>
-
-          <div style={{ height: '22px', width: '1px', background: '#e2e8f0' }} />
-
-          {/* ONLY ONE BUTTON: Exit */}
-          {onExitPos && (
-            <button
-              type="button"
-              className="btn btn-glass btn-sm erp-button"
-              onClick={onExitPos}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                gap: '5px',
-                color: '#dc2626',
-                borderColor: '#fca5a5',
-              }}
-              title="Exit POS Mode (Esc)"
-            >
-              <LogOut size={13} /> Exit
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 1: CUSTOMER SELECTION & FINANCIAL DETAILS (BELOW TOP BAR)
-         ───────────────────────────────────────────────────────────── */}
-      <div
-        className="glass-card"
-        style={{
-          padding: '10px 16px',
-          background: '#ffffff',
-          borderRadius: '10px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        {/* Row 1: Customer Selector Input */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 320px', position: 'relative' }}>
-            <div style={{ position: 'relative', flex: 1, maxWidth: '380px' }}>
-              <User size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#2563eb' }} />
-              <input
-                type="text"
-                className="input-glass erp-field"
-                placeholder="Search customer by name, code or phone..."
-                value={
-                  showCustomerSearch
-                    ? customerSearchQuery
-                    : selectedCustomer
-                    ? `${selectedCustomer.name} (${selectedCustomer.customerCode || selectedCustomer.code})`
-                    : ''
-                }
-                onFocus={() => {
-                  setShowCustomerSearch(true);
-                  setCustomerSearchQuery('');
-                }}
-                onChange={(e) => {
-                  setShowCustomerSearch(true);
-                  setCustomerSearchQuery(e.target.value);
-                }}
-                style={{
-                  paddingLeft: '32px',
-                  fontWeight: 600,
-                  width: '100%',
-                  height: '34px',
-                }}
-              />
-            </div>
-
-            {showCustomerSearch ? (
-              <button
-                type="button"
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setShowCustomerSearch(false)}
-                style={{ height: '34px', padding: '0 8px' }}
-                title="Cancel search"
-              >
-                <X size={13} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => {
-                  setShowCustomerSearch(true);
-                  setCustomerSearchQuery('');
-                }}
-                title="Change customer"
-                style={{ height: '34px', padding: '0 10px', gap: '4px' }}
-              >
-                <RefreshCw size={11} /> Change
-              </button>
-            )}
-
-            {/* Customer Search Dropdown */}
-            {showCustomerSearch && (
-              <div
-                className="glass-card"
-                style={{
-                  position: 'absolute',
-                  top: '40px',
-                  left: 0,
-                  width: '380px',
-                  maxWidth: '100%',
-                  zIndex: 350,
-                  maxHeight: '260px',
-                  overflowY: 'auto',
-                  background: 'rgba(255, 255, 255, 0.99)',
-                  boxShadow: '0 16px 36px rgba(0,0,0,0.18)',
-                  padding: '4px 0',
-                  borderRadius: '8px',
-                }}
-              >
-                {filteredCustomers.length === 0 ? (
-                  <div style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
-                    No matching customer found
-                  </div>
-                ) : (
-                  filteredCustomers.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => {
-                        setSelectedCustomerId(c.id);
-                        setShowCustomerSearch(false);
-                        setCustomerSearchQuery('');
-                        addToast(`Customer: ${c.name}`, 'info');
-                      }}
-                      style={{
-                        padding: '8px 14px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid rgba(226, 232, 240, 0.6)',
-                        background: c.id === selectedCustomerId ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                        fontSize: 'var(--erp-text-body)',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = c.id === selectedCustomerId ? 'rgba(37, 99, 235, 0.08)' : 'transparent')
-                      }
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name}</div>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                          {c.customerCode || c.code} • {c.phone || '-'}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700, color: Number(c.currentBalance) > 0 ? '#ef4444' : '#10b981', fontSize: 'var(--erp-text-small)' }}>
-                          Rs. {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {selectedCustomer && (
-            <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', display: 'flex', gap: '12px' }}>
-              <span>Phone: <strong style={{ color: '#334155' }}>{selectedCustomer.phone || '-'}</strong></span>
-              {selectedCustomer.city && <span>City: <strong style={{ color: '#334155' }}>{selectedCustomer.city}</strong></span>}
-            </div>
-          )}
-        </div>
-
-        {/* Row 2 (BELOW): Outstanding Amount, Credit Limit, Available Credit & Status */}
-        {selectedCustomer && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              flexWrap: 'wrap',
-              padding: '6px 12px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
-              <span style={{ color: '#64748b', fontWeight: 600 }}>Outstanding Amount:</span>
-              <strong style={{ color: custOutstanding > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
-                Rs. {custOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </strong>
-            </div>
-
-            <span style={{ color: '#cbd5e1' }}>•</span>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
-              <span style={{ color: '#64748b', fontWeight: 600 }}>Credit Limit:</span>
-              <strong style={{ color: '#334155', fontWeight: 700 }}>
-                Rs. {custCreditLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </strong>
-            </div>
-
-            <span style={{ color: '#cbd5e1' }}>•</span>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: 'var(--erp-text-small)' }}>
-              <span style={{ color: '#64748b', fontWeight: 600 }}>Available Credit:</span>
-              <strong style={{ color: '#2563eb', fontWeight: 700 }}>
-                Rs. {custAvailableCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </strong>
-            </div>
-
-            <span style={{ color: '#cbd5e1' }}>•</span>
-
-            <span
-              style={{
-                fontSize: 'var(--erp-text-badge)',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                fontWeight: 700,
-                color: creditStatusBadge.color,
-                background: creditStatusBadge.bg,
-              }}
-            >
-              {creditStatusBadge.text}
-            </span>
-          </div>
-        )}
-
-        {/* Row 3 (BELOW): Customer Monthly Purchase Range & Targets Milestone Panel in POS (Screen B) */}
-        {selectedCustomer && monthlyRangeProgress && (() => {
-          const m = monthlyRangeProgress;
-          const qualifyingPurchases = Number(m.monthlyPurchases || 0);
-          const nextThreshold = Number(m.nextRangeThreshold || 0);
-          const remaining = Number(m.remainingAmount || 0);
-          const progressPct = Number(m.progressPercentage || 0);
-          const isHighest = m.isHighestRange;
-
-          // Cart live projection metrics
-          const cartAmt = Number(m.currentBillAmount || subtotal || 0);
-          const projectedPurchases = Number(m.projectedMonthlyPurchases || (qualifyingPurchases + cartAmt));
-          const willPromote = Boolean(m.willAchieveNewRange);
-          const projectedRangeName = m.projectedRangeName || m.currentRangeName;
-          const projectedRemaining = Number(m.projectedRemainingAmount ?? remaining);
-          const projectedProgressPct = Number(m.projectedProgressPercentage ?? progressPct);
-
-          // Promotional target discount if active
-          const promoTarget = customerTargets.length > 0 ? customerTargets[0] : null;
-          const discPct = promoTarget ? Number(promoTarget.currentDiscountPercentage || 0) : 0;
-
-          return (
-            <div
-              style={{
-                marginTop: '6px',
-                padding: '12px 16px',
-                background: willPromote
-                  ? 'linear-gradient(135deg, #fef9c3 0%, #ecfeff 50%, #ffffff 100%)'
-                  : 'linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%)',
-                border: willPromote ? '1.5px solid #06b6d4' : '1px solid #bae6fd',
-                borderRadius: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '9px',
-                boxShadow: willPromote ? '0 4px 14px rgba(6, 182, 212, 0.15)' : '0 2px 6px rgba(2, 132, 199, 0.05)',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              {/* Header: Range Milestone Badge, Month, and View Ranges Button */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '8px',
-                      background: willPromote ? 'linear-gradient(135deg, #0891b2 0%, #0284c7 100%)' : '#0284c7',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                    }}
-                  >
-                    <Award size={16} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span
-                        style={{
-                          fontSize: 'var(--erp-text-small)',
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background: '#0284c7',
-                          color: '#ffffff',
-                        }}
-                      >
-                        {m.currentRangeName}
-                      </span>
-                      <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 700, color: '#0f172a' }}>
-                        {m.customerName}
-                      </span>
-                      {m.assignedStaffName && m.assignedStaffName !== 'Unassigned' && (
-                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b' }}>
-                          (Rep: {m.assignedStaffName})
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 'var(--erp-text-badge)', color: '#64748b', marginTop: '1px' }}>
-                      {m.monthLabel} qualifying net spend • Resets monthly on 1st
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button className="erp-button"
-                    type="button"
-                    onClick={handleOpenMonthlyRangeModal}
-                    style={{
-                      padding: '4px 9px',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      color: '#334155',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
-                    title="View all configured range tiers and thresholds"
-                  >
-                    <Layers size={13} /> View Ranges
-                  </button>
-
-                  {discPct > 0 && (
-                    <button className="erp-button"
-                      type="button"
-                      onClick={() => {
-                        const cartSubtotal = subtotal || 0;
-                        if (cartSubtotal <= 0) {
-                          addToast('Cart is empty. Add products to apply discount.', 'warning');
-                          return;
-                        }
-                        const discVal = parseFloat(((cartSubtotal * discPct) / 100).toFixed(2));
-                        setDiscountAmount(discVal);
-                        addToast(`🎯 Applied ${discPct}% Target Range Discount (-Rs. ${discVal.toLocaleString()})!`, 'success');
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                        border: 'none',
-                        color: '#ffffff',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      title="Click to apply promotional target discount to this bill"
-                    >
-                      <Zap size={12} /> Apply {discPct}% Target Discount
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Progress & Milestone Row */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#334155' }}>
-                  <span style={{ color: '#64748b', fontWeight: 600 }}>Monthly Purchases: </span>
-                  <strong style={{ fontWeight: 800, color: '#0f172a' }}>
-                    Rs. {qualifyingPurchases.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                  {!isHighest && (
-                    <>
-                      <span style={{ color: '#64748b' }}> / Rs. {nextThreshold.toLocaleString()}</span>{' '}
-                      <span style={{ fontWeight: 700, color: progressPct >= 100 ? '#16a34a' : '#0284c7' }}>
-                        ({progressPct}%)
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {!isHighest ? (
-                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#475569' }}>
-                    Remaining to <strong>{m.nextRangeName}</strong>:{' '}
-                    <strong style={{ color: '#dc2626' }}>
-                      Rs. {remaining.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </strong>
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 'var(--erp-text-caption)',
-                      fontWeight: 700,
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      background: '#ede9fe',
-                      color: '#701a75',
-                      border: '1px solid #d946ef',
-                    }}
-                  >
-                    🏆 Highest Customer Tier Achieved!
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Bar (Dual: Current vs Projected) */}
-              {!isHighest && (
-                <div
-                  style={{
-                    height: '7px',
-                    background: '#e2e8f0',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                    width: '100%',
-                    position: 'relative',
-                  }}
-                >
-                  {/* Projected portion if cart has items */}
-                  {cartAmt > 0 && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        height: '100%',
-                        width: `${Math.min(100, Math.max(0, projectedProgressPct))}%`,
-                        background: willPromote
-                          ? 'linear-gradient(90deg, #38bdf8 0%, #06b6d4 100%)'
-                          : 'linear-gradient(90deg, #93c5fd 0%, #60a5fa 100%)',
-                        borderRadius: '4px',
-                        transition: 'width 0.3s ease',
-                      }}
-                    />
-                  )}
-                  {/* Current settled purchases */}
-                  <div
-                    style={{
-                      position: 'relative',
-                      height: '100%',
-                      width: `${Math.min(100, Math.max(0, progressPct))}%`,
-                      background: progressPct >= 100 ? '#16a34a' : 'linear-gradient(90deg, #0284c7 0%, #1d4ed8 100%)',
-                      borderRadius: '4px',
-                      transition: 'width 0.3s ease',
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Live Cart Preview Projection (RT-08 & RT-19) */}
-              {cartAmt > 0 && !isHighest && (
-                <div
-                  style={{
-                    fontSize: 'var(--erp-text-caption)',
-                    color: willPromote ? '#0e7490' : '#0369a1',
-                    background: willPromote ? '#ecfeff' : '#f0f9ff',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    border: willPromote ? '1px solid #a5f3fc' : '1px solid #e0f2fe',
-                    flexWrap: 'wrap',
-                    gap: '4px',
-                  }}
-                >
-                  <span>
-                    {willPromote ? (
-                      <strong style={{ color: '#0891b2' }}>
-                        🎉 Congratulations! This bill (+Rs. {cartAmt.toLocaleString()}) will promote {m.customerName} to {projectedRangeName}!
-                      </strong>
-                    ) : (
-                      <span>
-                        Current bill adds <strong>+Rs. {cartAmt.toLocaleString()}</strong> → Projected month total:{' '}
-                        <strong>Rs. {projectedPurchases.toLocaleString()}</strong> (needs{' '}
-                        <strong>Rs. {projectedRemaining.toLocaleString()}</strong> more for {m.nextRangeName})
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ fontWeight: 800, color: willPromote ? '#0891b2' : '#0284c7' }}>
-                    {willPromote ? `✓ NEW TIER UNLOCKED` : `${projectedProgressPct}% PROJECTED`}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 2 & 3: PRODUCT SEARCH & PER-PRODUCT STAGING WORKSTATION
-         ───────────────────────────────────────────────────────────── */}
-      <div className="glass-card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* Product Search Bar */}
-        <div style={{ position: 'relative' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '13px', top: '10px', color: '#94a3b8' }} />
+        {/* Left: Customer Selection with Inline Financial Badges */}
+        <div className="pos-customer-tools" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '280px', flex: '0 0 auto', position: 'relative' }}>
+          <div style={{ position: 'relative', width: '260px' }}>
+            <User size={14} style={{ position: 'absolute', left: '10px', top: '9px', color: '#2563eb' }} />
             <input
-              ref={searchInputRef}
+              ref={customerSearchInputRef}
               type="text"
               className="input-glass erp-field"
-              style={{ paddingLeft: '38px', width: '100%', height: '36px' }}
-              placeholder="Search product code (SKU) or product name... (Press F2 to focus)"
-              value={searchQuery}
-              onChange={(e) => handleProductSearch(e.target.value)}
+              placeholder="Select Customer (F1)..."
+              value={
+                showCustomerSearch
+                  ? customerSearchQuery
+                  : selectedCustomer
+                  ? `${selectedCustomer.name}${selectedCustomer.address ? ` — ${selectedCustomer.address}` : ''}`
+                  : ''
+              }
+              onFocus={() => {
+                setShowCustomerSearch(true);
+                setCustomerSearchQuery('');
+              }}
+              onChange={(e) => {
+                setShowCustomerSearch(true);
+                setCustomerSearchQuery(e.target.value);
+              }}
+              onKeyDown={handleCustomerSearchKeyDown}
+              style={{
+                paddingLeft: '30px',
+                fontWeight: 600,
+                width: '100%',
+                height: '32px',
+                fontSize: '0.82rem',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#f8fafc',
+              }}
             />
           </div>
 
-          {/* Autocomplete Dropdown */}
-          {searchResults.length > 0 && (
+          {showCustomerSearch ? (
+            <button
+              type="button"
+              className="btn btn-glass btn-sm erp-button"
+              onClick={() => setShowCustomerSearch(false)}
+              style={{ height: '32px', padding: '0 8px' }}
+              title="Cancel search"
+            >
+              <X size={12} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-glass btn-sm erp-button"
+              onClick={() => {
+                setShowCustomerSearch(true);
+                setCustomerSearchQuery('');
+                customerSearchInputRef.current?.focus();
+              }}
+              title="Change Customer (F1)"
+              style={{ height: '32px', padding: '0 8px', gap: '4px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+            >
+              <RefreshCw size={11} /> Change
+            </button>
+          )}
+
+          {/* Customer Search Autocomplete Dropdown */}
+          {showCustomerSearch && (
             <div
-              className="glass-card"
               style={{
                 position: 'absolute',
-                top: '42px',
+                top: '38px',
                 left: 0,
-                right: 0,
-                zIndex: 300,
-                maxHeight: '260px',
+                width: '360px',
+                maxWidth: '92vw',
+                zIndex: 500,
+                maxHeight: '280px',
                 overflowY: 'auto',
-                background: 'rgba(255, 255, 255, 0.99)',
-                boxShadow: '0 18px 40px rgba(0,0,0,0.18)',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                boxShadow: 'none',
                 padding: '4px 0',
-                borderRadius: '8px',
+                borderRadius: '6px',
               }}
             >
-              {searchResults.map((p) => {
-                const totalStock = warehouses.reduce(
-                  (sum, wh) => sum + getProductStockInWarehouse(p.id, wh.id),
-                  0
-                );
+              {filteredCustomers.length === 0 ? (
+                <div style={{ padding: '12px 14px', textAlign: 'center', color: '#94a3b8', fontSize: '0.84rem' }}>
+                  No customer matching query
+                </div>
+              ) : (
+                filteredCustomers.slice(0,15).map((c, idx) => (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedCustomerId(c.id);
+                      setShowCustomerSearch(false);
+                      setCustomerSearchQuery('');
+
+                      setTimeout(() => {
+                        catalogSearchInputRef.current?.focus();
+                        catalogSearchInputRef.current?.select();
+                      }, 50);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid #f1f5f9',
+                      background: idx === customerHighlightedIndex ? '#dbeafe' : c.id === selectedCustomerId ? '#eff6ff' : 'transparent',
+                    }}
+                    onMouseEnter={() => setCustomerHighlightedIndex(idx)}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.84rem' }}>{c.name}</div><div className="pos-muted">Range: {customerRanges[c.id]?.currentRangeName || '—'}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                        {c.address ? `${c.address} ` : ''}{c.phone ? `• ${c.phone}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, color: Number(c.currentBalance) > 0 ? '#ef4444' : '#16a34a', fontSize: '0.8rem' }}>
+                        Rs. {Number(c.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Customer Financial Badges */}
+          {selectedCustomer && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem' }}>
+              <div
+                style={{
+                  padding: '2px 7px',
+                  borderRadius: '5px',
+                  background: custOutstanding > 0 ? '#fef2f2' : '#f0fdf4',
+                  border: `1px solid ${custOutstanding > 0 ? '#fca5a5' : '#86efac'}`,
+                  color: custOutstanding > 0 ? '#b91c1c' : '#15803d',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+                title="Outstanding Due"
+              >
+                Due: Rs. {custOutstanding.toLocaleString()}
+              </div>
+
+              <div
+                style={{
+                  padding: '2px 7px',
+                  borderRadius: '5px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  color: '#475569',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+                title="Credit Limit"
+              >
+                Limit: Rs. {custCreditLimit.toLocaleString()}
+              </div>
+
+
+            </div>
+          )}
+        </div>
+
+        <button type="button" className="pos-range-preview" onClick={handleOpenMonthlyRangeModal} title="View all ranges and campaign targets">
+          <div className="pos-range-heading"><span>Current range</span><strong>{monthlyRangeProgress?.currentRangeName || '—'}</strong><ChevronDown size={13}/></div>
+          {monthlyRangeProgress?.nextRange && !monthlyRangeProgress.highestRange?<><RangeMeter milestone={monthlyRangeProgress.nextRange} label="Next monthly range"/><small>{posMoney(monthlyRangeProgress.nextRange.remaining)} to {monthlyRangeProgress.nextRangeName}</small></>:<small>{loadingMonthlyRange?'Loading progress…':monthlyRangeProgress?'Highest range reached':'View ranges & targets'}</small>}
+        </button>
+
+        {/* Right: Held Bills Button + Clean Exit */}
+        <div className="pos-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {/* Held Bills Button (Contains held bills count) */}
+          <button
+            type="button"
+            className="btn btn-glass btn-sm erp-button"
+            onClick={() => setShowHeldModal(true)}
+            style={{
+              height: '32px',
+              padding: '0 12px',
+              gap: '6px',
+              color: heldInvoices.length > 0 ? '#d97706' : '#475569',
+              borderColor: heldInvoices.length > 0 ? '#fde68a' : '#cbd5e1',
+              backgroundColor: heldInvoices.length > 0 ? '#fffbeb' : '#ffffff',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+            }}
+            title="Inspect Held Bills"
+          >
+            <PauseCircle size={14} />
+            Held Bills ({heldInvoices.length})
+          </button>
+
+          <div style={{ height: '18px', width: '1px', background: '#e2e8f0' }} />
+
+          {/* Subtle Clean Exit Button */}
+          {onExitPos && (
+            <button
+              type="button"
+              className="btn btn-sm erp-button"
+              onClick={onExitPos}
+              style={{
+                height: '32px',
+                padding: '0 10px',
+                gap: '4px',
+                color: '#dc2626',
+                background: '#fff1f2',
+                border: '1px solid #fecdd3',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+              }}
+              title="Exit POS Mode (Esc)"
+            >
+              <LogOut size={12} /> Exit
+            </button>
+          )}
+        </div>
+      </header>
+      {checkingBill || billCheckFailed?<div className="pos-save-status" role="status">{checkingBill?'Restoring saved bill…':'Reload the saved bill before making further changes.'}{billCheckFailed?<button type="button" className="btn btn-secondary erp-button" onClick={()=>window.location.reload()}>Reload bill</button>:null}</div>:null}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MAIN SPLIT WORKSPACE: 1 WINDOW, ZERO VERTICAL SCROLL
+          Left Side (46%): Inventory Catalog with Search & Brand/Category Filters
+          Right Side (54%): Staging Workstation (Qty & 2 Disc boxes) + Cart Table + Totals & Hold Bill
+         ───────────────────────────────────────────────────────────── */}
+      <div className="pos-workspace"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          gap: '10px',
+          padding: '10px 14px 12px 14px',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* =========================================================
+            LEFT COLUMN: INVENTORY CATALOG & FILTERS
+           ========================================================= */}
+        <section
+          style={{
+            flex: '0 0 calc(46% - 1.5in)',
+            minWidth: '320px',
+            height: '100%',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#ffffff',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Catalog Search & Filter Header (Single Horizontal Line: Search + Category + Brand) */}
+          <div className="pos-catalog-filters"
+            style={{
+              flexShrink: 0,
+              padding: '6px 8px',
+              borderBottom: '1px solid #e2e8f0',
+              background: '#fafbfc',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxSizing: 'border-box',
+              width: '100%',
+            }}
+          >
+            {/* Compact Search Input Bar with Little Text */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '110px' }}>
+              <Search size={13} style={{ position: 'absolute', left: '8px', top: '7.5px', color: '#94a3b8' }} />
+              <input
+                ref={catalogSearchInputRef}
+                type="text"
+                className="input-glass erp-field"
+                style={{
+                  width: '100%',
+                  height: '28px',
+                  paddingLeft: '26px',
+                  paddingRight: catalogSearch ? '24px' : '6px',
+                  fontSize: '0.74rem',
+                  borderRadius: '5px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                }}
+                placeholder="Search product code..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                onKeyDown={handleCatalogSearchKeyDown}
+              />
+              {catalogSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCatalogSearch('');
+                    catalogSearchInputRef.current?.focus();
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '5px',
+                    top: '6px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Brand Filter Dropdown */}
+            <div style={{ flex: '0 0 90px', minWidth: '80px' }}>
+              <select
+                className="input-glass erp-field"
+                style={{
+                  width: '100%',
+                  height: '28px',
+                  padding: '2px 4px',
+                  fontSize: '0.72rem',
+                  borderRadius: '5px',
+                  fontWeight: 600,
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                }}
+                aria-label="Brand"
+                value={selectedBrandFilter}
+                onChange={(e) => setSelectedBrandFilter(e.target.value)}
+              >
+                <option value="">Brand</option>
+                {brands.map((b) => (
+                  <option key={`brand-${b.id}`} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Category Filter Dropdown */}
+            <div style={{ flex: '0 0 100px', minWidth: '85px' }}>
+              <select
+                className="input-glass erp-field"
+                style={{
+                  width: '100%',
+                  height: '28px',
+                  padding: '2px 4px',
+                  fontSize: '0.72rem',
+                  borderRadius: '5px',
+                  fontWeight: 600,
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                }}
+                aria-label="Category"
+                value={selectedCategoryFilter}
+                onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              >
+                <option value="">Category</option>
+                {categories.map((cat) => (
+                  <option key={`cat-${cat.id}`} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+
+          </div>
+
+          {/* Catalog Products List (Internally Scrollable Only, with Keyboard Highlight) */}
+          <div
+            ref={catalogListRef}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            {loadingData ? (
+              <div style={{ padding: '30px', textAlign: 'center', color: '#94a3b8', fontSize: '0.86rem' }}>
+                <RefreshCw size={20} className="erp-spin" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                Loading inventory catalog...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                <Package size={28} style={{ margin: '0 auto 8px auto', display: 'block', opacity: 0.4 }} />
+                <div style={{ fontWeight: 600, fontSize: '0.86rem' }}>No products match filter</div>
+                <div style={{ fontSize: '0.76rem', marginTop: '2px' }}>Try adjusting search or category/brand filter.</div>
+              </div>
+            ) : (
+              filteredProducts.map((p, idx) => {
+                const totalStock = getProductTotalStock(p.id);
                 const isOutOfStock = totalStock <= 0;
                 const isLowStock = totalStock > 0 && totalStock <= (p.minStockLevel || 5);
+                const isSelected = stagedItem?.product?.id === p.id;
+                const isHighlighted = idx === productHighlightedIndex;
 
                 return (
                   <div
                     key={p.id}
-                    role="button" tabIndex={isOutOfStock?-1:0} aria-label={`Select ${p.name}`} aria-disabled={isOutOfStock}
-                    onKeyDown={event=>{if(!isOutOfStock && ['Enter',' '].includes(event.key)){event.preventDefault();handleSelectProductForStaging(p);}}}
+                    role="button"
+                    tabIndex={isOutOfStock ? -1 : 0}
+                    aria-label={`Select ${p.name}`}
+                    aria-disabled={isOutOfStock}
                     onClick={() => {
                       if (!isOutOfStock) {
+                        setProductHighlightedIndex(idx);
                         handleSelectProductForStaging(p);
                       }
                     }}
                     style={{
-                      padding: '9px 14px',
+                      height: '0.5in',
+                      minHeight: '0.5in',
+                      maxHeight: '0.5in',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: isSelected
+                        ? '1.5px solid #0284c7'
+                        : isHighlighted
+                        ? '1.5px solid #0284c7'
+                        : '1px solid #f1f5f9',
+                      background: isSelected
+                        ? '#eff6ff'
+                        : isHighlighted
+                        ? '#f0f9ff'
+                        : isOutOfStock
+                        ? '#fff1f2'
+                        : '#ffffff',
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
+                      justifyContent: 'space-between',
                       cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                      opacity: isOutOfStock ? 0.55 : 1,
-                      backgroundColor: isOutOfStock ? '#fff1f2' : 'transparent',
-                      borderBottom: '1px solid rgba(226, 232, 240, 0.6)',
-                      transition: 'background-color 0.15s ease',
-                      pointerEvents: isOutOfStock ? 'none' : 'auto',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isOutOfStock) e.currentTarget.style.background = '#eff6ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = isOutOfStock ? '#fff1f2' : 'transparent';
+                      opacity: isOutOfStock ? 0.6 : 1,
+                      transition: 'all 0.1s ease',
+                      boxShadow: 'none',
+                      boxSizing: 'border-box',
                     }}
                   >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: isOutOfStock ? '#94a3b8' : '#0f172a', fontSize: 'var(--erp-text-field)' }}>
+                    {/* Product Details (Compact 1/2 inch fit) */}
+                    <div style={{ minWidth: 0, flex: 1, paddingRight: '8px', lineHeight: 1.15 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {p.name}
                         </span>
-                        {isOutOfStock ? (
-                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
-                            Out of Stock (0)
-                          </span>
-                        ) : isLowStock ? (
-                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
-                            Low Stock ({totalStock})
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
-                            In Stock ({totalStock})
+                        {p.unitOfMeasure && (
+                          <span style={{ fontSize: '0.64rem', color: '#64748b', background: '#f1f5f9', padding: '0 4px', borderRadius: '3px', flexShrink: 0 }}>
+                            {p.unitOfMeasure}
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'flex', gap: '8px', marginTop: '2px' }}>
-                        <span>Code: <strong>{p.sku}</strong></span>
-                        <span>Unit: <strong>{p.unitOfMeasure || 'PCS'}</strong></span>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#64748b', marginTop: '1px' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#2563eb' }}>{p.sku}</span>
+                        {p.brandName && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>• {p.brandName}</span>}
+                        {p.categoryName && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>• {p.categoryName}</span>}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, color: isOutOfStock ? '#94a3b8' : '#2563eb', fontSize: 'var(--erp-text-nav)' }}>
-                        Rs. {Number(p.sellingPrice || 0).toFixed(2)}
+
+                    {/* Stock Status Badge & Price */}
+                    <div style={{ textAlign: 'right', flexShrink: 0, lineHeight: 1.15 }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.86rem', color: isOutOfStock ? '#94a3b8' : '#2563eb' }}>
+                        Rs. {Number(p.sellingPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      {isOutOfStock ? (
-                        <span style={{ fontSize: 'var(--erp-text-badge)', color: '#dc2626', fontWeight: 700 }}>
-                          Not Selectable (No Stock)
-                        </span>
-                      ) : (
-                        <span className={`badge ${isLowStock ? 'badge-warning' : 'badge-primary'}`} style={{ fontSize: 'var(--erp-text-badge)', padding: '2px 6px' }}>
-                          Configure & Add +
-                        </span>
-                      )}
+
+                      <div style={{ marginTop: '1px' }}>
+                        {isOutOfStock ? (
+                          <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                            Out (0)
+                          </span>
+                        ) : isLowStock ? (
+                          <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', backgroundColor: '#fef3c7', color: '#b45309' }}>
+                            Low ({totalStock})
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', backgroundColor: '#dcfce7', color: '#15803d' }}>
+                            Stock ({totalStock})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
+              })
+            )}
+          </div>
+        </section>
 
-        {/* Per-Product Staging Workstation (Rendered when product is clicked) */}
-        {stagedItem && (
+        {/* =========================================================
+            RIGHT COLUMN: STAGING WORKSTATION (NO WAREHOUSE, 2 DISC BOXES) + CART TABLE + TOTALS & HOLD BILL
+           ========================================================= */}
+        <section
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: '100%',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#ffffff',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden',
+          }}
+        >
+          {/* 1. Staging Quick-Input Workstation (Always Visible: Price, Selling Qty, Disc %, Disc Rs., Add Button in-line) */}
           <div
             style={{
-              padding: '14px 16px',
-              background: '#f8fafc',
-              border: '2px solid #3b82f6',
-              borderRadius: '9px',
-              boxShadow: '0 6px 18px rgba(59, 130, 246, 0.1)',
+              flexShrink: 0,
+              padding: '10px 14px',
+              background: stagedItem ? '#f0f9ff' : '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              transition: 'background-color 0.2s ease',
+              boxSizing: 'border-box',
+              width: '100%',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={17} color="#2563eb" />
-                <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 800, color: '#0f172a' }}>
-                  {stagedItem.product.name}
+            {/* Header row: Product Title, SKU & Cancel */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '22px', marginBottom: stagedItem?.quotaInfo?.quotaRestricted ? '4px' : '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                <Package size={15} color={stagedItem ? '#0284c7' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontWeight: stagedItem ? 700 : 500,
+                    fontSize: '0.86rem',
+                    color: stagedItem ? '#0f172a' : '#64748b',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {stagedItem ? stagedItem.product.name : 'Select product from catalog (or press F2)'}
                 </span>
-                <span className="badge badge-outline" style={{ fontSize: 'var(--erp-text-badge)' }}>
-                  Code: {stagedItem.product.sku}
-                </span>
+                {stagedItem ? (
+                  <span
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      color: '#0369a1',
+                      background: '#e0f2fe',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid #bae6fd',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {stagedItem.product.sku}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      color: '#94a3b8',
+                      background: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      border: '1px solid #e2e8f0',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Ready
+                  </span>
+                )}
               </div>
 
-              <button
-                type="button"
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setStagedItem(null)}
-                style={{ color: '#64748b', padding: '2px 7px' }}
-              >
-                <X size={13} /> Cancel
-              </button>
+              {/* Cancel selection button */}
+              {stagedItem && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStagedItem(null);
+                    catalogSearchInputRef.current?.focus();
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: '4px',
+                    flexShrink: 0,
+                  }}
+                  title="Cancel selection (Esc)"
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
 
-            {/* Quota Restriction Alert Banner */}
-            {stagedItem.quotaInfo?.quotaRestricted && (
+            {/* Quota Banner if Applicable */}
+            {stagedItem?.quotaInfo?.quotaRestricted && (
               <div
                 style={{
-                  marginBottom: '12px',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
+                  marginBottom: '6px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fee2e2' : '#f0fdf4',
+                  border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fca5a5' : '#86efac'}`,
+                  color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#b91c1c' : '#15803d',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
-                  background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
-                    ? '#fef2f2'
-                    : '#f0fdf4',
-                  border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fca5a5' : '#86efac'}`,
+                  gap: '5px',
                 }}
               >
-                {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
-                  <ShieldAlert size={20} color="#dc2626" style={{ flexShrink: 0 }} />
-                ) : (
-                  <ShieldCheck size={20} color="#16a34a" style={{ flexShrink: 0 }} />
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    fontSize: 'var(--erp-text-body)',
-                    fontWeight: 800,
-                    color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#991b1b' : '#166534',
-                  }}>
-                    {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
-                      ? 'Inventory Allocation Finished'
-                      : 'Inventory Allocation Active'}
-                  </div>
-                  <div style={{
-                    fontSize: 'var(--erp-text-caption)',
-                    color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#b91c1c' : '#15803d',
-                    marginTop: '1px',
-                  }}>
-                    {Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0
-                      ? `You have reached your allocated limit of ${stagedItem.quotaInfo.allocatedQuantity} items. You cannot sell more of this product.`
-                      : `You have ${stagedItem.quotaInfo.remainingQuantity} items left out of ${stagedItem.quotaInfo.allocatedQuantity} allocated (Sold: ${stagedItem.quotaInfo.soldQuantity || 0}).`}
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontWeight: 800,
-                  fontSize: 'var(--erp-text-small)',
-                  background: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#fee2e2' : '#dcfce7',
-                  color: Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#dc2626' : '#15803d',
-                  border: `1px solid ${Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? '#f87171' : '#4ade80'}`,
-                  whiteSpace: 'nowrap',
-                }}>
-                  {stagedItem.quotaInfo.remainingQuantity} Left (Allocation)
-                </div>
+                <ShieldCheck size={13} />
+                <span>
+                  Quota Active: {stagedItem.quotaInfo.remainingQuantity} items remaining of {stagedItem.quotaInfo.allocatedQuantity} allocated
+                </span>
               </div>
             )}
 
-            <div
+            {/* Workstation Inputs: Price, Qty, Disc (%), Disc (Rs.), Line Total on left with better gaps, Add Product (2in) pushed right */}
+            <div className="pos-staging-fields"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                gap: '10px',
-                alignItems: 'end',
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '12px',
+                width: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box',
+                flexWrap: 'nowrap',
               }}
             >
-              {/* 1. Auto-Selected Assigned/Stocked Warehouse */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
-                  WAREHOUSE (ASSIGNED / IN STOCK)
-                </label>
-                <select
-                  className="input-glass erp-field"
-                  style={{ width: '100%', height: '34px', fontWeight: 600 }}
-                  value={stagedItem.warehouseId || ''}
-                  onChange={(e) => handleStagedWarehouseChange(e.target.value)}
-                >
-                  {(stagedItem.availableWarehouses && stagedItem.availableWarehouses.length > 0
-                    ? stagedItem.availableWarehouses
-                    : warehouses
-                  ).map((wh) => {
-                    const whStock = getProductStockInWarehouse(stagedItem.product.id, wh.id);
-                    return (
-                      <option key={wh.id} value={wh.id}>
-                        {wh.code} - {wh.name} ({whStock} in stock)
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* 2. Real Quantity */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
-                  REAL QUANTITY (IN STOCK)
+              {/* Locked Selling Price (Accommodates 10,000,000.00+ cleanly, left-aligned) */}
+              <div style={{ flex: '0 0 135px', minWidth: '115px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Price
                 </label>
                 <div
                   style={{
                     height: '34px',
                     display: 'flex',
                     alignItems: 'center',
-                    padding: '0 8px',
-                    background: stagedItem.realQuantity > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                    border: `1px solid ${stagedItem.realQuantity > 0 ? '#86efac' : '#fca5a5'}`,
-                    borderRadius: '6px',
-                    fontWeight: 800,
-                    color: stagedItem.realQuantity > 0 ? '#15803d' : '#b91c1c',
-                    fontSize: 'var(--erp-text-body)',
-                  }}
-                >
-                  {stagedItem.quotaInfo?.quotaRestricted
-                    ? `${stagedItem.quotaInfo.remainingQuantity} Left of Allocation (${stagedItem.realQuantity} in Stock)`
-                    : `${stagedItem.realQuantity} ${stagedItem.product.unitOfMeasure || 'Units'} Available`}
-                </div>
-              </div>
-
-              {/* 3. Non-Editable Sales Price (Fixed from Inventory / GRN) */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
-                  SALES PRICE (LOCKED - INVENTORY)
-                </label>
-                <div
-                  style={{
-                    height: '34px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: 'flex-start',
                     padding: '0 10px',
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
+                    background: stagedItem ? '#ffffff' : '#f8fafc',
+                    border: `1px solid ${stagedItem ? '#cbd5e1' : '#e2e8f0'}`,
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    color: stagedItem ? '#0f172a' : '#94a3b8',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textAlign: 'left',
+                  }}
+                  title={stagedItem ? `Rs. ${stagedItem.salesPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Rs. 0.00'}
+                >
+                  Rs. {stagedItem ? stagedItem.salesPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                </div>
+              </div>
+
+              {/* Selling Quantity (Left-aligned clean textbox without arrows) */}
+              <div style={{ flex: '0 0 90px', minWidth: '78px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={stagedItem ? `Available: ${stagedItem.realQuantity}` : ''}>
+                  Qty {stagedItem ? `(${stagedItem.realQuantity})` : ''}
+                </label>
+                <input
+                  ref={qtyInputRef}
+                  type="number"
+                  min="1"
+                  max={stagedItem?.realQuantity || 99999999}
+                  className="input-glass erp-field no-spin-arrows"
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    textAlign: 'left',
+                    padding: '0 10px',
+                    fontWeight: 700,
+                    fontSize: '0.86rem',
+                    border: `1px solid ${stagedItem ? '#cbd5e1' : '#e2e8f0'}`,
+                    background: stagedItem ? '#ffffff' : '#f8fafc',
+                    MozAppearance: 'textfield',
+                  }}
+                  value={stagedItem ? stagedItem.salesQty : 1}
+                  disabled={!stagedItem}
+                  onChange={(e) => stagedItem && handleStagedQtyChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddStagedToTable();
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Discount (%) Textbox (Left-aligned clean textbox without arrows) */}
+              <div style={{ flex: '0 0 72px', minWidth: '60px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Disc (%)
+                </label>
+                <input
+                  ref={discPercentInputRef}
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="100"
+                  className="input-glass erp-field no-spin-arrows"
+                  placeholder="0%"
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 8px',
+                    fontSize: '0.84rem',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    border: `1px solid ${stagedItem ? '#cbd5e1' : '#e2e8f0'}`,
+                    background: stagedItem ? '#ffffff' : '#f8fafc',
+                    MozAppearance: 'textfield',
+                  }}
+                  value={stagedItem ? (stagedItem.discountRate || '') : ''}
+                  disabled={!stagedItem}
+                  onChange={(e) => stagedItem && handleStagedDiscountRateChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddStagedToTable();
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Discount (Rs.) Textbox (Left-aligned clean textbox without arrows) */}
+              <div style={{ flex: '0 0 130px', minWidth: '115px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Disc (Rs.)
+                </label>
+                <input
+                  ref={discAmountInputRef}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="input-glass erp-field no-spin-arrows"
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    fontSize: '0.84rem',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    border: `1px solid ${stagedItem ? '#cbd5e1' : '#e2e8f0'}`,
+                    background: stagedItem ? '#ffffff' : '#f8fafc',
+                    MozAppearance: 'textfield',
+                  }}
+                  value={stagedItem ? (stagedItem.discountAmount || '') : ''}
+                  disabled={!stagedItem}
+                  onChange={(e) => stagedItem && handleStagedDiscountAmountChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddStagedToTable();
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Line Total (Accommodates 10,000,000.00+ cleanly, left-aligned) */}
+              <div style={{ flex: '0 0 150px', minWidth: '135px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#475569', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Line Total
+                </label>
+                <div
+                  style={{
+                    height: '34px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    padding: '0 10px',
+                    background: stagedItem ? '#ffffff' : '#f8fafc',
+                    border: `1px solid ${stagedItem ? '#cbd5e1' : '#e2e8f0'}`,
                     borderRadius: '6px',
                     fontWeight: 800,
-                    color: '#0f172a',
-                    fontSize: 'var(--erp-text-field)',
+                    fontSize: '0.84rem',
+                    color: stagedItem ? '#0284c7' : '#94a3b8',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textAlign: 'left',
                   }}
-                  title="Sales price is fixed from Inventory / GRN and cannot be edited"
+                  title={stagedItem ? `Rs. ${stagedItem.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Rs. 0.00'}
                 >
-                  <span>Rs. {Number(stagedItem.salesPrice || 0).toFixed(2)}</span>
-                  <span style={{ fontSize: 'var(--erp-text-badge)', color: '#475569', fontWeight: 700, background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
-                    Fixed
-                  </span>
+                  Rs. {stagedItem ? stagedItem.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                 </div>
               </div>
 
-              {/* 4. Sales Quantity */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
-                  SALES QTY
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <button
-                    type="button"
-                    className="btn btn-glass btn-sm erp-button"
-                    style={{ height: '34px', width: '32px', padding: 0 }}
-                    onClick={() => handleStagedQtyChange(stagedItem.salesQty - 1)}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '34px', textAlign: 'center', fontWeight: 700 }}
-                    value={stagedItem.salesQty}
-                    onChange={(e) => handleStagedQtyChange(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-glass btn-sm erp-button"
-                    style={{ height: '34px', width: '32px', padding: 0 }}
-                    onClick={() => handleStagedQtyChange(stagedItem.salesQty + 1)}
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              </div>
-
-              {/* 5. Discount in % or Amount */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: '#475569', marginBottom: '3px' }}>
-                  DISCOUNT (% OR RS.)
-                </label>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="100"
-                      className="input-glass erp-field"
-                      placeholder="%"
-                      style={{ width: '100%', height: '34px', paddingRight: '18px' }}
-                      value={stagedItem.discountRate || ''}
-                      onChange={(e) => handleStagedDiscountRateChange(e.target.value)}
-                    />
-                    <span style={{ position: 'absolute', right: '5px', top: '7px', fontSize: 'var(--erp-text-badge)', color: '#94a3b8' }}>
-                      %
-                    </span>
-                  </div>
-                  <div style={{ position: 'relative', flex: 1 }}>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="input-glass erp-field"
-                      placeholder="Rs."
-                      style={{ width: '100%', height: '34px' }}
-                      value={stagedItem.discountAmount || ''}
-                      onChange={(e) => handleStagedDiscountAmountChange(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* 6. Product Sub Total & Add to Table */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 800, color: '#64748b' }}>
-                  SUB TOTAL
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
-                  Rs. {stagedItem.subtotal.toFixed(2)}
-                </div>
+              {/* Button to Add Items (Width: exactly 2 inches = 2in, pushed to far right) */}
+              <div style={{ flex: '0 0 2in', width: '2in', minWidth: '2in', marginLeft: 'auto' }}>
                 <button
                   type="button"
-                  className={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? "btn btn-secondary" : "btn btn-primary"}
+                  className={`btn erp-button ${stagedItem ? 'btn-primary' : 'btn-glass'}`}
                   onClick={handleAddStagedToTable}
-                  disabled={stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0}
-                  style={{ height: '34px', width: '100%', gap: '5px', fontWeight: 700, fontSize: 'var(--erp-text-body)' }}
+                  disabled={savingBill || checkingBill || billCheckFailed || !stagedItem || Number(stagedItem.salesQty)>stagedItem.realQuantity || (stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0)}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    whiteSpace: 'nowrap',
+                    background: stagedItem ? '#0284c7' : '#f1f5f9',
+                    color: stagedItem ? '#ffffff' : '#94a3b8',
+                    border: `1px solid ${stagedItem ? '#0284c7' : '#cbd5e1'}`,
+                    cursor: stagedItem ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={stagedItem ? "Add Product (Enter)" : "Select a product from catalog first"}
                 >
-                  {stagedItem.quotaInfo?.quotaRestricted && Number(stagedItem.quotaInfo.remainingQuantity || 0) <= 0 ? (
-                    <>
-                      <ShieldAlert size={14} /> Allocation Limit Reached
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={14} /> Add to Table
-                    </>
+                  <Plus size={15} /> Add Product
+                  {stagedItem && (
+                    <span style={{ fontSize: '0.7rem', opacity: 0.85, fontWeight: 600, marginLeft: '2px' }}>
+                      (Enter)
+                    </span>
                   )}
                 </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 4: SALES ITEMS TABLE & SINGLE ACTION (HOLD BILL)
-         ───────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-start', flex: 1 }}>
-
-        {/* Left Side: Main Sales Table */}
-        <div className="glass-card" style={{ flex: '1 1 680px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h3 style={{ fontSize: 'var(--erp-text-nav)', color: '#0f172a', margin: 0, fontWeight: 700 }}>
-                Sales Order Items ({cart.length})
-              </h3>
-              {uniqueWarehouseIds.length > 1 && (
-                <span
-                  style={{
-                    fontSize: 'var(--erp-text-badge)',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '20px',
-                    background: '#eff6ff',
-                    color: '#2563eb',
-                    border: '1px solid #bfdbfe',
-                  }}
-                >
-                  Multi-Warehouse: {warehouseBreakdown.map((w) => w.warehouse.code).join(', ')}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Sales Items Table Styled Exactly Like Customer Table */}
-          <div className="erp-table-scroll erp-table-frame" style={{ width: '100%', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#ffffff' }}>
-            <table className="erp-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0', width: '110px' }}>
-                    WAREHOUSE
-                  </th>
-                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0', width: '120px' }}>
-                    PRODUCT CODE
-                  </th>
-                  <th className="erp-table-heading" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    PRODUCT NAME
-                  </th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
-                    PRICE
-                  </th>
-                  <th className="erp-table-heading" style={{ textAlign: 'center', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
-                    QTY
-                  </th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '95px' }}>
-                    DISCOUNT
-                  </th>
-                  <th className="erp-table-heading" style={{ textAlign: 'right', borderBottom: '1px solid #e2e8f0', width: '110px' }}>
-                    AMOUNT
-                  </th>
-                  <th className="erp-table-heading" style={{ textAlign: 'center', width: '40px', borderBottom: '1px solid #e2e8f0' }}>
-                  </th>
+          {/* 2. Added Products Table (Cart) (Scrollable internally with Delete icon in action col) */}
+          <div
+            className="erp-table-scroll erp-table-frame"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <table className="erp-table" style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fafbfc' }}>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', fontSize: '0.74rem' }}>
+                  <th className="erp-table-heading" style={{ width: '105px', padding: '8px 10px' }}>SKU</th>
+                  <th className="erp-table-heading" style={{ padding: '8px 10px' }}>PRODUCT NAME</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', width: '120px', padding: '8px 10px' }}>PRICE</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'center', width: '130px', padding: '8px 10px' }}>QTY</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', width: '120px', padding: '8px 10px' }}>DISC</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'right', width: '145px', padding: '8px 10px' }}>TOTAL</th>
+                  <th className="erp-table-heading" style={{ textAlign: 'center', width: '44px', padding: '8px 6px' }}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {cart.length === 0 ? (
                   <tr>
-                    <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
-                      <ShoppingCart size={32} style={{ opacity: 0.3, marginBottom: '6px' }} />
-                      <br />
-                      No products added yet. Search and configure products above to populate the sales table.
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '48px 16px', color: '#94a3b8' }}>
+                      <ShoppingCart size={32} style={{ opacity: 0.35, margin: '0 auto 8px auto', display: 'block' }} />
+                      <div style={{ fontWeight: 600, fontSize: '0.86rem' }}>Bill is currently empty</div>
+                      <div style={{ fontSize: '0.76rem', marginTop: '2px' }}>
+                        Search and select products to add items to this bill.
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   cart.map((item) => (
                     <tr
                       key={item.id}
-                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}
+                      style={{ borderBottom: '1px solid #f1f5f9', fontSize: '0.82rem' }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      <td className="erp-table-cell">
-                        <span
-                          className="badge badge-primary"
-                          style={{ fontSize: 'var(--erp-text-caption)', padding: '3px 8px', fontWeight: 700, letterSpacing: '0.04em' }}
-                        >
-                          {item.warehouseCode}
-                        </span>
-                      </td>
-
-                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 600, color: '#2563eb' }}>
+                      <td className="erp-table-cell erp-table-code" style={{ padding: '6px 10px', fontWeight: 600, color: '#0284c7' }}>
                         {item.sku}
                       </td>
 
-                      <td className="erp-table-cell">
-                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-field)', lineHeight: '1.25' }}>{item.name}</div>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>Unit: {item.unitOfMeasure || 'PCS'}</span>
-                          {item.quotaInfo?.quotaRestricted && (
-                            <span
-                              style={{
-                                background: '#ecfdf5',
-                                color: '#047857',
-                                border: '1px solid #a7f3d0',
-                                borderRadius: '4px',
-                                padding: '1px 5px',
-                                fontSize: 'var(--erp-text-badge)',
-                                fontWeight: 700,
-                              }}
-                              title={`Allocation: ${item.quotaInfo.remainingQuantity} left of ${item.quotaInfo.allocatedQuantity} allocated`}
-                            >
-                              Allocation: {item.quotaInfo.remainingQuantity} left
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#334155' }}>
-                        Rs. {item.unitPrice.toFixed(2)}
-                      </td>
-
-                      <td className="erp-table-cell">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                          <button aria-label="Minus" title="Minus"
-                            type="button"
-                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                            style={{ padding: '2px 5px', height: '24px', width: '24px' }}
-                            onClick={() => updateTableItemQty(item.id, -1)}
-                          >
-                            <Minus size={10} />
-                          </button>
-                          <input
-                            type="number"
-                            className="input-glass erp-field"
-                            style={{ width: '44px', height: '24px', textAlign: 'center', padding: '2px', fontWeight: 700 }}
-                            value={item.quantity}
-                            onChange={(e) => setTableItemQtyDirect(item.id, e.target.value)}
-                          />
-                          <button aria-label="Plus" title="Plus"
-                            type="button"
-                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                            style={{ padding: '2px 5px', height: '24px', width: '24px' }}
-                            onClick={() => updateTableItemQty(item.id, 1)}
-                          >
-                            <Plus size={10} />
-                          </button>
-                        </div>
-                      </td>
-
-                      <td className="erp-table-cell" style={{ textAlign: 'right', color: item.discountAmount > 0 ? '#ef4444' : '#64748b' }}>
-                        {item.discountAmount > 0 ? (
-                          <>
-                            -Rs. {item.discountAmount.toFixed(2)}
-                            {item.discountRate > 0 && <span style={{ fontSize: 'var(--erp-text-badge)', display: 'block', color: '#dc2626' }}>({item.discountRate}%)</span>}
-                          </>
-                        ) : (
-                          '-'
+                      <td className="erp-table-cell" style={{ padding: '6px 10px' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
+                        {item.unitOfMeasure && (
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Unit: {item.unitOfMeasure}</span>
                         )}
                       </td>
 
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        Rs. {item.total.toFixed(2)}
+                      <td className="erp-table-cell" style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: '#334155' }}>
+                        Rs. {item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                        <button aria-label="Remove item" className="erp-table-icon-action" data-tone="danger"
+                      <td className="erp-table-cell" style={{ padding: '6px 10px', textAlign: 'left' }}>
+                        {item.quantity}
+                      </td>
+
+                      <td className="erp-table-cell" style={{ textAlign: 'right', padding: '6px 10px', color: item.discountAmount > 0 ? '#ef4444' : '#64748b' }}>
+                        {item.discountAmount > 0 ? `-Rs. ${item.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </td>
+
+                      <td className="erp-table-cell" style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 800, color: '#0f172a' }}>
+                        Rs. {item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+
+                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center', padding: '6px 6px', whiteSpace: 'nowrap' }}>
+                        <button
                           type="button"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                          onClick={() => removeFromCart(item.id)}
-                          title="Remove item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditCartItem(item);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#0284c7',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: '2px',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e0f2fe')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          title="Edit item quantity & discount"
+                          className="erp-table-icon-action" disabled={savingBill}
+                          aria-label={`Edit ${item.name}`}
                         >
-                          <X size={14} />
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromCart(item.id);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fee2e2')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          title="Delete item"
+                          className="erp-table-icon-action" data-tone="danger" disabled={savingBill}
+                          aria-label={`Delete ${item.name}`}
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </td>
                     </tr>
@@ -2072,114 +1799,139 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* Right Side: Bill Summary & ONLY ONE BUTTON: "Hold Bill" */}
-        <div style={{ flex: '1 1 290px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div className="glass-card" style={{ padding: '18px' }}>
-            <h3 style={{ fontSize: 'var(--erp-text-section)', color: '#0f172a', margin: '0 0 12px 0', fontWeight: 700 }}>
-              Order Summary
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontSize: 'var(--erp-text-body)' }}>
-                <span>Subtotal ({cart.length} items):</span>
-                <span style={{ fontWeight: 700 }}>Rs. {subtotal.toFixed(2)}</span>
+          {/* 3. Single-Line Dock: Subtotal, Discount, Net Total, Clear, and Add to Hold Bill (ALL IN ONE LINE) */}
+          <div className="pos-bill-footer"
+            style={{
+              flexShrink: 0,
+              padding: '8px 16px',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              boxSizing: 'border-box',
+              width: '100%',
+              flexWrap: 'nowrap',
+            }}
+          >
+            {/* Left: Subtotal, Bill Discount, Net Total (Left aligned, clean textboxes, no arrows) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'nowrap', minWidth: 0, justifyContent: 'flex-start' }}>
+              {/* Subtotal */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', fontSize: '0.82rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                <span style={{ fontWeight: 600 }}>Sub:</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.88rem', fontFamily: 'monospace' }}>
+                  Rs. {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#475569', fontSize: 'var(--erp-text-body)' }}>Bill Discount (Rs.):</span>
-                <input
-                  type="number"
-                  className="input-glass erp-field"
-                  style={{ width: '85px', textAlign: 'right', padding: '3px 6px', fontWeight: 600 }}
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
-                />
+              {/* Discount (Clean left-aligned textbox, no arrows) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                <span style={{ fontWeight: 600 }}>Disc:</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '7px', top: '5.5px', fontSize: '0.72rem', color: '#94a3b8' }}>Rs.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="input-glass erp-field no-spin-arrows"
+                    style={{ width: '135px', height: '28px', paddingLeft: '26px', paddingRight: '8px', textAlign: 'left', fontWeight: 700, fontSize: '0.82rem', border: '1px solid #cbd5e1', background: '#ffffff', MozAppearance: 'textfield' }}
+                    value={discountAmount || ''}
+                    placeholder="0.00"
+                    onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
               </div>
 
-              <div style={{ height: '1px', background: 'rgba(226, 232, 240, 0.8)', margin: '2px 0' }} />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 800, color: '#0f172a' }}>NET TOTAL:</span>
-                <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
-                  Rs. {netTotal.toFixed(2)}
+              {/* Net Total */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>NET:</span>
+                <span
+                  style={{
+                    fontSize: '1.24rem',
+                    fontWeight: 900,
+                    color: '#0284c7',
+                    fontFamily: 'var(--font-heading, system-ui)',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  Rs. {netTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
-            {/* Warehouse Breakdown Pill */}
-            {warehouseBreakdown.length > 0 && (
-              <div
-                style={{
-                  padding: '8px 10px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  marginBottom: '14px',
-                  fontSize: 'var(--erp-text-caption)',
-                }}
-              >
-                <div style={{ fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                  Warehouse Fulfillment:
-                </div>
-                {warehouseBreakdown.map((wb) => (
-                  <div key={wb.warehouse.id} style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', margin: '2px 0' }}>
-                    <span>{wb.warehouse.code} ({wb.items.length} items):</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Rs. {wb.subtotal.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ONLY ONE ACTION BUTTON: "Hold Bill" (No create invoice button needed) */}
-            <div>
+            {/* Right: Clear Button & Add to Hold Bill Button (ALL IN ONE LINE) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {/* Clear Cart Button */}
               <button
+                type="button"
+                className="btn btn-glass btn-sm erp-button"
+                onClick={clearCart}
+                disabled={cart.length === 0 || savingBill || checkingBill || billCheckFailed}
+                style={{ height: '32px', padding: '0 10px', gap: '4px', color: '#64748b', fontSize: '0.78rem', border: '1px solid #cbd5e1', background: '#ffffff' }}
+                title="Clear current bill"
+              >
+                <Trash2 size={13} /> Clear
+              </button>
+
+              {/* Add to Hold Bill Button (Primary Action) */}
+              <button
+                type="button"
                 className="btn btn-primary erp-button erp-button-primary"
+                onClick={handleHoldCart}
+                disabled={cart.length === 0 || isHoldingCart || savingBill || checkingBill || billCheckFailed}
                 style={{
-                  width: '100%',
-                  padding: '13px',
+                  height: '32px',
+                  padding: '0 14px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  gap: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  whiteSpace: 'nowrap',
+                  background: '#0284c7',
+                  borderColor: '#0284c7',
                 }}
-                disabled={cart.length === 0}
-                onClick={handleHoldCart}
-                title="Hold Bill / Save Draft (F12 or F5)"
+                title="Save bill to On-Hold bills (F12 or F5)"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <PauseCircle size={18} /> Hold Bill
-                </div>
-                <kbd className="erp-kbd" style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff', borderColor: 'rgba(255,255,255,0.4)' }}>
-                  F12
-                </kbd>
+                <PauseCircle size={15} /> Hold Bill (F12)
               </button>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          STAFF MOTIVATION POPUPS (3 CIRCLES MODALS)
+          POPUP MODAL: INVOICE COMPLETED & RECEIPT PRINT
          ───────────────────────────────────────────────────────────── */}
 
-      {/* POPUP 1: My Billing Details Modal */}
+
+      {/* ─────────────────────────────────────────────────────────────
+          HELD BILLS RESUME MODAL
+         ───────────────────────────────────────────────────────────── */}
+      {showHeldModal && <PosHeldBills activeBillId={activeBillId} busy={savingBill} onResume={handleResumeInvoice} onClose={()=>setShowHeldModal(false)}/>}
+
+      {/* ─────────────────────────────────────────────────────────────
+          CASHIER KPI / MOTIVATION CIRCLES MODAL
+         ───────────────────────────────────────────────────────────── */}
       {activeCircleModal === 'my' && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
+          onClick={() => setActiveCircleModal(null)}
         >
           <div
             className="glass-modal"
-            style={{ width: 'min(720px, 96vw)', maxWidth: '720px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
+            style={{ width: 'min(720px, 96vw)', maxWidth: '720px', padding: '24px', borderRadius: '14px' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
-                    width: '38px',
-                    height: '38px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '50%',
                     background: '#2563eb',
                     color: '#ffffff',
@@ -2188,493 +1940,53 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
                     justifyContent: 'center',
                   }}
                 >
-                  <UserCheck size={20} />
+                  <UserCheck size={18} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
                     My Billing Performance
                   </h3>
-                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
                     Cashier: <strong>{user?.fullName || user?.username}</strong>
                   </p>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={() => setActiveCircleModal(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* KPI Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '18px' }}>
-              <div style={{ padding: '14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#1e40af' }}>BILLS COMPLETED</div>
-                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#1d4ed8', fontFamily: 'var(--font-heading)' }}>
-                  {myBillsCount}
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#60a5fa' }}>Transactions settled</div>
-              </div>
-
-              <div style={{ padding: '14px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#166534' }}>TOTAL AMOUNT BILLED</div>
-                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#15803d', fontFamily: 'var(--font-heading)' }}>
-                  Rs. {myTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#4ade80' }}>Revenue generated</div>
-              </div>
-
-              <div style={{ padding: '14px', background: '#faf5ff', borderRadius: '10px', border: '1px solid #e9d5ff' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#6b21a8' }}>AVERAGE BILL VALUE</div>
-                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#7e22ce', fontFamily: 'var(--font-heading)' }}>
-                  Rs. {myAvgBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#c084fc' }}>Per sale transaction</div>
-              </div>
-            </div>
-
-            {/* My Bills List */}
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 800, color: '#334155' }}>
-                  My Bills ({myInvoices.length})
-                </span>
-                <span style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                  Click any bill to inspect product details
-                </span>
-              </div>
-
-              <div className="erp-table-scroll erp-table-frame" style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                {myInvoices.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-field)' }}>
-                    No completed bills recorded in this session yet.
-                  </div>
-                ) : (
-                  <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                        <th className="erp-table-heading">Invoice #</th>
-                        <th className="erp-table-heading">Customer</th>
-                        <th className="erp-table-heading">Date</th>
-                        <th className="erp-table-heading" style={{ textAlign: 'center' }}>Items</th>
-                        <th className="erp-table-heading" style={{ textAlign: 'right' }}>Amount</th>
-                        <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {myInvoices.map((inv) => (
-                        <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
-                            {inv.invoiceNumber}
-                          </td>
-                          <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
-                            {inv.customerName || 'Walk-in'}
-                          </td>
-                          <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                            {inv.invoiceDate || 'Today'}
-                          </td>
-                          <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600 }}>
-                            {inv.items?.length || 1}
-                          </td>
-                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                            Rs. {Number(inv.netTotal || 0).toFixed(2)}
-                          </td>
-                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                            <button aria-label="View" title="View"
-                              type="button"
-                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                              onClick={() => setSelectedInvoiceDetail(inv)}
-                              style={{ padding: '3px 8px', gap: '4px' }}
-                            ><Eye size={12} /></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <button
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setActiveCircleModal(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP 2: Max Record / Top Performer Benchmark Modal */}
-      {activeCircleModal === 'max' && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{ width: 'min(640px, 96vw)', maxWidth: '640px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    background: '#d97706',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Trophy size={20} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
-                    Top Performance Record
-                  </h3>
-                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                    Benchmark Record Leader: <strong>{topCashierName}</strong>
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setActiveCircleModal(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '18px' }}>
-              <div style={{ padding: '16px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#92400e' }}>MAX BILLS RECORD</div>
-                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
-                  {maxBillsCount} Bills
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#d97706' }}>Highest billing volume</div>
-              </div>
-
-              <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '10px', border: '1px solid #fcd34d' }}>
-                <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 800, color: '#92400e' }}>MAX SALES AMOUNT</div>
-                <div style={{ fontSize: 'var(--erp-text-title)', fontWeight: 900, color: '#b45309', fontFamily: 'var(--font-heading)' }}>
-                  Rs. {maxSalesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#d97706' }}>Highest revenue benchmark</div>
-              </div>
-            </div>
-
-            {/* Motivation Progress & Comparison */}
-            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: 'var(--erp-text-body)', fontWeight: 800, color: '#334155' }}>
-                  Your Progress Toward Record ({myTotalAmount >= maxSalesAmount ? '100%' : `${Math.min(100, Math.round((myTotalAmount / (maxSalesAmount || 1)) * 100))}%`})
-                </span>
-                <span style={{ fontSize: 'var(--erp-text-caption)', color: '#2563eb', fontWeight: 700 }}>
-                  You: Rs. {myTotalAmount.toFixed(0)} / Max: Rs. {maxSalesAmount.toFixed(0)}
-                </span>
-              </div>
-
-              <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: `${Math.min(100, (myTotalAmount / (maxSalesAmount || 1)) * 100)}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 100%)',
-                    borderRadius: '4px',
-                    transition: 'width 0.4s ease',
-                  }}
-                />
-              </div>
-
-              <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', fontWeight: 600 }}>
-                {myTotalAmount >= maxSalesAmount
-                  ? '🏆 Outstanding! You are currently the #1 Top Cashier Record Holder!'
-                  : `🔥 Keep billing! You are Rs. ${(maxSalesAmount - myTotalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} away from setting the new record!`}
-              </div>
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <button
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setActiveCircleModal(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP 3: All Staffs Performance & Bills Details Modal */}
-      {activeCircleModal === 'all' && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{ width: 'min(880px, 96vw)', maxWidth: '880px', padding: '24px', borderRadius: '14px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    background: '#7c3aed',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Users size={20} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
-                    All Staff Billing Performance
-                  </h3>
-                  <p style={{ margin: 0, fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                    Overview of active cashiers and bills created
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setActiveCircleModal(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Staff Overview Table */}
-            <div style={{ marginBottom: '18px', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                    <th className="erp-table-heading">Staff Name</th>
-                    <th className="erp-table-heading">Username</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Completed Bills</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total Amount</th>
-                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cashierStats.length === 0 ? (
-                    <tr>
-                      <td className="erp-table-cell" colSpan="5" style={{ textAlign: 'center', color: '#94a3b8' }}>
-                        No staff records found
-                      </td>
-                    </tr>
-                  ) : (
-                    cashierStats.map((c) => (
-                      <tr
-                        key={c.username}
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          background: selectedStaffForBills === c.username ? '#eff6ff' : 'transparent',
-                        }}
-                      >
-                        <td className="erp-table-cell" style={{ fontWeight: 700, color: '#0f172a' }}>
-                          {c.fullName || c.username}
-                          {c.username === user?.username && (
-                            <span className="badge badge-primary" style={{ marginLeft: '6px', fontSize: 'var(--erp-text-badge)' }}>
-                              You
-                            </span>
-                          )}
-                        </td>
-                        <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                          {c.username}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
-                          {c.completedInvoicesCount || 0}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
-                          Rs. {Number(c.totalSalesAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                          <button aria-label="View Bills" title="View Bills"
-                            type="button"
-                            className={((`btn ${selectedStaffForBills === c.username ? 'btn-primary' : 'btn-glass'} btn-sm`) + ' erp-button') + ' erp-table-icon-action'}
-                            onClick={() => setSelectedStaffForBills(c.username)}
-                            style={{ padding: '4px 10px', gap: '4px' }}
-                          ><FileText size={12} /></button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table></div>
-            </div>
-
-            {/* Selected Staff's Detailed Bills */}
-            {selectedStaffForBills && (
-              <div className="erp-table-frame" style={{ border: '2px solid #3b82f6', borderRadius: '10px', padding: '16px', background: '#f8fafc' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
-                    Bills created by <strong>{selectedStaffForBills}</strong>
-                  </div>
-                  <button
-                    className="btn btn-glass btn-sm erp-button"
-                    onClick={() => setSelectedStaffForBills(null)}
-                    style={{ padding: '2px 8px' }}
-                  >
-                    Close Staff Bills
-                  </button>
-                </div>
-
-                <div className="erp-table-scroll" style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                  {allInvoices.filter((inv) => inv.createdBy === selectedStaffForBills).length === 0 ? (
-                    <div style={{ padding: '18px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
-                      No bills recorded for this staff member in this period.
-                    </div>
-                  ) : (
-                    <table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse', background: '#ffffff', borderRadius: '6px' }}>
-                      <thead>
-                        <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>
-                          <th className="erp-table-heading">Invoice #</th>
-                          <th className="erp-table-heading">Customer</th>
-                          <th className="erp-table-heading">Date</th>
-                          <th className="erp-table-heading" style={{ textAlign: 'center' }}>Items</th>
-                          <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
-                          <th className="erp-table-heading" style={{ textAlign: 'center' }}>Detail</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allInvoices
-                          .filter((inv) => inv.createdBy === selectedStaffForBills)
-                          .map((inv) => (
-                            <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
-                                {inv.invoiceNumber}
-                              </td>
-                              <td className="erp-table-cell" style={{ fontWeight: 600 }}>
-                                {inv.customerName || 'Walk-in'}
-                              </td>
-                              <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                                {inv.invoiceDate || 'Today'}
-                              </td>
-                              <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 600 }}>
-                                {inv.items?.length || 1}
-                              </td>
-                              <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
-                                Rs. {Number(inv.netTotal || 0).toFixed(2)}
-                              </td>
-                              <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                                <button aria-label="Inspect" title="Inspect"
-                                  type="button"
-                                  className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                                  onClick={() => setSelectedInvoiceDetail(inv)}
-                                  style={{ padding: '2px 8px', gap: '3px' }}
-                                ><Eye size={12} /></button>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div style={{ textAlign: 'right', marginTop: '14px' }}>
-              <button
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setActiveCircleModal(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP: Bill Detail Inspection Modal (Shows all products/details in any bill) */}
-      {selectedInvoiceDetail && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{ width: 'min(640px, 96vw)', maxWidth: '640px', padding: '24px', borderRadius: '12px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div>
-                <h3 style={{ fontSize: 'var(--erp-text-dialog)', color: '#0f172a', margin: 0, fontWeight: 800 }}>
-                  Bill Details: {selectedInvoiceDetail.invoiceNumber}
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                  Customer: <strong>{selectedInvoiceDetail.customerName || 'Walk-in'}</strong> • Cashier: <strong>{selectedInvoiceDetail.createdBy}</strong>
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedInvoiceDetail(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
-              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-small)', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
-                    <th className="erp-table-heading">Code</th>
-                    <th className="erp-table-heading">Product</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Qty</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Price</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedInvoiceDetail.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
-                        {it.productSku || it.sku || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
-                        {it.productName || it.name || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
-                        {it.quantity}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                        Rs. {Number(it.unitPrice || 0).toFixed(2)}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
-                        Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ padding: '12px', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af' }}>BILLS HELD THIS MONTH</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1d4ed8' }}>{myBillsCount}</div>
+              </div>
+
+              <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>TOTAL AMOUNT</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#15803d' }}>
+                  Rs. {myTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              <div style={{ padding: '12px', background: '#faf5ff', borderRadius: '8px', border: '1px solid #e9d5ff' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6b21a8' }}>AVERAGE BILL</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#7e22ce' }}>
+                  Rs. {myAvgBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px' }}>
-              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
-              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
-                Rs. {Number(selectedInvoiceDetail.netTotal || 0).toFixed(2)}
-              </span>
-            </div>
-
-            <div style={{ textAlign: 'right', marginTop: '14px' }}>
+            <div style={{ textAlign: 'right' }}>
               <button
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setSelectedInvoiceDetail(null)}
+                type="button"
+                className="btn btn-secondary erp-button"
+                onClick={() => setActiveCircleModal(null)}
               >
                 Close
               </button>
@@ -2684,370 +1996,11 @@ export default function PosView({ onExitPos, initialHeldInvoice }) {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          HELD CARTS MODAL
+          MONTHLY RANGE TIERS OVERVIEW MODAL
          ───────────────────────────────────────────────────────────── */}
-      {showHeldModal && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{ width: 'min(800px, 96vw)', maxWidth: '800px', padding: '24px', borderRadius: '12px', maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: 'var(--erp-text-section)', color: '#0f172a', margin: 0, fontWeight: 700 }}>
-                  {isSupervisor ? 'Suspended / Held Carts' : 'My Suspended Bills'}
-                </h3>
-                <p style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '2px' }}>
-                  {isSupervisor
-                    ? 'Supervise and resume carts across active cashier sessions'
-                    : 'Your personal held transactions waiting to be completed'}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowHeldModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-              >
-                <X size={17} />
-              </button>
-            </div>
+      {showMonthlyRangesModal && <PosRangeProgress customer={selectedCustomer} progress={monthlyRangeProgress} loading={loadingMonthlyRange} onClose={()=>setShowMonthlyRangesModal(false)}/>}
 
-            {isSupervisor && (
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setHeldTab('mine')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    border: '1px solid',
-                    borderColor: heldTab === 'mine' ? '#2563eb' : '#e2e8f0',
-                    background: heldTab === 'mine' ? '#eff6ff' : '#ffffff',
-                    color: heldTab === 'mine' ? '#1d4ed8' : '#64748b',
-                    cursor: 'pointer',
-                  }}
-                >
-                  My Held Carts ({heldInvoices.filter((h) => h.createdBy === user?.username).length})
-                </button>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setHeldTab('all')}
-                  style={{
-                    flex: 1,
-                    padding: '6px 10px',
-                    border: '1px solid',
-                    borderColor: heldTab === 'all' ? '#2563eb' : '#e2e8f0',
-                    background: heldTab === 'all' ? '#eff6ff' : '#ffffff',
-                    color: heldTab === 'all' ? '#1d4ed8' : '#64748b',
-                    cursor: 'pointer',
-                  }}
-                >
-                  All Cashiers ({heldInvoices.length})
-                </button>
-              </div>
-            )}
-
-            {(() => {
-              const displayed =
-                isSupervisor && heldTab === 'mine'
-                  ? heldInvoices.filter((h) => h.createdBy === user?.username)
-                  : heldInvoices;
-
-              if (displayed.length === 0) {
-                return (
-                  <p style={{ textAlign: 'center', color: '#94a3b8', padding: '30px 0', fontSize: 'var(--erp-text-field)' }}>
-                    No suspended bills found.
-                  </p>
-                );
-              }
-
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
-                  {displayed.map((held) => (
-                    <div
-                      key={held.id}
-                      className="glass-card"
-                      style={{
-                        padding: '10px 14px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '10px',
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                          <span style={{ fontWeight: 700, color: '#2563eb' }}>{held.invoiceNumber}</span>
-                          {held.createdBy && (
-                            <span
-                              style={{
-                                fontSize: 'var(--erp-text-badge)',
-                                color: '#4338ca',
-                                background: '#e0e7ff',
-                                padding: '1px 5px',
-                                borderRadius: '4px',
-                                fontWeight: 600,
-                              }}
-                            >
-                              Cashier: {held.createdBy}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                          Customer: {held.customerName} | {held.items?.length || 0} items
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-button)' }}>
-                          Rs. {Number(held.netTotal).toFixed(2)}
-                        </span>
-                        <button
-                          className="btn btn-primary btn-sm erp-button"
-                          onClick={() => handleResumeInvoice(held)}
-                          style={{ padding: '4px 8px' }}
-                        >
-                          <PlayCircle size={12} /> Resume
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Target Ranges Breakdown Modal in POS */}
-      {showTargetRangesModal && activeTargetForModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            padding: '16px',
-          }}
-          onClick={() => setShowTargetRangesModal(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '20px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Target size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
-                  {activeTargetForModal.targetName} Slabs
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTargetRangesModal(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ margin: '0 0 12px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-              Purchasing within each slab unlocks the reward discount for this customer during the promotion period.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              {(activeTargetForModal.tiers || []).map((tier) => (
-                <div
-                  key={tier.id}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    border: tier.isAchieved ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                    background: tier.isAchieved ? '#f0fdf4' : '#f8fafc',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-body)', color: tier.isAchieved ? '#15803d' : '#1e293b' }}>
-                      {tier.tierName}
-                    </div>
-                    <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                      Spend: Rs. {Number(tier.minAmount).toLocaleString()} - {tier.maxAmount ? `Rs. ${Number(tier.maxAmount).toLocaleString()}` : 'Unlimited'}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: 'var(--erp-text-button)', color: tier.isAchieved ? '#16a34a' : '#0284c7' }}>
-                      {tier.discountPercentage}% Discount
-                    </div>
-                    <div style={{ fontSize: 'var(--erp-text-badge)', fontWeight: 700, color: tier.isAchieved ? '#16a34a' : '#94a3b8' }}>
-                      {tier.isAchieved ? '✓ REACHED' : 'NOT REACHED'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <button className="erp-button"
-                type="button"
-                onClick={() => setShowTargetRangesModal(false)}
-                style={{
-                  padding: '7px 16px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Monthly Purchase Ranges Breakdown Modal in POS (Screen B) */}
-      {showMonthlyRangesModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            padding: '16px',
-          }}
-          onClick={() => setShowMonthlyRangesModal(false)}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '14px',
-              maxWidth: '540px',
-              width: '100%',
-              padding: '22px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Award size={19} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 800, color: '#0f172a' }}>
-                  Customer Monthly Spend Range Tiers
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowMonthlyRangesModal(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p style={{ margin: '0 0 14px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-              Customer purchases accumulate each calendar month. Reaching the threshold automatically promotes the customer. Every month starts at Range 0.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              {(allRangeConfigs || []).map((tier) => {
-                const currentSpend = Number(monthlyRangeProgress?.monthlyPurchases || 0);
-                const projectedSpend = currentSpend + (subtotal || 0);
-                const threshold = Number(tier.minSpend || 0);
-                const isCurrentlyAchieved = currentSpend >= threshold;
-                const willAchieveWithCart = !isCurrentlyAchieved && projectedSpend >= threshold;
-
-                return (
-                  <div
-                    key={tier.id}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      border: isCurrentlyAchieved
-                        ? '1.5px solid #86efac'
-                        : willAchieveWithCart
-                        ? '1.5px solid #67e8f9'
-                        : '1px solid #e2e8f0',
-                      background: isCurrentlyAchieved
-                        ? '#f0fdf4'
-                        : willAchieveWithCart
-                        ? '#ecfeff'
-                        : '#f8fafc',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 'var(--erp-text-field)',
-                          color: isCurrentlyAchieved ? '#15803d' : willAchieveWithCart ? '#0891b2' : '#1e293b',
-                        }}
-                      >
-                        {tier.name}
-                      </div>
-                      <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                        Monthly Spend Threshold: <strong>Rs. {threshold.toLocaleString()}</strong>
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <span
-                        style={{
-                          fontSize: 'var(--erp-text-caption)',
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background: isCurrentlyAchieved ? '#dcfce7' : willAchieveWithCart ? '#cffafe' : '#f1f5f9',
-                          color: isCurrentlyAchieved ? '#15803d' : willAchieveWithCart ? '#0e7490' : '#94a3b8',
-                        }}
-                      >
-                        {isCurrentlyAchieved
-                          ? '✓ ACHIEVED'
-                          : willAchieveWithCart
-                          ? '⭐ REACHED WITH THIS BILL'
-                          : `NEEDS RS. ${(threshold - currentSpend).toLocaleString()} MORE`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ textAlign: 'right' }}>
-              <button
-                type="button"
-                onClick={() => setShowMonthlyRangesModal(false)}
-                className="btn-secondary erp-button"
-                style={{ padding: '6px 14px' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {editingCartItem && <PosLineEditor item={editingCartItem} busy={savingBill} onQty={handleEditCartItemQtyChange} onRate={handleEditCartItemDiscRateChange} onAmount={handleEditCartItemDiscAmtChange} onSave={handleSaveEditCartItem} onClose={()=>setEditingCartItem(null)}/>}
     </div>
   );
 }

@@ -4,6 +4,10 @@ import StatusBadge from './StatusBadge';
 import {staffCode} from '../utils/staffCode';
 import {printCurrentDirectory} from '../utils/printDirectory';
 
+export function allocationCode(quota) {
+  return quota?.allocationCode || quota?.code || (quota?.id != null ? `ALC-${String(quota.id).padStart(4,'0')}` : '—');
+}
+
 export default function AllocationTable({rows,loading,canEdit,onView,onEdit,onDelete,statusOf,onCreate}) {
   const printRow=event=>{
     event.stopPropagation();
@@ -13,10 +17,11 @@ export default function AllocationTable({rows,loading,canEdit,onView,onEdit,onDe
     printCurrentDirectory(root,'Inventory Allocation');
   };
   return <div className="allocation-list-table erp-table-frame"><div className="allocation-list-scroll erp-table-scroll"><table className="erp-table" aria-label="Inventory allocations">
-    <thead><tr>{['Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'].map(label=><th key={label} className={(label==='Actions'?'allocation-list-actions':undefined) + ' erp-table-heading'}>{label}</th>)}</tr></thead>
-    <tbody>{loading?<tr><td colSpan={8} className="allocation-list-empty erp-table-cell">Loading inventory allocations...</td></tr>:!rows.length?<tr><td colSpan={8} className="allocation-list-empty erp-table-cell"><ShieldCheck size={28}/><p>No inventory allocations found.</p>{canEdit && <button type="button" className="btn btn-primary erp-button" onClick={onCreate}>New Allocation</button>}</td></tr>:rows.map(q=>{
+    <thead><tr>{['Allocation code','Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'].map(label=><th key={label} className={(label==='Actions'?'allocation-list-actions':undefined) + ' erp-table-heading'}>{label}</th>)}</tr></thead>
+    <tbody>{loading?<tr><td colSpan={9} className="allocation-list-empty erp-table-cell">Loading inventory allocations...</td></tr>:!rows.length?<tr><td colSpan={9} className="allocation-list-empty erp-table-cell"><ShieldCheck size={28}/><p>No inventory allocations found.</p>{canEdit && <button type="button" className="btn btn-primary erp-button" onClick={onCreate}>New Allocation</button>}</td></tr>:rows.map(q=>{
       const stock=Number(q.totalStockAvailable ?? q.currentStockInWarehouse ?? 0),unit=q.productUnit || 'Units';
       return <tr key={q.id} onClick={()=>onView(q)} title="Click row to view allocation details">
+        <td className="erp-table-cell"><span className="erp-table-code">{allocationCode(q)}</span></td>
         <td className="erp-table-cell"><strong className="allocation-list-code">{q.productSku || '—'}</strong>{' '}<span className="allocation-list-name">{q.productName || 'Product not selected'}</span></td>
         <td className="erp-table-cell"><strong className="allocation-list-name">{q.userFullName || q.username || 'Staff not selected'}</strong><span className="allocation-list-secondary">{q.userEmployeeCode || (q.userId?staffCode({id:q.userId}):'—')}</span></td>
         <td className="allocation-list-quantity erp-table-cell"><span className={q.productId && stock<=0?'allocation-list-stock-empty':undefined}>{q.productId?stock.toLocaleString():'—'}</span>{q.productId && <small> {unit}</small>}</td>

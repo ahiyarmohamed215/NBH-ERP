@@ -7,6 +7,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "stock_adjustment_items")
 @Getter
 @Setter
@@ -26,6 +27,10 @@ public class StockAdjustmentItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name="source_grn_item_id")
+    private com.nbh.erp.grn.entity.GrnItem sourceGrnItem;
 
     @Column(name = "system_quantity", nullable = false)
     private BigDecimal systemQuantity;

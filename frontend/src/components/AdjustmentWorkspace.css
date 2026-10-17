@@ -1,0 +1,205 @@
+.adjustment-type-dialog {
+  width: min(440px, 94vw);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #1e293b;
+}
+.adjustment-type-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.adjustment-type-dialog header > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+.adjustment-type-dialog h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.adjustment-type-dialog p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+.adjustment-type-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+.adjustment-type-options .btn {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+.adjustment-type-options .btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #f8fafc;
+}
+.adjustment-type-options span {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.adjustment-type-options small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 5px;
+}
+.adjustment-type-dialog footer {
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+.adjustment-product-search {
+  position: relative;
+}
+.adjustment-product-search > label {
+  display: block;
+  font-size: var(--erp-text-label, 0.8rem);
+  margin-bottom: 7px;
+}
+.adjustment-search-input {
+  position: relative;
+}
+.adjustment-search-input > svg {
+  position: absolute;
+  left: 10px;
+  top: 11px;
+  color: #64748b;
+}
+.allocation-workspace .adjustment-search-input input {
+  width: 100%;
+  padding-left: 34px !important;
+}
+.adjustment-product-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  margin-top: 4px;
+}
+.adjustment-product-options > button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 12px;
+  text-align: left;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+}
+.adjustment-product-options > button[aria-selected="true"] {
+  background: #eff6ff;
+}
+.adjustment-product-options strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.adjustment-product-options small {
+  display: block;
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+.adjustment-product-options > p {
+  font-size: 0.8rem;
+  padding: 12px;
+  margin: 0;
+  color: #64748b;
+}
+.adjustment-option-stock {
+  text-align: right;
+  white-space: nowrap;
+}
+.adjustment-source-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+.adjustment-source-note strong {
+  color: #334155;
+  font-weight: 600;
+}
+.adjustment-change-type {
+  background: transparent;
+  border: 0;
+  text-align: left;
+  padding: 0;
+  color: #2563eb;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.adjustment-error {
+  color: #b91c1c;
+  font-size: 0.8rem;
+}
+.adjustment-type-dialog { width: min(480px, 94vw); }
+.adjustment-type-dialog .adjustment-type-choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.adjustment-type-dialog .adjustment-type-choice:hover,
+.adjustment-type-dialog .adjustment-type-choice:focus-visible {
+  border-color: var(--erp-accent, #0284c7);
+  background: var(--erp-accent-soft, #f0f9ff);
+  outline: 2px solid transparent;
+}
+.adjustment-type-dialog .adjustment-type-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #f0f9ff;
+  color: var(--erp-accent, #0284c7);
+}

@@ -27,15 +27,28 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Sales & Invoicing", description = "Point of Sale, Billing, and Held Carts APIs")
 public class InvoiceController {
-    public record CompleteHeldRequest(@jakarta.validation.constraints.NotEmpty java.util.List<@jakarta.validation.constraints.NotNull Long> ids) {}
+    public record CompleteHeldRequest(@jakarta.validation.constraints.NotEmpty java.util.List<@jakarta.validation.constraints.NotNull Long> ids,java.util.Map<Long,Long> expectedVersions) {}
     @PostMapping("/complete-held")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_EDIT')")
     public com.nbh.erp.common.dto.ApiResponse<?> completeHeld(@Valid @RequestBody CompleteHeldRequest request) {
-        return com.nbh.erp.common.dto.ApiResponse.ok(invoiceService.completeHeldInvoices(request.ids()));
+        return com.nbh.erp.common.dto.ApiResponse.ok(invoiceService.completeHeldInvoices(request.ids(),request.expectedVersions()));
     }
 
 
     private final InvoiceService invoiceService;
+    private final com.nbh.erp.sales.service.PosProgressService posProgress;
+
+    @GetMapping("/held/workspace")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
+    public ApiResponse<?> heldWorkspace(@RequestParam(defaultValue="mine") String scope,@RequestParam(required=false) String query,@RequestParam(required=false) Long excludeId){return ApiResponse.ok(invoiceService.heldWorkspace(scope,query,excludeId));}
+
+    @PostMapping("/held/merge-preview")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_EDIT')")
+    public ApiResponse<?> previewMerge(@Valid @RequestBody CompleteHeldRequest request){return ApiResponse.ok(invoiceService.previewHeldMerge(request.ids()));}
+
+    @GetMapping("/pos/progress")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_CREATE')")
+    public ApiResponse<?> progress(@RequestParam Long customerId,@RequestParam(required=false) Long billId){return ApiResponse.ok(posProgress.progress(customerId,billId));}
 
     @GetMapping
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
@@ -67,7 +80,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/cashiers/summary")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_VIEW_ALL')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Get per-cashier sales and held billing summary")
     public ResponseEntity<ApiResponse<List<CashierSalesSummaryDto>>> getCashierSalesSummary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -97,6 +110,12 @@ public class InvoiceController {
     public ResponseEntity<ApiResponse<InvoiceDto>> createInvoice(@Valid @RequestBody CreateInvoiceRequest request) {
         InvoiceDto created = invoiceService.createInvoice(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Invoice created successfully", created));
+    }
+
+    @PutMapping("/held/{id}/draft")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','SALES_CREATE')")
+    public ResponseEntity<ApiResponse<InvoiceDto>> savePosDraft(@PathVariable Long id,@Valid @RequestBody CreateInvoiceRequest request){
+        return ResponseEntity.ok(ApiResponse.ok(invoiceService.savePosDraft(id,request)));
     }
 
     @PostMapping("/held/{id}/resume")

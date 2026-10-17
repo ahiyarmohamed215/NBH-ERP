@@ -144,6 +144,7 @@ api.interceptors.response.use(
       if (url.includes('/brands')) {clearApiCache('/brands');clearApiCache('/products');clearApiCache('/inventory');}
       if (url.includes('/roles')) clearApiCache('/roles');
       if (url.includes('/products')) {clearApiCache('/products');clearApiCache('/inventory');}
+      if (url.includes('/invoices')) {clearApiCache('/products');clearApiCache('/inventory');}
       if (url.includes('/grns') || url.includes('/stock-adjustments')) {clearApiCache('/products');clearApiCache('/inventory');}
       if (url.includes('/customers')) clearApiCache('/customers');
 
@@ -161,7 +162,7 @@ api.interceptors.response.use(
           window.dispatchEvent(new CustomEvent('erp:customers_updated', { detail: payload }));
           window.dispatchEvent(new CustomEvent('erp:targets_updated', { detail: payload }));
         }
-        if (url.includes('/products') || url.includes('/inventory') || url.includes('/warehouses') || url.includes('/stock') || url.includes('/categories') || url.includes('/brands') || url.includes('/adjustments')) {
+        if (url.includes('/invoices') || url.includes('/products') || url.includes('/inventory') || url.includes('/warehouses') || url.includes('/stock') || url.includes('/categories') || url.includes('/brands') || url.includes('/adjustments')) {
           window.dispatchEvent(new CustomEvent('erp:inventory_updated', { detail: payload }));
         }
         if (url.includes('/invoices') || url.includes('/sales') || url.includes('/quotations') || url.includes('/payments')) {
@@ -454,15 +455,22 @@ export const prnApi = {
 };
 
 export const adjustmentApi = {
+  update: (id,data,process=false) => api.put(`/stock-adjustments/${id}?process=${process}`,data),
+  cancel: (id,reason) => api.post(`/stock-adjustments/${id}/cancel`,{reason}),
+  searchProducts: query => api.get('/stock-adjustments/products',{params:{query},skipCache:true,skipDedupe:true}),
   search: (params) => api.get('/stock-adjustments', { params }),
   getById: (id) => api.get(`/stock-adjustments/${id}`),
   create: (data, process = false) => api.post(`/stock-adjustments?process=${process}`, data),
-  process: (id) => api.post(`/stock-adjustments/${id}/process`),
+  process: (id,reason) => api.post(`/stock-adjustments/${id}/process`,reason?{reason}:undefined),
   reject: (id) => api.post(`/stock-adjustments/${id}/reject`),
 };
 
 export const salesApi = {
-  completeHeld: (ids) => api.post('/invoices/complete-held', { ids }),
+  savePosDraft: (id,data) => api.put(`/invoices/held/${id}/draft`,data),
+  getHeldWorkspace: (params) => api.get('/invoices/held/workspace',{params,skipCache:true,skipDedupe:true}),
+  previewHeldMerge: (ids) => api.post('/invoices/held/merge-preview',{ids}),
+  getPosProgress: (params) => api.get('/invoices/pos/progress',{params,skipCache:true,skipDedupe:true}),
+  completeHeld: (ids,expectedVersions) => api.post('/invoices/complete-held', { ids,expectedVersions }),
   search: (params) => fetchAllPages('/invoices', params),
   getHeld: (cashier) => api.get('/invoices/held', { params: cashier ? { cashier } : {} }),
   getCashierSalesSummary: (params) => api.get('/invoices/cashiers/summary', { params }),

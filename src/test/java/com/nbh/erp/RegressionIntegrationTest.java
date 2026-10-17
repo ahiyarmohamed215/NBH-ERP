@@ -225,6 +225,10 @@ class RegressionIntegrationTest {
   assertEquals(0,n("110").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
  @Test void openingStockAdjustmentEstablishesMissingCostAndBrandSellingPrice() {
+  var opening=com.nbh.erp.grn.entity.Grn.builder().grnNumber("REG-OPEN").supplier(supplier).warehouse(warehouse).receivedDate(LocalDate.now()).status("PROCESSED").items(new ArrayList<>()).build();
+  opening.getItems().add(com.nbh.erp.grn.entity.GrnItem.builder().grn(opening).product(product).warehouse(warehouse).quantityReceived(n("100")).unitCost(BigDecimal.ZERO).totalCost(BigDecimal.ZERO).build());
+  context.getBean(com.nbh.erp.grn.repository.GrnRepository.class).saveAndFlush(opening);
+
   var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("OPEN-B").name("Opening brand").markupPercent(n("25")).build());
   product.setBrand(brand);product.setCostPrice(BigDecimal.ZERO);product.setSellingPrice(BigDecimal.ZERO);product.setUseBrandMarkup(true);products.save(product);
   var request=new com.nbh.erp.stockadjustment.dto.CreateStockAdjustmentRequest();request.setWarehouseId(warehouse.getId());request.setAdjustmentDate(LocalDate.now());request.setReason("Opening cost correction");

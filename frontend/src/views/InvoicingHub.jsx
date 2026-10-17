@@ -595,6 +595,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // HELD BILLS DATA & WORKFLOW ACTIONS (100% Backend REST API)
   // -------------------------------------------------------------
   const [heldBills, setHeldBills] = useState([]);
+  const [heldOwnerScope,setHeldOwnerScope]=useState('mine');
+  const [creatingMergedInvoice,setCreatingMergedInvoice]=useState(false);
+  const [heldWorkspace,setHeldWorkspace]=useState(null);
   const [loadingHeldBills, setLoadingHeldBills] = useState(false);
   const [heldSearchQuery, setHeldSearchQuery] = useState('');
   const [heldStatusFilter, setHeldStatusFilter] = useState('ALL');
@@ -619,9 +622,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   const loadHeldBills = async () => {
     try {
       setLoadingHeldBills(true);
-      const res = await salesApi.getHeld();
-      const list = res.data && Array.isArray(res.data) ? res.data : [];
-      setHeldBills(list);
+      const res = await salesApi.getHeldWorkspace({scope:heldOwnerScope,query:heldSearchQuery});
+      const workspace=res.data?.data || res.data;
+      setHeldWorkspace(workspace);setHeldBills(workspace?.bills || []);
     } catch (err) {
       console.error('Failed to load held bills:', err);
     } finally {
@@ -630,10 +633,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   useEffect(() => {
-    if (currentTab === 'hold-bills') {
-      loadHeldBills();
-    }
-  }, [currentTab]);
+    if(currentTab!=='hold-bills')return;
+    const timer=setTimeout(loadHeldBills,200);
+    return()=>{clearTimeout(timer);};
+  },[currentTab,heldOwnerScope,heldSearchQuery]);
+  useDataSync(() => currentTab === 'hold-bills' ? loadHeldBills() : undefined,
+    ['erp:sales_updated'], [], ['sales']);
 
   const handleResumeHeldBill = (heldInv) => {
     setHeldToResume(heldInv);
@@ -643,7 +648,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // Workflow Action 1: Send bill to warehouse
   const handleSendToWarehouse = async (heldBill) => {
     try { await salesApi.update(heldBill.id, { status: 'SENT_TO_WAREHOUSE' }); await loadHeldBills();
-      addToast(`Bill ${heldBill.invoiceNumber} sent for warehouse verification`, 'success');
+      addToast(`Bill ${heldBill.heldNumber} sent for warehouse verification`, 'success');
     } catch (err) { addToast(err.message, 'error'); }
   };
 
@@ -675,72 +680,32 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   // Workflow Action 4: Merge multiple bills & open dispatch note
-  const handleOpenMergeDispatchModal = () => {
-    const selected = heldBills.filter((b) => selectedHeldIds.includes(b.id));
-    if (selected.length === 0) {
-      addToast('Please select at least one held bill to dispatch', 'error');
-      return;
-    }
-    const customer = selected[0].customerName || 'Walk-in';
-    const mergedItems = [];
-    selected.forEach((bill) => {
-      (bill.items || []).forEach((item) => {
-        mergedItems.push({
-          ...item,
-          fromInvoice: bill.invoiceNumber,
-        });
-      });
-    });
-
-    const totalVal = selected.reduce((s, b) => s + Number(b.netTotal || b.totalAmount || 0), 0);
-
-    setDispatchNoteData({
-      odnNumber: `ODN-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-      date: new Date().toLocaleString(),
-      customerName: customer,
-      sourceBills: selected.map((b) => b.invoiceNumber),
-      sourceBillIds: selected.map((b) => b.id),
-      items: mergedItems,
-      totalAmount: totalVal,
-      vehicleNumber: '',
-      driverName: '',
-      deliveryAddress: '',
-      deliveryNotes: '',
-    });
+  const openHeldMergePreview = async (ids) => {
+    try {
+      const response=await salesApi.previewHeldMerge(ids);
+      setDispatchNoteData(response.data?.data || response.data);
+    } catch(error) {addToast(error.message || 'Unable to prepare the selected held bills.','error');}
   };
-
-  const handleOpenSingleDispatchModal = (bill) => {
-    setSelectedHeldIds([bill.id]);
-    setDispatchNoteData({
-      odnNumber: `ODN-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
-      date: new Date().toLocaleString(),
-      customerName: bill.customerName || 'Walk-in',
-      sourceBills: [bill.invoiceNumber],
-      sourceBillIds: [bill.id],
-      items: (bill.items || []).map((it) => ({ ...it, fromInvoice: bill.invoiceNumber })),
-      totalAmount: Number(bill.netTotal || bill.totalAmount || 0),
-      vehicleNumber: '',
-      driverName: '',
-      deliveryAddress: '',
-      deliveryNotes: '',
-    });
-  };
+  const handleOpenMergeDispatchModal = () => openHeldMergePreview(selectedHeldIds);
+  const handleOpenSingleDispatchModal = (bill) => {setSelectedHeldIds([bill.id]);openHeldMergePreview([bill.id]);};
 
   // Workflow Action 5: Confirm Dispatch Note, mark bills as Dispatched, create Commercial Invoice
   const handleConfirmDispatch = async () => {
-    if (!dispatchNoteData) return;
+    if (!dispatchNoteData || creatingMergedInvoice) return;
+    setCreatingMergedInvoice(true);
     const targetIds = dispatchNoteData.sourceBillIds || [];
 
     try {
-      await salesApi.completeHeld(targetIds);
-      addToast('Invoices completed as unpaid credit sales. Assign the delivery trip in Delivery.', 'success');
+      const response=await salesApi.completeHeld(targetIds,dispatchNoteData.expectedVersions);
+      const created=(response.data?.data || response.data)?.[0];
+      addToast(`Invoice ${created?.invoiceNumber || ''} created from the selected held bills. Assign its delivery in Delivery.`, 'success');
       setSelectedHeldIds([]);
       setDispatchNoteData(null);
       await Promise.all([loadHeldBills(), loadBackendInvoices()]);
       setCurrentTab('sales');
     } catch (err) {
-      addToast('Failed to process dispatch: ' + err.message, 'error');
-    }
+      addToast('Failed to create invoice: ' + err.message, 'error');
+    } finally {setCreatingMergedInvoice(false);}
   };
 
   const filteredHeldBills = useMemo(() => {
@@ -748,7 +713,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       if (heldStatusFilter !== 'ALL' && b.status !== heldStatusFilter) return false;
       if (heldSearchQuery.trim()) {
         const q = heldSearchQuery.toLowerCase();
-        const num = (b.invoiceNumber || '').toLowerCase();
+        const num = (b.heldNumber || '').toLowerCase();
         const cust = (b.customerName || '').toLowerCase();
         const salesman = (b.salesman || b.salesmanName || b.createdBy || '').toLowerCase();
         const wh = (b.warehouseCode || '').toLowerCase();
@@ -765,9 +730,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       addToast('No held bills to export', 'error');
       return;
     }
-    const headers = ['Invoice #', 'Customer', 'Date / Time', 'Warehouse', 'Items Count', 'Cashier', 'Status', 'Total Amount'];
+    const headers = ['Held #', 'Customer', 'Date / Time', 'Warehouse', 'Items Count', 'Cashier', 'Status', 'Total Amount'];
     const rows = filteredHeldBills.map((b) => [
-      `"${b.invoiceNumber || ''}"`,
+      `"${b.heldNumber || ''}"`,
       `"${b.customerName || 'Walk-in'}"`,
       `"${b.invoiceDate ? new Date(b.invoiceDate).toLocaleString() : ''}"`,
       `"${b.warehouseCode || ''}"`,
@@ -822,8 +787,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
 
   useEffect(() => {
-    loadBackendQuotations();
-  }, []);
+    if (currentTab === 'quotations') loadBackendQuotations();
+  }, [currentTab]);
+  useDataSync(() => currentTab === 'quotations' ? loadBackendQuotations() : undefined,
+    ['erp:sales_updated'], [], ['quotations']);
 
   const resolveCustomerId = async (name) => {
     const res = await customerApi.search(name);
@@ -928,7 +895,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // Dedicated POS Full-Screen Mode (No navigation, no header, pure POS desk)
   if (currentTab === 'pos') {
     return (
-      <div style={{ flex: 1, minHeight: 0, height: '100%', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
+      <div style={{ flex: 1, minHeight: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
         <PosView
           onExitPos={() => {
             setHeldToResume(null);
@@ -1482,6 +1449,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* ------------------------------------------------------------- */}
       {currentTab === 'hold-bills' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
+          {heldWorkspace?<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'var(--erp-text-body)',color:'#64748b'}}><span>{heldWorkspace.periodStart} — {heldWorkspace.periodEnd}</span><span>{heldOwnerScope==='mine'?'My held bills this month':'Other staff held bills this month'}: <strong style={{color:'#1e293b'}}>Rs. {Number(heldOwnerScope==='mine'?heldWorkspace.mineAmount:heldWorkspace.othersAmount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></span></div>:null}
           {/* Toolbar Card */}
           <div
             style={{
@@ -1500,6 +1468,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               flexShrink: 0,
             }}
           >
+            <select className="erp-field" aria-label="Held bill owner" value={heldOwnerScope} onChange={e=>{setHeldOwnerScope(e.target.value);setSelectedHeldIds([]);}} style={{height:38,width:130}}><option value="mine">My bills</option><option value="others">Other bills</option></select>
             {/* Left Control: Search Input */}
             <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
               <Search
@@ -1514,7 +1483,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               />
               <input className="erp-field"
                 type="text"
-                placeholder="Search held bills by invoice #, customer, cashier, or warehouse..."
+                placeholder="Search held bills by held #, customer, cashier, or warehouse..."
                 value={heldSearchQuery}
                 onChange={(e) => setHeldSearchQuery(e.target.value)}
                 style={{
@@ -1595,7 +1564,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   whiteSpace: 'nowrap',
                 }}
               >
-                Total Value:&nbsp;<strong style={{ color: '#0f172a' }}>Rs. {filteredHeldBills.reduce((s, b) => s + Number(b.netTotal || b.totalAmount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                Open bills total:&nbsp;<strong style={{ color: '#0f172a' }}>Rs. {Number(heldWorkspace?.visibleAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
               </div>
 
               {(heldSearchQuery || heldStatusFilter !== 'ALL') && (
@@ -1699,43 +1668,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#1e40af' }}>
                   {selectedHeldIds.length} Held Bill{selectedHeldIds.length > 1 ? 's' : ''} Selected
                 </span>
-                {(() => {
-                  const selectedBills = heldBills.filter((b) => selectedHeldIds.includes(b.id));
-                  const customerNames = Array.from(new Set(selectedBills.map((b) => b.customerName || 'Walk-in')));
-                  if (customerNames.length > 1) {
-                    return (
-                      <span
-                        style={{
-                          fontSize: 'var(--erp-text-small)',
-                          color: '#b91c1c',
-                          backgroundColor: '#fee2e2',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <AlertCircle size={13} /> Multiple customers selected: {customerNames.join(', ')} (Must select same customer to merge)
-                      </span>
-                    );
-                  }
-                  return (
-                    <span
-                      style={{
-                        fontSize: 'var(--erp-text-small)',
-                        color: '#15803d',
-                        backgroundColor: '#dcfce7',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Customer: {customerNames[0]}
-                    </span>
-                  );
-                })()}
+
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button className="erp-button"
@@ -1762,7 +1695,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     gap: '6px',
                   }}
                 >
-                  <Truck size={15} /> Merge & Generate Dispatch Note
+                  <Truck size={15} /> Merge & Create Invoice
                 </button>
               </div>
             </div>
@@ -1798,7 +1731,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedHeldIds(filteredHeldBills.map((b) => b.id));
+                            setSelectedHeldIds(filteredHeldBills.filter(b=>b.canResume).map((b) => b.id));
                           } else {
                             setSelectedHeldIds([]);
                           }
@@ -1845,6 +1778,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
+                            disabled={!hb.canResume}
                             checked={selectedHeldIds.includes(hb.id)}
                             onChange={(e) => {
                               if (e.target.checked) {
@@ -1860,7 +1794,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                             style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: 'var(--erp-text-button)' }}
                             title="Click to inspect items"
                           >
-                            {hb.invoiceNumber}
+                            {hb.heldNumber}
                           </span>
                         </td>
                         <td className="erp-table-cell">
@@ -1895,7 +1829,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                         <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                             {/* 1. Resume in POS (Primary Action) */}
-                            <button disabled={!hasPermission(user,'SALES_CREATE')} aria-label="Resume billing in POS" className="erp-button erp-button-primary erp-table-icon-action"
+                            <button disabled={!hb.canResume || !hasPermission(user,'SALES_CREATE')} aria-label="Resume billing in POS" className="erp-button erp-button-primary erp-table-icon-action"
                               type="button"
                               onClick={() => handleResumeHeldBill(hb)}
                               style={{
@@ -1939,7 +1873,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
                             {/* Optional Warehouse helper if already in warehouse workflow */}
                             {hb.status === 'SENT_TO_WAREHOUSE' && (
-                              <button disabled={!hasPermission(user,'INVENTORY_ADJUST')} aria-label="Adjust warehouse stock quantities" className="erp-button erp-table-icon-action"
+                              <button disabled={!hb.canResume || !hasPermission(user,'INVENTORY_ADJUST')} aria-label="Adjust warehouse stock quantities" className="erp-button erp-table-icon-action"
                                 type="button"
                                 onClick={() => handleOpenStockAdjustment(hb)}
                                 style={{
@@ -1956,7 +1890,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                               ><Edit2 size={11} /></button>
                             )}
                             {hb.status === 'STOCK_ADJUSTED' && (
-                              <button disabled={!hasPermission(user,'SALES_EDIT')} aria-label="Generate Dispatch Note" className="erp-button erp-table-icon-action"
+                              <button disabled={!hb.canResume || !hasPermission(user,'SALES_EDIT')} aria-label="Create invoice from held bill" className="erp-button erp-table-icon-action"
                                 type="button"
                                 onClick={() => handleOpenSingleDispatchModal(hb)}
                                 style={{
@@ -2768,7 +2702,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', fontWeight: 800 }}>
-                  Held Bill: {selectedHeldDetail.invoiceNumber}
+                  Held Bill: {selectedHeldDetail.heldNumber}
                 </h3>
                 <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
                   Customer: <strong>{selectedHeldDetail.customerName || 'Walk-in'}</strong> • Salesman: <strong>{selectedHeldDetail.salesman || selectedHeldDetail.salesmanName || selectedHeldDetail.createdBy || 'Staff'}</strong>
@@ -2885,7 +2819,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <Edit3 size={18} color="#7c3aed" /> Warehouse Stock Adjustment
                 </h3>
                 <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                  Bill: <strong>{adjustingHeldBill.invoiceNumber}</strong> • Customer: <strong>{adjustingHeldBill.customerName || 'Walk-in'}</strong> • Warehouse: <strong>{adjustingHeldBill.warehouseCode || 'WH'}</strong>
+                  Bill: <strong>{adjustingHeldBill.heldNumber}</strong> • Customer: <strong>{adjustingHeldBill.customerName || 'Walk-in'}</strong> • Warehouse: <strong>{adjustingHeldBill.warehouseCode || 'WH'}</strong>
                 </p>
               </div>
               <button
@@ -3041,11 +2975,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Truck size={22} color="#0284c7" />
                   <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
-                    ORDER DISPATCH NOTE
+                    Create invoice from held bills
                   </h2>
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
-                  Official Delivery & Handover Document • Ref: <strong style={{ color: '#0284c7', fontFamily: 'monospace' }}>{dispatchNoteData.odnNumber}</strong>
+                  Review selected held bills before creating one invoice.
                 </p>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -3057,7 +2991,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <X size={20} />
                 </button>
                 <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '6px' }}>
-                  Date: <strong>{new Date().toLocaleDateString()}</strong>
+                  Date: <strong>{dispatchNoteData.date}</strong>
                 </div>
               </div>
             </div>
@@ -3070,8 +3004,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-nav)' }}>{dispatchNoteData.customerName}</div>
                 </div>
                 <div>
-                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Merged Held Bills ({dispatchNoteData.billIds?.length || 1}):</div>
-                  <div style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{dispatchNoteData.billNumbers?.join(', ')}</div>
+                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Merged Held Bills ({dispatchNoteData.sourceBillIds?.length || 0}):</div>
+                  <div style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{dispatchNoteData.sourceBills?.join(', ')}</div>
                 </div>
               </div>
 
@@ -3113,7 +3047,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
               {/* Total & Summary */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#e0f2fe', borderRadius: '8px' }}>
-                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0369a1' }}>Total Dispatch Order Value:</span>
+                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0369a1' }}>Invoice total:</span>
                 <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#0284c7', fontFamily: 'monospace' }}>
                   Rs. {Number(dispatchNoteData.totalAmount || 0).toFixed(2)}
                 </span>
@@ -3155,10 +3089,11 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 <button
                   type="button"
                   className="btn btn-primary erp-button"
+                  disabled={creatingMergedInvoice}
                   onClick={handleConfirmDispatch}
                   style={{ gap: '6px', backgroundColor: '#16a34a', borderColor: '#16a34a' }}
                 >
-                  <Check size={16} /> Confirm Dispatch & Create Invoice
+                  <Check size={16} /> {creatingMergedInvoice?'Creating…':'Create Invoice'}
                 </button>
               </div>
             </div>

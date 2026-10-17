@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "permissions")
 @Getter
 @Setter

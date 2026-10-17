@@ -3,6 +3,12 @@ import React, { createContext, useContext, useLayoutEffect, useRef, useState } f
 const WorkspaceActive = createContext(true);
 export const useWorkspaceActive = () => useContext(WorkspaceActive);
 
+// Nested retained tabs must also inherit their enclosing module's visibility.
+export function WorkspaceActivity({active, children}) {
+  const parentActive = useWorkspaceActive();
+  return <WorkspaceActive.Provider value={parentActive && active}>{children}</WorkspaceActive.Provider>;
+}
+
 function Workspace({ active, id, children }) {
   const element = useRef(null);
   const positions = useRef(new Map());

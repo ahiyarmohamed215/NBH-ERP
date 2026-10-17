@@ -37,6 +37,10 @@ public class StockAdjustmentController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @GetMapping("/products")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
+    public ApiResponse<?> searchProducts(@RequestParam(defaultValue="") String query){return ApiResponse.ok(adjustmentService.searchProducts(query));}
+
     @GetMapping("/{id}")
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('STOCK_ADJUSTMENT')")
     @Operation(summary = "Get stock adjustment by ID")
@@ -45,7 +49,7 @@ public class StockAdjustmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_ADJUST')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
     @Operation(summary = "Create a stock adjustment (pass ?process=true to auto-adjust inventory immediately)")
     public ResponseEntity<ApiResponse<StockAdjustmentDto>> createAdjustment(
             @Valid @RequestBody CreateStockAdjustmentRequest request,
@@ -55,16 +59,31 @@ public class StockAdjustmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Stock adjustment created successfully", created));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
+    public ApiResponse<StockAdjustmentDto> updateDraft(@PathVariable Long id, @Valid @RequestBody CreateStockAdjustmentRequest request,
+            @RequestParam(defaultValue="false") boolean process) {
+        return ApiResponse.ok(adjustmentService.updateDraft(id,request,process));
+    }
+
+    public record CancelRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=1000) String reason) {}
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
+    public ApiResponse<StockAdjustmentDto> cancel(@PathVariable Long id,@Valid @RequestBody CancelRequest request) {
+        return ApiResponse.ok(adjustmentService.cancelAdjustment(id,request.reason()));
+    }
+
     @PostMapping("/{id}/process")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_ADJUST')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
     @Operation(summary = "Process stock adjustment and update warehouse inventory")
-    public ResponseEntity<ApiResponse<StockAdjustmentDto>> processAdjustment(@PathVariable Long id) {
-        StockAdjustmentDto processed = adjustmentService.processAdjustment(id);
+    public ResponseEntity<ApiResponse<StockAdjustmentDto>> processAdjustment(@PathVariable Long id, @Valid @RequestBody(required=false) CancelRequest request) {
+        StockAdjustmentDto processed = adjustmentService.processAdjustment(id, request==null?null:request.reason());
         return ResponseEntity.ok(ApiResponse.ok("Stock adjustment processed and inventory synchronized", processed));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN') or hasAuthority('INVENTORY_ADJUST')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','INVENTORY_ADJUST')")
     @Operation(summary = "Reject draft stock adjustment")
     public ResponseEntity<ApiResponse<Void>> rejectAdjustment(@PathVariable Long id) {
         adjustmentService.rejectAdjustment(id);

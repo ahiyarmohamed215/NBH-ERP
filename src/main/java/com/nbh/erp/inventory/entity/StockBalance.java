@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "stock_balances", uniqueConstraints = {
         @UniqueConstraint(name = "uk_warehouse_product", columnNames = {"warehouse_id", "product_id"})
 })

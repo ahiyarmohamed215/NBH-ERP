@@ -19,7 +19,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class InvoiceDto {
     private Long id;
+    private long recordVersion;
     private String invoiceNumber;
+    private String heldNumber;
+    private Long mergedInvoiceId;
+    private Boolean canResume;
     private Long customerId;
     private String customerCode;
     private String customerName;
@@ -66,7 +70,10 @@ public class InvoiceDto {
 
         return InvoiceDto.builder()
                 .id(inv.getId())
+                .recordVersion(inv.getRecordVersion())
                 .invoiceNumber(inv.getInvoiceNumber())
+                .heldNumber(inv.getHeldNumber())
+                .mergedInvoiceId(inv.getMergedInvoiceId())
                 .customerId(inv.getCustomer().getId())
                 .customerCode(inv.getCustomer().getCustomerCode())
                 .customerName(inv.getCustomer().getName())

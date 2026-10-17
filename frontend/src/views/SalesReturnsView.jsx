@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect } from 'react';
 import { buildSalesReturnPayload } from '../utils/invoiceMapping';
@@ -55,6 +56,7 @@ export default function SalesReturnsView({ embedded = false }) {
     });
   };
 
+  useDataSync(() => loadData(), ['erp:sales_updated'], [], ['sales','returns']);
   const loadData = async () => {
     try {
       setLoading(true);

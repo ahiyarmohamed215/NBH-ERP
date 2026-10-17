@@ -7,7 +7,7 @@ const inactiveStatuses = new Set(['REDUCTION','INACTIVE', 'CANCELLED', 'CANCELED
 
 export default function StatusBadge({ status, label, onClick, title, disabled, 'aria-label': ariaLabel }) {
   const value = String(status || 'DRAFT').toUpperCase();
-  const tone = successStatuses.has(value) ? 'success' : pendingStatuses.has(value) ? 'pending' : inactiveStatuses.has(value) ? 'inactive' : 'neutral';
+  const tone = value === 'ADJUSTED' || successStatuses.has(value) ? 'success' : pendingStatuses.has(value) ? 'pending' : inactiveStatuses.has(value) ? 'inactive' : 'neutral';
   const Tag = onClick ? 'button' : 'span';
   return <Tag className={`erp-status-badge erp-status-${tone}`} data-status={value} title={title} aria-label={ariaLabel}
     {...(onClick ? { type: 'button', onClick, disabled } : {})}>

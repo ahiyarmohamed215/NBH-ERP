@@ -22,5 +22,8 @@ public class CashierSalesSummaryDto {
     private BigDecimal totalSalesAmount;
     private Long heldInvoicesCount;
     private BigDecimal totalHeldAmount;
+    private BigDecimal averageHeldAmount;
     private LocalDate lastSaleDate;
+    private LocalDate periodStart;
+    private LocalDate periodEnd;
 }

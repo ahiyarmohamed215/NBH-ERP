@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import StatusBadge from '../components/StatusBadge';
 import {useAuth} from '../context/AuthContext';
 import {hasPermission} from '../utils/moduleAccess';
@@ -26,6 +27,7 @@ export default function DashboardView({ onNavigate }) {
     loadSummary();
   }, []);
 
+  useDataSync(() => loadSummary(), ['erp:data_changed'], [], ['dashboard']);
   const loadSummary = async () => {
     try {
       setLoading(true);

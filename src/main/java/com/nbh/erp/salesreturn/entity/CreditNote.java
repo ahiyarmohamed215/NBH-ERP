@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "credit_notes")
 @Getter
 @Setter

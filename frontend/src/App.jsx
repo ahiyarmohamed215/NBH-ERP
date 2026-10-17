@@ -475,8 +475,8 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-      {/* Persistent sidebar navigation */}
-      {(
+      {/* Persistent sidebar navigation (hidden in POS mode) */}
+      {!isPosMode && (
         <aside
           className={`glass-sidebar ${isSidebarCompact ? 'collapsed' : ''}`}
           style={{
@@ -670,7 +670,7 @@ export default function App() {
         )}
 
         {/* Dynamic Workspace Rendering */}
-        <main className="erp-application" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
+        <main className="erp-application" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: isPosMode ? 'hidden' : 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, width: '100%', position: 'relative' }}>
           {accessibleModules.length === 0 ? (
             <ErrorState
               type="access-denied"

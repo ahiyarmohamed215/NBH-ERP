@@ -34,6 +34,7 @@ import java.util.ArrayList;
 public class GrnService {
     private final com.nbh.erp.common.service.IdempotencyService idempotency;
 
+    private final com.nbh.erp.stockadjustment.repository.StockAdjustmentRepository adjustmentRepository;
     private final GrnRepository grnRepository;
     private final com.nbh.erp.purchaseorder.service.PurchaseOrderService purchaseOrders;
     private final com.nbh.erp.purchasereturn.repository.PurchaseReturnRepository purchaseReturns;
@@ -413,6 +414,7 @@ public class GrnService {
     }
 
     private void ensureNoDependentTransactions(Grn grn, String action) {
+        if(adjustmentRepository.hasGrnLinks(grn.getId()))throw new BusinessException("Cannot "+action+" GRN "+grn.getGrnNumber()+": a stock adjustment is linked to this receipt.");
         if (purchaseReturns.totalReturned(grn.getId()).signum() > 0 || supplierPayments.totalPaid(grn.getId()).signum() > 0) {
             throw new BusinessException("Reverse dependent supplier payments/returns before " + action + " this receipt");
         }

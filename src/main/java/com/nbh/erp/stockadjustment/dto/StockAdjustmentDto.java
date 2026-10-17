@@ -24,6 +24,7 @@ public class StockAdjustmentDto {
     private String warehouseCode;
     private String warehouseName;
     private String status;
+    private String adjustmentType;
     private LocalDate adjustmentDate;
     private String reason;
     private String approvedBy;
@@ -40,6 +41,7 @@ public class StockAdjustmentDto {
                 .warehouseCode(sa.getWarehouse().getCode())
                 .warehouseName(sa.getWarehouse().getName())
                 .status(sa.getStatus())
+                .adjustmentType(sa.getAdjustmentType())
                 .adjustmentDate(sa.getAdjustmentDate())
                 .reason(sa.getReason())
                 .approvedBy(sa.getApprovedBy())
@@ -67,6 +69,9 @@ public class StockAdjustmentDto {
         private BigDecimal differenceQuantity;
         private BigDecimal unitCost;
         private String reason;
+        private Long sourceGrnId;
+        private Long sourceGrnItemId;
+        private String sourceGrnNumber;
 
         public static StockAdjustmentItemDto from(StockAdjustmentItem item) {
             return StockAdjustmentItemDto.builder()
@@ -80,6 +85,9 @@ public class StockAdjustmentDto {
                     .differenceQuantity(item.getDifferenceQuantity())
                     .unitCost(item.getUnitCost())
                     .reason(item.getReason())
+                    .sourceGrnId(item.getSourceGrnItem()!=null?item.getSourceGrnItem().getGrn().getId():null)
+                    .sourceGrnItemId(item.getSourceGrnItem()!=null?item.getSourceGrnItem().getId():null)
+                    .sourceGrnNumber(item.getSourceGrnItem()!=null?item.getSourceGrnItem().getGrn().getGrnNumber():null)
                     .build();
         }
     }

@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -67,6 +68,8 @@ export default function AuditHub({ activeSubTab = 'day-summary', onSubTabChange 
   useEffect(() => {
     fetchDaySummary(selectedDate);
   }, [selectedDate, fetchDaySummary]);
+
+  useDataSync(() => fetchDaySummary(selectedDate, true), ['erp:data_changed'], [], ['audit']);
 
   // Quick Date Selectors
   const setQuickDate = (offsetDays) => {

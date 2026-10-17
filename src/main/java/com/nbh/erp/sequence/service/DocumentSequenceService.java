@@ -5,8 +5,10 @@ import com.nbh.erp.sequence.repository.DocumentSequenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 
@@ -16,9 +18,23 @@ import java.time.LocalDate;
 public class DocumentSequenceService {
 
     private final DocumentSequenceRepository sequenceRepository;
+    private final PlatformTransactionManager transactionManager;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public synchronized String getNextNumber(String documentType) {
+        // Keep the monitor until the independent number transaction has committed.
+        // Method-level transactions commit after a synchronized method releases its lock.
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        for (int attempt = 0; ; attempt++) {
+            try { return transaction.execute(status -> nextNumber(documentType)); }
+            catch (DataIntegrityViolationException collision) {
+                // Another application instance may have initialized the year first.
+                if (attempt >= 2) throw collision;
+            }
+        }
+    }
+
+    private String nextNumber(String documentType) {
         int currentYear = LocalDate.now().getYear();
         
         DocumentSequence sequence = sequenceRepository.findByDocumentTypeAndYearForUpdate(documentType, currentYear)
@@ -41,62 +57,50 @@ public class DocumentSequenceService {
         return String.format("%s%06d", sequence.getPrefix(), nextVal);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateInvoiceNumber() {
         return getNextNumber("INV");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateGrnNumber() {
         return getNextNumber("GRN");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateGtnNumber() {
         return getNextNumber("GTN");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generatePrnNumber() {
         return getNextNumber("PRN");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateAdjustmentNumber() {
         return getNextNumber("ADJ");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateReturnNumber() {
         return getNextNumber("RTN");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateCreditNoteNumber() {
         return getNextNumber("CRN");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generatePaymentNumber() {
         return getNextNumber("REC");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateQuotationNumber() {
         return getNextNumber("QT");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateAdvanceVoucherNumber() {
         return getNextNumber("ADV");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateTargetNumber() {
         return getNextNumber("TGT");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String generateRefundNumber() {
         return getNextNumber("RFD");
     }

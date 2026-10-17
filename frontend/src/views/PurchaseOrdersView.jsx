@@ -12,6 +12,7 @@ import { printPurchaseOrder, printPurchaseOrders, purchaseOrderDate } from '../u
 import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import PurchaseLines from '../components/PurchaseLines';
 import { usePurchasingStatusChange } from '../hooks/usePurchasingStatusChange';
+import { useDataSync } from '../hooks/useDataSync';
 import React, { useState, useEffect, useRef } from 'react';
 import { supplierApi, warehouseApi, productApi, purchaseOrderApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -105,6 +106,8 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
     const failed = requests.filter((_,index) => results[index].status === 'rejected').map(([name]) => name);
     if (failed.length) addToast(`Purchase orders loaded; could not refresh ${failed.join(', ')}.`,'warning');
   };
+
+  useDataSync(() => loadData(), ['erp:purchasing_updated', 'erp:inventory_updated'], [], ['orders','suppliers','inventory','grn','gtn','prn']);
 
   const resetForm = () => {
     setEditingPoId(null);setEditingPoStatus('DRAFT');setIntakeProduct(null);

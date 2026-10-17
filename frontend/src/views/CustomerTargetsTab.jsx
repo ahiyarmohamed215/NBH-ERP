@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   customerTargetApi,
@@ -120,12 +121,7 @@ export default function CustomerTargetsTab({
     loadTargets();
   }, []);
 
-  // Listen for target updates from event bus
-  useEffect(() => {
-    const handleUpdate = () => loadTargets();
-    window.addEventListener('erp:targets_updated', handleUpdate);
-    return () => window.removeEventListener('erp:targets_updated', handleUpdate);
-  }, []);
+  useDataSync(() => loadTargets(), ['erp:targets_updated'], [], ['targets','sales','customers']);
 
   // Filtered targets
   const filteredTargets = useMemo(() => {

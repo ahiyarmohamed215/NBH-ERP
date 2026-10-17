@@ -76,6 +76,17 @@ public class StockService {
     }
 
     @Transactional
+    public void changeReservation(Long warehouseId,Long productId,BigDecimal delta) {
+        StockBalance balance=stockBalanceRepository.findByWarehouseIdAndProductIdForUpdate(warehouseId,productId)
+            .orElseThrow(()->new InsufficientStockException(productId,warehouseId,BigDecimal.ZERO,delta.abs()));
+        BigDecimal reserved=balance.getReservedQuantity()!=null?balance.getReservedQuantity():BigDecimal.ZERO;
+        if(delta.signum()>0 && balance.getAvailableQuantity().compareTo(delta)<0)
+            throw new InsufficientStockException(productId,warehouseId,balance.getAvailableQuantity(),delta);
+        if(reserved.add(delta).signum()<0)throw new IllegalStateException("Stock reservation is inconsistent");
+        balance.setReservedQuantity(reserved.add(delta));stockBalanceRepository.save(balance);
+    }
+
+    @Transactional
     public StockBalance increaseStock(
             Long warehouseId,
             Long productId,
@@ -255,6 +266,8 @@ public class StockService {
                 );
 
         BigDecimal before = stockBalance.getQuantity() != null ? stockBalance.getQuantity() : BigDecimal.ZERO;
+        if(physicalQuantity.compareTo(stockBalance.getReservedQuantity()!=null?stockBalance.getReservedQuantity():BigDecimal.ZERO)<0)
+            throw new com.nbh.erp.common.exception.BusinessException("Stock count cannot be lower than the stock reserved for held bills");
         BigDecimal difference = physicalQuantity.subtract(before);
 
         if (difference.compareTo(BigDecimal.ZERO) == 0) {

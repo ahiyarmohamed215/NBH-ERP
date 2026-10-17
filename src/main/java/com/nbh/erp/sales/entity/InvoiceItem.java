@@ -7,6 +7,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
+@EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "invoice_items")
 @Getter
 @Setter

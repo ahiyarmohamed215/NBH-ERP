@@ -34,6 +34,10 @@ public class StockAdjustment extends BaseEntity {
     @Builder.Default
     private String status = "DRAFT"; // DRAFT, PROCESSED, REJECTED
 
+    @Column(name="adjustment_type",nullable=false,length=20)
+    @Builder.Default
+    private String adjustmentType="COUNT";
+
     @Column(name = "adjustment_date", nullable = false)
     private LocalDate adjustmentDate;
 

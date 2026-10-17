@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import StatusBadge from '../components/StatusBadge';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -218,20 +219,11 @@ export default function CustomerMonthlyRangeHub({
     }
   }, [subTab, selectedMonth, loadReports, loadDashboard]);
 
-  // Listen to ERP event bus updates (invoices finalized, targets changed)
-  useEffect(() => {
-    const handleSync = () => {
-      if (subTab === 'dashboard') loadDashboard();
-      if (subTab === 'setup') loadRanges();
-      if (subTab === 'reports') loadReports();
-    };
-    window.addEventListener('erp:sales_updated', handleSync);
-    window.addEventListener('erp:targets_updated', handleSync);
-    return () => {
-      window.removeEventListener('erp:sales_updated', handleSync);
-      window.removeEventListener('erp:targets_updated', handleSync);
-    };
-  }, [subTab, loadDashboard, loadRanges, loadReports]);
+  useDataSync(() => {
+    if (subTab === 'dashboard') return loadDashboard();
+    if (subTab === 'setup') return loadRanges();
+    if (subTab === 'reports') return loadReports();
+  }, ['erp:sales_updated','erp:targets_updated'], [], ['sales','targets','customers','users']);
 
   // =========================================================================
   // Screen A Actions: Range CRUD & Status Toggle

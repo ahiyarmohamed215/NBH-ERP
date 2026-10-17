@@ -8,6 +8,7 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "quotation_items")
 @Getter
 @Setter

@@ -24,12 +24,24 @@ import java.util.List;
 @Builder
 public class Invoice extends BaseEntity {
 
+    @Column(name="stock_reserved",nullable=false)
+    @Builder.Default
+    private Boolean stockReserved=false;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "invoice_number", nullable = false, unique = true, length = 50)
+    @Column(name = "invoice_number", unique = true, length = 50)
     private String invoiceNumber;
+
+    @Column(name = "held_number", unique = true, length = 50)
+    private String heldNumber;
+
+    @Column(name = "merged_invoice_id")
+    private Long mergedInvoiceId;
+
+    public String getDocumentNumber() { return invoiceNumber != null ? invoiceNumber : heldNumber; }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "customer_id", nullable = false)

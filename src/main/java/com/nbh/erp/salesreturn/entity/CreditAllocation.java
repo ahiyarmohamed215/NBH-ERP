@@ -3,6 +3,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 @Entity @Getter @Setter @NoArgsConstructor
+@EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 public class CreditAllocation {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @ManyToOne(optional=false) private CreditNote creditNote;

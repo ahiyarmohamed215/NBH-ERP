@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import {canWriteTab,hasPermission,canAccessTab} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
@@ -250,6 +251,7 @@ export default function PaymentsHub({ activeSubTab = 'payments', onSubTabChange 
     loadCustomers();
   }, []);
 
+  useDataSync(() => Promise.allSettled([loadBackendPayments(),loadBackendAdvances(),loadBackendRefunds(),loadBackendInvoices(),loadCustomers()]), ['erp:sales_updated','erp:customers_updated'], [], ['payments','returns','sales','customers']);
   const resolveCustomerId = async (name) => {
     try {
       const res = await customerApi.search(name);

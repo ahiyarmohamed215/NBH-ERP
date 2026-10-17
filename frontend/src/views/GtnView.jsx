@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import {useAuth} from '../context/AuthContext';
 import {hasPermission} from '../utils/moduleAccess';
 import {newestFirst} from '../utils/recordOrder';
@@ -104,7 +105,8 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
     });
   };
 
-  const loadData = async () => {
+  useDataSync(() => loadData({preserveEditor:true}), ['erp:purchasing_updated','erp:inventory_updated'], [], ['gtn','inventory']);
+  const loadData = async ({preserveEditor=false} = {}) => {
     try {
       setLoading(true);
       const [gtnRes, whRes, prodRes, stockRows, staffRes] = await Promise.all([
@@ -125,7 +127,7 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
       setInventory(stockRows);
       setStaff(staffRes.data || []);
 
-      if (formData.items.length === 0) {
+      if (!preserveEditor && formData.items.length === 0) {
         resetForm(whList, prodList);
       }
     } catch (err) {

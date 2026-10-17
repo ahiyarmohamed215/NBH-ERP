@@ -4,6 +4,7 @@ import { Download, Printer, RefreshCw, Eye, Edit2, History } from 'lucide-react'
 /**
  * Reusable Global Toolbar Action Buttons (Export CSV, Print A4, Download PDF, Refresh)
  * Standardized across all ERP hubs (Employees, Customers, Groups, Inventory, Sales)
+ * Matching GRN and Supplier standard: 38x38px, #cbd5e1 border, size 15 icons.
  */
 export function ToolbarActions({
   onExportCsv,
@@ -18,11 +19,11 @@ export function ToolbarActions({
   extraActions = null,
 }) {
   const buttonStyle = {
-    height: '34px',
-    width: '36px',
-    minWidth: '36px',
+    height: '38px',
+    width: '38px',
+    minWidth: '38px',
     backgroundColor: '#ffffff',
-    border: '1px solid #e2e8f0',
+    border: '1px solid #cbd5e1',
     borderRadius: '6px',
     color: '#334155',
     display: 'inline-flex',
@@ -30,7 +31,7 @@ export function ToolbarActions({
     justifyContent: 'center',
     cursor: 'pointer',
     boxSizing: 'border-box',
-    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+    boxShadow: 'none',
     transition: 'all 0.15s ease',
     padding: 0,
     outline: 'none',
@@ -44,7 +45,7 @@ export function ToolbarActions({
 
   const handleMouseLeave = (e) => {
     e.currentTarget.style.backgroundColor = '#ffffff';
-    e.currentTarget.style.borderColor = '#e2e8f0';
+    e.currentTarget.style.borderColor = '#cbd5e1';
     e.currentTarget.style.color = '#334155';
   };
 
@@ -61,8 +62,9 @@ export function ToolbarActions({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           title={exportTitle}
+          aria-label={exportTitle}
         >
-          <Download size={14} />
+          <Download size={15} />
         </button>
       )}
 
@@ -75,8 +77,9 @@ export function ToolbarActions({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           title={printTitle}
+          aria-label={printTitle}
         >
-          <Printer size={14} />
+          <Printer size={15} />
         </button>
       )}
 
@@ -89,8 +92,9 @@ export function ToolbarActions({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           title={refreshTitle}
+          aria-label={refreshTitle}
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
         </button>
       )}
     </div>
@@ -120,15 +124,28 @@ export function TableRowActions({
     [onHistory, historyTitle, History],
     [onEdit, editTitle, Edit2],
   ];
-  return <div className="erp-row-actions" onClick={event=>event.stopPropagation()}>
-    {extraActions}
-    {actions.filter(([handler])=>handler).map(([handler,title,Icon])=>(
-      <button key={title} type="button" className="erp-table-icon-action"
-        title={title} aria-label={title} onClick={event=>{event.stopPropagation();handler();}}>
-        <Icon size={13}/>
-      </button>
-    ))}
-  </div>;
+  return (
+    <div className="erp-row-actions" onClick={(event) => event.stopPropagation()}>
+      {extraActions}
+      {actions
+        .filter(([handler]) => handler)
+        .map(([handler, title, Icon]) => (
+          <button
+            key={title}
+            type="button"
+            className="erp-table-icon-action"
+            title={title}
+            aria-label={title}
+            onClick={(event) => {
+              event.stopPropagation();
+              handler();
+            }}
+          >
+            <Icon size={13} />
+          </button>
+        ))}
+    </div>
+  );
 }
 
 export default ToolbarActions;

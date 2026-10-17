@@ -51,6 +51,11 @@ public class CreateInvoiceRequest {
     @Builder.Default
     private Boolean hold = false; // If true, saved as HELD cart
 
+    @PositiveOrZero
+    private Long expectedVersion;
+
+    private Boolean reserveStock; // POS working bills reserve availability before checkout.
+
     public boolean isHold() {
         return Boolean.TRUE.equals(this.hold);
     }

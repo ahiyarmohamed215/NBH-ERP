@@ -82,7 +82,7 @@ public class PdfGenerationService {
 
             PdfPCell leftCell = new PdfPCell();
             leftCell.setBorder(Rectangle.NO_BORDER);
-            leftCell.addElement(new Paragraph("INVOICE TO:", boldBody));
+            leftCell.addElement(new Paragraph(invoice.getInvoiceNumber()==null?"HELD BILL FOR:":"INVOICE TO:", boldBody));
             leftCell.addElement(new Paragraph(invoice.getCustomer().getName(), bodyFont));
             leftCell.addElement(new Paragraph("Phone: " + (invoice.getCustomer().getPhone() != null ? invoice.getCustomer().getPhone() : "-"), bodyFont));
             leftCell.addElement(new Paragraph("Warehouse: " + invoice.getWarehouse().getName(), bodyFont));
@@ -90,7 +90,7 @@ public class PdfGenerationService {
             PdfPCell rightCell = new PdfPCell();
             rightCell.setBorder(Rectangle.NO_BORDER);
             rightCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            rightCell.addElement(new Paragraph("INVOICE: " + invoice.getInvoiceNumber(), titleFont));
+            rightCell.addElement(new Paragraph((invoice.getInvoiceNumber()==null?"HELD BILL: ":"INVOICE: ") + invoice.getDocumentNumber(), titleFont));
             rightCell.addElement(new Paragraph("Date: " + DateUtils.formatDate(invoice.getInvoiceDate()), bodyFont));
             rightCell.addElement(new Paragraph("Payment: " + invoice.getPaymentType(), bodyFont));
             rightCell.addElement(new Paragraph("Status: " + invoice.getStatus(), boldBody));

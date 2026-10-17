@@ -175,8 +175,7 @@ const MastersView = React.forwardRef(function MastersView({
   }, [activeTab]);
 
   useDataSync(() => {
-    loadAllCounts();
-    loadTabData();
+    return Promise.allSettled([loadAllCounts(),loadTabData()]);
   }, ['erp:data_changed', 'erp:inventory_updated', 'erp:customers_updated', 'erp:purchasing_updated']);
 
   const handleTabChange = (tabId) => {
@@ -989,7 +988,7 @@ const MastersView = React.forwardRef(function MastersView({
             }}
             title="Refresh records"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>

@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "audit_logs", indexes = {
         @Index(name = "idx_audit_created", columnList = "created_at"),
         @Index(name = "idx_audit_entity", columnList = "entity_name, entity_id"),

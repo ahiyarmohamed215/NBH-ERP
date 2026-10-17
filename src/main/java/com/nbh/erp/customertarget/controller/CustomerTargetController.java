@@ -41,7 +41,7 @@ public class CustomerTargetController {
     }
 
     @GetMapping("/customer/{customerId}/progress")
-    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET') or hasAuthority('SALES_CREATE')")
     @Operation(summary = "Get active target progress and unlocked discount ranges for POS checkout & customer summary")
     public ResponseEntity<ApiResponse<List<CustomerTargetProgressDto>>> getCustomerTargetProgress(
             @PathVariable Long customerId

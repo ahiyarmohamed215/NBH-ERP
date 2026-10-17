@@ -17,6 +17,9 @@ public interface StockAdjustmentRepository extends JpaRepository<StockAdjustment
     java.util.Optional<StockAdjustment> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
 
+    @Query("select count(i)>0 from StockAdjustmentItem i where i.sourceGrnItem.grn.id=:grnId")
+    boolean hasGrnLinks(@Param("grnId") Long grnId);
+
     Optional<StockAdjustment> findByAdjustmentNumber(String adjustmentNumber);
 
     @Query("SELECT sa FROM StockAdjustment sa WHERE " +

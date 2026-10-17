@@ -29,7 +29,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping
-    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET') or hasAuthority('SALES_CREATE')")
     public ResponseEntity<ApiResponse<List<CustomerRangeConfigDto>>> getAllRanges() {
         List<CustomerRangeConfigDto> ranges = customerRangeService.getAllRanges();
         return ResponseEntity.ok(ApiResponse.ok(ranges));
@@ -73,7 +73,7 @@ public class CustomerRangeController {
     // =========================================================================
 
     @GetMapping("/customer/{customerId}/progress")
-    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER_TARGET') or hasAuthority('SALES_CREATE')")
     public ResponseEntity<ApiResponse<CustomerMonthlyProgressDto>> getCustomerProgress(
             @PathVariable Long customerId,
             @RequestParam(required = false) BigDecimal cartTotal) {

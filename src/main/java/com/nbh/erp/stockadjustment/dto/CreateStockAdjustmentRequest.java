@@ -21,6 +21,9 @@ public class CreateStockAdjustmentRequest {
     @jakarta.validation.constraints.Positive
     private Long warehouseId;
 
+    @jakarta.validation.constraints.Pattern(regexp="ADDITION|REDUCTION",message="Choose addition or reduction")
+    private String adjustmentType;
+
     @NotNull(message = "Adjustment date is required")
     private LocalDate adjustmentDate;
 
@@ -40,10 +43,16 @@ public class CreateStockAdjustmentRequest {
         @jakarta.validation.constraints.Positive
         private Long productId;
 
-        @NotNull(message = "Physical quantity is required")
         @PositiveOrZero(message = "Physical quantity cannot be negative")
         @jakarta.validation.constraints.Digits(integer=36,fraction=2)
         private BigDecimal physicalQuantity;
+
+        @jakarta.validation.constraints.Positive(message="Adjustment quantity must be greater than zero")
+        @jakarta.validation.constraints.Digits(integer=13,fraction=2)
+        private BigDecimal quantity;
+
+        @jakarta.validation.constraints.AssertTrue(message="Enter either an adjustment quantity or a physical count")
+        public boolean isQuantitySpecified(){return (quantity!=null) != (physicalQuantity!=null);}
 
         @PositiveOrZero(message="Unit cost cannot be negative")
         @jakarta.validation.constraints.Digits(integer=32,fraction=6)

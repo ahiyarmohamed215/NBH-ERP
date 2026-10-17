@@ -14,7 +14,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @MappedSuperclass
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners({AuditingEntityListener.class, com.nbh.erp.realtime.RealtimeEntityListener.class})
 @Getter
 @Setter
 public abstract class BaseEntity {

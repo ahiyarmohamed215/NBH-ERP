@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
+@jakarta.persistence.EntityListeners(com.nbh.erp.realtime.RealtimeEntityListener.class)
 @Table(name = "stock_movements", indexes = {
         @Index(name = "idx_sm_history", columnList = "product_id, warehouse_id, created_at"),
         @Index(name = "idx_sm_ref", columnList = "reference_type, reference_number")

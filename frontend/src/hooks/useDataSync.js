@@ -1,84 +1,58 @@
-import { useEffect, useRef } from 'react';
-import { useWorkspaceActive } from '../components/RetainedWorkspaces';
+import {useEffect, useRef} from 'react';
+import {useWorkspaceActive} from '../components/RetainedWorkspaces';
 
-/**
- * useDataSync
- *
- * Automatically refreshes component data when:
- * 1. An ERP mutation event fires (e.g. erp:data_changed, erp:roles_updated, erp:customers_updated)
- * 2. Window gains focus (throttled to avoid network flooding)
- * 3. Enclosing workspace switches from inactive to active if a sync was pending
- *
- * Prevents inactive/hidden background workspaces from triggering unnecessary network calls.
- */
-export function useDataSync(callback, events = ['erp:data_changed'], deps = []) {
-  const isWorkspaceActive = useWorkspaceActive();
-  const savedCallback = useRef(callback);
-  savedCallback.current = callback;
-
-  const hasPendingSync = useRef(false);
-  const lastFocusSync = useRef(0);
-
-  // When workspace transitions from inactive to active, execute any pending sync
+/** Coalesces invalidations, serializes refreshes and defers hidden workspaces. */
+export function useDataSync(callback, events = ['erp:data_changed'], deps = [], topics = null) {
+  const active = useWorkspaceActive();
+  const callbackRef = useRef(callback);
+  const scheduleRef = useRef(null);
+  const pending = useRef(false), running = useRef(false), lastFocus = useRef(Date.now());
+  callbackRef.current = callback;
+  const eventKey = JSON.stringify(Array.isArray(events) ? events : [events]);
+  const topicGroups = {purchasing:['orders','suppliers','grn','gtn','prn'], inventory:['inventory','grn','gtn','prn','sales','returns'], sales:['sales','quotations','payments','returns'], customers:['customers','targets'], targets:['targets','sales'], users:['users'], roles:['roles'], delivery:['delivery','sales']};
+  const inferred = JSON.parse(eventKey).flatMap(event => topicGroups[event.replace(/^erp:/,'').replace(/_updated$/,'')] || []);
+  const topicKey = JSON.stringify(topics || (inferred.length ? [...new Set(inferred)] : null));
   useEffect(() => {
-    if (isWorkspaceActive && hasPendingSync.current) {
-      hasPendingSync.current = false;
-      if (savedCallback.current) {
-        try {
-          Promise.resolve(savedCallback.current({ type: 'workspace_activated' })).catch(() => {});
-        } catch (_) {}
+    let disposed = false, timer;
+    const visible = () => active && document.visibilityState !== 'hidden';
+    const execute = async event => {
+      timer = null;
+      if (disposed) return;
+      if (!visible() || running.current) { pending.current = true; return; }
+      pending.current = false; running.current = true;
+      try { await callbackRef.current?.(event); }
+      catch (_) { /* Existing page loaders retain their error behavior. */ }
+      finally {
+        running.current = false;
+        if (pending.current) scheduleRef.current?.({type:'pending_sync'});
       }
-    }
-  }, [isWorkspaceActive]);
-
-  useEffect(() => {
-    let timeoutId = null;
-
-    const triggerRefresh = (e) => {
-      // If workspace is inactive/hidden, defer until user switches back to this workspace
-      if (!isWorkspaceActive) {
-        hasPendingSync.current = true;
-        return;
-      }
-
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (savedCallback.current) {
-          try {
-            Promise.resolve(savedCallback.current(e)).catch((err) => {
-              console.debug('DataSync auto-refresh skipped or failed:', err?.message || err);
-            });
-          } catch (err) {
-            console.debug('DataSync auto-refresh skipped or failed:', err?.message || err);
-          }
-        }
-      }, 250);
     };
-
-    const eventList = Array.isArray(events) ? events : [events];
-    eventList.forEach((evt) => {
-      window.addEventListener(evt, triggerRefresh);
-    });
-
-    const handleFocus = () => {
-      const now = Date.now();
-      // Throttle window focus refreshes to at most once every 30 seconds
-      if (now - lastFocusSync.current < 30000) {
-        return;
-      }
-      lastFocusSync.current = now;
-      triggerRefresh({ type: 'focus' });
+    const schedule = event => {
+      if (!visible()) { pending.current = true; return; }
+      clearTimeout(timer); timer = setTimeout(() => execute(event), 250);
     };
-    window.addEventListener('focus', handleFocus);
-
+    scheduleRef.current = schedule;
+    const handle = event => {
+      const changed = event.detail?.topics, relevant = JSON.parse(topicKey);
+      if (changed && relevant && !changed.some(topic => relevant.includes(topic))) return;
+      schedule(event);
+    };
+    const focus = () => {
+      if (!visible()) return;
+      if (pending.current || Date.now() - lastFocus.current >= 30000) {
+        lastFocus.current = Date.now(); schedule({type:'focus'});
+      }
+    };
+    const names = new Set([...JSON.parse(eventKey), 'erp:realtime_sync']);
+    names.forEach(name => window.addEventListener(name, handle));
+    window.addEventListener('focus', focus); document.addEventListener('visibilitychange', focus);
+    if (pending.current && visible()) schedule({type:'workspace_activated'});
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      eventList.forEach((evt) => {
-        window.removeEventListener(evt, triggerRefresh);
-      });
-      window.removeEventListener('focus', handleFocus);
+      disposed = true; if (timer) { clearTimeout(timer); pending.current = true; }
+      scheduleRef.current = null;
+      names.forEach(name => window.removeEventListener(name, handle));
+      window.removeEventListener('focus', focus); document.removeEventListener('visibilitychange', focus);
     };
-  }, [isWorkspaceActive, ...deps]);
+  }, [active, eventKey, topicKey, ...deps]);
 }
-
 export default useDataSync;

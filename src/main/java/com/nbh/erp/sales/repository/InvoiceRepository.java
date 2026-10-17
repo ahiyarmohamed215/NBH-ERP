@@ -24,8 +24,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
 
     Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
+    Optional<Invoice> findByHeldNumber(String heldNumber);
+    List<Invoice> findByMergedInvoiceId(Long mergedInvoiceId);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @Query("select i from Invoice i where i.invoiceNumber = :number")
+    @Query("select i from Invoice i where i.invoiceNumber = :number or i.heldNumber = :number")
     Optional<Invoice> findByNumberForUpdate(@Param("number") String number);
 
 
@@ -41,7 +43,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
            "LEFT JOIN FETCH i.customer " +
            "LEFT JOIN FETCH i.warehouse " +
            "LEFT JOIN FETCH i.salesRep " +
-           "WHERE i.customer.isActive = true " +
+           "WHERE i.customer.isActive = true AND i.invoiceNumber IS NOT NULL " +
            "ORDER BY i.createdAt DESC")
     List<Invoice> findRecentInvoices(Pageable pageable);
 
@@ -64,9 +66,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByCustomerId(Long customerId);
 
     @Query("SELECT i FROM Invoice i WHERE i.customer.isActive = true AND " +
-            "(:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
+            "i.status <> 'MERGED' AND (:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR i.customer.id = :customerId) AND " +
-            "(:status IS NULL OR i.status = :status) AND " +
+            "((:status IS NULL AND i.invoiceNumber IS NOT NULL) OR i.status = :status) AND " +
             "(:paymentType IS NULL OR i.paymentType = :paymentType) AND " +
             "(:startDate IS NULL OR i.invoiceDate >= :startDate) AND " +
             "(:endDate IS NULL OR i.invoiceDate <= :endDate) AND " +
@@ -117,6 +119,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             "FROM Invoice i WHERE i.status in ('HELD','SENT_TO_WAREHOUSE','STOCK_ADJUSTED') " +
             "GROUP BY i.createdBy")
     List<CashierHeldProjection> getCashierHeldSummary();
+
+    @Query("select i.createdBy as cashier, count(i) as heldCount, coalesce(sum(i.netTotal),0) as totalHeld from Invoice i where i.heldNumber is not null and i.status not in ('CANCELLED','VOIDED') and i.invoiceDate between :start and :end and (:excludeId is null or i.id <> :excludeId) group by i.createdBy")
+    List<CashierHeldProjection> getMonthlyHeldSummary(@Param("start") LocalDate start,@Param("end") LocalDate end,@Param("excludeId") Long excludeId);
 
     interface CashierSalesProjection {
         String getCashier();

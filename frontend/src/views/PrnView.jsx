@@ -1,3 +1,4 @@
+import {useDataSync} from '../hooks/useDataSync';
 import {useAuth} from '../context/AuthContext';
 import {hasPermission} from '../utils/moduleAccess';
 import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
@@ -96,7 +97,8 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
     });
   };
 
-  const loadData = async () => {
+  useDataSync(() => loadData({preserveEditor:true}), ['erp:purchasing_updated','erp:inventory_updated'], [], ['prn','grn','suppliers','inventory']);
+  const loadData = async ({preserveEditor=false} = {}) => {
     try {
       setLoading(true);
       const [prnRes, whRes, prodRes, stockRows, sourceRes] = await Promise.all([
@@ -117,7 +119,7 @@ const PrnView = React.forwardRef(function PrnView(props, ref) {
       setInventory(stockRows);
       setReturnSources(sourceRes.data || []);
 
-      if (formData.items.length === 0) {
+      if (!preserveEditor && formData.items.length === 0) {
         resetForm();
       }
     } catch (err) {

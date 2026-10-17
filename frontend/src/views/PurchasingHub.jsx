@@ -6,6 +6,7 @@ import '../components/PurchasingAppearance.css';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import MastersView from './MastersView';
+import {WorkspaceActivity} from '../components/RetainedWorkspaces';
 import GrnView from './GrnView';
 import GtnView from './GtnView';
 import PrnView from './PrnView';
@@ -282,34 +283,34 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
         {visitedTabs.has('suppliers') && (
           <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <MastersView
+            <WorkspaceActivity active={currentTab === 'suppliers'}><MastersView
               ref={mastersRef}
               onFormModeChange={formCallbacks.suppliers}
               activeSubTab="suppliers"
               isStandalone={true}
               allowedTabs={['suppliers']}
               hideHeader={true}
-            />
+            /></WorkspaceActivity>
           </div>
         )}
         {visitedTabs.has('grn') && (
           <div style={{ display: currentTab === 'grn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <GrnView ref={grnRef} onFormModeChange={formCallbacks.grn} />
+            <WorkspaceActivity active={currentTab === 'grn'}><GrnView ref={grnRef} onFormModeChange={formCallbacks.grn} /></WorkspaceActivity>
           </div>
         )}
         {visitedTabs.has('gtn') && (
           <div style={{ display: currentTab === 'gtn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <GtnView ref={gtnRef} onFormModeChange={formCallbacks.gtn} />
+            <WorkspaceActivity active={currentTab === 'gtn'}><GtnView ref={gtnRef} onFormModeChange={formCallbacks.gtn} /></WorkspaceActivity>
           </div>
         )}
         {visitedTabs.has('prn') && (
           <div style={{ display: currentTab === 'prn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <PrnView ref={prnRef} onFormModeChange={formCallbacks.prn} />
+            <WorkspaceActivity active={currentTab === 'prn'}><PrnView ref={prnRef} onFormModeChange={formCallbacks.prn} /></WorkspaceActivity>
           </div>
         )}
         {visitedTabs.has('purchase-orders') && (
           <div style={{ display: currentTab === 'purchase-orders' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <PurchaseOrdersView ref={poRef} onFormModeChange={formCallbacks['purchase-orders']} />
+            <WorkspaceActivity active={currentTab === 'purchase-orders'}><PurchaseOrdersView ref={poRef} onFormModeChange={formCallbacks['purchase-orders']} /></WorkspaceActivity>
           </div>
         )}
       </div>

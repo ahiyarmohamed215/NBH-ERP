@@ -14,8 +14,12 @@ import { ToolbarActions, TableRowActions } from '../components/ToolbarActions';
 import RoleSearchSelector from '../components/RoleSearchSelector';
 import RolesView from './RolesView';
 import useRecordDeletion from '../hooks/useRecordDeletion';
+import SearchBar from '../components/SearchBar';
+import FilterSelect from '../components/FilterSelect';
+import EmployeeDetailsModal from '../components/EmployeeDetailsModal';
+import EmployeeEditorModal from '../components/EmployeeEditorModal';
 import './EmployeeDialogs.css';
-import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info, Trash2, Printer, RefreshCw } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
@@ -150,15 +154,52 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
+  const employeeStatus = (emp) => {
+    if (!emp) return 'INACTIVE';
+    if (emp.status) return emp.status.toUpperCase();
+    if (emp.approvalStatus && emp.approvalStatus.toUpperCase() === 'PENDING') return 'DRAFT';
+    if (emp.approvalStatus && emp.approvalStatus.toUpperCase() === 'DRAFT') return 'DRAFT';
+    return emp.isActive ? 'ACTIVE' : 'INACTIVE';
+  };
+
+  const employeeActionStyle = {
+    width: '30px',
+    height: '30px',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    color: '#475569',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
+  };
+
+  const toolbarBtnStyle = {
+    height: '38px',
+    width: '38px',
+    minWidth: '38px',
+    backgroundColor: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    color: '#334155',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+    boxShadow: 'none',
+    transition: 'all 0.15s ease',
+    padding: 0,
+    outline: 'none',
+  };
+
   // Filtered employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      // Unapproved / pending registrations must not be displayed in the main Employee List
-      if (emp.approvalStatus && emp.approvalStatus.toUpperCase() !== 'APPROVED') return false;
-
-      // Status filter
-      if (statusFilter === 'ACTIVE' && !emp.isActive) return false;
-      if (statusFilter === 'INACTIVE' && emp.isActive) return false;
+      const status = employeeStatus(emp);
+      if (statusFilter !== 'ALL' && status !== statusFilter) return false;
 
       // Search query filter
       if (!searchQuery.trim()) return true;
@@ -652,6 +693,102 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
     }
   };
 
+  const handleSaveEmployee = async (event, draftStatus) => {
+    if (event) event.preventDefault();
+    if (submitting) return;
+
+    const isDraft = draftStatus === 'DRAFT';
+    if (modalMode === 'add') {
+      try {
+        setSubmitting(true);
+        const rolesToSave = formData.roles && formData.roles.length > 0 ? formData.roles : ['ROLE_STAFF'];
+        const res = await userApi.create({
+          username: formData.username || `draft_${Date.now()}`,
+          fullName: formData.fullName || 'Draft Employee',
+          email: formData.email || `draft_${Date.now()}@example.com`,
+          phone: formData.phone || '',
+          password: formData.password || 'Temporary123!',
+          roles: rolesToSave,
+        });
+        const createdUser = res.data?.data || res.data;
+        if (isDraft && createdUser?.id) {
+          try { await userApi.toggleActive(createdUser.id); } catch {}
+        }
+        addToast(isDraft ? 'Employee draft saved' : `Employee "${formData.fullName || formData.username}" created successfully`, 'success');
+        setModalMode(null);
+        setSelectedEmployee(null);
+        await loadData();
+      } catch (err) {
+        addToast(err.response?.data?.message || err.message || 'Failed to create employee', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (modalMode === 'edit') {
+      if (!selectedEmployee) return;
+      if (!canEditUser) {
+        addToast('Permission denied: Only authorized staff can edit existing employee accounts.', 'error');
+        return;
+      }
+      try {
+        setSubmitting(true);
+        const rolesToSave = formData.roles || [];
+        if (isSuperAdminUser(selectedEmployee)) {
+          if (!rolesToSave.some((r) => r === 'ROLE_SUPER_ADMIN' || r === 'SUPER_ADMIN')) {
+            rolesToSave.push('ROLE_SUPER_ADMIN');
+          }
+        }
+        await userApi.update(selectedEmployee.id, {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password || undefined,
+          roles: rolesToSave,
+          isActive: isSuperAdminUser(selectedEmployee) ? true : undefined,
+        });
+        addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
+        setModalMode(null);
+        setSelectedEmployee(null);
+        await loadData();
+      } catch (err) {
+        addToast(err.response?.data?.message || err.message || 'Failed to update employee', 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  };
+
+  const handleEmployeeStatus = async (employee, target) => {
+    if (!canEditUser || isSuperAdminUser(employee)) return;
+    try {
+      setSubmitting(true);
+      if (target === 'ACTIVE') {
+        if (employee.approvalStatus === 'PENDING' || employee.status === 'DRAFT') {
+          await userApi.approve(employee.id, { roles: employee.roles || ['ROLE_STAFF'] });
+        } else if (!employee.isActive) {
+          await userApi.toggleActive(employee.id);
+        }
+      } else if (target === 'INACTIVE' && employee.isActive) {
+        await userApi.toggleActive(employee.id);
+      }
+      setViewingEmployee((prev) =>
+        prev && prev.id === employee.id
+          ? {
+              ...prev,
+              isActive: target === 'ACTIVE',
+              status: target,
+              approvalStatus: target === 'ACTIVE' ? 'APPROVED' : prev.approvalStatus,
+            }
+          : prev
+      );
+      await loadData();
+      addToast(`Employee status updated to ${target.toLowerCase()}`, 'success');
+    } catch (err) {
+      addToast(err.response?.data?.message || err.message || 'Failed to update employee status', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
 
   return (
     <div className="erp-page"
@@ -802,8 +939,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
             </div>
           )}
 
-          {/* Search Bar & Action Buttons (Fixed / Sticky - Customer Page Look) */}
+          {/* Search Bar & Action Buttons (Standardized Supplier Theme) */}
           <div
+            className="master-toolbar"
             style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
@@ -820,118 +958,42 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
               flexShrink: 0,
             }}
           >
-            {/* Left Control: Search Input */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '11px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search employees by name, staff code, email, phone or role..."
+            {/* Left Control: Reusable SearchBar with blue focus border */}
+            <div style={{ flex: 1, minWidth: '240px' }}>
+              <SearchBar
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #cbd5e1',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
-                }}
+                onClear={() => setSearchQuery('')}
+                placeholder="Search employees by name, staff code, email, phone or role..."
+                ariaLabel="Search employees"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={15} />
-                </button>
-              )}
             </div>
 
-            {/* Right Controls: Status Filter, Reset, & Global Toolbar Actions */}
+            {/* Right Controls: Status Filter (with Draft), Reset, Print & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              {/* Status Filter Dropdown */}
-              <select className="erp-field"
+              <FilterSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '135px',
-                  minWidth: '115px',
-                  border: '1px solid #e2e8f0',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
-                title="Filter by account status"
+                style={{ width: '140px' }}
+                title="Filter records by status"
+                ariaLabel="Filter records by status"
               >
                 <option value="ALL">All Statuses</option>
-                <option value="ACTIVE">Active Only</option>
-                <option value="INACTIVE">Inactive Only</option>
-              </select>
+                <option value="DRAFT">Draft</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </FilterSelect>
 
-              {/* Reset Filters button */}
               {(statusFilter !== 'ALL' || searchQuery) && (
-                <button className="erp-button"
+                <button
+                  className="erp-button"
                   type="button"
                   onClick={() => {
                     setStatusFilter('ALL');
                     setSearchQuery('');
                   }}
                   style={{
-                    height: '34px',
+                    height: '38px',
                     padding: '0 12px',
                     border: '1px solid #e2e8f0',
                     backgroundColor: '#f1f5f9',
@@ -950,18 +1012,25 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 </button>
               )}
 
-              {/* Global Reusable Toolbar Action Buttons (Export CSV, Print A4, Download PDF, Refresh) */}
-              <ToolbarActions
-                onExportCsv={handleExportCSV}
-                onPrint={handlePrintEmployeeList}
-                onDownloadPdf={handleDownloadEmployeeListPdf}
-                onRefresh={loadData}
-                loading={loading}
-                exportTitle="Export employees to CSV"
-                printTitle="Print Employee Directory (A4)"
-                pdfTitle="Download Employee Directory PDF (A4)"
-                refreshTitle="Refresh employee records"
-              />
+              <button
+                type="button"
+                onClick={handlePrintEmployeeList}
+                style={toolbarBtnStyle}
+                title="Print Employee Directory (A4)"
+                aria-label="Print Employee Directory (A4)"
+              >
+                <Printer size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={loadData}
+                style={toolbarBtnStyle}
+                title="Refresh employee records"
+                aria-label="Refresh employee records"
+              >
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              </button>
             </div>
           </div>
 
@@ -984,16 +1053,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      EMPLOYEE
+                      EMPLOYEE CODE
+                    </th>
+                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      EMPLOYEE NAME
                     </th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ROLE
                     </th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      TYPE
-                    </th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      CONTACT
+                      PHONE / EMAIL
                     </th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       JOINED
@@ -1022,6 +1091,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                   ) : (
                     filteredEmployees.map((emp) => {
                       const primaryRole = getPrimaryRole(emp);
+                      const status = employeeStatus(emp);
                       return (
                         <tr
                           key={emp.id}
@@ -1035,12 +1105,16 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                           title="Click row to view employee profile"
                         >
+                          <td className="erp-table-cell" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                            {staffCode(emp)}
+                          </td>
+
                           <td className="erp-table-cell">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div
                                 style={{
-                                  width: '34px',
-                                  height: '34px',
+                                  width: '32px',
+                                  height: '32px',
                                   borderRadius: '50%',
                                   backgroundColor: '#f0fdf4',
                                   color: '#16a34a',
@@ -1056,13 +1130,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                                 {(emp.fullName || emp.username).slice(0, 1).toUpperCase()}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-nav)' }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a' }}>
                                   {emp.fullName || emp.username}
                                 </div>
-                                <div style={{ fontSize: 'var(--erp-text-caption)', color:'#2563eb', marginTop:'3px', fontWeight:500 }}>Staff code: {staffCode(emp)}</div>
-                                {emp.fullName && (
-                                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8' }}>@{emp.username}</div>
-                                )}
+                                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
+                                  @{emp.username}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1071,12 +1144,22 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                             {primaryRole}
                           </td>
 
-                          <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                            Full-time
-                          </td>
-
-                          <td className="erp-table-cell" style={{ color: '#334155' }}>
-                            {emp.phone || emp.email || '—'}
+                          <td className="erp-table-cell" style={{ color: '#475569' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '240px' }}>
+                              {emp.phone && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-body)', fontWeight: 500 }}>
+                                  <Phone size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                  {emp.phone}
+                                </span>
+                              )}
+                              {emp.email && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
+                                  <Mail size={12} aria-hidden="true" style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                  <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{emp.email}</span>
+                                </span>
+                              )}
+                              {!emp.phone && !emp.email && '—'}
+                            </div>
                           </td>
 
                           <td className="erp-table-cell" style={{ color: '#64748b' }}>
@@ -1084,26 +1167,69 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           </td>
 
                           <td className="erp-table-cell">
-                            {isSuperAdminUser(emp) ? (
-                              <StatusBadge status={"ACTIVE"} title="Status: Active"/>
-                            ) : (
-                              <StatusBadge status={emp.isActive ? 'Active' : 'Inactive'} onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleActive(emp);
-                                }} title={`Status: ${emp.isActive ? 'Active' : 'Inactive'} (Click to toggle)`}/>
-                            )}
+                            <StatusBadge
+                              status={status}
+                              title={`Status: ${status}`}
+                            />
                           </td>
 
-                          <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                            <TableRowActions
-                              onPrint={() => handlePrintEmployee(emp)}
-                              onDownloadPdf={() => handleDownloadEmployeePdf(emp)}
-                              onEdit={() => handleOpenEdit(emp)}
-                              printTitle="Print Employee Record (A4)"
-                              pdfTitle="Download Employee PDF (A4)"
-                              editTitle="Edit Employee"
-                              extraActions={canEditUser && !isSuperAdminUser(emp) && String(emp.id)!==String(currentUser.id) ? <button type="button" className="erp-table-icon-action" data-tone="danger" aria-label="Delete Employee" title="Delete Employee" onClick={()=>employeeDeletion.requestDeletion(emp)}><Trash2 size={13}/></button> : null}
-                            />
+                          <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                              <button
+                                className="erp-table-icon-action"
+                                type="button"
+                                title="Edit Employee"
+                                aria-label="Edit Employee"
+                                disabled={!canEditUser || isSuperAdminUser(emp)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleOpenEdit(emp);
+                                }}
+                                style={employeeActionStyle}
+                                onMouseEnter={(event) => {
+                                  event.currentTarget.style.backgroundColor = '#f0f9ff';
+                                }}
+                                onMouseLeave={(event) => {
+                                  event.currentTarget.style.backgroundColor = '#ffffff';
+                                }}
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                className="erp-table-icon-action"
+                                type="button"
+                                title="Print Employee Profile (A4)"
+                                aria-label="Print Employee Profile (A4)"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handlePrintEmployee(emp);
+                                }}
+                                style={employeeActionStyle}
+                                onMouseEnter={(event) => {
+                                  event.currentTarget.style.backgroundColor = '#f0f9ff';
+                                }}
+                                onMouseLeave={(event) => {
+                                  event.currentTarget.style.backgroundColor = '#ffffff';
+                                }}
+                              >
+                                <Printer size={13} />
+                              </button>
+                              {canEditUser && !isSuperAdminUser(emp) && String(emp.id) !== String(currentUser?.id) && (
+                                <button
+                                  className="erp-table-icon-action"
+                                  data-tone="danger"
+                                  type="button"
+                                  title="Delete Employee"
+                                  aria-label="Delete Employee"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    employeeDeletion.requestDeletion(emp);
+                                  }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1484,529 +1610,21 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         </div>
       )}
 
-      {/* Add Employee Modal */}
-      {modalMode === 'add' && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal employee-dialog" role="dialog" aria-modal="true" aria-label={modalMode === 'add' ? 'Add New Employee' : 'Edit Employee'}
-            style={{
-              width: '100%',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '14px 22px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0284c7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: 'var(--erp-text-section)',
-                  }}
-                >
-                  <Plus size={20} />
-                </div>
-                <div>
-                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
-                    Add New Employee
-                  </h2>
-                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px' }}>
-                    Register a new staff member and assign system permissions
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalMode(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
-                title="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Split Form: Left side details, Right side role assignment */}
-            <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              <div
-                className="employee-dialog-layout"
-                style={{
-                  gap: '20px',
-                  padding: '18px 22px',
-                  overflowY: 'auto',
-                  flex: 1,
-                  minHeight: 0,
-                }}
-              >
-                {/* Left Side: Employee Information Card */}
-                <div
-                  className="employee-details-panel"
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    minHeight: 0,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    Employee Information
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                      <label className="label">Full Name *</label>
-                      <input
-                        type="text"
-                        className="input-glass erp-field"
-                        required
-                        placeholder="e.g. Abdul Rahman"
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label className="label">Username (Login ID) *</label>
-                        <input
-                          type="text"
-                          className="input-glass erp-field"
-                          required
-                          placeholder="e.g. abdul"
-                          value={formData.username}
-                          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Temporary Password *</label>
-                        <input
-                          type="password"
-                          className="input-glass erp-field"
-                          required
-                          placeholder="Min 6 characters"
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label className="label">Email Address</label>
-                        <input
-                          type="email"
-                          className="input-glass erp-field"
-                          placeholder="abdul@company.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Phone / Contact</label>
-                        <input
-                          type="text"
-                          className="input-glass erp-field"
-                          placeholder="077xxxxxxx"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="label">Employee Type</label>
-                      <select
-                        className="input-glass erp-field"
-                        value={formData.employeeType}
-                        onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
-                      >
-                        <option value="Full-time">Full-time</option>
-                        <option value="Part-time">Part-time</option>
-                        <option value="Contract">Contract</option>
-                        <option value="Intern">Intern</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Role Assignment Card */}
-                <div
-                  className="employee-roles-panel"
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    minHeight: 0,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
-                        Assign Roles & Permissions
-                      </div>
-                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '1px' }}>
-                        Select roles below to grant module permissions to this employee
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 700,
-                        backgroundColor: '#eff6ff',
-                        color: '#0284c7',
-                        padding: '3px 10px',
-                        borderRadius: '9999px',
-                        border: '1px solid #bae6fd',
-                      }}
-                    >
-                      {(formData.roles || []).length} Assigned
-                    </span>
-                  </div>
-
-                  <RoleSearchSelector
-                    assignedRoles={formData.roles || []}
-                    allRoles={roles}
-                    onChange={(newRoles) => setFormData({ ...formData, roles: newRoles })}
-                    label=""
-                    formatRoleName={formatRoleName}
-                    placeholder="Search roles by title, code (e.g. ROLE_SALES), or keywords..."
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div
-                style={{
-                  padding: '12px 24px',
-                  borderTop: '1px solid #e2e8f0',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
-                  backgroundColor: '#f8fafc',
-                  flexShrink: 0,
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-glass erp-button"
-                  onClick={() => setModalMode(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary erp-button"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Creating...' : 'Create Employee'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Employee Modal - Split 2-Column Layout (Matching Customer Groups style) */}
-      {modalMode === 'edit' && selectedEmployee && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '16px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal employee-dialog" role="dialog" aria-modal="true" aria-label={modalMode === 'add' ? 'Add New Employee' : 'Edit Employee'}
-            style={{
-              width: '100%',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '14px 22px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0284c7',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: 'var(--erp-text-section)',
-                  }}
-                >
-                  {(formData.fullName || selectedEmployee.username || 'E').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: 0 }}>
-                    Edit Employee: {selectedEmployee.fullName || selectedEmployee.username}
-                  </h2>
-                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '2px' }}>
-                    @{selectedEmployee.username} • Update personal information and access roles
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalMode(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
-                title="Close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Split Form: Left side details, Right side role assignment */}
-            <form onSubmit={handleSaveModal} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-              <div
-                className="employee-dialog-layout"
-                style={{
-                  gap: '20px',
-                  padding: '18px 22px',
-                  overflowY: 'auto',
-                  flex: 1,
-                  minHeight: 0,
-                }}
-              >
-                {/* Left Side: Employee Information Card */}
-                <div
-                  className="employee-details-panel"
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px',
-                    minHeight: 0,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
-                      Employee Profile
-                    </div>
-                    <span style={{ fontSize: 'var(--erp-text-caption)', backgroundColor: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                      ID: #{selectedEmployee.id || '—'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div><label className="label">Staff code</label><input type="text" className="input-glass erp-field" aria-label="Staff code" readOnly value={staffCode(selectedEmployee)}/></div>
-                    <div>
-                      <label className="label">Full Name *</label>
-                      <input
-                        type="text"
-                        className="input-glass erp-field"
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        required
-                        placeholder="e.g. John Doe"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">Username</label>
-                      <input
-                        type="text"
-                        className="input-glass erp-field"
-                        disabled
-                        value={formData.username}
-                        style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
-                      />
-                      <span style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '3px', display: 'block' }}>
-                        System username cannot be modified
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label className="label">Email Address *</label>
-                        <input
-                          type="email"
-                          className="input-glass erp-field"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          required
-                          placeholder="email@company.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Phone Number</label>
-                        <input
-                          type="text"
-                          className="input-glass erp-field"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="077xxxxxxx"
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label className="label">Reset Password</label>
-                        <input
-                          type="password"
-                          className="input-glass erp-field"
-                          placeholder="Leave blank to keep"
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Employee Type</label>
-                        <select
-                          className="input-glass erp-field"
-                          value={formData.employeeType}
-                          onChange={(e) => setFormData({ ...formData, employeeType: e.target.value })}
-                        >
-                          <option value="Full-time">Full-time</option>
-                          <option value="Part-time">Part-time</option>
-                          <option value="Contract">Contract</option>
-                          <option value="Intern">Intern</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Side: Role Assignment Card (Splitted side-by-side like Customer Groups) */}
-                <div
-                  className="employee-roles-panel"
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    minHeight: 0,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-nav)', color: '#0f172a' }}>
-                        Assign Roles & Permissions
-                      </div>
-                      <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '1px' }}>
-                        Select roles below to grant module permissions to this employee
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 700,
-                        backgroundColor: '#eff6ff',
-                        color: '#0284c7',
-                        padding: '3px 10px',
-                        borderRadius: '9999px',
-                        border: '1px solid #bae6fd',
-                      }}
-                    >
-                      {(formData.roles || []).length} Assigned
-                    </span>
-                  </div>
-
-                  <RoleSearchSelector
-                    assignedRoles={formData.roles || []}
-                    allRoles={roles}
-                    onChange={(newRoles) => {
-                      if (isSuperAdminUser(selectedEmployee) && !newRoles.some((r) => r === 'ROLE_SUPER_ADMIN' || r === 'SUPER_ADMIN')) {
-                        addToast('Super Administrator role cannot be removed. Full access to all modules is permanent.', 'info');
-                        newRoles = [...newRoles, 'ROLE_SUPER_ADMIN'];
-                      }
-                      setFormData({ ...formData, roles: newRoles });
-                    }}
-                    label=""
-                    formatRoleName={formatRoleName}
-                    placeholder="Search roles by title, code (e.g. ROLE_SALES), or keywords..."
-                    isSuperAdmin={isSuperAdminUser(selectedEmployee)}
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div
-                style={{
-                  padding: '12px 24px',
-                  borderTop: '1px solid #e2e8f0',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
-                  backgroundColor: '#f8fafc',
-                  flexShrink: 0,
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-glass erp-button"
-                  onClick={() => setModalMode(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary erp-button"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Employee Editor Modal (New / Edit) */}
+      {(modalMode === 'add' || modalMode === 'edit') && (
+        <EmployeeEditorModal
+          form={formData}
+          setForm={setFormData}
+          editing={modalMode === 'edit'}
+          selectedEmployee={selectedEmployee}
+          saving={submitting}
+          roles={roles}
+          onClose={() => {
+            setModalMode(null);
+            setSelectedEmployee(null);
+          }}
+          onSubmit={handleSaveEmployee}
+        />
       )}
 
       {/* Complete & Approve Modal - Split 2-Column Layout */}
@@ -2535,327 +2153,27 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Employee Profile View Popup (When clicking row / View)  */}
-      {/* ------------------------------------------------------------- */}
+      {/* Employee Details Modal (Supplier Theme) */}
       {viewingEmployee && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '740px',
-              padding: '24px 28px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Profile Header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingBottom: '16px',
-                borderBottom: '1px solid #e2e8f0',
-                marginBottom: '18px',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '8px',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0284c7',
-                    border: '1px solid #bae6fd',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: 'var(--erp-text-section)',
-                    flexShrink: 0,
-                  }}
-                >
-                  {(viewingEmployee.fullName || viewingEmployee.username || 'E').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
-                      {viewingEmployee.fullName || viewingEmployee.username}
-                    </h2>
-                    <span
-                      style={{
-                        fontFamily: 'monospace',
-                        fontWeight: 600,
-                        fontSize: 'var(--erp-text-small)',
-                        backgroundColor: '#f8fafc',
-                        color: '#475569',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      @{viewingEmployee.username}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 600,
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        backgroundColor: viewingEmployee.isActive ? '#dcfce7' : '#fee2e2',
-                        color: viewingEmployee.isActive ? '#15803d' : '#b91c1c',
-                      }}
-                    >
-                      {viewingEmployee.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', marginTop: '3px' }}>
-                    Role: <strong style={{ color: '#0284c7' }}>{getPrimaryRole(viewingEmployee)}</strong>
-                    {viewingEmployee.email && <span> • {viewingEmployee.email}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons in Modal Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => {
-                    const emp = viewingEmployee;
-                    setViewingEmployee(null);
-                    handleOpenEdit(emp);
-                  }}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    padding: '6px 12px',
-                    color: '#334155',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Edit2 size={13} /> Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewingEmployee(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Profile Details Cards in Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Contact Information
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', gap:'12px', marginBottom:'10px', fontSize: 'var(--erp-text-body)' }}><span style={{color:'#64748b'}}>Staff code</span><strong style={{color:'#2563eb',fontWeight:500}}>{staffCode(viewingEmployee)}</strong></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Full Name</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingEmployee.fullName || '—'}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Username</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>@{viewingEmployee.username}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Phone Number</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingEmployee.phone || '—'}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Email Address</span>
-                    <span style={{ color: '#334155' }}>{viewingEmployee.email || '—'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Employment Details
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Employment Type</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>Full-time</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Account Status</span>
-                    <span style={{ fontWeight: 600, color: viewingEmployee.isActive ? '#16a34a' : '#dc2626' }}>
-                      {viewingEmployee.isActive ? 'Active (Operational)' : 'Inactive / Disabled'}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Approval Status</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                      {viewingEmployee.approvalStatus || 'APPROVED'}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Joined Date</span>
-                    <span style={{ color: '#334155' }}>{formatJoinedDate(viewingEmployee.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Roles & Permissions
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '4px' }}>
-                      Primary Designation
-                    </span>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        backgroundColor: '#eff6ff',
-                        color: '#1d4ed8',
-                        border: '1px solid #dbeafe',
-                        borderRadius: '5px',
-                        padding: '2px 8px',
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {getPrimaryRole(viewingEmployee)}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '6px' }}>
-                      Assigned System Roles ({viewingEmployee.roles?.length || 0})
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {viewingEmployee.roles && viewingEmployee.roles.length > 0 ? (
-                        viewingEmployee.roles.map((r, idx) => (
-                          <span
-                            key={idx}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              backgroundColor: '#f1f5f9',
-                              color: '#334155',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '4px',
-                              padding: '2px 7px',
-                              fontSize: 'var(--erp-text-caption)',
-                              fontWeight: 500,
-                            }}
-                          >
-                            <ShieldCheck size={11} color="#0284c7" /> {formatRoleName(r)}
-                          </span>
-                        ))
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: 'var(--erp-text-small)' }}>No explicit roles</span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '4px' }}>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>User ID</span>
-                    <span style={{ color: '#64748b', fontFamily: 'monospace', fontSize: 'var(--erp-text-small)' }}>#{viewingEmployee.id}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick footer toggle */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingTop: '14px',
-                borderTop: '1px solid #f1f5f9',
-              }}
-            >
-              {isSuperAdminUser(viewingEmployee) ? (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#0284c7',
-                    fontSize: 'var(--erp-text-body)',
-                    fontWeight: 700,
-                    backgroundColor: '#f0f9ff',
-                    padding: '7px 14px',
-                    borderRadius: '6px',
-                    border: '1px solid #bae6fd',
-                  }}
-                >
-                  <Shield size={14} /> Super Administrator (Permanent Full Access)
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await handleToggleActive(viewingEmployee);
-                    setViewingEmployee((prev) => (prev ? { ...prev, isActive: !prev.isActive } : null));
-                  }}
-                  style={{
-                    backgroundColor: viewingEmployee.isActive ? '#fff1f2' : '#f0fdf4',
-                    color: viewingEmployee.isActive ? '#e11d48' : '#16a34a',
-                    border: `1px solid ${viewingEmployee.isActive ? '#fecdd3' : '#bbf7d0'}`,
-                    borderRadius: '6px',
-                    padding: '7px 14px',
-                    fontSize: 'var(--erp-text-body)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  {viewingEmployee.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
-                  {viewingEmployee.isActive ? 'Deactivate Employee' : 'Activate Employee'}
-                </button>
-              )}
-
-              <button className="erp-button"
-                type="button"
-                onClick={() => setViewingEmployee(null)}
-                style={{
-                  backgroundColor: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
-                  padding: '7px 16px',
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <EmployeeDetailsModal
+          employee={viewingEmployee}
+          currentUser={currentUser}
+          canManage={canEditUser}
+          isSuperAdmin={isSuperAdminUser(viewingEmployee)}
+          onClose={() => setViewingEmployee(null)}
+          onPrint={() => handlePrintEmployee(viewingEmployee)}
+          onEdit={() => {
+            const emp = viewingEmployee;
+            setViewingEmployee(null);
+            handleOpenEdit(emp);
+          }}
+          onStatusChange={(target) => handleEmployeeStatus(viewingEmployee, target)}
+          onDelete={() => {
+            const emp = viewingEmployee;
+            setViewingEmployee(null);
+            employeeDeletion.requestDeletion(emp);
+          }}
+        />
       )}
 
       {employeeDeletion.deletionDialog}
