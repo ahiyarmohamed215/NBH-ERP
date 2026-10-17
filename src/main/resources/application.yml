@@ -35,13 +35,16 @@ spring:
 # Application-specific configuration
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app,https://*.vercel.app}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app}
   jwt:
-    # 256-bit secure secret key
-    secret: ${JWT_SECRET:dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZy0xMjM0NTY=}
+    # 256-bit secure secret key. Must be set via the JWT_SECRET environment variable.
+    secret: ${JWT_SECRET:}
     access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:900000} # 15 minutes
     refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 days
   security:
+    refresh-session:
+      retention-days: ${REFRESH_SESSION_RETENTION_DAYS:1}
+      cleanup-cron: ${REFRESH_SESSION_CLEANUP_CRON:0 0 3 * * ?}
     initial-admin:
       enabled: ${INITIAL_ADMIN_ENABLED:false}
       username: ${INITIAL_ADMIN_USERNAME:admin}

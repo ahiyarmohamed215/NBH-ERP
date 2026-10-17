@@ -16,7 +16,7 @@ import java.util.Set;
 @Configuration
 public class CorsConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app,https://*.vercel.app}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -24,24 +24,21 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
-                .filter(s -> !s.isEmpty())
+                .filter(s -> !s.isEmpty() && !s.contains("*"))
                 .toList();
 
-        Set<String> patternSet = new LinkedHashSet<>(origins);
-        patternSet.add("https://*.vercel.app");
-        patternSet.add("https://nbh-erp.vercel.app");
-        patternSet.add("http://localhost:5173");
-        patternSet.add("http://localhost:3000");
-
-        if (origins.contains("*")) {
-            configuration.setAllowedOriginPatterns(List.of("*"));
-        } else {
-            configuration.setAllowedOriginPatterns(new ArrayList<>(patternSet));
+        Set<String> approvedOrigins = new LinkedHashSet<>(origins);
+        if (approvedOrigins.isEmpty()) {
+            approvedOrigins.add("http://localhost:5173");
+            approvedOrigins.add("http://localhost:3000");
+            approvedOrigins.add("http://127.0.0.1:5173");
+            approvedOrigins.add("https://nbh-erp.vercel.app");
         }
 
+        configuration.setAllowedOrigins(new ArrayList<>(approvedOrigins));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition", "Idempotency-Key"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition", "Idempotency-Key", "X-Request-Id"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

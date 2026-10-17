@@ -12,10 +12,25 @@ import java.util.*;
 public class JwtTokenProvider {
  private final SecretKey key;
  private final long accessMs, refreshMs;
- public JwtTokenProvider(@Value("${app.jwt.secret}") String secret,
+ public JwtTokenProvider(
+   @Value("${app.jwt.secret:}") String secret,
    @Value("${app.jwt.access-token-expiration-ms:900000}") long accessMs,
    @Value("${app.jwt.refresh-token-expiration-ms:604800000}") long refreshMs) {
-  key=Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret)); this.accessMs=accessMs; this.refreshMs=refreshMs;
+  if (secret == null || secret.trim().isEmpty()) {
+   throw new IllegalStateException("JWT signing secret is missing. Set the JWT_SECRET environment variable with a Base64-encoded key of at least 32 bytes (256 bits).");
+  }
+  byte[] decoded;
+  try {
+   decoded = Decoders.BASE64.decode(secret.trim());
+  } catch (Exception e) {
+   throw new IllegalStateException("JWT_SECRET must be a valid Base64-encoded string.", e);
+  }
+  if (decoded.length < 32) {
+   throw new IllegalStateException("JWT_SECRET is too weak. Key must decode to at least 32 bytes (256 bits) for HMAC-SHA256, but decoded length is " + decoded.length + " bytes.");
+  }
+  this.key = Keys.hmacShaKeyFor(decoded);
+  this.accessMs = accessMs;
+  this.refreshMs = refreshMs;
  }
  public String generateAccessToken(Authentication authentication) {
   UserPrincipal p=(UserPrincipal)authentication.getPrincipal();
