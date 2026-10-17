@@ -28,8 +28,13 @@ public class DashboardService {
     public DashboardDto getDashboardSummary() {
         LocalDate today = LocalDate.now();
 
-        BigDecimal todaySales = invoiceRepository.getTotalSalesForDate(today);
-        long todayOrders = invoiceRepository.countCompletedInvoicesForDate(today);
+        InvoiceRepository.TodaySalesSummary todaySummary = invoiceRepository.getTodaySalesSummary(today);
+        BigDecimal todaySales = todaySummary != null && todaySummary.getTotalSales() != null
+                ? todaySummary.getTotalSales()
+                : BigDecimal.ZERO;
+        long todayOrders = todaySummary != null && todaySummary.getOrderCount() != null
+                ? todaySummary.getOrderCount()
+                : 0L;
 
         // High performance SQL aggregations (0 N+1 queries, <15ms execution)
         BigDecimal totalInventoryValue = stockBalanceRepository.getTotalCostValuation(null);
@@ -39,13 +44,13 @@ public class DashboardService {
         List<InvoiceDto> recentInvoices = invoiceRepository
                 .findRecentInvoices(PageRequest.of(0, 5))
                 .stream()
-                .map(InvoiceDto::from)
+                .map(InvoiceDto::fromSummary)
                 .collect(Collectors.toList());
 
         List<GrnDto> recentGrns = grnRepository
                 .findRecentGrns(PageRequest.of(0, 5))
                 .stream()
-                .map(GrnDto::from)
+                .map(GrnDto::fromSummary)
                 .collect(Collectors.toList());
 
         return DashboardDto.builder()

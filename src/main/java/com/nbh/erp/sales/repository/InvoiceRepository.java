@@ -39,10 +39,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     long countByStatusIn(java.util.Collection<String> statuses);
 
-    @Query("SELECT DISTINCT i FROM Invoice i " +
+    @Query("SELECT i FROM Invoice i " +
            "LEFT JOIN FETCH i.customer " +
            "LEFT JOIN FETCH i.warehouse " +
-           "LEFT JOIN FETCH i.salesRep " +
            "WHERE i.customer.isActive = true AND i.invoiceNumber IS NOT NULL " +
            "ORDER BY i.createdAt DESC")
     List<Invoice> findRecentInvoices(Pageable pageable);
@@ -105,6 +104,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Query("SELECT COUNT(i) FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate = :date")
     long countCompletedInvoicesForDate(@Param("date") LocalDate date);
 
+    @Query("SELECT COALESCE(SUM(i.netTotal), 0) AS totalSales, COUNT(i) AS orderCount " +
+           "FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') AND i.invoiceDate = :date")
+    TodaySalesSummary getTodaySalesSummary(@Param("date") LocalDate date);
+
     @Query("SELECT i.createdBy AS cashier, COUNT(i) AS invoiceCount, COALESCE(SUM(i.netTotal), 0) AS totalSales, MAX(i.invoiceDate) AS lastSaleDate " +
             "FROM Invoice i WHERE i.status IN ('COMPLETED','PAID','PARTIAL') " +
             "AND (:startDate IS NULL OR i.invoiceDate >= :startDate) " +
@@ -134,6 +137,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
         String getCashier();
         Long getHeldCount();
         BigDecimal getTotalHeld();
+    }
+
+    interface TodaySalesSummary {
+        BigDecimal getTotalSales();
+        Long getOrderCount();
     }
 }
 

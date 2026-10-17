@@ -68,6 +68,33 @@ public class GrnDto {
                 .build();
     }
 
+    public static GrnDto fromSummary(Grn grn) {
+        if (grn == null) return null;
+        return GrnDto.builder()
+                .id(grn.getId())
+                .grnNumber(grn.getGrnNumber())
+                .grnType(grn.getGrnType())
+                .purchaseOrderId(grn.getPurchaseOrderId())
+                .supplierId(grn.getSupplier() != null ? grn.getSupplier().getId() : null)
+                .supplierCode(grn.getSupplier() != null ? grn.getSupplier().getSupplierCode() : null)
+                .supplierName(grn.getSupplier() != null ? grn.getSupplier().getDisplayName() : null)
+                .warehouseId(grn.getWarehouse() != null ? grn.getWarehouse().getId() : null)
+                .warehouseCode(grn.getWarehouse() != null ? grn.getWarehouse().getCode() : null)
+                .warehouseName(grn.getWarehouse() != null ? grn.getWarehouse().getName() : null)
+                .supplierInvoiceNumber(grn.getSupplierInvoiceNumber())
+                .status(grn.getStatus())
+                .totalAmount(grn.getTotalAmount())
+                .receivedDate(grn.getReceivedDate())
+                .notes(grn.getNotes())
+                .createdBy(grn.getCreatedBy())
+                .createdAt(grn.getCreatedAt())
+                .cancelledAt(grn.getCancelledAt())
+                .cancelledBy(grn.getCancelledBy())
+                .cancelReason(grn.getCancelReason())
+                .items(List.of())
+                .build();
+    }
+
     @Data
     @Builder
     @NoArgsConstructor

@@ -112,6 +112,45 @@ public class InvoiceDto {
                 .build();
     }
 
+    public static InvoiceDto fromSummary(Invoice inv) {
+        if (inv == null) return null;
+        return InvoiceDto.builder()
+                .id(inv.getId())
+                .recordVersion(inv.getRecordVersion())
+                .invoiceNumber(inv.getInvoiceNumber())
+                .heldNumber(inv.getHeldNumber())
+                .mergedInvoiceId(inv.getMergedInvoiceId())
+                .customerId(inv.getCustomer() != null ? inv.getCustomer().getId() : null)
+                .customerCode(inv.getCustomer() != null ? inv.getCustomer().getCustomerCode() : null)
+                .customerName(inv.getCustomer() != null ? inv.getCustomer().getName() : null)
+                .warehouseId(inv.getWarehouse() != null ? inv.getWarehouse().getId() : null)
+                .warehouseCode(inv.getWarehouse() != null ? inv.getWarehouse().getCode() : null)
+                .warehouseName(inv.getWarehouse() != null ? inv.getWarehouse().getName() : null)
+                .salesmanId(inv.getSalesRep() != null && org.hibernate.Hibernate.isInitialized(inv.getSalesRep()) ? inv.getSalesRep().getId() : null)
+                .salesmanName(inv.getSalesRep() != null && org.hibernate.Hibernate.isInitialized(inv.getSalesRep())
+                        ? (inv.getSalesRep().getFullName() != null ? inv.getSalesRep().getFullName() : inv.getSalesRep().getUsername()) : null)
+                .status(inv.getStatus())
+                .paymentType(inv.getPaymentType())
+                .paymentMethod(inv.getPaymentMethod())
+                .returnedAmount(inv.getReturnedAmount())
+                .deliveryStatus(inv.getDeliveryStatus() != null ? inv.getDeliveryStatus() : "PENDING")
+                .deliveryDate(inv.getDeliveryDate())
+                .deliveryNotes(inv.getDeliveryNotes())
+                .subtotal(inv.getSubtotal())
+                .discountAmount(inv.getDiscountAmount())
+                .taxRate(inv.getTaxRate())
+                .taxAmount(inv.getTaxAmount())
+                .netTotal(inv.getNetTotal())
+                .paidAmount(inv.getPaidAmount())
+                .balanceAmount(inv.getBalanceAmount())
+                .invoiceDate(inv.getInvoiceDate())
+                .notes(inv.getNotes())
+                .createdBy(inv.getCreatedBy())
+                .createdAt(inv.getCreatedAt())
+                .items(List.of())
+                .build();
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
