@@ -30,6 +30,12 @@ public class StockDto {
     private BigDecimal totalCostValue;
     private Integer minStockLevel;
     private Boolean isLowStock;
+    private Long categoryId;
+    private String categoryName;
+    private Long brandId;
+    private String brandName;
+    private BigDecimal brandMarkupPercent;
+    private Boolean useBrandMarkup;
 
     public static StockDto from(StockBalance sb) {
         return from(sb, com.nbh.erp.security.SecurityUtils.canViewCostPrice());
@@ -45,31 +51,55 @@ public class StockDto {
         BigDecimal cost = null;
         BigDecimal totalValue = null;
         if (allowCostPrice) {
-            cost = sb.getProduct().getCostPrice() != null ? sb.getProduct().getCostPrice() : BigDecimal.ZERO;
+            cost = sb.getProduct() != null && sb.getProduct().getCostPrice() != null ? sb.getProduct().getCostPrice() : BigDecimal.ZERO;
             totalValue = qty.multiply(cost);
         }
 
-        int minLevel = sb.getProduct().getMinStockLevel() != null ? sb.getProduct().getMinStockLevel() : 0;
+        int minLevel = sb.getProduct() != null && sb.getProduct().getMinStockLevel() != null ? sb.getProduct().getMinStockLevel() : 0;
         boolean lowStock = qty.compareTo(BigDecimal.valueOf(minLevel)) <= 0;
+
+        Long categoryId = null;
+        String categoryName = null;
+        if (sb.getProduct() != null && sb.getProduct().getCategory() != null) {
+            categoryId = sb.getProduct().getCategory().getId();
+            categoryName = sb.getProduct().getCategory().getName();
+        }
+
+        Long brandId = null;
+        String brandName = null;
+        BigDecimal brandMarkupPercent = null;
+        if (sb.getProduct() != null && sb.getProduct().getBrand() != null) {
+            brandId = sb.getProduct().getBrand().getId();
+            brandName = sb.getProduct().getBrand().getName();
+            brandMarkupPercent = sb.getProduct().getBrand().getMarkupPercent();
+        }
+
+        Boolean useBrandMarkup = sb.getProduct() != null ? sb.getProduct().isBrandMarkupPricing() : null;
 
         return StockDto.builder()
                 .id(sb.getId())
-                .warehouseId(sb.getWarehouse().getId())
-                .warehouseCode(sb.getWarehouse().getCode())
-                .warehouseName(sb.getWarehouse().getName())
-                .productId(sb.getProduct().getId())
-                .productSku(sb.getProduct().getSku())
-                .productBarcode(sb.getProduct().getBarcode())
-                .productName(sb.getProduct().getName())
-                .unitOfMeasure(sb.getProduct().getUnitOfMeasure())
+                .warehouseId(sb.getWarehouse() != null ? sb.getWarehouse().getId() : null)
+                .warehouseCode(sb.getWarehouse() != null ? sb.getWarehouse().getCode() : null)
+                .warehouseName(sb.getWarehouse() != null ? sb.getWarehouse().getName() : null)
+                .productId(sb.getProduct() != null ? sb.getProduct().getId() : null)
+                .productSku(sb.getProduct() != null ? sb.getProduct().getSku() : null)
+                .productBarcode(sb.getProduct() != null ? sb.getProduct().getBarcode() : null)
+                .productName(sb.getProduct() != null ? sb.getProduct().getName() : null)
+                .unitOfMeasure(sb.getProduct() != null ? sb.getProduct().getUnitOfMeasure() : null)
                 .quantity(qty)
                 .reservedQuantity(reserved)
                 .availableQuantity(available)
                 .costPrice(cost)
-                .sellingPrice(sb.getProduct().getSellingPrice())
+                .sellingPrice(sb.getProduct() != null ? sb.getProduct().getSellingPrice() : null)
                 .totalCostValue(totalValue)
                 .minStockLevel(minLevel)
                 .isLowStock(lowStock)
+                .categoryId(categoryId)
+                .categoryName(categoryName)
+                .brandId(brandId)
+                .brandName(brandName)
+                .brandMarkupPercent(brandMarkupPercent)
+                .useBrandMarkup(useBrandMarkup)
                 .build();
     }
 }

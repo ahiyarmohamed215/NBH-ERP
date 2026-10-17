@@ -61,7 +61,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public ProductDto getProductById(Long id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         return ProductDto.from(product);
     }

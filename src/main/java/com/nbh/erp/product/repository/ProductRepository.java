@@ -14,9 +14,29 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends com.nbh.erp.common.repository.RecyclableRepository<Product> {
 
-    Optional<Product> findBySku(String sku);
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.id = :id AND p.deletedAt IS NULL")
+    Optional<Product> findByIdWithDetails(@Param("id") Long id);
 
-    Optional<Product> findByBarcode(String barcode);
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.sku = :sku AND p.deletedAt IS NULL")
+    Optional<Product> findBySku(@Param("sku") String sku);
+
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.barcode = :barcode AND p.deletedAt IS NULL")
+    Optional<Product> findByBarcode(@Param("barcode") String barcode);
 
     boolean existsBySku(String sku);
 
@@ -26,17 +46,43 @@ public interface ProductRepository extends com.nbh.erp.common.repository.Recycla
 
     boolean existsByDefaultSupplierId(Long supplierId);
 
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.deletedAt IS NULL AND p.isActive = true")
     List<Product> findByIsActiveTrue();
 
-    List<Product> findByCategoryIdAndIsActiveTrue(Long categoryId);
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.deletedAt IS NULL AND p.isActive = true AND p.category.id = :categoryId")
+    List<Product> findByCategoryIdAndIsActiveTrue(@Param("categoryId") Long categoryId);
 
-    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND p.isActive = true AND (" +
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.deletedAt IS NULL AND p.isActive = true AND (" +
             "LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR p.barcode = :query)")
     List<Product> searchActiveProducts(@Param("query") String query);
 
-    @Query("SELECT p FROM Product p WHERE p.deletedAt IS NULL AND " +
+    @Query(value = "SELECT p FROM Product p " +
+            "LEFT JOIN FETCH p.category " +
+            "LEFT JOIN FETCH p.brand " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE p.deletedAt IS NULL AND " +
+            "(:query IS NULL OR :query = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+            "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR p.barcode LIKE CONCAT('%', :query, '%')) " +
+            "AND (:categoryId IS NULL OR p.category.id = :categoryId)",
+            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.deletedAt IS NULL AND " +
             "(:query IS NULL OR :query = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR p.barcode LIKE CONCAT('%', :query, '%')) " +
             "AND (:categoryId IS NULL OR p.category.id = :categoryId)")

@@ -26,7 +26,7 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
             @Param("productId") Long productId
     );
 
-    @Query("SELECT sb FROM StockBalance sb WHERE sb.warehouse.id = :warehouseId AND sb.quantity > 0")
+    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.warehouse w JOIN FETCH sb.product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH p.brand b WHERE sb.warehouse.id = :warehouseId AND sb.quantity > 0")
     List<StockBalance> findByWarehouseId(@Param("warehouseId") Long warehouseId);
 
     List<StockBalance> findByProductId(Long productId);
@@ -38,14 +38,25 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
     @Query("SELECT COALESCE(SUM(sb.quantity), 0) FROM StockBalance sb WHERE sb.product.id = :productId")
     BigDecimal getTotalEnterpriseStockForProduct(@Param("productId") Long productId);
 
-    @Query("SELECT sb FROM StockBalance sb WHERE sb.warehouse.id = :warehouseId AND sb.quantity <= sb.product.minStockLevel")
+    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.warehouse w JOIN FETCH sb.product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH p.brand b WHERE sb.warehouse.id = :warehouseId AND sb.quantity <= p.minStockLevel")
     List<StockBalance> findLowStockInWarehouse(@Param("warehouseId") Long warehouseId);
 
-    @Query("SELECT sb FROM StockBalance sb WHERE sb.quantity <= sb.product.minStockLevel")
+    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.warehouse w JOIN FETCH sb.product p LEFT JOIN FETCH p.category c LEFT JOIN FETCH p.brand b WHERE sb.quantity <= p.minStockLevel")
     List<StockBalance> findAllLowStock();
 
-    @Query("SELECT sb FROM StockBalance sb WHERE " +
-            "sb.quantity > 0 AND " +
+    @Query(value = "SELECT sb FROM StockBalance sb " +
+            "JOIN FETCH sb.warehouse w " +
+            "JOIN FETCH sb.product p " +
+            "LEFT JOIN FETCH p.category c " +
+            "LEFT JOIN FETCH p.brand b " +
+            "LEFT JOIN FETCH p.defaultSupplier " +
+            "LEFT JOIN FETCH p.defaultWarehouse " +
+            "WHERE sb.quantity > 0 AND " +
+            "(:warehouseId IS NULL OR sb.warehouse.id = :warehouseId) AND " +
+            "(:query IS NULL OR :query = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+            "OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR p.barcode LIKE CONCAT('%', :query, '%'))",
+            countQuery = "SELECT COUNT(sb) FROM StockBalance sb " +
+            "WHERE sb.quantity > 0 AND " +
             "(:warehouseId IS NULL OR sb.warehouse.id = :warehouseId) AND " +
             "(:query IS NULL OR :query = '' OR LOWER(sb.product.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
             "OR LOWER(sb.product.sku) LIKE LOWER(CONCAT('%', :query, '%')) OR sb.product.barcode LIKE CONCAT('%', :query, '%'))")
@@ -61,6 +72,6 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance, Long
     @Query("SELECT COUNT(sb) FROM StockBalance sb WHERE sb.quantity <= sb.product.minStockLevel AND (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
     long countLowStockAlerts(@Param("warehouseId") Long warehouseId);
 
-    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.product p JOIN FETCH sb.warehouse w WHERE (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
+    @Query("SELECT sb FROM StockBalance sb JOIN FETCH sb.product p JOIN FETCH sb.warehouse w LEFT JOIN FETCH p.category c LEFT JOIN FETCH p.brand b WHERE (:warehouseId IS NULL OR sb.warehouse.id = :warehouseId)")
     List<StockBalance> findAllWithProductAndWarehouse(@Param("warehouseId") Long warehouseId);
 }

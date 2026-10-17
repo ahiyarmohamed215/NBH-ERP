@@ -67,6 +67,9 @@ const getDefaultTtlForUrl = (url = '') => {
   if (u.includes('/warehouses') || u.includes('/categories') || u.includes('/brands') || u.includes('/roles/permissions')) {
     return 300000;
   }
+  if (u.includes('/products') || u.includes('/inventory/balances')) {
+    return 60000;
+  }
   return 0;
 };
 
@@ -81,15 +84,17 @@ api.request = function (configOrUrl, maybeConfig) {
   }
   const method = (config.method || 'get').toLowerCase();
 
+  const shouldBypassCache = Boolean(config.skipCache || config.force);
+
   // Deduplicate and cache safe GET requests
-  if (method === 'get' && !config.skipDedupe) {
+  if (method === 'get' && !config.skipDedupe && !config.force) {
     const generation=cacheGeneration;
     const serializedParams = config.params ? JSON.stringify(config.params) : '';
     const sessionKey = getAccessToken() || '';
     const dedupeKey = `GET:${sessionKey}:${config.url || ''}:${serializedParams}`;
 
     // 1. Check TTL cache if not bypassed
-    if (!config.skipCache && apiCache.has(dedupeKey)) {
+    if (!shouldBypassCache && apiCache.has(dedupeKey)) {
       const entry = apiCache.get(dedupeKey);
       if (entry.expiresAt > Date.now()) {
         return Promise.resolve(entry.data);
@@ -105,7 +110,7 @@ api.request = function (configOrUrl, maybeConfig) {
     const requestPromise = originalRequest(config)
       .then((data) => {
         const ttl = config.cacheTtl !== undefined ? config.cacheTtl : getDefaultTtlForUrl(config.url);
-        if (ttl > 0 && !config.skipCache && data && generation===cacheGeneration) {
+        if (ttl > 0 && !shouldBypassCache && data && generation===cacheGeneration) {
           apiCache.set(dedupeKey, { data, expiresAt: Date.now() + ttl });
         }
         return data;
@@ -502,6 +507,7 @@ export const brandApi = {
 
 export const productApi = {
   getProducts: (params, config = {}) => fetchAllPages('/products', params, config),
+  getProductsPaged: (params, config = {}) => api.get('/products', { ...config, params }),
   searchActive: (query) => api.get('/products/search', { params: { query } }),
   getByBarcode: (barcode) => api.get(`/products/barcode/${barcode}`),
   getById: (id) => api.get(`/products/${id}`),

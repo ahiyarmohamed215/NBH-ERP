@@ -147,20 +147,24 @@ const MastersView = React.forwardRef(function MastersView({
   // Load counts for all tabs so pill badges show real numbers immediately
   const loadAllCounts = async () => {
     try {
-      const [wRes, cRes, cuRes, sRes, pRes, bRes] = await Promise.allSettled([
+      const promises = [
         warehouseApi.getAll(),
         categoryApi.getAll(),
         customerApi.getAll(),
         supplierApi.getAll(),
-        productApi.getProducts({ size: 300 }),
+        // When products tab is active, loadTabData handles product loading; avoid duplicate download on mount/sync
+        activeTab === 'products' ? Promise.resolve({ status: 'skipped' }) : productApi.getProducts({ size: 300 }),
         brandApi.getAll(),
-      ]);
-      if (wRes.status === 'fulfilled') setWarehouses(wRes.value.data || []);
-      if (cRes.status === 'fulfilled') setCategories(cRes.value.data || []);
-      if (cuRes.status === 'fulfilled') setCustomers(cuRes.value.data || []);
-      if (sRes.status === 'fulfilled') setSuppliers(sRes.value.data || []);
-      if (pRes.status === 'fulfilled') setProducts(pRes.value.data?.content || pRes.value.data || []);
-      if (bRes.status === 'fulfilled') setBrands(bRes.value.data || []);
+      ];
+      const [wRes, cRes, cuRes, sRes, pRes, bRes] = await Promise.allSettled(promises);
+      if (wRes.status === 'fulfilled' && wRes.value?.data) setWarehouses(wRes.value.data || []);
+      if (cRes.status === 'fulfilled' && cRes.value?.data) setCategories(cRes.value.data || []);
+      if (cuRes.status === 'fulfilled' && cuRes.value?.data) setCustomers(cuRes.value.data || []);
+      if (sRes.status === 'fulfilled' && sRes.value?.data) setSuppliers(sRes.value.data || []);
+      if (pRes.status === 'fulfilled' && pRes.value?.status !== 'skipped' && pRes.value?.data) {
+        setProducts(pRes.value.data?.content || pRes.value.data || []);
+      }
+      if (bRes.status === 'fulfilled' && bRes.value?.data) setBrands(bRes.value.data || []);
     } catch (e) {
       // silent fallback
     }
