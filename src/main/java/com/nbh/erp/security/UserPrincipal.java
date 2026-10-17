@@ -24,8 +24,11 @@ public class UserPrincipal implements UserDetails {
     private final String password;
     private final String email;
     private final String fullName;
+    private final String phone;
     private final boolean active;
     private final long tokenVersion;
+    private final java.util.List<String> roles;
+    private final java.util.List<String> permissions;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
@@ -34,20 +37,31 @@ public class UserPrincipal implements UserDetails {
                         "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
 
         Set<GrantedAuthority> authorities = new HashSet<>();
+        Set<String> roleNames = new HashSet<>();
+        Set<String> permissionNames = new HashSet<>();
 
-        user.getRoles().forEach(role -> {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
-            if (role.getPermissions() != null) {
-                role.getPermissions().forEach(permission -> {
-                    authorities.add(new SimpleGrantedAuthority(permission.getName()));
-                });
-            }
-        });
+        if (user.getRoles() != null) {
+            user.getRoles().forEach(role -> {
+                authorities.add(new SimpleGrantedAuthority(role.getName()));
+                roleNames.add(role.getName());
+                if (role.getPermissions() != null) {
+                    role.getPermissions().forEach(permission -> {
+                        authorities.add(new SimpleGrantedAuthority(permission.getName()));
+                        permissionNames.add(permission.getName());
+                    });
+                }
+            });
+        }
 
         if (isSuperAdmin) {
             authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
             authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            roleNames.add("ROLE_SUPER_ADMIN");
+            roleNames.add("ROLE_ADMIN");
         }
+
+        java.util.List<String> sortedRoles = roleNames.stream().sorted().toList();
+        java.util.List<String> sortedPermissions = permissionNames.stream().sorted().toList();
 
         return UserPrincipal.builder()
                 .id(user.getId())
@@ -55,8 +69,11 @@ public class UserPrincipal implements UserDetails {
                 .password(user.getPassword())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .phone(user.getPhone())
                 .active(isSuperAdmin || (Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus())))
                 .tokenVersion(user.getTokenVersion())
+                .roles(sortedRoles)
+                .permissions(sortedPermissions)
                 .authorities(authorities)
                 .build();
     }

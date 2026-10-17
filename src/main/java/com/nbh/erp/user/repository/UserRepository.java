@@ -18,6 +18,14 @@ public interface UserRepository extends com.nbh.erp.common.repository.Recyclable
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameIgnoreCase(String username);
     Optional<User> findByEmailIgnoreCase(String email);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT u FROM User u " +
+            "LEFT JOIN FETCH u.roles r " +
+            "LEFT JOIN FETCH r.permissions p " +
+            "WHERE (u.username = :usernameOrEmail OR u.email = :usernameOrEmail) " +
+            "AND u.deletedAt IS NULL")
+    Optional<User> findByUsernameOrEmailWithRolesAndPermissions(@org.springframework.data.repository.query.Param("usernameOrEmail") String usernameOrEmail);
+
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
     boolean existsByUsernameIgnoreCase(String username);

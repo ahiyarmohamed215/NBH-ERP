@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -102,9 +103,10 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        // Pre-check user status to provide helpful error message if pending or rejected
-        User candidateUser = userRepository.findByUsername(request.getUsername())
-                .or(() -> userRepository.findByEmail(request.getUsername()))
+        String usernameOrEmail = request.getUsername() != null ? request.getUsername().trim() : "";
+
+        // Pre-check user status using single fetch join query to provide helpful error message if pending or rejected
+        User candidateUser = userRepository.findByUsernameOrEmailWithRolesAndPermissions(usernameOrEmail)
                 .orElse(null);
 
         if (candidateUser != null) {
@@ -143,36 +145,26 @@ public class AuthService {
         String accessToken = tokenProvider.generateAccessToken(authentication);
         String refreshToken = newRefreshSession(userPrincipal);
 
-        User user = userRepository.findById(userPrincipal.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
+        boolean isSuperAdmin = "admin".equalsIgnoreCase(userPrincipal.getUsername()) ||
+                userPrincipal.getAuthorities().stream().anyMatch(a ->
+                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()) || "SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
 
-        boolean isSuperAdmin = "admin".equalsIgnoreCase(user.getUsername()) ||
-                (user.getRoles() != null && user.getRoles().stream().anyMatch(r ->
-                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
-
-        List<String> roles = user.getRoles().stream()
-                .map(r -> r.getName())
-                .collect(Collectors.toList());
-
+        List<String> roles = new ArrayList<>(userPrincipal.getRoles());
         if (isSuperAdmin && !roles.contains("ROLE_SUPER_ADMIN")) {
             roles.add("ROLE_SUPER_ADMIN");
         }
 
         List<String> permissions = isSuperAdmin
-                ? permissionRepository.findAll().stream().map(p -> p.getName()).distinct().collect(Collectors.toList())
-                : user.getRoles().stream()
-                        .flatMap(r -> r.getPermissions().stream())
-                        .map(p -> p.getName())
-                        .distinct()
-                        .collect(Collectors.toList());
+                ? permissionRepository.findAll().stream().map(com.nbh.erp.role.entity.Permission::getName).distinct().collect(Collectors.toList())
+                : userPrincipal.getPermissions();
 
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
+                .id(userPrincipal.getId())
+                .username(userPrincipal.getUsername())
+                .email(userPrincipal.getEmail())
+                .fullName(userPrincipal.getFullName())
                 .roles(roles)
                 .permissions(permissions)
                 .build();
@@ -190,7 +182,7 @@ public class AuthService {
         }
 
         String username = tokenProvider.getUsernameFromToken(refreshToken);
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameOrEmailWithRolesAndPermissions(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
 
         UserPrincipal principal = UserPrincipal.create(user);
@@ -209,25 +201,15 @@ public class AuthService {
 
         String newAccessToken = tokenProvider.generateAccessToken(authentication);
 
-        List<String> roles = user.getRoles().stream()
-                .map(r -> r.getName())
-                .collect(Collectors.toList());
-
-        List<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getName())
-                .distinct()
-                .collect(Collectors.toList());
-
         return LoginResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(rotated)
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .roles(roles)
-                .permissions(permissions)
+                .id(principal.getId())
+                .username(principal.getUsername())
+                .email(principal.getEmail())
+                .fullName(principal.getFullName())
+                .roles(principal.getRoles())
+                .permissions(principal.getPermissions())
                 .build();
     }
 
@@ -238,29 +220,17 @@ public class AuthService {
             throw new BusinessException("User is not authenticated");
         }
 
-        String username = auth.getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
-
-        List<String> roles = user.getRoles().stream()
-                .map(r -> r.getName())
-                .collect(Collectors.toList());
-
-        List<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getName())
-                .distinct()
-                .collect(Collectors.toList());
+        UserPrincipal principal = (UserPrincipal) auth.getPrincipal();
 
         return UserProfileDto.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .isActive(user.getIsActive())
-                .roles(roles)
-                .permissions(permissions)
+                .id(principal.getId())
+                .username(principal.getUsername())
+                .email(principal.getEmail())
+                .fullName(principal.getFullName())
+                .phone(principal.getPhone())
+                .isActive(principal.isEnabled())
+                .roles(principal.getRoles())
+                .permissions(principal.getPermissions())
                 .build();
     }
 
