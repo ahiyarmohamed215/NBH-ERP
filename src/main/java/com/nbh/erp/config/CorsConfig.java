@@ -19,9 +19,7 @@ public class CorsConfig {
     @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app}")
     private String allowedOrigins;
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+    public Set<String> getAllowedOriginSet() {
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty() && !s.contains("*"))
@@ -34,7 +32,13 @@ public class CorsConfig {
             approvedOrigins.add("http://127.0.0.1:5173");
             approvedOrigins.add("https://nbh-erp.vercel.app");
         }
+        return approvedOrigins;
+    }
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        Set<String> approvedOrigins = getAllowedOriginSet();
         configuration.setAllowedOrigins(new ArrayList<>(approvedOrigins));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));

@@ -180,18 +180,23 @@ public class AuthService {
 
     @Transactional
     public LoginResponse refreshToken(RefreshTokenRequest request) {
-        if (!tokenProvider.validateToken(request.getRefreshToken(), "REFRESH")) {
+        return refreshToken(request != null ? request.getRefreshToken() : null);
+    }
+
+    @Transactional
+    public LoginResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || !tokenProvider.validateToken(refreshToken, "REFRESH")) {
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid or expired refresh token");
         }
 
-        String username = tokenProvider.getUsernameFromToken(request.getRefreshToken());
+        String username = tokenProvider.getUsernameFromToken(refreshToken);
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
 
         UserPrincipal principal = UserPrincipal.create(user);
-        if (!principal.isEnabled() || !tokenProvider.matchesVersion(request.getRefreshToken(), user.getTokenVersion()))
+        if (!principal.isEnabled() || !tokenProvider.matchesVersion(refreshToken, user.getTokenVersion()))
             throw new org.springframework.security.authentication.BadCredentialsException("Session expired");
-        var claims = tokenProvider.claims(request.getRefreshToken());
+        var claims = tokenProvider.claims(refreshToken);
         var session = refreshSessions.lockById(claims.get("sid", String.class))
             .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Session expired"));
         if (!session.getUsername().equals(username) || !session.getTokenId().equals(claims.getId()) || session.getExpiresAt().isBefore(java.time.Instant.now()))
@@ -332,10 +337,44 @@ public class AuthService {
         return tokenProvider.generateRefreshToken(principal.getUsername(), principal.getTokenVersion(), session.getId(), session.getTokenId());
     }
     @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken != null && tokenProvider.validateToken(refreshToken, "REFRESH")) {
+            try {
+                var claims = tokenProvider.claims(refreshToken);
+                String sessionId = claims.get("sid", String.class);
+                if (sessionId != null) {
+                    refreshSessions.deleteById(sessionId);
+                    log.info("Revoked refresh session '{}' on logout", sessionId);
+                }
+                String username = claims.getSubject();
+                if (username != null) {
+                    userRepository.findByUsername(username).ifPresent(u -> {
+                        u.setTokenVersion(u.getTokenVersion() + 1);
+                        userRepository.save(u);
+                        log.info("Incremented token version for user '{}' on cookie-based logout", username);
+                    });
+                }
+            } catch (Exception e) {
+                log.warn("Could not revoke refresh session during logout: {}", e.getMessage());
+            }
+        }
+
+        try {
+            var currentUsername = com.nbh.erp.security.SecurityUtils.getCurrentUsername();
+            if (currentUsername.isPresent()) {
+                userRepository.findByUsername(currentUsername.get()).ifPresent(user -> {
+                    user.setTokenVersion(user.getTokenVersion() + 1);
+                    userRepository.save(user);
+                    log.info("Incremented token version for principal '{}' on logout", user.getUsername());
+                });
+            }
+        } catch (Exception e) {
+            log.debug("No active security context during logout: {}", e.getMessage());
+        }
+    }
+
+    @Transactional
     public void logout() {
-        String username = com.nbh.erp.security.SecurityUtils.getCurrentUsername().orElseThrow();
-        User user = userRepository.findByUsername(username).orElseThrow();
-        user.setTokenVersion(user.getTokenVersion() + 1);
-        userRepository.save(user);
+        logout(null);
     }
 }

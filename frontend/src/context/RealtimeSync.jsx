@@ -1,6 +1,6 @@
 import {useEffect} from 'react';
 import {useAuth} from './AuthContext';
-import {clearApiCache, refreshSession} from '../api/apiClient';
+import {clearApiCache, refreshSession, getAccessToken} from '../api/apiClient';
 import {createRealtimeClient} from '../api/realtimeClient';
 
 const topicEvents = {
@@ -25,7 +25,7 @@ export default function RealtimeSync() {
     if (!user?.id) return;
     return createRealtimeClient({
       url:`${(import.meta.env?.VITE_API_URL || '').replace(/\/$/, '')}/api/v1/events`,
-      getToken:() => localStorage.getItem('nbh_token'), refreshSession, invalidate:invalidateRealtime,
+      getToken: getAccessToken, refreshSession, invalidate:invalidateRealtime,
     });
   }, [user?.id]);
   return null;

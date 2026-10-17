@@ -25,6 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.nbh.erp.security.csrf.OriginValidationFilter originValidationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final com.nbh.erp.security.jwt.JwtAccessDeniedHandler jwtAccessDeniedHandler;
     private final CorsConfigurationSource corsConfigurationSource;
@@ -43,6 +44,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                // CSRF Protection Architecture:
+                // 1. Data endpoints are authenticated strictly via in-memory Bearer JWTs (immune to browser CSRF).
+                // 2. Cookie-authenticated auth endpoints (/refresh, /logout) are protected via OriginValidationFilter,
+                //    SameSite=Lax/Strict cookie attribute, and restricted cookie path (/api/v1/auth).
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
@@ -55,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/login", "/api/v1/auth/signup", "/api/v1/auth/refresh",
+                                "/api/v1/auth/logout", "/api/v1/auth/csrf",
                                 "/health/live", "/health/ready",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -63,6 +69,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(originValidationFilter, org.springframework.security.web.authentication.logout.LogoutFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

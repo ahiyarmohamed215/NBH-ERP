@@ -42,6 +42,9 @@ app:
     access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:900000} # 15 minutes
     refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 days
   security:
+    cookie:
+      secure: ${COOKIE_SECURE:false}
+      same-site: ${COOKIE_SAME_SITE:Lax}
     refresh-session:
       retention-days: ${REFRESH_SESSION_RETENTION_DAYS:1}
       cleanup-cron: ${REFRESH_SESSION_CLEANUP_CRON:0 0 3 * * ?}

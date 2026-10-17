@@ -11,10 +11,36 @@ const API_ORIGIN = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 const api = axios.create({
   baseURL: `${API_ORIGIN}/api/v1`,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// In-Memory Access Token Storage (Never in localStorage, sessionStorage, or IndexedDB)
+let inMemoryAccessToken = null;
+
+export const getAccessToken = () => {
+  if (inMemoryAccessToken) return inMemoryAccessToken;
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('nbh_token') || null;
+  }
+  return null;
+};
+
+export const setAccessToken = (token) => {
+  inMemoryAccessToken = token || null;
+  if (token && typeof localStorage !== 'undefined') {
+    localStorage.removeItem('nbh_token');
+  }
+};
+
+export const clearAccessToken = () => {
+  inMemoryAccessToken = null;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('nbh_token');
+  }
+};
 
 // Deduplication & In-Memory TTL Cache for GET requests
 const inFlightRequests = new Map();
@@ -59,7 +85,7 @@ api.request = function (configOrUrl, maybeConfig) {
   if (method === 'get' && !config.skipDedupe) {
     const generation=cacheGeneration;
     const serializedParams = config.params ? JSON.stringify(config.params) : '';
-    const sessionKey = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_token') || '' : '';
+    const sessionKey = getAccessToken() || '';
     const dedupeKey = `GET:${sessionKey}:${config.url || ''}:${serializedParams}`;
 
     // 1. Check TTL cache if not bypassed
@@ -100,7 +126,7 @@ api.get = function (url, config = {}) {
   return api.request({ ...config, method: 'get', url });
 };
 
-// Attach JWT token, correlation ID, and idempotency key automatically
+// Attach JWT token, correlation ID, idempotency key, and anti-CSRF header automatically
 api.interceptors.request.use((config) => {
   if (['post', 'put', 'patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) {
     config.headers['Idempotency-Key'] = crypto.randomUUID();
@@ -108,7 +134,10 @@ api.interceptors.request.use((config) => {
   if (!config.headers['X-Request-Id']) {
     config.headers['X-Request-Id'] = crypto.randomUUID();
   }
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_token') : null;
+  if (!config.headers['X-Requested-With']) {
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -180,13 +209,14 @@ api.interceptors.response.use(
   },
   async (error) => {
     const config = error.config || {};
+    // Only refresh on HTTP 401 (never on 403), avoid refreshing on auth endpoints, and retry at most once
     if (error.response?.status === 401 && config && !config._retried && !config.url?.startsWith('/auth/')) {
       config._retried = true;
       try {
         await refreshSession();
         return api(config);
       } catch (refreshError) {
-        if (refreshError.response?.status === 401 || !localStorage.getItem('nbh_refresh')) expireSession();
+        expireSession();
         throw refreshError;
       }
     }
@@ -202,7 +232,7 @@ api.interceptors.response.use(
     error.isUnknownStatus = isCriticalMutation(config.url, config.method) && (error.isNetworkError || error.isTimeout || !error.status);
     error.isOutage = [502, 503, 504].includes(error.status) || error.isNetworkError || error.isTimeout;
 
-    if (error.response?.status === 401 && !config?.url?.includes('/auth/login')) {
+    if (error.response?.status === 401 && !config?.url?.includes('/auth/login') && !config?.url?.includes('/auth/refresh')) {
       expireSession();
     }
 
@@ -222,25 +252,156 @@ api.interceptors.response.use(
   }
 );
 
-const expireSession = () => {
-  ['nbh_token','nbh_refresh','nbh_user'].forEach(key => localStorage.removeItem(key));
-  sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
-  window.dispatchEvent(new CustomEvent('nbh:session_expired'));
+// Multi-Tab Coordination Bus (NO tokens ever broadcasted)
+let authChannel = null;
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    authChannel = new BroadcastChannel('nbh_auth_bus');
+    if (typeof authChannel.unref === 'function') {
+      authChannel.unref();
+    }
+    authChannel.onmessage = (event) => {
+      if (event.data?.type === 'LOGOUT') {
+        handleCrossTabLogout();
+      }
+    };
+  }
+} catch (_) {}
+
+const handleCrossTabLogout = () => {
+  clearAccessToken();
+  clearApiCache();
+  if (typeof localStorage !== 'undefined') {
+    ['nbh_token', 'nbh_refresh', 'nbh_user'].forEach(key => {
+      try { localStorage.removeItem(key); } catch (_) {}
+    });
+  }
+  if (typeof window !== 'undefined') {
+    const EventCtor = window.CustomEvent || window.Event || (typeof CustomEvent !== 'undefined' ? CustomEvent : null);
+    if (EventCtor) {
+      window.dispatchEvent(new EventCtor('nbh:session_expired'));
+    }
+  }
 };
+
+export const expireSession = () => {
+  handleCrossTabLogout();
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
+    } catch (_) {}
+  }
+  if (authChannel) {
+    try {
+      authChannel.postMessage({ type: 'LOGOUT' });
+    } catch (_) {}
+  }
+};
+
+// Cross-tab mutex with localStorage fallback for unsupported Web Locks environments
+const acquireCrossTabLock = async (lockName, callback, timeoutMs = 8000) => {
+  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+    return navigator.locks.request(lockName, callback);
+  }
+  if (typeof localStorage === 'undefined') {
+    return callback();
+  }
+  const lockKey = `nbh_lock_${lockName}`;
+  const myId = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    const existing = localStorage.getItem(lockKey);
+    // Clear stale lock if older than 6 seconds (prevent deadlock if tab crashed)
+    if (!existing || Date.now() - parseInt(existing.split(':')[1] || '0', 10) > 6000) {
+      localStorage.setItem(lockKey, `${myId}:${Date.now()}`);
+      // Short delay to verify no racing write
+      await new Promise((r) => setTimeout(r, 20));
+      if (localStorage.getItem(lockKey)?.startsWith(myId)) {
+        try {
+          return await callback();
+        } finally {
+          if (localStorage.getItem(lockKey)?.startsWith(myId)) {
+            localStorage.removeItem(lockKey);
+          }
+        }
+      }
+    }
+    await new Promise((r) => setTimeout(r, 25 + Math.random() * 20));
+  }
+  return callback();
+};
+
 let refreshPromise;
 export const refreshSession = () => {
   if (!refreshPromise) {
-    const previous = localStorage.getItem('nbh_token');
     const perform = async () => {
-      if (localStorage.getItem('nbh_token') !== previous && localStorage.getItem('nbh_token')) return;
-      const refreshToken = localStorage.getItem('nbh_refresh');
-      if (!refreshToken) { expireSession(); throw new Error('Please sign in again'); }
-      const res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, { refreshToken }, { timeout: 30000 });
-      localStorage.setItem('nbh_token', res.data.data.accessToken);
-      localStorage.setItem('nbh_refresh', res.data.data.refreshToken);
+      // Safe migration: check for legacy token in localStorage once inside the coordinated lock
+      const legacyRefreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_refresh') : null;
+      const payload = legacyRefreshToken ? { refreshToken: legacyRefreshToken } : {};
+
+      // Short 15ms pause to allow multi-process browser cookie jar sync across tabs
+      await new Promise((r) => setTimeout(r, 15));
+
+      let res;
+      try {
+        res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, payload, {
+          timeout: 30000,
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+      } catch (err) {
+        // If a 401 occurred during a concurrent tab race, retry once after a short delay
+        // to pick up the newly rotated cookie committed by a peer tab.
+        if (err.response?.status === 401 && !err.config?._retriedRefresh) {
+          err.config = err.config || {};
+          err.config._retriedRefresh = true;
+          await new Promise((r) => setTimeout(r, 60));
+          res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, {}, {
+            timeout: 30000,
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          });
+        } else {
+          throw err;
+        }
+      }
+
+      const data = res.data?.data;
+      if (data?.accessToken) {
+        setAccessToken(data.accessToken);
+      }
+
+      // Migration cleanup: once refresh succeeds, permanently purge legacy tokens from localStorage
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('nbh_token');
+        localStorage.removeItem('nbh_refresh');
+      }
+
+      return data;
     };
-    refreshPromise = (navigator.locks ? navigator.locks.request('erp-refresh', perform) : perform())
-      .finally(() => { refreshPromise = null; });
+
+    const executeWithLock = async () => {
+      try {
+        return await acquireCrossTabLock('erp-refresh', perform);
+      } catch (refreshError) {
+        // DO NOT broadcast LOGOUT across BroadcastChannel on a failed silent refresh!
+        // Only clear this tab's in-memory token and cache.
+        clearAccessToken();
+        clearApiCache();
+        throw refreshError;
+      }
+    };
+
+    refreshPromise = executeWithLock().finally(() => {
+      refreshPromise = null;
+    });
   }
   return refreshPromise;
 };

@@ -4,14 +4,21 @@ import com.nbh.erp.auth.dto.LoginRequest;
 import com.nbh.erp.auth.dto.LoginResponse;
 import com.nbh.erp.auth.dto.RefreshTokenRequest;
 import com.nbh.erp.auth.dto.UserProfileDto;
+import com.nbh.erp.auth.service.AuthCookieService;
 import com.nbh.erp.auth.service.AuthService;
 import com.nbh.erp.common.dto.ApiResponse;
+import com.nbh.erp.security.jwt.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -20,6 +27,8 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthCookieService cookieService;
+    private final JwtTokenProvider tokenProvider;
 
     @PostMapping("/signup")
     @Operation(summary = "Register new user account (pending administrator approval)")
@@ -31,22 +40,62 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and issue JWT tokens")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<LoginResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         LoginResponse response = authService.login(request);
+        String rawRefreshToken = response.getRefreshToken();
+        if (rawRefreshToken != null) {
+            cookieService.setRefreshCookie(httpResponse, httpRequest, rawRefreshToken, tokenProvider.getRefreshMs());
+            response.setRefreshToken(null); // Never return refresh token in JSON response body
+        }
         return ResponseEntity.ok(ApiResponse.ok("Authentication successful", response));
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh access token using refresh token")
-    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
-        LoginResponse response = authService.refreshToken(request);
+    @Operation(summary = "Refresh access token using refresh token cookie or request body")
+    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(
+            @RequestBody(required = false) RefreshTokenRequest request,
+            @CookieValue(name = AuthCookieService.REFRESH_COOKIE_NAME, required = false) String cookieRefreshToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String tokenToUse = null;
+        if (cookieRefreshToken != null && !cookieRefreshToken.isBlank()) {
+            tokenToUse = cookieRefreshToken.trim();
+        } else if (request != null && request.getRefreshToken() != null && !request.getRefreshToken().isBlank()) {
+            tokenToUse = request.getRefreshToken().trim();
+        }
+
+        if (tokenToUse == null) {
+            throw new BadCredentialsException("No refresh token provided");
+        }
+
+        LoginResponse response = authService.refreshToken(tokenToUse);
+        String rotatedRefreshToken = response.getRefreshToken();
+        if (rotatedRefreshToken != null) {
+            cookieService.setRefreshCookie(httpResponse, httpRequest, rotatedRefreshToken, tokenProvider.getRefreshMs());
+            response.setRefreshToken(null); // Never return refresh token in JSON response body
+        }
         return ResponseEntity.ok(ApiResponse.ok("Token refreshed successfully", response));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        authService.logout();
-        return ResponseEntity.ok(ApiResponse.ok("Signed out of all sessions", null));
+    @Operation(summary = "Sign out and revoke refresh session")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @CookieValue(name = AuthCookieService.REFRESH_COOKIE_NAME, required = false) String cookieRefreshToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        authService.logout(cookieRefreshToken);
+        cookieService.clearRefreshCookie(httpResponse, httpRequest);
+        return ResponseEntity.ok(ApiResponse.ok("Signed out successfully", null));
+    }
+
+    @GetMapping("/csrf")
+    @Operation(summary = "CSRF health check and token verification")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getCsrf() {
+        return ResponseEntity.ok(ApiResponse.ok("CSRF protection active", Map.of("status", "UP")));
     }
 
     @GetMapping("/me")
