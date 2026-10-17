@@ -95,6 +95,49 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
     ];
     apis.adjustmentApi.searchProducts = async () => ({ data: adjustmentChoices });
 
+    apis.adjustmentApi.search = async () => ({
+      data: {
+        content: [
+          {
+            id: 99,
+            adjustmentNumber: 'ADJ-2026-0001',
+            adjustmentType: 'Addition',
+            adjustmentDate: '2026-10-17',
+            status: 'POSTED',
+            reason: 'Routine Cycle Count Audit',
+            warehouseId: 10,
+            warehouseName: 'Main Warehouse',
+            items: [
+              {
+                id: 501,
+                productId: 1,
+                productSku: 'SKU-001',
+                productName: 'Product Alpha',
+                systemQuantity: 50,
+                differenceQuantity: 7,
+                physicalQuantity: 57,
+                unitCost: 10,
+                sourceGrnNumber: 'GRN-001',
+                reason: 'Cycle Count',
+              },
+              {
+                id: 502,
+                productId: 2,
+                productSku: 'SKU-002',
+                productName: 'Product Beta',
+                systemQuantity: 30,
+                differenceQuantity: 12,
+                physicalQuantity: 42,
+                unitCost: 20,
+                sourceGrnNumber: 'GRN-002',
+                reason: 'Found on shelf',
+              },
+            ],
+          },
+        ],
+      },
+    });
+
     const createdAdjustments = [];
     apis.adjustmentApi.create = async (payload, process) => {
       createdAdjustments.push({ payload, process });
@@ -179,10 +222,24 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
     const ths = [...host.querySelectorAll('.allocation-list-table th')];
     assert.ok(ths.length > 0);
     assert.equal(ths[0].textContent.trim(), 'Allocation code', 'First column in allocation table must be Allocation code');
+    const allocHeaders = ths.map((th) => th.textContent.trim());
+    assert.deepEqual(allocHeaders, ['Allocation code', 'Staff member', 'Total products', 'Date', 'Status', 'Remarks', 'Actions']);
 
     const firstRowFirstTd = host.querySelector('.allocation-list-table tbody tr td');
     assert.ok(firstRowFirstTd);
     assert.equal(firstRowFirstTd.textContent.trim(), 'ALC-0042', 'First cell must show ALC-0042 code');
+
+    // Verify GRN-style Allocation Details Modal popup view
+    await click(host.querySelector('.allocation-list-table tbody tr'));
+    const allocPopup = host.querySelector('[aria-label="Inventory allocation details"]');
+    assert.ok(allocPopup, 'Allocation popup view must open on row click');
+    assert.ok(allocPopup.querySelector('.purchase-inspection-table table'), 'Popup view must contain products table like GRN');
+    assert.ok(allocPopup.textContent.includes('Cashier One'), 'Popup header must show staff member');
+    assert.ok(allocPopup.textContent.includes('SKU-001'), 'Popup table must list product code');
+    const closeAllocPopupBtn = [...allocPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
+    assert.ok(closeAllocPopupBtn);
+    await click(closeAllocPopupBtn);
+    assert.equal(host.querySelector('[aria-label="Inventory allocation details"]'), null, 'Popup closes on click');
 
     // 3. TEST MULTI-PRODUCT INVENTORY ALLOCATION (GRN Style)
     const newAllocBtn = [...host.querySelectorAll('button')].find((b) => b.textContent.includes('New Allocation'));
@@ -252,6 +309,32 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
         )
       );
     });
+    await act(async () => new Promise((res) => setTimeout(res, 250)));
+
+    // Verify Adjustment table headers
+    const adjThs = [...host.querySelectorAll('.adjustment-table th')];
+    assert.ok(adjThs.length > 0);
+    const adjHeaders = adjThs.map((th) => th.textContent.trim());
+    assert.deepEqual(adjHeaders, ['Adjustment code', 'Type', 'Warehouse', 'Total products', 'Date', 'Status', 'Reason', 'Actions']);
+
+    // Check row display
+    const firstAdjRow = host.querySelector('.adjustment-table tbody tr');
+    assert.ok(firstAdjRow);
+    assert.ok(firstAdjRow.textContent.includes('ADJ-2026-0001'));
+    assert.equal(firstAdjRow.querySelector('.adjustment-total-products')?.textContent.trim(), '2');
+
+    // Open Adjustment details modal (GRN inspection style)
+    await click(firstAdjRow);
+    const adjPopup = host.querySelector('[aria-label="Stock adjustment details"]');
+    assert.ok(adjPopup, 'Stock adjustment popup view must open on row click');
+    assert.ok(adjPopup.querySelector('.purchase-inspection-table table'), 'Popup view must contain products table like GRN');
+    assert.ok(adjPopup.textContent.includes('Main Warehouse'), 'Popup header must show warehouse');
+    assert.ok(adjPopup.textContent.includes('SKU-001'), 'Popup table must list product 1');
+    assert.ok(adjPopup.textContent.includes('SKU-002'), 'Popup table must list product 2');
+    const closeAdjPopupBtn = [...adjPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
+    assert.ok(closeAdjPopupBtn);
+    await click(closeAdjPopupBtn);
+    assert.equal(host.querySelector('[aria-label="Stock adjustment details"]'), null, 'Popup closes on click');
 
     const newAdjBtn = [...host.querySelectorAll('button')].find((b) => b.textContent.includes('New Adjustment'));
     await click(newAdjBtn);

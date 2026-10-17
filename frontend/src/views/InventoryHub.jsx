@@ -135,27 +135,56 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     try {
       const res = await adjustmentApi.search({ size: 100 });
       const content = res.data?.data?.content || res.data?.content || [];
-      const formatted = content.flatMap((adj) =>
-        (adj.items || []).map((it) => ({
-          id: String(adj.id) + '-' + (it.id || it.productId),
-          adjustmentId: adj.id,
+      const formatted = content.map((adj) => {
+        const items = (adj.items || []).map((it) => ({
+          id: it.id || `${adj.id}-${it.productId}`,
           productId: it.productId,
-          recordNo: adj.adjustmentNumber,
-          date: adj.adjustmentDate,
-          type: Number(it.differenceQuantity || 0) >= 0 ? 'Addition' : 'Reduction',
-          warehouse: adj.warehouseName,
-          warehouseId: String(adj.warehouseId),
+          productCode: it.productSku,
           sku: it.productSku,
+          productSku: it.productSku,
           productName: it.productName,
-          batch: adj.adjustmentNumber,
+          unitOfMeasure: it.unitOfMeasure,
+          warehouseName: adj.warehouseName,
+          warehouseId: String(adj.warehouseId),
           sourceGrnNumber: it.sourceGrnNumber,
           sourceGrnId: it.sourceGrnId,
-          quantity: Number(it.differenceQuantity || 0),
+          availableStock: it.systemQuantity,
+          systemQuantity: it.systemQuantity,
+          physicalQuantity: it.physicalQuantity,
+          differenceQuantity: it.differenceQuantity,
+          quantity: Math.abs(Number(it.differenceQuantity || 0)),
+          unitCost: it.unitCost,
           reason: it.reason || adj.reason,
-          remarks: it.reason && adj.reason?.startsWith(it.reason+': ')?adj.reason.slice(it.reason.length+2):'',
+          after: it.physicalQuantity != null ? it.physicalQuantity : (
+            adj.adjustmentType === 'REDUCTION' || adj.adjustmentType === 'Reduction'
+              ? (Number(it.systemQuantity || 0) - Math.abs(Number(it.differenceQuantity || 0)))
+              : (Number(it.systemQuantity || 0) + Math.abs(Number(it.differenceQuantity || 0)))
+          ),
+        }));
+        const first = items[0] || {};
+        const isReduction = adj.adjustmentType === 'REDUCTION' || adj.adjustmentType === 'Reduction' || Number(first.differenceQuantity || 0) < 0;
+        return {
+          id: adj.id,
+          adjustmentId: adj.id,
+          productId: first.productId,
+          recordNo: adj.adjustmentNumber,
+          date: adj.adjustmentDate,
+          type: isReduction ? 'Reduction' : 'Addition',
+          warehouse: adj.warehouseName,
+          warehouseId: String(adj.warehouseId),
+          sku: first.productSku,
+          productName: first.productName,
+          batch: adj.adjustmentNumber,
+          sourceGrnNumber: first.sourceGrnNumber,
+          sourceGrnId: first.sourceGrnId,
+          quantity: Number(first.differenceQuantity || 0),
+          reason: first.reason || adj.reason,
+          remarks: first.reason && adj.reason?.startsWith(first.reason + ': ') ? adj.reason.slice(first.reason.length + 2) : (adj.reason || ''),
           status: adj.status || 'DRAFT',
-        }))
-      );
+          totalProducts: items.length,
+          items: items,
+        };
+      });
       setAdjustmentRecords(formatted);
     } catch (err) {
       console.error('Failed to load adjustments from API:', err);
@@ -654,7 +683,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         const matchBatch = (rec.batch || '').toLowerCase().includes(q);
         const matchWarehouse = (rec.warehouse || '').toLowerCase().includes(q);
         const matchReason = (rec.reason || '').toLowerCase().includes(q);
-        if (!matchRecord && !matchProduct && !matchSku && !matchBatch && !matchWarehouse && !matchReason) {
+        const matchItem = (rec.items || []).some(it => 
+          (it.productName || '').toLowerCase().includes(q) || (it.productCode || it.productSku || '').toLowerCase().includes(q)
+        );
+        if (!matchRecord && !matchProduct && !matchSku && !matchBatch && !matchWarehouse && !matchReason && !matchItem) {
           return false;
         }
       }

@@ -40,7 +40,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    }
    const expectedHeaders={
     'inventory-list':['Code / Product name','Brand / Category','Warehouse','Qty','Selling price','Status','Actions'],
-    'pos-quotas':['Allocation code','Code / Product name','Staff member','Total stock available','Given to staff','Date','Status','Remarks','Actions'],
+    'pos-quotas':['Allocation code','Staff member','Total products','Date','Status','Remarks','Actions'],
     products:['Code / Product name','Brand / Category','Warehouse','Min stock','Status','Remarks','Actions'],
     brands:['Brand code','Brand name','MP%','Status','Remarks','Actions'],
     warehouses:['Warehouse code','Warehouse name','Address','Contact number','Status','Remarks','Actions'],
@@ -58,8 +58,8 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
      await act(async()=>calendar.querySelector('[aria-label="12 October 2026"]').click());
     };
     await selectDate();assert.equal(host.querySelectorAll('tbody tr').length,1);
-    assert.equal(host.querySelector('tbody tr td:nth-child(6)').textContent,'2026-10-12');
-    const identity=host.querySelector('tbody tr td:nth-child(2)').textContent;assert.ok(identity.includes('SKU-FIRST') && identity.includes('First item'));
+    assert.equal(host.querySelector('tbody tr td:nth-child(4)').textContent,'2026-10-12');
+    const staffCell=host.querySelector('tbody tr td:nth-child(2)').textContent;assert.ok(staffCell.includes('Test staff'));
     await act(async()=>host.querySelector('[title="Reset allocation filters"]').click());assert.equal(host.querySelectorAll('tbody tr').length,2);
     await selectDate();
    }

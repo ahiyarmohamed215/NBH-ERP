@@ -87,8 +87,8 @@ export default function AllocationWorkspace({
     (form.notes || '').length <= 255 &&
     !stagedHasError &&
     (editing && !isDraftEdit
-      ? !error && !exceeds && available > 0 && !loadingStock
-      : form.userId && (items.length > 0 || hasStagedValid));
+      ? (items.length > 0 || (!error && !exceeds && available > 0 && !loadingStock))
+      : Boolean(form.userId && (items.length > 0 || hasStagedValid)));
 
   const change = (field, value) => onChange((previous) => ({ ...previous, [field]: value }));
 
@@ -145,6 +145,7 @@ export default function AllocationWorkspace({
       productId: '',
       allocatedQuantity: '',
     }));
+    setTouched(false);
     onProductQuery('');
     setProductOpen(false);
   };
@@ -208,6 +209,7 @@ export default function AllocationWorkspace({
     }
     setProductOpen(false);
     setStaffOpen(false);
+    setTouched(false);
     onSave(event);
   };
 
@@ -216,6 +218,7 @@ export default function AllocationWorkspace({
       className="allocation-workspace purchase-document"
       aria-label={editing ? 'Edit inventory allocation' : 'New inventory allocation'}
       onSubmit={handleSubmit}
+      noValidate
     >
       <header className="allocation-workspace-header">
         <div className="allocation-workspace-title">
@@ -445,44 +448,6 @@ export default function AllocationWorkspace({
               </small>
             )}
           </label>
-
-          {/* Staged product review receipt */}
-          {product ? (
-            <div
-              className="allocation-receipt allocation-inline-review"
-              aria-label="Allocation review receipt"
-              style={{
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                margin: '2px 0',
-              }}
-            >
-              <div className="allocation-receipt-section" style={{ padding: 0, border: 'none' }}>
-                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <dt style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>Product code</dt>
-                    <dd style={{ margin: 0, fontSize: 'var(--erp-text-caption)', fontWeight: 600 }}>
-                      {product?.sku || editing?.productSku || '—'}
-                    </dd>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <dt style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>Brand / category</dt>
-                    <dd style={{ margin: 0, fontSize: 'var(--erp-text-caption)', fontWeight: 600 }}>
-                      {[product?.brandName, product?.categoryName].filter(Boolean).join(' / ') || '—'}
-                    </dd>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <dt style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>Available stock</dt>
-                    <dd style={{ margin: 0, fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#0284c7' }}>
-                      {available.toLocaleString()} {unit}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-          ) : null}
 
           {/* Add / Update item button */}
           <div style={{ display: 'flex', gap: '8px' }}>
