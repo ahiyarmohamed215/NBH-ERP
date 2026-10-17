@@ -63,12 +63,14 @@ export const clearApiCache = (pattern) => {
 
 const getDefaultTtlForUrl = (url = '') => {
   const u = (url || '').toLowerCase();
-  // Static / master data cached for 5 minutes
+  // Static / master data cached for 5 minutes in legacy apiCache
   if (u.includes('/warehouses') || u.includes('/categories') || u.includes('/brands') || u.includes('/roles/permissions')) {
     return 300000;
   }
+  // TanStack Query is now the central primary cache for /products and /inventory/balances.
+  // Axios response TTL cache is 0 for these endpoints to prevent duplicate caching conflicts.
   if (u.includes('/products') || u.includes('/inventory/balances')) {
-    return 60000;
+    return 0;
   }
   return 0;
 };

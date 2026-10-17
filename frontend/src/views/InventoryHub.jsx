@@ -39,6 +39,7 @@ import {
   staffQuotaApi,
   salesmanApi,
 } from '../api/apiClient';
+import { useInventoryBalancesQuery, invalidateInventoryQueries } from '../queryClient';
 import {
   SlidersHorizontal,
   Building2,
@@ -477,6 +478,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         });
         addToast('Inventory allocation saved successfully', 'success');
       }
+      invalidateInventoryQueries();
       setShowQuotaModal(false);
       await loadQuotas();
     } catch (err) {
@@ -495,6 +497,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       const response=await staffQuotaApi.update(quota.id,{status:target,statusReason:quotaStatusReason.trim()});
       const updated=response.data?.data || response.data;
       if(viewingQuota?.id===quota.id)setViewingQuota(updated?.id?updated:{...quota,status:target,isActive:target==='ACTIVE'});
+      invalidateInventoryQueries();
       setQuotaStatusChange(null);await loadQuotas();addToast('Allocation status updated.','success');
     }catch(error){addToast(error.response?.data?.message || error.message || 'Unable to change allocation status.','error');}
     finally{setSavingQuota(false);}
@@ -529,6 +532,21 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [viewingStockItem, setViewingStockItem] = useState(null);
   const inventoryLoadGeneration=useRef(0);
 
+  // Central TanStack Query for Inventory Balances
+  const {
+    data: balancesQueryData,
+    refetch: refetchBalances,
+  } = useInventoryBalancesQuery(
+    {
+      warehouseId: invWarehouseFilter !== 'ALL' ? invWarehouseFilter : undefined,
+      query: invSearchQuery,
+      size: 300,
+    },
+    {
+      enabled: currentTab === 'inventory-list',
+    }
+  );
+
   const activeCategories = useMemo(() => (Array.isArray(categoriesList) ? categoriesList : []).filter(c => c && c.isActive !== false), [categoriesList]);
   const activeBrands = useMemo(() => (Array.isArray(brandsList) ? brandsList : []).filter(b => b && b.isActive !== false), [brandsList]);
 
@@ -538,7 +556,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     try {
       setInventoryLoading(true);
       const [balRes, whRes, catRes, brandRes] = await Promise.allSettled([
-        inventoryApi.getBalances({ size: 300 }, { force: true }),
+        inventoryApi.getBalances({ size: 300 }, { force: true, skipCache: true }),
         warehouseApi.getAll(),
         categoryApi.getActive(),
         brandApi.getActive(),
@@ -846,6 +864,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
       if (editingRecord && adjustmentStatus(editingRecord) === 'DRAFT') await adjustmentApi.update(editingRecord.adjustmentId, payload, !saveDraft);
       else await adjustmentApi.create(payload, !saveDraft);
+      invalidateInventoryQueries();
       addToast(saveDraft ? 'Adjustment saved as draft.' : 'Stock adjustment applied.', 'success');
       setShowCreateModal(false);
       setEditingRecord(null);
@@ -865,6 +884,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       const record=adjustmentTransition.record;
       if(adjustmentTransition.target==='CANCELLED')await adjustmentApi.cancel(record.adjustmentId,adjustmentTransitionReason.trim());
       else await adjustmentApi.process(record.adjustmentId,adjustmentTransitionReason.trim());
+      invalidateInventoryQueries();
       setAdjustmentTransition(null);setViewingRecord(null);
       await Promise.all([loadAdjustments(),loadInventoryBalances()]);
       addToast('Adjustment status updated.','success');

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { authApi, refreshSession, clearApiCache, getAccessToken, setAccessToken, clearAccessToken, expireSession } from '../api/apiClient';
+import { queryClient, clearSecureQueryCache } from '../queryClient';
 
 const AuthContext = createContext(null);
 
@@ -21,6 +23,7 @@ export function AuthProvider({ children }) {
   const clear = useCallback(() => {
     sessionGeneration.current++;
     clearApiCache();
+    clearSecureQueryCache();
     clearAccessToken();
     if (typeof localStorage !== 'undefined') {
       ['nbh_token', 'nbh_refresh', 'nbh_user'].forEach(k => {
@@ -111,6 +114,7 @@ export function AuthProvider({ children }) {
     const { data } = await authApi.login(username, password);
     sessionGeneration.current++;
     clearApiCache();
+    clearSecureQueryCache();
 
     // Store access token in JavaScript memory ONLY!
     setAccessToken(data.accessToken);
@@ -133,9 +137,11 @@ export function AuthProvider({ children }) {
   const updateUser = profile => setUser(prev => ({ ...prev, ...profile }));
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isTokenExpired }}>
-      {children}
-    </AuthContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isTokenExpired }}>
+        {children}
+      </AuthContext.Provider>
+    </QueryClientProvider>
   );
 }
 

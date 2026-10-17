@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDataSync } from '../hooks/useDataSync';
 import { canEditModule } from '../utils/permissionUtils';
 import { printA4Report } from '../utils/printReport';
+import { useProductsQuery, invalidateProductQueries, invalidateMasterQueries } from '../queryClient';
 
 import {
   Database,
@@ -76,6 +77,8 @@ const MastersView = React.forwardRef(function MastersView({
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'INACTIVE'
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [productPage, setProductPage] = useState(0);
+  const productPageSize = 20;
 
   // Data lists
   const [products, setProducts] = useState([]);
@@ -87,6 +90,27 @@ const MastersView = React.forwardRef(function MastersView({
   const [deletingSupplier, setDeletingSupplier] = useState(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
   const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
+
+  // Central TanStack Query for Products
+  const {
+    data: pagedProductsData,
+    isLoading: productsQueryLoading,
+    refetch: refetchProducts,
+  } = useProductsQuery({
+    page: productPage,
+    size: productPageSize,
+    query: searchTerm,
+    enabled: activeTab === 'products',
+  });
+
+  useEffect(() => {
+    if (activeTab === 'products' && pagedProductsData) {
+      const content = pagedProductsData.content || (Array.isArray(pagedProductsData) ? pagedProductsData : []);
+      if (content.length > 0 || (pagedProductsData.totalElements === 0 && pagedProductsData.totalPages != null)) {
+        setProducts(content);
+      }
+    }
+  }, [activeTab, pagedProductsData]);
 
   const getBrandForProduct = (p) => {
     if (!p) return 'General';
@@ -186,6 +210,7 @@ const MastersView = React.forwardRef(function MastersView({
     setActiveTab(tabId);
     setStatusFilter('ALL');
     setSearchTerm('');
+    setProductPage(0);
     if (onSubTabChange) {
       onSubTabChange(tabId);
     }
@@ -196,11 +221,16 @@ const MastersView = React.forwardRef(function MastersView({
       setLoading(true);
       if (activeTab === 'products') {
         const [pRes, cRes, bRes] = await Promise.all([
-          productApi.getProducts({ size: 300 }),
+          refetchProducts().then(r => r?.data).catch(() => null),
           categories.length === 0 ? categoryApi.getAll() : Promise.resolve({ data: categories }),
           brands.length === 0 ? brandApi.getAll() : Promise.resolve({ data: brands }),
         ]);
-        setProducts(pRes.data?.content || pRes.data || []);
+        const fetchedContent = pRes?.content || pRes?.data?.content || (Array.isArray(pRes) ? pRes : pRes?.data || []);
+        if (fetchedContent && fetchedContent.length > 0) {
+          setProducts(fetchedContent);
+        } else if (pagedProductsData?.content) {
+          setProducts(pagedProductsData.content);
+        }
         if (categories.length === 0 && cRes.data) {
           setCategories(cRes.data || []);
         }
@@ -429,6 +459,12 @@ const MastersView = React.forwardRef(function MastersView({
         }
       }
 
+      if (activeTab === 'products') {
+        invalidateProductQueries();
+      } else {
+        invalidateMasterQueries(activeTab);
+      }
+
       addToast(`Record saved successfully!`, 'success');
       setShowModal(false);
       loadTabData();
@@ -449,13 +485,24 @@ const MastersView = React.forwardRef(function MastersView({
       requestStatusChange({type:'Supplier',number:supplier?.name || supplier?.supplierCode,current:currentStatus?'ACTIVE':'INACTIVE',target:currentStatus?'INACTIVE':'ACTIVE',onConfirm:reason=>handleToggleActive(id,currentStatus,reason)});return false;
     }
     try {
-      if (activeTab === 'products') await productApi.toggleActive(id);
-      else if (activeTab === 'brands') await brandApi.toggleActive(id);
-      else if (activeTab === 'warehouses') await warehouseApi.toggleActive(id);
-      else if (activeTab === 'categories') await categoryApi.toggleActive(id);
-      else if (activeTab === 'customers') await customerApi.toggleActive(id);
-      else if (activeTab === 'suppliers') {
+      if (activeTab === 'products') {
+        await productApi.toggleActive(id);
+        invalidateProductQueries();
+      } else if (activeTab === 'brands') {
+        await brandApi.toggleActive(id);
+        invalidateMasterQueries('brands');
+      } else if (activeTab === 'warehouses') {
+        await warehouseApi.toggleActive(id);
+        invalidateMasterQueries('warehouses');
+      } else if (activeTab === 'categories') {
+        await categoryApi.toggleActive(id);
+        invalidateMasterQueries('categories');
+      } else if (activeTab === 'customers') {
+        await customerApi.toggleActive(id);
+        invalidateMasterQueries('customers');
+      } else if (activeTab === 'suppliers') {
         await supplierApi.toggleActive(id,reason);
+        invalidateMasterQueries('suppliers');
         setViewingItem(previous=>previous?.id===id && previous.type==='suppliers' ? {...previous,active:!currentStatus,isActive:!currentStatus,status:currentStatus?'INACTIVE':'ACTIVE'} : previous);
       }
 
@@ -578,13 +625,20 @@ const MastersView = React.forwardRef(function MastersView({
     addToast('Records exported to CSV', 'success');
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     let itemsToExport = [];
     let headers = [];
     let filename = `${activeTab}_export_${new Date().toISOString().slice(0, 10)}.csv`;
 
     if (activeTab === 'products') {
       itemsToExport = filteredProducts;
+      try {
+        const fullRes = await productApi.getProducts({ size: 1000 });
+        const allFetched = fullRes.data?.content || fullRes.data || [];
+        if (allFetched.length > 0) {
+          itemsToExport = filterList(newestFirst(allFetched), ['name', 'sku', 'categoryName', 'description']);
+        }
+      } catch (_) {}
       headers = ['SKU', 'Name', 'Description / Note', 'Brand', 'Category', 'Unit', 'Min Stock', 'Status'];
       if (itemsToExport.length === 0) {
         addToast('No products to export', 'error');
@@ -838,7 +892,10 @@ const MastersView = React.forwardRef(function MastersView({
                 : `Search ${activeTab} by name, code, contact...`
             }
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setProductPage(0);
+            }}
             style={{
               width: '100%',
               height: '38px',
@@ -863,7 +920,10 @@ const MastersView = React.forwardRef(function MastersView({
           {searchTerm && (
             <button
               type="button"
-              onClick={() => setSearchTerm('')}
+              onClick={() => {
+                setSearchTerm('');
+                setProductPage(0);
+              }}
               style={{
                 position: 'absolute',
                 right: '10px',
@@ -886,7 +946,10 @@ const MastersView = React.forwardRef(function MastersView({
           {/* Status Filter Dropdown */}
           <ToolbarFilter
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setProductPage(0);
+            }}
             style={{width:'140px'}}
             title="Filter records by status"
           >
@@ -903,6 +966,7 @@ const MastersView = React.forwardRef(function MastersView({
               onClick={() => {
                 setStatusFilter('ALL');
                 setSearchTerm('');
+                setProductPage(0);
               }}
               style={{
                 height: '38px',
@@ -1201,6 +1265,66 @@ const MastersView = React.forwardRef(function MastersView({
             </table>
           )}
         </div>
+
+        {/* Product Server Pagination Controls */}
+        {activeTab === 'products' && (pagedProductsData?.totalPages > 1 || ((pagedProductsData?.totalElements || products.length) > productPageSize)) && (
+          <div
+            style={{
+              padding: '8px 16px',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#fafbfc',
+              fontSize: 'var(--erp-text-small)',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ color: '#64748b' }}>
+              Showing {productPage * productPageSize + 1} to{' '}
+              {Math.min((productPage + 1) * productPageSize, pagedProductsData?.totalElements || products.length)} of{' '}
+              {pagedProductsData?.totalElements || products.length} products
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                className="erp-button"
+                type="button"
+                disabled={productPage === 0}
+                onClick={() => setProductPage((p) => Math.max(0, p - 1))}
+                style={{
+                  height: '28px',
+                  padding: '0 10px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: productPage === 0 ? '#94a3b8' : '#334155',
+                  cursor: productPage === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Previous
+              </button>
+              <span style={{ padding: '0 6px', fontWeight: 600, color: '#334155', fontSize: 'var(--erp-text-small)' }}>
+                {productPage + 1} / {pagedProductsData?.totalPages || 1}
+              </span>
+              <button
+                className="erp-button"
+                type="button"
+                disabled={productPage >= (pagedProductsData?.totalPages || 1) - 1}
+                onClick={() => setProductPage((p) => p + 1)}
+                style={{
+                  height: '28px',
+                  padding: '0 10px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#ffffff',
+                  color: productPage >= (pagedProductsData?.totalPages || 1) - 1 ? '#94a3b8' : '#334155',
+                  cursor: productPage >= (pagedProductsData?.totalPages || 1) - 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View Details Modal */}

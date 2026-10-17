@@ -15,6 +15,7 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.4",
     "axios": "^1.20.0",
     "canvas-confetti": "^1.9.4",
     "exceljs": "^4.4.0",
