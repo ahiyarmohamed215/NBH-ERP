@@ -54,7 +54,15 @@ INITIAL_ADMIN_EMAIL=admin@example.com
 # Warehouse & Office Printing Integration
 APP_WAREHOUSE_PRINT_POLL_MS=5000
 
-# Company Metadata
+# Company Metadata (bound to app.company.* in Spring Boot application.yml)
+APP_COMPANY_NAME="Example Distribution Co."
 COMPANY_NAME="Example Distribution Co."
+APP_COMPANY_ADDRESS="123 Example Street, City, Country"
 COMPANY_ADDRESS="123 Example Street, City, Country"
+APP_COMPANY_PHONE="+1 555 0100"
 COMPANY_PHONE="+1 555 0100"
+APP_COMPANY_CURRENCY_SYMBOL="Rs."
+COMPANY_CURRENCY_SYMBOL="Rs."
+
+# Business Timezone (defaults to Asia/Colombo if unset)
+APP_BUSINESS_TIMEZONE=Asia/Colombo

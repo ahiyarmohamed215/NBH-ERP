@@ -201,12 +201,16 @@ sudo mysql -u root
 Execute SQL commands:
 ```sql
 CREATE DATABASE nbhdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE nbhdb_drill CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Replace 'YOUR_STRONG_PASSWORD_32_CHARS' with a secure generated password
 CREATE USER 'nbh_erp'@'127.0.0.1' IDENTIFIED WITH caching_sha2_password BY 'YOUR_STRONG_PASSWORD_32_CHARS';
 
--- Grant required application privileges (avoid granting global DROP privileges)
+-- Grant required application privileges on production schema (avoid granting global DROP)
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON nbhdb.* TO 'nbh_erp'@'127.0.0.1';
+
+-- Grant isolated test privileges on drill schema for automated backup restoration verification
+GRANT ALL PRIVILEGES ON nbhdb_drill.* TO 'nbh_erp'@'127.0.0.1';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -282,11 +286,21 @@ INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=
 INITIAL_ADMIN_EMAIL=admin@example.com
 
+# Warehouse & Office Printing Integration
 APP_WAREHOUSE_PRINT_POLL_MS=5000
 
+# Company Metadata (bound to app.company.* in Spring Boot)
+APP_COMPANY_NAME="Example Distribution Co."
 COMPANY_NAME="Example Distribution Co."
+APP_COMPANY_ADDRESS="123 Example Street, City, Country"
 COMPANY_ADDRESS="123 Example Street, City, Country"
+APP_COMPANY_PHONE="+1 555 0100"
 COMPANY_PHONE="+1 555 0100"
+APP_COMPANY_CURRENCY_SYMBOL="Rs."
+COMPANY_CURRENCY_SYMBOL="Rs."
+
+# Business Timezone (defaults to Asia/Colombo if unset)
+APP_BUSINESS_TIMEZONE=Asia/Colombo
 EOF
 ```
 
@@ -439,40 +453,60 @@ set -euo pipefail
 LABEL="${1:-daily}"
 BACKUP_DIR="/var/backups/nbh-erp"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-TEMP_GZ="/tmp/nbhdb_${LABEL}_${TIMESTAMP}.sql.gz"
-FINAL_ENC="$BACKUP_DIR/nbhdb_${LABEL}_${TIMESTAMP}.sql.gz.enc"
+TEMP_ENC="${BACKUP_DIR}/nbhdb_${LABEL}_${TIMESTAMP}.sql.gz.enc.tmp"
+FINAL_ENC="${BACKUP_DIR}/nbhdb_${LABEL}_${TIMESTAMP}.sql.gz.enc"
+FINAL_HMAC="${FINAL_ENC}.hmac"
 
 mkdir -p "$BACKUP_DIR"
 
-# 1. Atomic mysqldump with gzip compression
+# Clean up temporary incomplete files on error
+trap 'rm -f "${TEMP_ENC}" "${TEMP_ENC}.hmac"' ERR
+
+# 1. Atomic mysqldump streamed directly into gzip and AES-256-CBC PBKDF2 encryption
+# Eliminates insecure plaintext intermediate dumps from the filesystem completely
+echo "[$(date)] Starting encrypted database backup for label: $LABEL..."
 mysqldump --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf \
           --single-transaction \
           --quick \
           --routines \
           --triggers \
-          nbhdb | gzip -9 > "$TEMP_GZ"
-
-# 2. Symmetrical AES-256-CBC encryption using PBKDF2
+          nbhdb | gzip -9 | \
 openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
             -pass file:/opt/erp/config/.backup_key \
-            -in "$TEMP_GZ" -out "$FINAL_ENC"
+            -out "${TEMP_ENC}"
 
-# 3. Clean up unencrypted temporary dump
-rm -f "$TEMP_GZ"
-chmod 600 "$FINAL_ENC"
+# 2. Authenticated Encryption Integrity Tag (HMAC-SHA256)
+# Computes cryptographic authentication tag over ciphertext before releasing
+openssl dgst -sha256 -hmac "$(cat /opt/erp/config/.backup_key)" "${TEMP_ENC}" | awk '{print $2}' > "${TEMP_ENC}.hmac"
 
-# 4. Prune local backups older than 14 days
-find "$BACKUP_DIR" -type f -name "nbhdb_*.sql.gz.enc" -mtime +14 -delete
+# 3. Atomic commit of encrypted backup and authentication tag
+mv "${TEMP_ENC}" "${FINAL_ENC}"
+mv "${TEMP_ENC}.hmac" "${FINAL_HMAC}"
+chmod 600 "${FINAL_ENC}" "${FINAL_HMAC}"
 
-echo "[$(date)] Encrypted backup created successfully: $FINAL_ENC"
+# 4. Prune local encrypted backups and HMAC tags older than 14 days
+find "$BACKUP_DIR" -type f \( -name "nbhdb_*.sql.gz.enc" -o -name "nbhdb_*.sql.gz.enc.hmac" \) -mtime +14 -delete
 
-# 5. Off-server transfer hook (Optional: triggers if offserver_backup.env exists)
+echo "[$(date)] Local encrypted backup created successfully: $FINAL_ENC"
+
+# 5. Off-Server Replication & Disaster Recovery Status
+# True disaster recovery requires successful off-server copy in an independent failure domain
 if [ -f "/opt/erp/config/offserver_backup.env" ]; then
+    # shellcheck disable=SC1091
     source /opt/erp/config/offserver_backup.env
-    if [ -n "${OFFSERVER_DEST:-}" ]; then
-        echo "Syncing encrypted backup to off-server destination: $OFFSERVER_DEST"
-        scp -i "$OFFSERVER_KEY" "$FINAL_ENC" "$OFFSERVER_DEST/" || echo "WARNING: Off-server sync failed!"
+    if [ -n "${OFFSERVER_DEST:-}" ] && [ -n "${OFFSERVER_KEY:-}" ]; then
+        echo "Syncing encrypted backup and HMAC tag to off-server destination: $OFFSERVER_DEST"
+        if scp -i "$OFFSERVER_KEY" -B -q "$FINAL_ENC" "$FINAL_HMAC" "$OFFSERVER_DEST/"; then
+            echo "[$(date)] Off-server transfer verified. DISASTER RECOVERY STATUS: READY"
+        else
+            echo "[$(date)] CRITICAL: Off-server backup transfer FAILED!" >&2
+            echo "Local backup is intact, but DISASTER RECOVERY IS INCOMPLETE without off-server copy." >&2
+            exit 2
+        fi
     fi
+else
+    echo "[$(date)] WARNING: Off-server replication not configured (/opt/erp/config/offserver_backup.env missing)."
+    echo "DISASTER RECOVERY IS NOT CERTIFIED without an off-server copy in an independent failure domain."
 fi
 EOF
 
@@ -510,6 +544,14 @@ sudo tee /opt/erp/scripts/verify-backup.sh > /dev/null << 'EOF'
 set -euo pipefail
 
 BACKUP_DIR="/var/backups/nbh-erp"
+DRILL_DB="nbhdb_drill"
+
+# CRITICAL SAFETY ASSERTION: Never run drills against production database
+if [ "$DRILL_DB" == "nbhdb" ]; then
+    echo "CRITICAL ERROR: Drill database cannot be 'nbhdb'!" >&2
+    exit 1
+fi
+
 LATEST_ENC=$(ls -t "$BACKUP_DIR"/nbhdb_*.sql.gz.enc 2>/dev/null | head -n 1)
 
 if [ -z "$LATEST_ENC" ]; then
@@ -517,38 +559,75 @@ if [ -z "$LATEST_ENC" ]; then
     exit 1
 fi
 
-echo "==> Verifying latest encrypted backup: $LATEST_ENC"
-TEMP_GZ="/tmp/verify_test.sql.gz"
+echo "================================================================"
+echo " NBH ERP - Automated Backup Verification Drill"
+echo " Target Isolated Database: $DRILL_DB"
+echo " Testing Snapshot: $LATEST_ENC"
+echo "================================================================"
 
-# 1. Decrypt
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
-            -pass file:/opt/erp/config/.backup_key \
-            -in "$LATEST_ENC" -out "$TEMP_GZ"
-
-# 2. Check gzip archive integrity
-gzip -t "$TEMP_GZ"
-echo "Archive integrity: PASS"
-
-# 3. Restore to temporary drill database
-mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf -e "CREATE DATABASE IF NOT EXISTS nbhdb_drill;"
-gunzip < "$TEMP_GZ" | mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf nbhdb_drill
-
-# 4. Verify table integrity
-TABLE_COUNT=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf nbhdb_drill -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='nbhdb_drill';")
-echo "Restored table count: $TABLE_COUNT"
-
-if [ "$TABLE_COUNT" -lt 30 ]; then
-    echo "ERROR: Table count ($TABLE_COUNT) is below expected threshold!"
-    mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf -e "DROP DATABASE nbhdb_drill;"
-    rm -f "$TEMP_GZ"
+# 1. Authenticate Ciphertext Integrity (HMAC-SHA256) Prior to Decryption
+HMAC_FILE="${LATEST_ENC}.hmac"
+if [ ! -f "$HMAC_FILE" ]; then
+    echo "CRITICAL ERROR: Missing authentication tag ($HMAC_FILE)!" >&2
+    echo "Cannot verify ciphertext authenticity. Aborting drill." >&2
     exit 1
 fi
 
-# Clean up
-mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf -e "DROP DATABASE nbhdb_drill;"
-rm -f "$TEMP_GZ"
+EXPECTED_HMAC=$(cat "$HMAC_FILE")
+CALCULATED_HMAC=$(openssl dgst -sha256 -hmac "$(cat /opt/erp/config/.backup_key)" "$LATEST_ENC" | awk '{print $2}')
 
-echo "==> [SUCCESS] Backup verification drill PASSED completely!"
+if [ "$EXPECTED_HMAC" != "$CALCULATED_HMAC" ]; then
+    echo "CRITICAL ERROR: Backup integrity authentication FAILED!" >&2
+    echo "Ciphertext does not match HMAC signature. File is corrupted or tampered." >&2
+    exit 1
+fi
+echo "==> [1/4] Ciphertext authentication: HMAC-SHA256 VERIFIED"
+
+# 2. Reset Isolated Drill Database
+# Removes previous drill tables without requiring global administrative DROP DATABASE privileges
+echo "==> [2/4] Resetting isolated test database ($DRILL_DB)..."
+EXISTING_TABLES=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -sN -e "SHOW TABLES;" 2>/dev/null || true)
+if [ -n "$EXISTING_TABLES" ]; then
+    DROP_CMDS=$(echo "$EXISTING_TABLES" | awk '{print "DROP TABLE IF EXISTS `" $1 "`;"}')
+    mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -e "SET FOREIGN_KEY_CHECKS = 0; $DROP_CMDS SET FOREIGN_KEY_CHECKS = 1;"
+fi
+
+# 3. Direct Streaming Decryption and Restore into Drill Database
+# Eliminates unencrypted intermediate files on disk completely
+echo "==> [3/4] Streaming decryption and restore into $DRILL_DB..."
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+            -pass file:/opt/erp/config/.backup_key \
+            -in "$LATEST_ENC" | gunzip | \
+mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB"
+
+# 4. Verify Database Integrity in Drill Database
+echo "==> [4/4] Auditing restored data integrity in $DRILL_DB..."
+TABLE_COUNT=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -sN -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DRILL_DB';")
+echo "    - Total Restored Tables: $TABLE_COUNT"
+
+if [ "$TABLE_COUNT" -lt 30 ]; then
+    echo "CRITICAL ERROR: Restored table count ($TABLE_COUNT) is below threshold (< 30)!" >&2
+    exit 1
+fi
+
+RESTORED_VERSION=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -sN -e "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1;" 2>/dev/null || echo "unknown")
+echo "    - Restored Flyway Migration Version: $RESTORED_VERSION"
+
+USER_COUNT=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -sN -e "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
+echo "    - Restored Users Count: $USER_COUNT"
+
+# Clean up drill tables after successful drill
+DRILL_TABLES=$(mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -sN -e "SHOW TABLES;" 2>/dev/null || true)
+if [ -n "$DRILL_TABLES" ]; then
+    CLEANUP_CMDS=$(echo "$DRILL_TABLES" | awk '{print "DROP TABLE IF EXISTS `" $1 "`;"}')
+    mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf "$DRILL_DB" -e "SET FOREIGN_KEY_CHECKS = 0; $CLEANUP_CMDS SET FOREIGN_KEY_CHECKS = 1;"
+fi
+
+echo "================================================================"
+echo " ==> [SUCCESS] Backup Verification Drill PASSED Completely!"
+echo " Ciphertext HMAC: VALID | Streaming: PASS | Schema Integrity: PASS"
+echo " Production database was NOT touched."
+echo "================================================================"
 EOF
 
 sudo chown root:root /opt/erp/scripts/verify-backup.sh
@@ -617,12 +696,13 @@ if [ -f "/tmp/nbh-erp.jar" ]; then
     systemctl restart nbh-erp.service
     
     # Health check polling loop (up to 60 seconds)
-    echo "Checking backend health via /api/v1/auth/csrf..."
+    # Uses genuine /health/ready endpoint which verifies active MySQL datasource connectivity
+    echo "Checking backend health and database readiness via /health/ready..."
     HEALTHY=0
     for i in {1..30}; do
-        if curl -s -f http://127.0.0.1:8080/api/v1/auth/csrf > /dev/null; then
+        if curl -s -f http://127.0.0.1:8080/health/ready > /dev/null; then
             HEALTHY=1
-            echo "Backend is HEALTHY!"
+            echo "Backend is HEALTHY and database connection is ready!"
             break
         fi
         sleep 2
@@ -642,12 +722,14 @@ if [ -f "/tmp/nbh-erp.jar" ]; then
                 ln -sfn "$(cat /var/www/erp/releases/.previous_release)" /var/www/erp/current
             fi
             systemctl reload nginx
-            echo "Auto-rollback completed. Old version restored."
+            echo "Auto-rollback completed. Previous version restored."
             exit 1
         else
             echo "DANGER: Database migrations were applied ($FLYWAY_BEFORE -> $FLYWAY_FAILED)!"
-            echo "Auto-rollback of JAR alone is UNSAFE as it would mismatch the altered database schema!"
-            echo "Service stopped. To perform full synchronized rollback, run:"
+            echo "AUTOMATIC DATABASE ROLLBACK IS STRICTLY INHIBITED TO PREVENT PERMANENT LOSS OF BUSINESS TRANSACTIONS."
+            echo "The service has been stopped to protect data integrity."
+            echo "Review logs using: sudo journalctl -u nbh-erp.service -n 100 --no-pager"
+            echo "If a synchronized full database rollback is explicitly required, run:"
             echo "  sudo /opt/erp/scripts/rollback-full.sh pre_deploy_v${FLYWAY_BEFORE}"
             systemctl stop nbh-erp.service
             exit 1
@@ -684,39 +766,81 @@ if [ -z "$SNAPSHOT_FILE" ]; then
     exit 1
 fi
 
-echo "==> Initiating full synchronized rollback..."
+echo "================================================================"
+echo " NBH ERP - Manual Synchronized Rollback Procedure"
+echo " Target Snapshot: $SNAPSHOT_FILE"
+echo "================================================================"
+
+# 1. Authenticate Ciphertext Integrity (HMAC-SHA256) Prior to Restoring
+if [ -f "${SNAPSHOT_FILE}.hmac" ]; then
+    EXPECTED_HMAC=$(cat "${SNAPSHOT_FILE}.hmac")
+    CALCULATED_HMAC=$(openssl dgst -sha256 -hmac "$(cat /opt/erp/config/.backup_key)" "$SNAPSHOT_FILE" | awk '{print $2}')
+    if [ "$EXPECTED_HMAC" != "$CALCULATED_HMAC" ]; then
+        echo "CRITICAL ERROR: Snapshot HMAC signature verification failed!" >&2
+        echo "The snapshot file appears corrupted or altered. Aborting rollback." >&2
+        exit 1
+    fi
+    echo "==> [1/5] Snapshot HMAC authentication: VERIFIED"
+fi
+
+# 2. Stop application to prevent concurrent database writes during restoration
+echo "==> [2/5] Stopping Spring Boot service..."
 systemctl stop nbh-erp.service
 
-# 1. Restore Database Snapshot
-echo "==> Decrypting and restoring database snapshot: $SNAPSHOT_FILE"
-TEMP_GZ="/tmp/rollback_dump.sql.gz"
+# 3. Mandatory Safety Backup of Current Live Database Before Overwriting
+# Guarantees that any business transactions recorded since the snapshot are NOT permanently lost
+echo "==> [3/5] Taking safety snapshot of current live database before restoration..."
+/opt/erp/scripts/backup-db.sh "pre_rollback_safety_$(date +%Y%m%d_%H%M%S)"
+
+# 4. Mandatory Explicit Operator Confirmation
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "CRITICAL WARNING: MANUAL PRODUCTION DATABASE RESTORATION!"
+echo "Restoring snapshot '$SNAPSHOT_LABEL' will OVERWRITE current production tables."
+echo "Any sales, payments, or stock movements committed after this snapshot was created"
+echo "will be replaced by the snapshot state in 'nbhdb'."
+echo "A pre-rollback safety snapshot has been saved to /var/backups/nbh-erp/."
+echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+read -r -p "Type 'RESTORE-CONFIRM' to proceed with production database overwrite: " CONFIRM_RESTORE
+if [ "$CONFIRM_RESTORE" != "RESTORE-CONFIRM" ]; then
+    echo "Rollback aborted by operator. Production database was NOT modified."
+    exit 1
+fi
+
+# 5. Direct Streaming Restore into Production Database
+# Eliminates unencrypted intermediate files on disk completely
+echo "==> [4/5] Restoring production database from snapshot via streaming decryption..."
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
             -pass file:/opt/erp/config/.backup_key \
-            -in "$SNAPSHOT_FILE" -out "$TEMP_GZ"
+            -in "$SNAPSHOT_FILE" | gunzip | \
+mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf nbhdb
 
-gunzip < "$TEMP_GZ" | mysql --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf nbhdb
-rm -f "$TEMP_GZ"
-
-# 2. Restore Previous Backend JAR
+# 6. Restore Previous Backend JAR and Frontend Release Symlink
+echo "==> [5/5] Restoring binaries and web assets..."
 if [ -f "/opt/erp/nbh-erp.jar.bak" ]; then
-    echo "==> Restoring previous backend JAR..."
+    echo "    - Restoring previous backend JAR..."
     cp /opt/erp/nbh-erp.jar.bak /opt/erp/nbh-erp.jar
 fi
 
-# 3. Restore Previous Frontend Release
 if [ -f "/var/www/erp/releases/.previous_release" ]; then
     PREV_DIR=$(cat /var/www/erp/releases/.previous_release)
     if [ -d "$PREV_DIR" ]; then
-        echo "==> Restoring previous frontend release: $PREV_DIR"
+        echo "    - Restoring previous frontend release: $PREV_DIR"
         ln -sfn "$PREV_DIR" /var/www/erp/current
     fi
 fi
 
-# 4. Start service and verify health
+# 7. Start Service and Verify Health
+echo "Starting Spring Boot and reloading NGINX..."
 systemctl start nbh-erp.service
 systemctl reload nginx
 
-echo "==> Full synchronized rollback completed successfully!"
+# Check readiness
+sleep 5
+if curl -s -f http://127.0.0.1:8080/health/ready > /dev/null; then
+    echo "==> [SUCCESS] Full synchronized rollback completed successfully and service is HEALTHY!"
+else
+    echo "==> [WARNING] Service started but health check did not report UP yet. Inspect journalctl."
+fi
 systemctl status nbh-erp.service --no-pager
 EOF
 
@@ -728,16 +852,22 @@ sudo chmod 700 /opt/erp/scripts/rollback-full.sh
 
 ## 16. Verification and Health Checks
 
-1. **Verify Backend Health:**
+1. **Verify Backend Health & Database Readiness:**
    ```bash
-   curl -I http://127.0.0.1:8080/api/v1/auth/csrf
-   # Should return HTTP 200 with {"status":"UP"}
+   curl -i http://127.0.0.1:8080/health/ready
+   # Should return HTTP 200 with {"status":"UP"} (validates Spring Boot and MySQL connection pool)
    ```
+   *Security Note:* `/health/ready` and `/health/live` are bound strictly to localhost loopback (127.0.0.1:8080) and are NOT exposed to the public internet by NGINX. No sensitive Spring Boot Actuator information, heap dumps, environment variables, or stack traces are ever exposed publicly.
 
-2. **Verify Public HTTPS:**
+2. **Verify Public HTTPS & Security Headers:**
    ```bash
    curl -I https://erp.example.com
-   # Should return HTTP/2 200 with security headers
+   # Verify that:
+   # 1. Strict-Transport-Security: max-age=31536000 (without preload or includeSubDomains)
+   # 2. X-Content-Type-Options: nosniff
+   # 3. X-Frame-Options: DENY
+   # 4. Content-Security-Policy: script-src 'self' (no 'unsafe-inline' for JS)
+   # 5. Cache-Control: single header with no duplicate max-age on assets or index.html
    ```
 
 3. **Verify SSE Connection:**

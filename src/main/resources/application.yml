@@ -55,12 +55,15 @@ app:
       password: ${INITIAL_ADMIN_PASSWORD:}
       email: ${INITIAL_ADMIN_EMAIL:admin@nbh.com}
   company:
-    name: NBH Warehouse & Distribution
-    address: 123 Commercial Avenue, Colombo, Sri Lanka
-    phone: "+94 11 234 5678"
-    currency: LKR
-    currency-symbol: "Rs."
-    default-tax-rate: 0.00
+    name: ${APP_COMPANY_NAME:${COMPANY_NAME:NBH Warehouse & Distribution}}
+    address: ${APP_COMPANY_ADDRESS:${COMPANY_ADDRESS:123 Commercial Avenue, Colombo, Sri Lanka}}
+    phone: ${APP_COMPANY_PHONE:${COMPANY_PHONE:+94 11 234 5678}}
+    currency: ${APP_COMPANY_CURRENCY:LKR}
+    currency-symbol: ${APP_COMPANY_CURRENCY_SYMBOL:${COMPANY_CURRENCY_SYMBOL:Rs.}}
+    default-tax-rate: ${APP_COMPANY_DEFAULT_TAX_RATE:0.00}
+  business-timezone: ${APP_BUSINESS_TIMEZONE:Asia/Colombo}
+  warehouse-print:
+    poll-ms: ${APP_WAREHOUSE_PRINT_POLL_MS:5000}
 
 # SpringDoc OpenAPI configuration
 springdoc:

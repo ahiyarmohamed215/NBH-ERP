@@ -90,8 +90,10 @@ sudo ufw enable
 - [ ] Create dedicated application user locked to `127.0.0.1` with least privilege:
   ```sql
   CREATE DATABASE nbhdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CREATE DATABASE nbhdb_drill CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   CREATE USER 'nbh_erp'@'127.0.0.1' IDENTIFIED BY 'STRONG_SECRET_AT_LEAST_32_CHARS';
   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON nbhdb.* TO 'nbh_erp'@'127.0.0.1';
+  GRANT ALL PRIVILEGES ON nbhdb_drill.* TO 'nbh_erp'@'127.0.0.1';
   FLUSH PRIVILEGES;
   ```
 - [ ] Verify that NO user exists with host `'%'` (wildcard):
@@ -151,12 +153,14 @@ sudo ufw enable
 
 ### HTTP Security Headers
 Verify headers using `curl -I https://erp.example.com`:
-- [ ] `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- [ ] `Strict-Transport-Security: max-age=31536000` (without `preload` or `includeSubDomains`)
 - [ ] `X-Content-Type-Options: nosniff`
 - [ ] `X-Frame-Options: DENY`
 - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
 - [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`
-- [ ] `Content-Security-Policy: default-src 'self'; connect-src 'self'; ...`
+- [ ] `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; ...`
+- [ ] Single `Cache-Control` header (no duplicate `max-age` from `expires`)
+- [ ] Security headers explicitly preserved on `/assets/`, static media, and `/index.html`
 - [ ] `Server` banner tokens hidden (`server_tokens off;`).
 
 ---
@@ -174,18 +178,17 @@ Verify headers using `curl -I https://erp.example.com`:
 
 ### Daily Automated Database Backups
 - [ ] Deploy backup script at `/opt/erp/scripts/backup-db.sh` running via cron daily at 02:30 AM UTC.
-- [ ] Verify backup script permissions (`chmod 700 /opt/erp/scripts/backup-db.sh`).
+- [ ] Verify streaming pipeline (mysqldump -> gzip -> openssl enc) leaves no plaintext files in `/tmp`.
+- [ ] Verify HMAC-SHA256 authentication tag generation (`.hmac`) for ciphertext verification.
 - [ ] Store MySQL backup credentials in `/opt/erp/config/.mysql_backup.cnf` with `chmod 600`.
+- [ ] Off-server backup transfer configured and verified before declaring Disaster Recovery ready.
 
 ### Disaster Recovery Restoration Drill
-- [ ] Conduct a monthly database restoration test on a staging database to verify backup integrity:
-  ```bash
-  # Test restoration into a test verification database
-  mysql -u root -e "CREATE DATABASE IF NOT EXISTS nbhdb_drill;"
-  gunzip < /var/backups/nbh-erp/nbhdb_YYYYMMDD_HHMMSS.sql.gz | mysql -u root nbhdb_drill
-  mysql -u root -e "CHECK TABLE nbhdb_drill.users; CHECK TABLE nbhdb_drill.invoices;"
-  mysql -u root -e "DROP DATABASE nbhdb_drill;"
-  ```
+- [ ] Run scheduled automated restoration drill via `/opt/erp/scripts/verify-backup.sh`:
+  - Verifies ciphertext HMAC integrity prior to decryption.
+  - Streams decryption directly into isolated test database (`nbhdb_drill`).
+  - Audits table count, Flyway schema migration history, and record sanity.
+  - Never touches production database `nbhdb`.
 
 ### OCI Always Free Block Volume Backups
 - [ ] Configure OCI Boot Volume automated backup policy:
