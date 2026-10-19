@@ -24,6 +24,7 @@ import {
   recycleBinApi,
   productApi,
   brandApi,
+  clearApiCache,
 } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -207,7 +208,10 @@ const MastersView = React.forwardRef(function MastersView({
     loadTabData();
   }, [activeTab]);
 
-  useDataSync(() => {
+  useDataSync((event) => {
+    if (event?.detail?.remote && activeTab === 'products') {
+      return Promise.allSettled([loadAllCounts()]);
+    }
     return Promise.allSettled([loadAllCounts(),loadTabData()]);
   }, ['erp:data_changed', 'erp:inventory_updated', 'erp:customers_updated', 'erp:purchasing_updated']);
 
@@ -221,14 +225,25 @@ const MastersView = React.forwardRef(function MastersView({
     }
   };
 
-  const loadTabData = async () => {
+  const loadTabData = async (isManualRefresh = false) => {
     try {
       setLoading(true);
+      if (isManualRefresh) {
+        clearApiCache('/' + activeTab);
+        invalidateMasterQueries(activeTab);
+      }
+      const minDelay = isManualRefresh ? new Promise(r => setTimeout(r, 250)) : Promise.resolve();
+
       if (activeTab === 'products') {
+        if (isManualRefresh) {
+          clearApiCache('/products');
+          invalidateProductQueries();
+        }
         const [pRes, cRes, bRes] = await Promise.all([
           refetchProducts().then(r => r?.data).catch(() => null),
-          categories.length === 0 ? categoryApi.getAll() : Promise.resolve({ data: categories }),
-          brands.length === 0 ? brandApi.getAll() : Promise.resolve({ data: brands }),
+          categories.length === 0 ? categoryApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }) : Promise.resolve({ data: categories }),
+          brands.length === 0 ? brandApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }) : Promise.resolve({ data: brands }),
+          minDelay,
         ]);
         const fetchedContent = pRes?.content || pRes?.data?.content || (Array.isArray(pRes) ? pRes : pRes?.data);
         if (Array.isArray(fetchedContent)) {
@@ -243,19 +258,34 @@ const MastersView = React.forwardRef(function MastersView({
           setBrands(bRes.data || []);
         }
       } else if (activeTab === 'brands') {
-        const res = await brandApi.getAll();
+        const [res] = await Promise.all([
+          brandApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }),
+          minDelay,
+        ]);
         setBrands(res.data || []);
       } else if (activeTab === 'warehouses') {
-        const res = await warehouseApi.getAll();
+        const [res] = await Promise.all([
+          warehouseApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }),
+          minDelay,
+        ]);
         setWarehouses(res.data || []);
       } else if (activeTab === 'categories') {
-        const res = await categoryApi.getAll();
+        const [res] = await Promise.all([
+          categoryApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }),
+          minDelay,
+        ]);
         setCategories(res.data || []);
       } else if (activeTab === 'customers') {
-        const res = await customerApi.getAll();
+        const [res] = await Promise.all([
+          customerApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }),
+          minDelay,
+        ]);
         setCustomers(res.data || []);
       } else if (activeTab === 'suppliers') {
-        const res = await supplierApi.getAll();
+        const [res] = await Promise.all([
+          supplierApi.getAll({ force: isManualRefresh, skipCache: isManualRefresh }),
+          minDelay,
+        ]);
         setSuppliers(res.data || []);
       }
     } catch (err) {
@@ -263,6 +293,12 @@ const MastersView = React.forwardRef(function MastersView({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([loadTabData(true), loadAllCounts()]);
+    const tabName = masterNames[activeTab] || (activeTab.charAt(0).toUpperCase() + activeTab.slice(1));
+    addToast(`${tabName} records refreshed`, 'info');
   };
 
   const supplierStatus=item=>item?.status || (isItemActive(item)?'ACTIVE':'INACTIVE');
@@ -1032,7 +1068,8 @@ const MastersView = React.forwardRef(function MastersView({
           {/* Refresh Records - Icon only */}
           <button
             type="button"
-            onClick={loadTabData}
+            onClick={handleRefresh}
+            disabled={loading}
             style={{
               height: '38px',
               width: '38px',
@@ -1044,22 +1081,28 @@ const MastersView = React.forwardRef(function MastersView({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
               boxSizing: 'border-box',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-              e.currentTarget.style.borderColor = '#94a3b8';
-              e.currentTarget.style.color = '#0f172a';
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#f8fafc';
+                e.currentTarget.style.borderColor = '#94a3b8';
+                e.currentTarget.style.color = '#0f172a';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.color = activeTab === 'suppliers' ? '#334155' : '#64748b';
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#ffffff';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+                e.currentTarget.style.color = activeTab === 'suppliers' ? '#334155' : '#64748b';
+              }
             }}
             title="Refresh records"
+            aria-label="Refresh records"
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>

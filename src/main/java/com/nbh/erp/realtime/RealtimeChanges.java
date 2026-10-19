@@ -11,13 +11,29 @@ import java.util.Set;
 @Component
 public class RealtimeChanges {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RealtimeChanges.class);
-    public record Change(String topic, String owner) {}
+    public record Change(
+            String topic,
+            String owner,
+            String type,
+            Long productId,
+            Long warehouseId,
+            Long invoiceId,
+            Long grnId
+    ) {
+        public Change(String topic, String owner) {
+            this(topic, owner, null, null, null, null, null);
+        }
+    }
     private final Object resourceKey = new Object();
     private final ObjectProvider<RealtimeStreams> streams;
     public RealtimeChanges(ObjectProvider<RealtimeStreams> streams) { this.streams = streams; }
 
-    @SuppressWarnings("unchecked")
     public void changed(String topic, String owner) {
+        changed(topic, owner, null, null, null, null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void changed(String topic, String owner, String type, Long productId, Long warehouseId, Long invoiceId, Long grnId) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) return;
         Set<Change> pending = (Set<Change>) TransactionSynchronizationManager.getResource(resourceKey);
@@ -40,6 +56,6 @@ public class RealtimeChanges {
                 }
             });
         }
-        pending.add(new Change(topic, owner));
+        pending.add(new Change(topic, owner, type, productId, warehouseId, invoiceId, grnId));
     }
 }

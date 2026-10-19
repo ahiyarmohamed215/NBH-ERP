@@ -60,8 +60,13 @@ export function createRealtimeClient({url, getToken, refreshSession, invalidate,
         if (signal.aborted || stopped) return;
         if (event === 'ready') { connected = true; connectedAt = Date.now(); sync(); }
         if (event === 'invalidate') {
-          const {topics} = JSON.parse(payload);
-          if (Array.isArray(topics) && topics.length && topics.length <= 32 && topics.every(t => typeof t === 'string')) invalidate(topics);
+          try {
+            const data = JSON.parse(payload);
+            const topics = data?.topics;
+            if (Array.isArray(topics) && topics.length && topics.length <= 32 && topics.every(t => typeof t === 'string')) {
+              invalidate(topics, data);
+            }
+          } catch (_) {}
         }
       }, signal, activity);
     } catch (_) { /* Transport retries stay silent; page loaders handle data errors. */ }

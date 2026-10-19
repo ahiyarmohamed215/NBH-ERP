@@ -83,11 +83,49 @@ public class RealtimeStreams {
             context.setAuthentication(new UsernamePasswordAuthenticationToken(current, null, current.getAuthorities()));
             SecurityContextHolder.setContext(context);
             Set<String> topics = new TreeSet<>();
+            String primaryType = null;
+            Long targetProductId = null;
+            Long targetWarehouseId = null;
+            Long targetInvoiceId = null;
+            Long targetGrnId = null;
+            List<Map<String, Object>> details = new ArrayList<>();
+
             for (var change : Set.copyOf(client.pending)) {
                 client.pending.remove(change);
-                if (allowed(change, current)) topics.add(change.topic());
+                if (allowed(change, current)) {
+                    topics.add(change.topic());
+                    if (change.type() != null) {
+                        Map<String, Object> item = new LinkedHashMap<>();
+                        item.put("topic", change.topic());
+                        item.put("type", change.type());
+                        if (change.productId() != null) item.put("productId", change.productId());
+                        if (change.warehouseId() != null) item.put("warehouseId", change.warehouseId());
+                        if (change.invoiceId() != null) item.put("invoiceId", change.invoiceId());
+                        if (change.grnId() != null) item.put("grnId", change.grnId());
+                        details.add(item);
+
+                        if (primaryType == null) primaryType = change.type();
+                        if (targetProductId == null && change.productId() != null) targetProductId = change.productId();
+                        if (targetWarehouseId == null && change.warehouseId() != null) targetWarehouseId = change.warehouseId();
+                        if (targetInvoiceId == null && change.invoiceId() != null) targetInvoiceId = change.invoiceId();
+                        if (targetGrnId == null && change.grnId() != null) targetGrnId = change.grnId();
+                    }
+                }
             }
-            if (!topics.isEmpty()) client.emitter.send(SseEmitter.event().name("invalidate").data(Map.of("topics", topics)));
+
+            if (!topics.isEmpty()) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("topics", topics);
+                if (primaryType != null) payload.put("type", primaryType);
+                if (targetProductId != null) payload.put("productId", targetProductId);
+                if (targetWarehouseId != null) payload.put("warehouseId", targetWarehouseId);
+                if (targetInvoiceId != null) payload.put("invoiceId", targetInvoiceId);
+                if (targetGrnId != null) payload.put("grnId", targetGrnId);
+                if (!details.isEmpty()) payload.put("details", details);
+                payload.put("timestamp", System.currentTimeMillis());
+
+                client.emitter.send(SseEmitter.event().name("invalidate").data(payload));
+            }
             client.emitter.send(SseEmitter.event().comment("heartbeat"));
             client.lastHeartbeat = System.currentTimeMillis();
         } catch (Exception error) { close(client); }

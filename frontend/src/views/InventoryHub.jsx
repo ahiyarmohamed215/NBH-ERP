@@ -38,6 +38,7 @@ import {
   brandApi,
   staffQuotaApi,
   salesmanApi,
+  clearApiCache,
 } from '../api/apiClient';
 import { useInventoryBalancesQuery, invalidateInventoryQueries } from '../queryClient';
 import {
@@ -131,10 +132,20 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   const [adjustmentTransition,setAdjustmentTransition]=useState(null);
   const [adjustmentTransitionReason,setAdjustmentTransitionReason]=useState('');
   const [adjustmentTransitionBusy,setAdjustmentTransitionBusy]=useState(false);
+  const [adjustmentsLoading, setAdjustmentsLoading] = useState(false);
 
-  const loadAdjustments = async () => {
+  const loadAdjustments = async (isManual = false) => {
     try {
-      const res = await adjustmentApi.search({ size: 100 });
+      setAdjustmentsLoading(true);
+      if (isManual) {
+        clearApiCache('/stock-adjustments');
+        invalidateInventoryQueries();
+      }
+      const minDelay = isManual ? new Promise((r) => setTimeout(r, 250)) : Promise.resolve();
+      const [res] = await Promise.all([
+        adjustmentApi.search({ size: 100 }, { force: true, skipCache: true }),
+        minDelay,
+      ]);
       const content = res.data?.data?.content || res.data?.content || [];
       const formatted = content.map((adj) => {
         const items = (adj.items || []).map((it) => ({
@@ -170,13 +181,15 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           productId: first.productId,
           recordNo: adj.adjustmentNumber,
           date: adj.adjustmentDate,
-          type: isReduction ? 'Reduction' : 'Addition',
+          type: adj.adjustmentType==='ORDER_REVIEW'?'Bill quantity':isReduction ? 'Reduction' : 'Addition',
+          adjustmentType: adj.adjustmentType,
           warehouse: adj.warehouseName,
           warehouseId: String(adj.warehouseId),
           sku: first.productSku,
           productName: first.productName,
           batch: adj.adjustmentNumber,
           sourceGrnNumber: first.sourceGrnNumber,
+          sourceHeldBillId: adj.sourceHeldBillId, sourceHeldBillNumber: adj.sourceHeldBillNumber,
           sourceGrnId: first.sourceGrnId,
           quantity: Number(first.differenceQuantity || 0),
           reason: first.reason || adj.reason,
@@ -189,6 +202,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       setAdjustmentRecords(formatted);
     } catch (err) {
       console.error('Failed to load adjustments from API:', err);
+    } finally {
+      setAdjustmentsLoading(false);
     }
   };
 
@@ -547,6 +562,50 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     }
   );
 
+  useEffect(() => {
+    if (balancesQueryData && currentTab === 'inventory-list') {
+      const rawBalances = balancesQueryData?.content || balancesQueryData?.data?.content || (Array.isArray(balancesQueryData?.data) ? balancesQueryData?.data : (Array.isArray(balancesQueryData) ? balancesQueryData : []));
+      if (Array.isArray(rawBalances) && rawBalances.length > 0) {
+        const items = rawBalances
+          .filter((b) => Number(b.quantity ?? 0) > 0)
+          .map((b) => {
+            const prod = productsList && productsList.length > 0
+              ? productsList.find((p) => String(p.id) === String(b.productId) || (b.productSku && p.sku === b.productSku))
+              : null;
+            const qty = Number(b.quantity ?? 0);
+            const reserved = Number(b.reservedQuantity ?? 0);
+            const avail = Number(b.availableQuantity ?? (qty - reserved));
+            const cost = canSeeCost ? Number(b.costPrice ?? prod?.costPrice ?? 0) : null;
+            const sell = inventorySellingPrice(b, prod || b, canSeeCost);
+            const min = Number(b.minStockLevel ?? prod?.minStockLevel ?? 0);
+            return {
+              id: b.id || `bal-${b.productId}-${b.warehouseId}`,
+              warehouseId: b.warehouseId,
+              warehouseName: b.warehouseName || warehousesList.find(w => String(w.id) === String(b.warehouseId))?.name || '—',
+              warehouseCode: b.warehouseCode || warehousesList.find(w => String(w.id) === String(b.warehouseId))?.code,
+              productId: b.productId || prod?.id,
+              sku: b.productSku || prod?.sku || '—',
+              productName: b.productName || prod?.name || 'Unknown Product',
+              brandName: b.brandName || prod?.brandName || '—',
+              categoryName: b.categoryName || prod?.categoryName || '—',
+              unitOfMeasure: b.unitOfMeasure || prod?.unitOfMeasure || 'PCS',
+              quantity: qty,
+              reservedQuantity: reserved,
+              availableQuantity: avail,
+              costPrice: cost,
+              sellingPrice: sell,
+              totalCostValue: canSeeCost ? Number(b.totalCostValue ?? (qty * (cost || 0))) : null,
+              minStockLevel: min,
+              isLowStock: qty <= min && qty > 0,
+              isOutOfStock: qty <= 0,
+            };
+          });
+        setInventoryBalances(items);
+        setViewingStockItem(current => current ? items.find(item => item.id === current.id) || null : null);
+      }
+    }
+  }, [balancesQueryData, currentTab, canSeeCost, productsList, warehousesList]);
+
   const activeCategories = useMemo(() => (Array.isArray(categoriesList) ? categoriesList : []).filter(c => c && c.isActive !== false), [categoriesList]);
   const activeBrands = useMemo(() => (Array.isArray(brandsList) ? brandsList : []).filter(b => b && b.isActive !== false), [brandsList]);
 
@@ -555,11 +614,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     const generation=++inventoryLoadGeneration.current;
     try {
       setInventoryLoading(true);
-      const [balRes, whRes, catRes, brandRes] = await Promise.allSettled([
+      invalidateInventoryQueries();
+      const [balRes, whRes, catRes, brandRes, prodRes] = await Promise.allSettled([
         inventoryApi.getBalances({ size: 300 }, { force: true, skipCache: true }),
-        warehouseApi.getAll(),
-        categoryApi.getActive(),
-        brandApi.getActive(),
+        warehouseApi.getAll({ force: true, skipCache: true }),
+        categoryApi.getActive({ force: true, skipCache: true }),
+        brandApi.getActive({ force: true, skipCache: true }),
+        productApi.getProducts({ size: 300 }, { force: true, skipCache: true }),
       ]);
       if(generation!==inventoryLoadGeneration.current)return;
 
@@ -567,19 +628,14 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       const fetchedWarehouses = whRes.status === 'fulfilled' ? (whRes.value.data?.data || (Array.isArray(whRes.value.data) ? whRes.value.data : [])) : [];
       const fetchedCategories = catRes.status === 'fulfilled' ? (catRes.value.data?.data || (Array.isArray(catRes.value.data) ? catRes.value.data : catRes.value.data?.content || [])) : [];
       const fetchedBrands = brandRes.status === 'fulfilled' ? (brandRes.value.data?.data || (Array.isArray(brandRes.value.data) ? brandRes.value.data : brandRes.value.data?.content || [])) : [];
+      const fetchedProducts = prodRes.status === 'fulfilled' ? (prodRes.value.data?.content || (Array.isArray(prodRes.value.data) ? prodRes.value.data : prodRes.value.data?.data || [])) : [];
 
       if (whRes.status === 'fulfilled') setWarehousesList(fetchedWarehouses);
       if (catRes.status === 'fulfilled') setCategoriesList(fetchedCategories);
       if (brandRes.status === 'fulfilled') setBrandsList(fetchedBrands);
+      if (prodRes.status === 'fulfilled' && fetchedProducts.length > 0) setProductsList(fetchedProducts);
 
-      let currentProducts = productsList;
-      if (!currentProducts || currentProducts.length === 0) {
-        try {
-          const pRes = await productApi.getProducts({ size: 300 });
-          currentProducts = pRes.data?.content || (Array.isArray(pRes.data) ? pRes.data : pRes.data?.data || []);
-          setProductsList(currentProducts);
-        } catch (_) {}
-      }
+      const currentProducts = (prodRes.status === 'fulfilled' && fetchedProducts.length > 0) ? fetchedProducts : productsList;
 
       let items = [];
 
@@ -645,8 +701,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     loadAdjustments();
   }, []);
 
-  useDataSync(() => {
-    return Promise.allSettled([loadInventoryBalances(),loadAdjustments(),loadQuotas()]);
+  useDataSync((event) => {
+    if (event?.detail?.remote) {
+      return Promise.allSettled([loadAdjustments(), loadQuotas()]);
+    }
+    return Promise.allSettled([loadInventoryBalances(), loadAdjustments(), loadQuotas()]);
   }, ['erp:data_changed', 'erp:inventory_updated']);
 
   // Filtered inventory balances
@@ -1053,6 +1112,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 onChange={(e) => setInvBrandFilter(e.target.value)}
                 className="inventory-full-label-filter"
                 title="Filter by brand"
+                searchable={false}
               >
                 <option value="ALL">All Brands</option>
                 {activeBrands.map((b) => (
@@ -1184,8 +1244,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Refresh inventory balances"
-                aria-label="Refresh inventory balances"
+                title="Refresh records"
+                aria-label="Refresh records"
+                disabled={inventoryLoading}
               >
                 <RefreshCw size={15} className={inventoryLoading ? 'animate-spin' : ''} />
               </button>
@@ -1328,6 +1389,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <option value="ALL">All Types</option>
                 <option value="Addition">Addition</option>
                 <option value="Reduction">Reduction</option>
+                <option value="Bill quantity">Bill quantity</option>
               </FilterSelect>
 
               <FilterSelect value={adjustmentStatusFilter} onChange={event=>setAdjustmentStatusFilter(event.target.value)} title="Filter stock adjustments by status" style={{width:140}}>
@@ -1398,9 +1460,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               {/* Refresh Records - Icon only */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  await loadAdjustments(true);
                   addToast('Stock adjustments refreshed', 'info');
                 }}
+                disabled={adjustmentsLoading}
                 style={{
                   height: '38px',
                   width: '38px',
@@ -1432,12 +1496,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 title="Refresh records"
                 aria-label="Refresh records"
               >
-                <RefreshCw size={15} />
+                <RefreshCw size={15} className={adjustmentsLoading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
 
-          <AdjustmentTable rows={filteredAdjustments} canEdit={canEditInventory} onView={setViewingRecord} onEdit={handleOpenEditRecord}/>
+          <AdjustmentTable rows={filteredAdjustments} loading={adjustmentsLoading} canEdit={canEditInventory} onView={setViewingRecord} onEdit={handleOpenEditRecord}/>
         </div>
       )}
       {/* ------------------------------------------------------------- */}

@@ -39,4 +39,15 @@ class RealtimeChangesTest {
         changes.changed("orders",null);
         assertDoesNotThrow(() -> TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit));
     }
+    @Test void commitPublishesTargetedMetadataAndCoalescesIdenticalChanges() {
+        changes.changed("inventory", null, "STOCK_UPDATED", 101L, 5L, null, null);
+        changes.changed("inventory", null, "STOCK_UPDATED", 101L, 5L, null, null);
+        changes.changed("sales", "cashier1", "INVOICE_UPDATED", null, 5L, 202L, null);
+        verifyNoInteractions(streams);
+        for (var sync : TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+        verify(streams).enqueue(Set.of(
+            new RealtimeChanges.Change("inventory", null, "STOCK_UPDATED", 101L, 5L, null, null),
+            new RealtimeChanges.Change("sales", "cashier1", "INVOICE_UPDATED", null, 5L, 202L, null)
+        ));
+    }
 }

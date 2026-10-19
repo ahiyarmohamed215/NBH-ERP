@@ -197,9 +197,10 @@ export function useMastersQuery(type, options = {}) {
   });
 }
 
-// Auto-invalidate TanStack Query on mutation events broadcast by apiClient
+// Auto-invalidate TanStack Query on local mutation events broadcast by apiClient
 if (typeof window !== 'undefined') {
   window.addEventListener('erp:data_changed', (event) => {
+    if (event.detail?.remote) return;
     const url = event.detail?.url || '';
     if (url.includes('/products')) {
       queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
@@ -221,11 +222,13 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  window.addEventListener('erp:inventory_updated', () => {
+  window.addEventListener('erp:inventory_updated', (event) => {
+    if (event.detail?.remote) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
   });
 
-  window.addEventListener('erp:purchasing_updated', () => {
+  window.addEventListener('erp:purchasing_updated', (event) => {
+    if (event.detail?.remote) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
   });
 }
