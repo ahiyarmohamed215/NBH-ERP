@@ -106,7 +106,7 @@ const MastersView = React.forwardRef(function MastersView({
   useEffect(() => {
     if (activeTab === 'products' && pagedProductsData) {
       const content = pagedProductsData.content || (Array.isArray(pagedProductsData) ? pagedProductsData : []);
-      if (content.length > 0 || (pagedProductsData.totalElements === 0 && pagedProductsData.totalPages != null)) {
+      if (Array.isArray(content)) {
         setProducts(content);
       }
     }
@@ -155,7 +155,12 @@ const MastersView = React.forwardRef(function MastersView({
     }
   };
   const canEditCurrentTab = canEditModule(user, getTabModule(activeTab));
-  const masterDeletion=useRecordDeletion(getTabModule(activeTab),activeTab==='categories'?'Category':activeTab==='warehouses'?'Warehouse':activeTab==='brands'?'Brand':activeTab==='products'?'Product':'Record',()=>{setViewingItem(null);return loadTabData();});
+  const masterDeletion=useRecordDeletion(getTabModule(activeTab),activeTab==='categories'?'Category':activeTab==='warehouses'?'Warehouse':activeTab==='brands'?'Brand':activeTab==='products'?'Product':'Record',async ()=>{
+    if (activeTab === 'products') invalidateProductQueries();
+    else invalidateMasterQueries(activeTab);
+    setViewingItem(null);
+    return loadTabData();
+  });
 
   React.useImperativeHandle(ref, () => ({
     openAdd: handleOpenAdd,
@@ -225,8 +230,8 @@ const MastersView = React.forwardRef(function MastersView({
           categories.length === 0 ? categoryApi.getAll() : Promise.resolve({ data: categories }),
           brands.length === 0 ? brandApi.getAll() : Promise.resolve({ data: brands }),
         ]);
-        const fetchedContent = pRes?.content || pRes?.data?.content || (Array.isArray(pRes) ? pRes : pRes?.data || []);
-        if (fetchedContent && fetchedContent.length > 0) {
+        const fetchedContent = pRes?.content || pRes?.data?.content || (Array.isArray(pRes) ? pRes : pRes?.data);
+        if (Array.isArray(fetchedContent)) {
           setProducts(fetchedContent);
         } else if (pagedProductsData?.content) {
           setProducts(pagedProductsData.content);
