@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useLayoutEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useLayoutEffect, useRef, useState, Suspense } from 'react';
+import ErrorBoundary from './ErrorBoundary';
+import WorkspaceFallback from './WorkspaceFallback';
 
 const WorkspaceActive = createContext(true);
 export const useWorkspaceActive = () => useContext(WorkspaceActive);
@@ -25,7 +27,11 @@ function Workspace({ active, id, children }) {
         if (active) positions.current.set(event.target, [event.target.scrollTop, event.target.scrollLeft]);
       }}
       style={{ display:active ? 'flex' : 'none', flexDirection:'column', flex:1, minHeight:0, minWidth:0, overflow:'auto' }}>
-      {children}
+      <ErrorBoundary>
+        <Suspense fallback={<WorkspaceFallback id={id} />}>
+          {children}
+        </Suspense>
+      </ErrorBoundary>
     </section>
   </WorkspaceActive.Provider>;
 }

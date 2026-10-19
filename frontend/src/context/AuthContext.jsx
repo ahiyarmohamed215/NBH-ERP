@@ -1,9 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { authApi, refreshSession, clearApiCache, getAccessToken, setAccessToken, clearAccessToken, expireSession } from '../api/apiClient';
+import {
+  authApi,
+  refreshSession,
+  clearApiCache,
+  getAccessToken,
+  setAccessToken,
+  clearAccessToken,
+  expireSession,
+  recordUserActivity,
+  getLastUserActivity,
+  IDLE_TIMEOUT_MS,
+  IDLE_EXPIRED_MESSAGE,
+} from '../api/apiClient';
 import { queryClient, clearSecureQueryCache } from '../queryClient';
 
 const AuthContext = createContext(null);
+
+export { IDLE_TIMEOUT_MS, IDLE_EXPIRED_MESSAGE };
 
 export const isTokenExpired = token => {
   if (!token) return true;
@@ -26,20 +40,24 @@ export function AuthProvider({ children }) {
     clearSecureQueryCache();
     clearAccessToken();
     if (typeof localStorage !== 'undefined') {
-      ['nbh_token', 'nbh_refresh', 'nbh_user'].forEach(k => {
+      ['nbh_token', 'nbh_refresh', 'nbh_user', 'nbh_last_active'].forEach(k => {
         try { localStorage.removeItem(k); } catch (_) {}
       });
     }
     setUser(null);
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (isIdle = false) => {
     try {
       if (getAccessToken()) await authApi.logout();
     } catch (_) {
       // Ignore network errors during logout
     } finally {
-      expireSession();
+      if (isIdle) {
+        expireSession(IDLE_EXPIRED_MESSAGE);
+      } else {
+        expireSession();
+      }
       clear();
     }
   }, [clear]);
@@ -48,6 +66,13 @@ export function AuthProvider({ children }) {
     let active = true;
 
     const check = async (isInitial = false) => {
+      // 1. Inactivity check: if idle for 30+ minutes, terminate session immediately
+      const lastActive = getLastUserActivity();
+      if (lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
+        logout(true);
+        return;
+      }
+
       let token = getAccessToken();
       if (!token) {
         if (!isInitial) return;
@@ -76,6 +101,9 @@ export function AuthProvider({ children }) {
           setUser(res.data);
           if (typeof localStorage !== 'undefined' && localStorage.getItem('nbh_user')) {
             localStorage.setItem('nbh_user', JSON.stringify(res.data));
+          }
+          if (getLastUserActivity() === 0) {
+            recordUserActivity();
           }
         }
       } catch (e) {
@@ -107,9 +135,63 @@ export function AuthProvider({ children }) {
       window.removeEventListener('erp:roles_updated', onCheckEvent);
       window.removeEventListener('erp:users_updated', onCheckEvent);
     };
-  }, [clear]);
+  }, [clear, logout]);
 
-  const login = async (username, password) => {
+  // 30-Minute Idle Inactivity Auto-Logout Effect
+  useEffect(() => {
+    if (!user) return;
+
+    recordUserActivity();
+
+    const onUserInteraction = () => {
+      recordUserActivity();
+    };
+
+    const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
+    if (typeof window !== 'undefined') {
+      ACTIVITY_EVENTS.forEach(event => {
+        window.addEventListener(event, onUserInteraction, { passive: true });
+      });
+    }
+
+    const checkIdle = () => {
+      const lastActive = getLastUserActivity();
+      if (lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
+        logout(true);
+      }
+    };
+
+    const idleInterval = setInterval(checkIdle, 10000); // Check every 10 seconds
+    if (idleInterval && typeof idleInterval.unref === 'function') {
+      idleInterval.unref();
+    }
+
+    const onVisibilityOrFocus = () => {
+      checkIdle();
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityOrFocus);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onVisibilityOrFocus);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        ACTIVITY_EVENTS.forEach(event => {
+          window.removeEventListener(event, onUserInteraction);
+        });
+        window.removeEventListener('focus', onVisibilityOrFocus);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+      }
+      clearInterval(idleInterval);
+    };
+  }, [user, logout]);
+
+  const login = useCallback(async (username, password) => {
     sessionGeneration.current++;
     const { data } = await authApi.login(username, password);
     sessionGeneration.current++;
@@ -118,6 +200,7 @@ export function AuthProvider({ children }) {
 
     // Store access token in JavaScript memory ONLY!
     setAccessToken(data.accessToken);
+    recordUserActivity();
 
     // Clean up any legacy localStorage tokens
     if (typeof localStorage !== 'undefined') {
@@ -132,13 +215,22 @@ export function AuthProvider({ children }) {
       sessionStorage.removeItem('nbh_session_expired');
     }
     return data;
-  };
+  }, []);
 
-  const updateUser = profile => setUser(prev => ({ ...prev, ...profile }));
+  const updateUser = useCallback(profile => setUser(prev => ({ ...prev, ...profile })), []);
+
+  const authValue = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    updateUser,
+    isTokenExpired,
+  }), [user, loading, login, logout, updateUser]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ user, loading, login, logout, updateUser, isTokenExpired }}>
+      <AuthContext.Provider value={authValue}>
         {children}
       </AuthContext.Provider>
     </QueryClientProvider>

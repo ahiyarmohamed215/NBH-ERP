@@ -1,27 +1,44 @@
 import RetainedWorkspaces from './components/RetainedWorkspaces';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
-import SignupView from './views/SignupView';
-import DashboardView from './views/DashboardView';
-import InventoryHub from './views/InventoryHub';
-import PurchasingHub from './views/PurchasingHub';
-import InvoicingHub from './views/InvoicingHub';
-import PaymentsHub from './views/PaymentsHub';
-import EmployeesHub from './views/EmployeesHub';
-
-import ReportsView from './views/ReportsView';
-import CustomersHub from './views/CustomersHub';
-import DeliveryHub from './views/DeliveryHub';
 import SidebarProfile from './components/SidebarProfile';
-import RecycleBinView from './views/RecycleBinView';
 import {canUseRecycleBin} from './utils/recycleBinAccess';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
 import {canAccessModule,canAccessTab,resolveModuleTab} from './utils/moduleAccess';
+import { lazyWithRetry } from './utils/lazyWithRetry';
+import WorkspaceFallback from './components/WorkspaceFallback';
 
 import { LayoutDashboard, Users, Contact, Boxes, Truck, FileText, BarChart3, Package, ShieldAlert, Lock, PanelLeftClose, ShoppingCart, CreditCard, WifiOff } from 'lucide-react';
 import ErrorState from './components/ErrorState';
+
+// Lazy-loaded ERP workspaces with resilient chunk retry
+const SignupView = lazyWithRetry(() => import('./views/SignupView'));
+const DashboardView = lazyWithRetry(() => import('./views/DashboardView'));
+const InventoryHub = lazyWithRetry(() => import('./views/InventoryHub'));
+const PurchasingHub = lazyWithRetry(() => import('./views/PurchasingHub'));
+const InvoicingHub = lazyWithRetry(() => import('./views/InvoicingHub'));
+const PaymentsHub = lazyWithRetry(() => import('./views/PaymentsHub'));
+const EmployeesHub = lazyWithRetry(() => import('./views/EmployeesHub'));
+const ReportsView = lazyWithRetry(() => import('./views/ReportsView'));
+const CustomersHub = lazyWithRetry(() => import('./views/CustomersHub'));
+const DeliveryHub = lazyWithRetry(() => import('./views/DeliveryHub'));
+const RecycleBinView = lazyWithRetry(() => import('./views/RecycleBinView'));
+
+// Module loader mapping for smart hover/focus prefetching
+export const moduleLoaders = {
+  dashboard: () => import('./views/DashboardView'),
+  inventory: () => import('./views/InventoryHub'),
+  purchasing: () => import('./views/PurchasingHub'),
+  invoicing: () => import('./views/InvoicingHub'),
+  payments: () => import('./views/PaymentsHub'),
+  employees: () => import('./views/EmployeesHub'),
+  reports: () => import('./views/ReportsView'),
+  customers: () => import('./views/CustomersHub'),
+  delivery: () => import('./views/DeliveryHub'),
+  'recycle-bin': () => import('./views/RecycleBinView'),
+};
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -153,7 +170,8 @@ export default function App() {
         permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN', 'QUOTATION_VIEW'],
         subItems: [
           { id: 'sales', label: 'Sales Invoices', permission: 'SALES_VIEW' },
-          { id: 'hold-bills', label: 'Hold Bills', permission: 'SALES_CREATE' },
+          { id: 'hold-bills', label: 'Onhold Bills', permission: 'SALES_CREATE' },
+          { id: 'held-history', label: 'Onhold Bill History', permission: 'SALES_VIEW' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
           { id: 'quotations', label: 'Quotations', permission: 'QUOTATION_VIEW' },
         ],
@@ -465,7 +483,9 @@ export default function App() {
 
   if (!user) {
     return authMode === 'signup' ? (
-      <SignupView onSwitchToLogin={() => setAuthMode('login')} />
+      <Suspense fallback={<WorkspaceFallback id="signup" />}>
+        <SignupView onSwitchToLogin={() => setAuthMode('login')} />
+      </Suspense>
     ) : (
       <LoginView onSwitchToSignup={() => setAuthMode('signup')} />
     );
@@ -591,6 +611,14 @@ export default function App() {
                     }}
                     onMouseEnter={(e) => {
                       if (!isCurrentModule) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      if (!isCurrentModule && isOnline && typeof moduleLoaders[mod.id] === 'function') {
+                        moduleLoaders[mod.id]();
+                      }
+                    }}
+                    onFocus={() => {
+                      if (!isCurrentModule && isOnline && typeof moduleLoaders[mod.id] === 'function') {
+                        moduleLoaders[mod.id]();
+                      }
                     }}
                     onMouseLeave={(e) => {
                       if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
