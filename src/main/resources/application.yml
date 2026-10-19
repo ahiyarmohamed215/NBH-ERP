@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8080}
+  address: ${SERVER_ADDRESS:0.0.0.0}
   servlet:
     context-path: /
 
@@ -40,7 +41,7 @@ app:
     # 256-bit secure secret key. Must be set via the JWT_SECRET environment variable.
     secret: ${JWT_SECRET:}
     access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:900000} # 15 minutes
-    refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000} # 7 days
+    refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:1800000} # 30 minutes
   security:
     cookie:
       secure: ${COOKIE_SECURE:false}

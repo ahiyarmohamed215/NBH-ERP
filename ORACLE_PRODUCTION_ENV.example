@@ -1,0 +1,51 @@
+# ==============================================================================
+# NBH ERP - Production Environment Variables Template
+# Target: Oracle Cloud Infrastructure (OCI) Always Free - VM.Standard.A1.Flex (ARM64)
+# Sizing: 2 OCPUs, 12 GB RAM, Ubuntu 24.04 LTS
+# Location: /opt/erp/config/erp.env (owned by erp:erp, chmod 600)
+# ==============================================================================
+
+# Server Network Binding (Loopback only - reverse proxied by NGINX)
+PORT=8080
+SERVER_ADDRESS=127.0.0.1
+
+# MySQL 8 Private Connection (Loopback only)
+DB_URL=jdbc:mysql://127.0.0.1:3306/nbhdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+DB_USERNAME=nbh_erp
+DB_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD_AT_LEAST_32_CHARS
+DB_DDL_AUTO=validate
+DB_BASELINE_ON_MIGRATE=true
+
+# HikariCP Connection Pool (Optimized for 2 OCPUs / 20-50 Concurrent Employees)
+HIKARI_MAX_POOL_SIZE=25
+HIKARI_MIN_IDLE=10
+
+# JWT Authentication Secrets (Must be at least 256-bit / 64 hex characters)
+# Generate with: openssl rand -hex 32
+JWT_SECRET=CHANGE_ME_TO_AT_LEAST_64_HEX_CHARACTERS_RANDOM_SECRET
+JWT_ACCESS_TOKEN_EXPIRATION_MS=900000
+JWT_REFRESH_TOKEN_EXPIRATION_MS=1800000
+
+# Cookie Security Settings (Enforce HTTPS in Production)
+COOKIE_SECURE=true
+COOKIE_SAME_SITE=Lax
+REFRESH_SESSION_RETENTION_DAYS=1
+REFRESH_SESSION_CLEANUP_CRON=0 0 3 * * ?
+
+# CORS and Origin Validation (Set to your exact HTTPS production domain)
+# Example: https://erp.yourcompany.com
+CORS_ALLOWED_ORIGINS=https://erp.yourcompany.com
+
+# Initial Super Admin Bootstrapping (Leave false in production; manage users via DB/UI)
+INITIAL_ADMIN_ENABLED=false
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=
+INITIAL_ADMIN_EMAIL=admin@yourcompany.com
+
+# Warehouse & Office Printing Integration
+APP_WAREHOUSE_PRINT_POLL_MS=5000
+
+# Company Metadata
+COMPANY_NAME="NBH Warehouse & Distribution"
+COMPANY_ADDRESS="123 Commercial Avenue, Colombo, Sri Lanka"
+COMPANY_PHONE="+94 11 234 5678"
