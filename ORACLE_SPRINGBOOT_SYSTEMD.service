@@ -15,7 +15,7 @@
 
 [Unit]
 Description=NBH ERP Spring Boot Application Backend
-Documentation=https://github.com/nbh-erp
+Documentation=https://example.com/erp
 After=network.target mysql.service
 Requires=mysql.service
 

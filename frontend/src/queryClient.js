@@ -1,5 +1,5 @@
 import { QueryClient, keepPreviousData, useQuery } from '@tanstack/react-query';
-import { productApi, inventoryApi, warehouseApi, categoryApi, brandApi, supplierApi, customerApi } from './api/apiClient';
+import { productApi, inventoryApi, warehouseApi, categoryApi, brandApi, supplierApi, customerApi } from './api/apiClient.js';
 import { useWorkspaceActive } from './components/RetainedWorkspaces';
 
 /**

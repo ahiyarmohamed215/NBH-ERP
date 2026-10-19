@@ -11,12 +11,15 @@ This checklist defines the defense-in-depth security configuration for hosting N
 | :--- | :--- | :--- | :--- | :--- |
 | **TCP** | `443` | `0.0.0.0/0` | HTTPS web traffic (React, REST API, SSE) | [ ] Required |
 | **TCP** | `80` | `0.0.0.0/0` | HTTP traffic (forwards 301 to HTTPS & ACME challenge) | [ ] Required |
-| **TCP** | `22` | `YOUR_OFFICE_OR_ADMIN_IP/32` (or `0.0.0.0/0` with key-only) | Secure administrative SSH access | [ ] Required |
-| **TCP** | `3306` | **BLOCKED / NEVER OPENED** | MySQL database (Strictly localhost only) | [x] Enforced |
-| **TCP** | `8080` | **BLOCKED / NEVER OPENED** | Spring Boot backend (Strictly localhost only) | [x] Enforced |
+| **TCP** | `22` | `YOUR_ADMIN_IP/32` (or OCI Bastion Service) | Secure administrative SSH access | [ ] Recommended |
+| **TCP** | `3306` | **BLOCKED / NEVER OPENED** | MySQL database (Strictly loopback only) | [x] Enforced |
+| **TCP** | `8080` | **BLOCKED / NEVER OPENED** | Spring Boot backend (Strictly loopback only) | [x] Enforced |
 
 > [!CRITICAL]
 > **Zero Direct Database Exposure:** Never add an ingress rule for port 3306 or 8080 in OCI Security Lists or Network Security Groups. All database and application requests must traverse through the local NGINX reverse proxy or SSH tunnels.
+>
+> [!TIP]
+> **OCI Bastion Service:** Oracle Cloud Always Free includes OCI Bastion Service at zero cost. By using OCI Bastion, you can eliminate public SSH port 22 completely and manage the instance via ephemeral, identity-authenticated sessions.
 
 ---
 
@@ -30,9 +33,8 @@ This checklist defines the defense-in-depth security configuration for hosting N
 - [ ] Install and enable Fail2Ban: `sudo apt-get install fail2ban -y`
 
 ### Host Firewall (UFW / OCI Default iptables)
-OCI Ubuntu images include pre-configured `iptables` rules in `/etc/iptables/rules.v4`. Ensure Oracle Cloud's local firewall allows traffic through NGINX:
+OCI Ubuntu images include pre-configured `iptables` rules. Ensure Oracle Cloud's local firewall allows traffic through NGINX while blocking internal ports:
 ```bash
-# Verify iptables allows HTTP/HTTPS or configure UFW
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow 22/tcp comment 'SSH'
@@ -45,7 +47,6 @@ sudo ufw enable
 - [ ] Create an unprivileged system user for the application:
   ```bash
   sudo useradd -r -s /usr/sbin/nologin -d /opt/erp erp
-  sudo usermod -aG erp erp
   ```
 - [ ] Application processes (`java`) must run exclusively under `User=erp, Group=erp`.
 
@@ -62,28 +63,35 @@ sudo ufw enable
 
 ### Network Isolation
 - [ ] Verify MySQL binds exclusively to loopback:
-  Check `/etc/mysql/mysql.conf.d/mysqld.cnf`:
+  Check `/etc/mysql/mysql.conf.d/99-nbh-erp.cnf`:
   ```ini
   [mysqld]
   bind-address           = 127.0.0.1
   mysqlx-bind-address    = 127.0.0.1
   ```
-- [ ] Verify binding with netstat/ss:
+- [ ] Verify binding with ss:
   ```bash
   sudo ss -tulpn | grep 3306
   # Must output: 127.0.0.1:3306 (NOT 0.0.0.0:3306)
   ```
+
+### ACID Durability Compliance
+- [ ] Ensure full ACID transaction durability is configured:
+  ```ini
+  innodb_flush_log_at_trx_commit = 1
+  ```
+  *(Never use value 2 in production ERP environments, as power failure or kernel panics can lose up to 1 second of committed sales invoices or inventory adjustments).*
 
 ### User & Privilege Isolation
 - [ ] Run initial hardening: `sudo mysql_secure_installation`
   - Remove anonymous users
   - Disallow root login remotely
   - Remove test database
-- [ ] Create dedicated application user locked to `127.0.0.1`:
+- [ ] Create dedicated application user locked to `127.0.0.1` with least privilege:
   ```sql
   CREATE DATABASE nbhdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   CREATE USER 'nbh_erp'@'127.0.0.1' IDENTIFIED BY 'STRONG_SECRET_AT_LEAST_32_CHARS';
-  GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON nbhdb.* TO 'nbh_erp'@'127.0.0.1';
+  GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES ON nbhdb.* TO 'nbh_erp'@'127.0.0.1';
   FLUSH PRIVILEGES;
   ```
 - [ ] Verify that NO user exists with host `'%'` (wildcard):
@@ -104,16 +112,22 @@ sudo ufw enable
   ```
 - [ ] Verify that Git repository ignores all `.env` files and no secrets exist in source code.
 
-### Cryptographic Keys
-- [ ] Generate a cryptographically secure 256-bit JWT secret:
+### Cryptographic Keys & Session Policies
+- [ ] Generate a cryptographically secure Base64-encoded 256-bit JWT secret:
   ```bash
-  openssl rand -hex 32
+  openssl rand -base64 32
   ```
-- [ ] Verify JWT secret length is at least 64 hex characters in `erp.env`.
+  *(Do NOT use hex encoding, as the ERP authentication provider strictly decodes Base64).*
+- [ ] Enforce 30-minute token and session expiration policies in `/opt/erp/config/erp.env`:
+  ```ini
+  JWT_ACCESS_TOKEN_EXPIRATION_MS=900000     # 15 minutes
+  JWT_REFRESH_TOKEN_EXPIRATION_MS=1800000    # 30 minutes
+  DB_BASELINE_ON_MIGRATE=false              # Enforce clean Flyway tracking
+  ```
 - [ ] Set `COOKIE_SECURE=true` in `erp.env` to enforce HTTPS-only cookies.
 - [ ] Set `COOKIE_SAME_SITE=Lax` to prevent cross-site request forgery.
-- [ ] Set `CORS_ALLOWED_ORIGINS=https://erp.yourcompany.com` matching your exact domain.
-- [ ] Set `INITIAL_ADMIN_ENABLED=false` after initial system setup.
+- [ ] Set `CORS_ALLOWED_ORIGINS=https://erp.example.com` matching your exact domain.
+- [ ] Set `INITIAL_ADMIN_ENABLED=false` after initial bootstrap.
 
 ---
 
@@ -122,7 +136,7 @@ sudo ufw enable
 ### SSL/TLS Configuration
 - [ ] Obtain Let's Encrypt certificate:
   ```bash
-  sudo certbot certonly --nginx -d erp.yourcompany.com
+  sudo certbot certonly --nginx -d erp.example.com
   ```
 - [ ] Verify automated certificate renewal:
   ```bash
@@ -133,13 +147,13 @@ sudo ufw enable
 - [ ] Ensure HTTP port 80 strictly issues `301 Moved Permanently` to `https://$host$request_uri`.
 
 ### HTTP Security Headers
-Verify headers using `curl -I https://erp.yourcompany.com`:
-- [ ] `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+Verify headers using `curl -I https://erp.example.com`:
+- [ ] `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
 - [ ] `X-Content-Type-Options: nosniff`
 - [ ] `X-Frame-Options: DENY`
 - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
 - [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`
-- [ ] `Content-Security-Policy: default-src 'self' ...`
+- [ ] `Content-Security-Policy: default-src 'self'; connect-src 'self'; ...`
 - [ ] `Server` banner tokens hidden (`server_tokens off;`).
 
 ---
@@ -153,29 +167,21 @@ Verify headers using `curl -I https://erp.yourcompany.com`:
 
 ---
 
-## 7. Backup, Disaster Recovery & Audit
+## 7. Backup, Disaster Recovery & Restoration Verification
 
 ### Daily Automated Database Backups
-- [ ] Deploy backup script at `/opt/erp/scripts/backup-db.sh`:
+- [ ] Deploy backup script at `/opt/erp/scripts/backup-db.sh` running via cron daily at 02:30 AM UTC.
+- [ ] Verify backup script permissions (`chmod 700 /opt/erp/scripts/backup-db.sh`).
+- [ ] Store MySQL backup credentials in `/opt/erp/config/.mysql_backup.cnf` with `chmod 600`.
+
+### Disaster Recovery Restoration Drill
+- [ ] Conduct a monthly database restoration test on a staging database to verify backup integrity:
   ```bash
-  #!/usr/bin/env bash
-  set -euo pipefail
-  BACKUP_DIR="/var/backups/nbh-erp"
-  TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-  mkdir -p "$BACKUP_DIR"
-  mysqldump --defaults-extra-file=/opt/erp/config/.mysql_backup.cnf \
-            --single-transaction \
-            --quick \
-            --routines \
-            --triggers \
-            nbhdb | gzip > "$BACKUP_DIR/nbhdb_$TIMESTAMP.sql.gz"
-  # Keep 14 days of backups
-  find "$BACKUP_DIR" -type f -name "nbhdb_*.sql.gz" -mtime +14 -delete
-  ```
-- [ ] Create `.mysql_backup.cnf` owned by `root:root` with `chmod 600`.
-- [ ] Add cron job in `/etc/cron.d/nbh-backup` running daily at 02:30 AM UTC:
-  ```cron
-  30 2 * * * root /opt/erp/scripts/backup-db.sh > /var/log/nbh-erp-backup.log 2>&1
+  # Test restoration into a test verification database
+  mysql -u root -e "CREATE DATABASE IF NOT EXISTS nbhdb_drill;"
+  gunzip < /var/backups/nbh-erp/nbhdb_YYYYMMDD_HHMMSS.sql.gz | mysql -u root nbhdb_drill
+  mysql -u root -e "CHECK TABLE nbhdb_drill.users; CHECK TABLE nbhdb_drill.invoices;"
+  mysql -u root -e "DROP DATABASE nbhdb_drill;"
   ```
 
 ### OCI Always Free Block Volume Backups
@@ -193,6 +199,10 @@ Verify headers using `curl -I https://erp.yourcompany.com`:
 | MySQL Loopback Binding (Direct connection fails) | | | [ ] PASS |
 | Spring Boot Loopback Binding (Direct connection fails) | | | [ ] PASS |
 | SSL Labs Test (Score A or A+) | | | [ ] PASS |
-| CSRF / Origin Validation Check | | | [ ] PASS |
-| Multi-Tab Concurrent Token Refresh | | | [ ] PASS |
-| Backup Restore Drill Verification | | | [ ] PASS |
+| 30-Minute Idle Inactivity Auto-Logout | | | [ ] PASS |
+| 30-Minute Refresh Token Sliding Expiration on Activity | | | [ ] PASS |
+| Base64 JWT Secret Validation | | | [ ] PASS |
+| Flyway Baseline On Migrate Disabled | | | [ ] PASS |
+| MySQL ACID Durability (`innodb_flush_log_at_trx_commit = 1`) | | | [ ] PASS |
+| Atomic Frontend Deployment (No 404 ChunkLoadErrors) | | | [ ] PASS |
+| Database Restore Drill Verification | | | [ ] PASS |

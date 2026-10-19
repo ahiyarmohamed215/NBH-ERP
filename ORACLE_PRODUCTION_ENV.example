@@ -14,17 +14,26 @@ DB_URL=jdbc:mysql://127.0.0.1:3306/nbhdb?useSSL=false&serverTimezone=UTC&allowPu
 DB_USERNAME=nbh_erp
 DB_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD_AT_LEAST_32_CHARS
 DB_DDL_AUTO=validate
-DB_BASELINE_ON_MIGRATE=true
+# Must be false in production so Flyway tracks and applies all schema migrations (V1 through V38)
+DB_BASELINE_ON_MIGRATE=false
 
-# HikariCP Connection Pool (Optimized for 2 OCPUs / 20-50 Concurrent Employees)
+# HikariCP Connection Pool (Optimized for 2 OCPUs / 4 vCPUs / 20-50 Concurrent Employees)
 HIKARI_MAX_POOL_SIZE=25
 HIKARI_MIN_IDLE=10
 
-# JWT Authentication Secrets (Must be at least 256-bit / 64 hex characters)
-# Generate with: openssl rand -hex 32
-JWT_SECRET=CHANGE_ME_TO_AT_LEAST_64_HEX_CHARACTERS_RANDOM_SECRET
+# JWT Authentication Secrets (Must be Base64-encoded 256-bit / 32 bytes)
+# CRITICAL: Generate with: openssl rand -base64 32
+# (Do NOT use openssl rand -hex 32, as the application strictly decodes Base64)
+JWT_SECRET=CHANGE_ME_TO_BASE64_ENCODED_32_BYTE_SECRET
+
+# Token & Session Lifetimes (30-Minute Security Policy)
 JWT_ACCESS_TOKEN_EXPIRATION_MS=900000
 JWT_REFRESH_TOKEN_EXPIRATION_MS=1800000
+
+# Note on Idle Inactivity Timeout:
+# The client enforces a 30-minute idle inactivity timeout matching the 30-minute refresh lifespan.
+# It defaults to 1,800,000 ms (30 mins). If building frontend with custom timeout, set:
+# VITE_IDLE_TIMEOUT_MS=1800000
 
 # Cookie Security Settings (Enforce HTTPS in Production)
 COOKIE_SECURE=true
@@ -33,19 +42,19 @@ REFRESH_SESSION_RETENTION_DAYS=1
 REFRESH_SESSION_CLEANUP_CRON=0 0 3 * * ?
 
 # CORS and Origin Validation (Set to your exact HTTPS production domain)
-# Example: https://erp.yourcompany.com
-CORS_ALLOWED_ORIGINS=https://erp.yourcompany.com
+# Example: https://erp.example.com
+CORS_ALLOWED_ORIGINS=https://erp.example.com
 
 # Initial Super Admin Bootstrapping (Leave false in production; manage users via DB/UI)
 INITIAL_ADMIN_ENABLED=false
 INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=
-INITIAL_ADMIN_EMAIL=admin@yourcompany.com
+INITIAL_ADMIN_EMAIL=admin@example.com
 
 # Warehouse & Office Printing Integration
 APP_WAREHOUSE_PRINT_POLL_MS=5000
 
 # Company Metadata
-COMPANY_NAME="NBH Warehouse & Distribution"
-COMPANY_ADDRESS="123 Commercial Avenue, Colombo, Sri Lanka"
-COMPANY_PHONE="+94 11 234 5678"
+COMPANY_NAME="Example Distribution Co."
+COMPANY_ADDRESS="123 Example Street, City, Country"
+COMPANY_PHONE="+1 555 0100"

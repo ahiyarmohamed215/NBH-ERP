@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let active = true;
 
-    const check = async (isInitial = false) => {
+    const check = async (isInitial = false, forceFetchProfile = false) => {
       // 1. Inactivity check: if idle for 30+ minutes, terminate session immediately
       const lastActive = getLastUserActivity();
       if (lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
@@ -90,20 +90,29 @@ export function AuthProvider({ children }) {
       let sessionToken = token;
       try {
         if (isTokenExpired(token)) {
+          // If the employee is currently idle (inactivity >= 30m), do NOT refresh session!
+          if (lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
+            logout(true);
+            return;
+          }
           await refreshSession();
           token = getAccessToken();
         }
         if (!active || generation !== sessionGeneration.current) return;
         sessionToken = token;
-        const res = await authApi.getMe();
-        if (active && generation === sessionGeneration.current && sessionToken === getAccessToken()) {
-          clearApiCache();
-          setUser(res.data);
-          if (typeof localStorage !== 'undefined' && localStorage.getItem('nbh_user')) {
-            localStorage.setItem('nbh_user', JSON.stringify(res.data));
-          }
-          if (getLastUserActivity() === 0) {
-            recordUserActivity();
+
+        // Fetch user profile only on initial load, when null, or on explicit role/user update events
+        if (isInitial || !user || forceFetchProfile) {
+          const res = await authApi.getMe();
+          if (active && generation === sessionGeneration.current && sessionToken === getAccessToken()) {
+            clearApiCache();
+            setUser(res.data);
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('nbh_user')) {
+              localStorage.setItem('nbh_user', JSON.stringify(res.data));
+            }
+            if (getLastUserActivity() === 0) {
+              recordUserActivity();
+            }
           }
         }
       } catch (e) {
@@ -117,25 +126,28 @@ export function AuthProvider({ children }) {
       if (active) setLoading(false);
     });
 
-    const onCheckEvent = () => check(false);
-    const timer = setInterval(() => check(false), 60000);
+    const onFocus = () => check(false, false);
+    const onRolesUpdated = () => check(false, true);
+    const onUsersUpdated = () => check(false, true);
+
+    const timer = setInterval(() => check(false, false), 60000);
     if (timer && typeof timer.unref === 'function') {
       timer.unref();
     }
     window.addEventListener('nbh:session_expired', clear);
-    window.addEventListener('focus', onCheckEvent);
-    window.addEventListener('erp:roles_updated', onCheckEvent);
-    window.addEventListener('erp:users_updated', onCheckEvent);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('erp:roles_updated', onRolesUpdated);
+    window.addEventListener('erp:users_updated', onUsersUpdated);
 
     return () => {
       active = false;
       clearInterval(timer);
       window.removeEventListener('nbh:session_expired', clear);
-      window.removeEventListener('focus', onCheckEvent);
-      window.removeEventListener('erp:roles_updated', onCheckEvent);
-      window.removeEventListener('erp:users_updated', onCheckEvent);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('erp:roles_updated', onRolesUpdated);
+      window.removeEventListener('erp:users_updated', onUsersUpdated);
     };
-  }, [clear, logout]);
+  }, [clear, logout, user]);
 
   // 30-Minute Idle Inactivity Auto-Logout Effect
   useEffect(() => {

@@ -42,6 +42,32 @@ export const clearAccessToken = () => {
   }
 };
 
+// Idle Inactivity & User Activity Tracking
+export const IDLE_TIMEOUT_MS = Number(import.meta.env?.VITE_IDLE_TIMEOUT_MS) || (30 * 60 * 1000); // 30 minutes (1,800,000 ms)
+export const IDLE_EXPIRED_MESSAGE = 'Your session has expired due to 30 minutes of inactivity. Please sign in again.';
+
+let lastRecordedActivity = 0;
+export const recordUserActivity = () => {
+  const now = Date.now();
+  if (now - lastRecordedActivity < 2000) return; // Throttle to at most once every 2 seconds
+  lastRecordedActivity = now;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem('nbh_last_active', String(now));
+    } catch (_) {}
+  }
+};
+
+export const getLastUserActivity = () => {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const val = localStorage.getItem('nbh_last_active');
+      return val ? parseInt(val, 10) : 0;
+    } catch (_) {}
+  }
+  return 0;
+};
+
 // Deduplication & In-Memory TTL Cache for GET requests
 const inFlightRequests = new Map();
 const apiCache = new Map();
@@ -135,6 +161,11 @@ api.get = function (url, config = {}) {
 
 // Attach JWT token, correlation ID, idempotency key, and anti-CSRF header automatically
 api.interceptors.request.use((config) => {
+  // Only record user activity on explicit user-initiated actions or mutations,
+  // NOT on automated background queries, SSE cache refetches, or silent polling.
+  if (config.isUserAction || ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+    recordUserActivity();
+  }
   if (['post', 'put', 'patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) {
     config.headers['Idempotency-Key'] = crypto.randomUUID();
   }
@@ -269,6 +300,11 @@ try {
     }
     authChannel.onmessage = (event) => {
       if (event.data?.type === 'LOGOUT') {
+        if (event.data?.message && typeof sessionStorage !== 'undefined') {
+          try {
+            sessionStorage.setItem('nbh_session_expired', event.data.message);
+          } catch (_) {}
+        }
         handleCrossTabLogout();
       }
     };
@@ -279,7 +315,7 @@ const handleCrossTabLogout = () => {
   clearAccessToken();
   clearApiCache();
   if (typeof localStorage !== 'undefined') {
-    ['nbh_token', 'nbh_refresh', 'nbh_user'].forEach(key => {
+    ['nbh_token', 'nbh_refresh', 'nbh_user', 'nbh_last_active'].forEach(key => {
       try { localStorage.removeItem(key); } catch (_) {}
     });
   }
@@ -291,16 +327,20 @@ const handleCrossTabLogout = () => {
   }
 };
 
-export const expireSession = () => {
+export const expireSession = (customMessage) => {
   handleCrossTabLogout();
   if (typeof sessionStorage !== 'undefined') {
     try {
-      sessionStorage.setItem('nbh_session_expired', 'Your session has expired. Please sign in again.');
+      sessionStorage.setItem('nbh_session_expired', customMessage || 'Your session has expired. Please sign in again.');
     } catch (_) {}
   }
   if (authChannel) {
     try {
-      authChannel.postMessage({ type: 'LOGOUT' });
+      authChannel.postMessage({
+        type: 'LOGOUT',
+        reason: customMessage ? 'IDLE_TIMEOUT' : 'EXPIRED',
+        message: customMessage || 'Your session has expired. Please sign in again.',
+      });
     } catch (_) {}
   }
 };
@@ -475,7 +515,7 @@ export const dashboardApi = {
 };
 
 export const warehouseApi = {
-  getAll: () => api.get('/warehouses'),
+  getAll: (config = {}) => api.get('/warehouses', config),
   getActive: (config = {}) => api.get('/warehouses/active', config),
   getById: (id) => api.get(`/warehouses/${id}`),
   create: (data) => api.post('/warehouses', data),
@@ -486,8 +526,8 @@ export const warehouseApi = {
 };
 
 export const categoryApi = {
-  getAll: () => api.get('/categories'),
-  getActive: () => api.get('/categories/active'),
+  getAll: (config = {}) => api.get('/categories', config),
+  getActive: (config = {}) => api.get('/categories/active', config),
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),
   changeStatus: (id,status,reason) => api.patch(`/categories/${id}/status`, {status,reason}),
@@ -496,8 +536,8 @@ export const categoryApi = {
 };
 
 export const brandApi = {
-  getAll: () => api.get('/brands'),
-  getActive: () => api.get('/brands/active'),
+  getAll: (config = {}) => api.get('/brands', config),
+  getActive: (config = {}) => api.get('/brands/active', config),
   search: (query) => api.get('/brands/search', { params: { query } }),
   getById: (id) => api.get(`/brands/${id}`),
   create: (data) => api.post('/brands', data),
@@ -521,8 +561,8 @@ export const productApi = {
 };
 
 export const customerApi = {
-  getAll: () => api.get('/customers'),
-  getActive: () => api.get('/customers/active'),
+  getAll: (config = {}) => api.get('/customers', config),
+  getActive: (config = {}) => api.get('/customers/active', config),
   search: (query) => api.get('/customers/search', { params: { query } }),
   getById: (id) => api.get(`/customers/${id}`),
   create: (data) => api.post('/customers', data),
@@ -549,7 +589,7 @@ export const recycleBinApi = {
 };
 
 export const supplierApi = {
-  getAll: () => api.get('/suppliers'),
+  getAll: (config = {}) => api.get('/suppliers', config),
   getActive: (config = {}) => api.get('/suppliers/active', config),
   search: (query) => api.get('/suppliers/search', { params: { query } }),
   getById: (id) => api.get(`/suppliers/${id}`),
@@ -626,8 +666,8 @@ export const prnApi = {
 export const adjustmentApi = {
   update: (id,data,process=false) => api.put(`/stock-adjustments/${id}?process=${process}`,data),
   cancel: (id,reason) => api.post(`/stock-adjustments/${id}/cancel`,{reason}),
-  searchProducts: query => api.get('/stock-adjustments/products',{params:{query},skipCache:true,skipDedupe:true}),
-  search: (params) => api.get('/stock-adjustments', { params }),
+  searchProducts: (query, config = {}) => api.get('/stock-adjustments/products',{params:{query},skipCache:true,skipDedupe:true,...config}),
+  search: (params, config = {}) => api.get('/stock-adjustments', { params, ...config }),
   getById: (id) => api.get(`/stock-adjustments/${id}`),
   create: (data, process = false) => api.post(`/stock-adjustments?process=${process}`, data),
   process: (id,reason) => api.post(`/stock-adjustments/${id}/process`,reason?{reason}:undefined),
@@ -635,6 +675,17 @@ export const adjustmentApi = {
 };
 
 export const salesApi = {
+  getOfficePrinter: () => api.get('/invoices/held/office-printer',{skipCache:true}),
+  setOfficePrinter: printerName => api.put('/invoices/held/office-printer',{printerName}),
+  retryHeldPrinting: id => api.post(`/invoices/held/${id}/retry-print`),
+  assignHeld: (id,data) => api.post(`/invoices/held/${id}/assign`,data),
+  sendHeld: (id,data) => api.post(`/invoices/held/${id}/send`,data),
+  reviewHeld: (id,data) => api.post(`/invoices/held/${id}/review`,data),
+  getHeldPrintJobs: id => api.get(`/invoices/held/${id}/print-jobs`,{skipCache:true,skipDedupe:true}),
+  printHeld: (id,warehouseId) => api.post(`/invoices/held/${id}/print`,undefined,{params:{warehouseId}}),
+  retryHeldPrint: (id,jobId) => api.post(`/invoices/held/${id}/print-jobs/${jobId}/retry`),
+  getWarehousePrinters: () => api.get('/invoices/held/printers',{skipCache:true}),
+  setWarehousePrinter: (id,printerName) => api.put(`/invoices/held/printers/${id}`,{printerName}),
   savePosDraft: (id,data) => api.put(`/invoices/held/${id}/draft`,data),
   getHeldWorkspace: (params) => api.get('/invoices/held/workspace',{params,skipCache:true,skipDedupe:true}),
   previewHeldMerge: (ids) => api.post('/invoices/held/merge-preview',{ids}),
