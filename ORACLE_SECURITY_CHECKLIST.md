@@ -1,6 +1,6 @@
 # NBH ERP — Oracle Cloud Infrastructure Security Checklist
 
-This checklist defines the defense-in-depth security configuration for hosting NBH ERP on an Oracle Cloud Infrastructure (OCI) Always Free `VM.Standard.A1.Flex` instance (ARM64, 2 OCPUs, 12 GB RAM, Ubuntu 24.04 LTS).
+This checklist defines the defense-in-depth security configuration for hosting NBH ERP on an Oracle Cloud Infrastructure (OCI) Always Free `VM.Standard.A1.Flex` instance (ARM64, 2 OCPUs, 12 GB RAM, 50 GB boot volume, Ubuntu 24.04 LTS), utilizing the continuous usage Always Free allocation.
 
 ---
 
@@ -120,9 +120,12 @@ sudo ufw enable
   *(Do NOT use hex encoding, as the ERP authentication provider strictly decodes Base64).*
 - [ ] Enforce 30-minute token and session expiration policies in `/opt/erp/config/erp.env`:
   ```ini
-  JWT_ACCESS_TOKEN_EXPIRATION_MS=900000     # 15 minutes
-  JWT_REFRESH_TOKEN_EXPIRATION_MS=1800000    # 30 minutes
-  DB_BASELINE_ON_MIGRATE=false              # Enforce clean Flyway tracking
+  # 15 minutes access token
+  JWT_ACCESS_TOKEN_EXPIRATION_MS=900000
+  # 30 minutes refresh token
+  JWT_REFRESH_TOKEN_EXPIRATION_MS=1800000
+  # Clean Flyway tracking
+  DB_BASELINE_ON_MIGRATE=false
   ```
 - [ ] Set `COOKIE_SECURE=true` in `erp.env` to enforce HTTPS-only cookies.
 - [ ] Set `COOKIE_SAME_SITE=Lax` to prevent cross-site request forgery.
