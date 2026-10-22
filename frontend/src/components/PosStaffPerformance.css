@@ -1,0 +1,45 @@
+.pos-performance-backdrop,.pos-staff-detail-backdrop {position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;z-index:1200;}
+.pos-staff-detail-backdrop {z-index:1300;background:rgb(15 23 42 / 35%);}
+.pos-performance-dialog.purchase-inspection {width:min(1120px,calc(100vw - 24px));height:min(680px,88dvh);max-height:calc(100dvh - 24px);font-family:var(--font-sans,var(--font-body,inherit));}
+.pos-performance-dialog .purchase-inspection-header {border-bottom:1px solid #e2e8f0;}
+.pos-performance-header-actions {display:flex;align-items:center;gap:10px;}
+.pos-performance-body {padding:18px 24px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+.pos-staff-performance {display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;font-size:var(--erp-text-body,.82rem);}
+.pos-performance-toolbar {display:flex;justify-content:flex-end;}
+.pos-performance-table {flex:1;min-height:100px;overflow:auto;}
+.pos-performance-table table {min-width:720px;width:100%;}
+.pos-performance-table tbody tr {cursor:pointer;}
+.pos-performance-table tbody tr[data-current="true"] > td {background:var(--erp-accent-soft,#eff6ff);}
+.pos-performance-money {font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600;}
+.pos-rank {display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:42px;padding:4px 7px;border-radius:5px;background:#eff6ff;color:#0369a1;font-size:var(--erp-text-caption,.74rem);font-weight:600;white-space:nowrap;}
+.pos-rank-1 {background:#fef3c7;color:#92400e;}.pos-rank-2 {background:#f1f5f9;color:#475569;}.pos-rank-3 {background:#ffedd5;color:#9a3412;}
+.pos-leader-name-line {display:flex;align-items:center;gap:7px;}
+.pos-staff-name {border:0;padding:0;background:none;color:#0f172a;font:inherit;font-weight:600;cursor:pointer;text-align:left;}
+.pos-staff-name:hover {color:#0369a1;}
+.pos-leader-you {padding:2px 6px;border-radius:5px;background:#e0f2fe;color:#075985;font-size:var(--erp-text-caption,.74rem);font-weight:600;}
+.pos-performance-achieved {display:inline-flex;align-items:center;gap:5px;color:#0369a1;}
+.pos-performance-pagination {display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:var(--erp-text-caption,.74rem);color:#64748b;}
+.pos-performance-pagination > div {display:flex;gap:8px;}
+.pos-performance-pagination .erp-table-icon-action {display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #bae6fd;border-radius:5px;background:#fff;color:#0284c7;cursor:pointer;}
+.pos-performance-pagination button:disabled {color:#94a3b8;border-color:#e2e8f0;cursor:default;}
+.pos-performance-error {color:#b91c1c;}.pos-performance-loading {padding:30px;text-align:center;color:#64748b;}
+.pos-staff-details.purchase-inspection {width:min(620px,calc(100vw - 24px));height:auto;max-height:calc(100dvh - 24px);font-family:var(--font-sans,var(--font-body,inherit));}
+.pos-staff-details .purchase-inspection-header {border-bottom:1px solid #e2e8f0;}
+.pos-staff-details .purchase-inspection-title p {margin:5px 0 0;color:#64748b;font-size:var(--erp-text-caption,.74rem);}
+.pos-staff-detail-body {padding:18px 24px;display:flex;flex-direction:column;gap:18px;overflow:auto;}
+.pos-staff-details .pos-staff-metrics {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0;gap:18px;padding:16px;}
+.pos-staff-metrics dt {color:#475569;font-size:var(--erp-text-caption,.74rem);}
+.pos-staff-metrics dd {margin:6px 0 0;color:#0f172a;font-size:var(--erp-text-body,.84rem);font-weight:600;font-variant-numeric:tabular-nums;}
+.pos-staff-challenge {display:flex;flex-direction:column;gap:9px;color:#0369a1;font-size:var(--erp-text-body,.82rem);}
+.pos-staff-challenge > span {font-size:var(--erp-text-caption,.74rem);color:#64748b;}
+.pos-staff-leader-meter {height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;}
+.pos-staff-leader-meter > span {display:block;height:100%;background:#0284c7;}
+.pos-staff-range-summary {font-size:var(--erp-text-caption,.74rem);color:#64748b;}
+.pos-staff-range-summary > div {display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;}
+.pos-staff-range-summary > div > span {display:flex;align-items:center;gap:6px;}
+.pos-staff-range-summary strong {color:#334155;}
+.pos-staff-performance button:focus-visible,.pos-staff-details button:focus-visible {outline:2px solid #0284c7;outline-offset:2px;}
+@media(max-width:650px){.pos-performance-dialog .purchase-inspection-header {flex-wrap:wrap;gap:12px;padding:16px;}.pos-performance-header-actions {margin-left:auto;}.pos-performance-body,.pos-staff-detail-body {padding:12px;}.pos-staff-details .pos-staff-metrics {height:auto;max-height:none;grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.pos-staff-details.purchase-inspection .pos-staff-metrics {height:auto;min-height:0;max-height:none;overflow:visible;}
+

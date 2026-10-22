@@ -88,16 +88,19 @@ public class ProductStaffQuotaService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId()));
         Warehouse warehouse = request.getWarehouseId() == null ? product != null ? product.getDefaultWarehouse() : null : warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
-        Optional<ProductStaffQuota> existing = matchingAllocation(product,user,warehouse);
-        ProductStaffQuota quota = existing.orElseGet(() -> ProductStaffQuota.builder().product(product).user(user).warehouse(warehouse).soldQuantity(BigDecimal.ZERO).build());
-        if (existing.isPresent() && !target.equals(quota.getAllocationStatus())) throw new BusinessException("An allocation already exists. Open it to change its status");
-        BigDecimal sold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
-        if (request.getAllocatedQuantity() != null && request.getAllocatedQuantity().compareTo(sold) < 0) throw new BusinessException("Allocated quantity cannot be less than quantity already sold");
-        quota.setAllocatedQuantity(request.getAllocatedQuantity());
-        quota.setNotes(request.getNotes());
-        quota.setValidFrom(request.getValidFrom());quota.setValidTo(request.getValidTo());
-        validateAllocation(quota,target);
-        quota.setAllocationStatus(target);quota.setIsActive("ACTIVE".equals(target));
+        ProductStaffQuota quota = ProductStaffQuota.builder()
+                .product(product)
+                .user(user)
+                .warehouse(warehouse)
+                .allocatedQuantity(request.getAllocatedQuantity())
+                .soldQuantity(BigDecimal.ZERO)
+                .notes(request.getNotes())
+                .validFrom(request.getValidFrom())
+                .validTo(request.getValidTo())
+                .build();
+        validateAllocation(quota, target);
+        quota.setAllocationStatus(target);
+        quota.setIsActive("ACTIVE".equals(target));
         ProductStaffQuota saved = quotaRepository.save(quota);
         audit.log("ALLOCATION_CREATE", "ProductStaffQuota", String.valueOf(saved.getId()), "Saved " + target + " allocation");
         return allocationDto(saved);
@@ -123,8 +126,6 @@ public class ProductStaffQuotaService {
             }
             if (replaceDraftFields && request.getUserId() == null) quota.setUser(null);
             if (request.getUserId() != null) quota.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new ResourceNotFoundException("User", "id", request.getUserId())));
-            Optional<ProductStaffQuota> duplicate = matchingAllocation(quota.getProduct(),quota.getUser(),quota.getWarehouse());
-            if (duplicate.isPresent() && !duplicate.get().getId().equals(id)) throw new BusinessException("An allocation already exists for this product and staff");
         }
         if (replaceDraftFields && request.getAllocatedQuantity() == null) quota.setAllocatedQuantity(null);
         if (request.getAllocatedQuantity() != null) {
@@ -140,14 +141,6 @@ public class ProductStaffQuotaService {
         quota.setAllocationStatus(target);quota.setIsActive("ACTIVE".equals(target));
         if (!previous.equals(target)) audit.log("ALLOCATION_STATUS", "ProductStaffQuota", String.valueOf(id), previous + " → " + target + ": " + request.getStatusReason().trim());
         return allocationDto(quotaRepository.save(quota));
-    }
-
-    private Optional<ProductStaffQuota> matchingAllocation(Product product,User user,Warehouse warehouse) {
-        if (product == null || user == null) return Optional.empty();
-        var match = warehouse != null ? quotaRepository.findByProductIdAndUserIdAndWarehouseId(product.getId(),user.getId(),warehouse.getId())
-                : quotaRepository.findByProductIdAndUserIdAndWarehouseIsNull(product.getId(),user.getId());
-        if(match.isPresent() && match.get().isDeleted()) throw new BusinessException("This allocation was deleted. Restore it from the recycle bin before making changes");
-        return match;
     }
 
     private void validateAllocation(ProductStaffQuota quota,String target) {
@@ -200,50 +193,65 @@ public class ProductStaffQuotaService {
                     .build();
         }
 
-        ProductStaffQuota quota = activeQuotas.get(0);
-
-        // Date validity check
         LocalDate today = LocalDate.now();
-        if (quota.getValidFrom() != null && today.isBefore(quota.getValidFrom())) {
-            return QuotaCheckResultDto.builder()
-                    .quotaRestricted(false)
-                    .isAllowed(true)
-                    .requestedQuantity(req)
-                    .message("Allocation starts on " + quota.getValidFrom())
-                    .build();
-        }
-        if (quota.getValidTo() != null && today.isAfter(quota.getValidTo())) {
+        List<ProductStaffQuota> validQuotas = activeQuotas.stream()
+                .filter(q -> (q.getValidFrom() == null || !today.isBefore(q.getValidFrom()))
+                          && (q.getValidTo() == null || !today.isAfter(q.getValidTo())))
+                .toList();
+
+        if (validQuotas.isEmpty()) {
+            ProductStaffQuota sample = activeQuotas.get(0);
+            if (sample.getValidFrom() != null && today.isBefore(sample.getValidFrom())) {
+                return QuotaCheckResultDto.builder()
+                        .quotaRestricted(false)
+                        .isAllowed(true)
+                        .requestedQuantity(req)
+                        .message("Allocation starts on " + sample.getValidFrom())
+                        .build();
+            }
             return QuotaCheckResultDto.builder()
                     .quotaRestricted(true)
                     .isAllowed(false)
-                    .allocatedQuantity(quota.getAllocatedQuantity())
-                    .soldQuantity(quota.getSoldQuantity())
+                    .allocatedQuantity(sample.getAllocatedQuantity())
+                    .soldQuantity(sample.getSoldQuantity())
                     .remainingQuantity(BigDecimal.ZERO)
                     .requestedQuantity(req)
-                    .staffName(quota.getUser() != null ? quota.getUser().getFullName() : "Staff")
-                    .productName(quota.getProduct() != null ? quota.getProduct().getName() : "Product")
-                    .message("Allocation ended on " + quota.getValidTo())
+                    .staffName(sample.getUser() != null ? sample.getUser().getFullName() : "Staff")
+                    .productName(sample.getProduct() != null ? sample.getProduct().getName() : "Product")
+                    .message("Allocation ended on " + sample.getValidTo())
                     .build();
         }
 
-        BigDecimal remaining = quota.getRemainingQuantity();
-        boolean allowed = remaining.compareTo(req) >= 0;
+        BigDecimal totalAllocated = validQuotas.stream()
+                .map(q -> q.getAllocatedQuantity() != null ? q.getAllocatedQuantity() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        String staffName = quota.getUser() != null ? (quota.getUser().getFullName() != null ? quota.getUser().getFullName() : quota.getUser().getUsername()) : "Staff";
-        String prodName = quota.getProduct() != null ? quota.getProduct().getName() : "Product";
+        BigDecimal totalSold = validQuotas.stream()
+                .map(q -> q.getSoldQuantity() != null ? q.getSoldQuantity() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalRemaining = validQuotas.stream()
+                .map(ProductStaffQuota::getRemainingQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        boolean allowed = totalRemaining.compareTo(req) >= 0;
+
+        ProductStaffQuota primary = validQuotas.get(0);
+        String staffName = primary.getUser() != null ? (primary.getUser().getFullName() != null ? primary.getUser().getFullName() : primary.getUser().getUsername()) : "Staff";
+        String prodName = primary.getProduct() != null ? primary.getProduct().getName() : "Product";
 
         String msg = allowed
                 ? String.format("Allocation OK: %s has %s left (Allocated: %s, Sold: %s)",
-                    staffName, remaining, quota.getAllocatedQuantity(), quota.getSoldQuantity())
+                    staffName, totalRemaining, totalAllocated, totalSold)
                 : String.format("Allocation Limit Reached: %s has only %s left for '%s' (Allocated: %s, Sold: %s). You entered: %s",
-                    staffName, remaining, prodName, quota.getAllocatedQuantity(), quota.getSoldQuantity(), req);
+                    staffName, totalRemaining, prodName, totalAllocated, totalSold, req);
 
         return QuotaCheckResultDto.builder()
                 .quotaRestricted(true)
                 .isAllowed(allowed)
-                .allocatedQuantity(quota.getAllocatedQuantity())
-                .soldQuantity(quota.getSoldQuantity())
-                .remainingQuantity(remaining)
+                .allocatedQuantity(totalAllocated)
+                .soldQuantity(totalSold)
+                .remainingQuantity(totalRemaining)
                 .requestedQuantity(req)
                 .staffName(staffName)
                 .productName(prodName)
@@ -273,23 +281,53 @@ public class ProductStaffQuotaService {
 
     /**
      * Records quota consumption upon invoice completion.
+     * Consumes sequentially across active allocations for the product and user.
      */
     @Transactional
     public void consumeStaffQuota(Long productId, Long userId, Long warehouseId, BigDecimal quantity) {
+        recordQuotaSale(productId,userId,warehouseId,quantity,true);
+    }
+
+    /** POS already validated/reserved this quantity. Office invoicing only records the sale. */
+    @Transactional
+    public void recordHeldStaffQuota(Long productId, Long userId, Long warehouseId, BigDecimal quantity) {
+        recordQuotaSale(productId,userId,warehouseId,quantity,false);
+    }
+
+    private void recordQuotaSale(Long productId, Long userId, Long warehouseId, BigDecimal quantity, boolean enforceLimit) {
         if (productId == null || userId == null || quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
 
-        validateStaffQuota(productId,userId,warehouseId,quantity);
         List<ProductStaffQuota> activeQuotas = quotaRepository.lockMatchingActiveQuotas(productId, userId, warehouseId);
-        if (!activeQuotas.isEmpty()) {
-            ProductStaffQuota quota = activeQuotas.get(0);
+        // No effective allocation means unrestricted sales, matching POS validation.
+        if(enforceLimit){
+            if (!checkStaffProductQuota(productId, userId, warehouseId, quantity).isQuotaRestricted()) return;
+            validateStaffQuota(productId, userId, warehouseId, quantity);
+        }
+        LocalDate today = LocalDate.now();
+        var effective=activeQuotas.stream().filter(quota->(quota.getValidFrom()==null || !today.isBefore(quota.getValidFrom())) && (quota.getValidTo()==null || !today.isAfter(quota.getValidTo()))).toList();
+        if(!enforceLimit && effective.isEmpty())return;
+        BigDecimal remainingToConsume = quantity;
+        for (ProductStaffQuota quota : effective) {
+            if (remainingToConsume.compareTo(BigDecimal.ZERO) <= 0) break;
+            BigDecimal quotaRemaining = quota.getRemainingQuantity();
+            if (quotaRemaining.compareTo(BigDecimal.ZERO) <= 0) continue;
+            BigDecimal consumeFromThis = remainingToConsume.min(quotaRemaining);
             BigDecimal currentSold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
-            if(currentSold.add(quantity).compareTo(quota.getAllocatedQuantity())>0) throw new BusinessException("Staff quota exceeded");
-            quota.setSoldQuantity(currentSold.add(quantity));
+            quota.setSoldQuantity(currentSold.add(consumeFromThis));
+            remainingToConsume = remainingToConsume.subtract(consumeFromThis);
             quotaRepository.save(quota);
             log.info("Consumed {} units from quota ID {} for user {}. Total sold: {}/{}",
-                    quantity, quota.getId(), userId, quota.getSoldQuantity(), quota.getAllocatedQuantity());
+                    consumeFromThis, quota.getId(), userId, quota.getSoldQuantity(), quota.getAllocatedQuantity());
+        }
+        if (remainingToConsume.compareTo(BigDecimal.ZERO) > 0) {
+            if(enforceLimit)throw new BusinessException("Staff quota exceeded");
+            // Allocation edits after POS submission cannot block warehouse-approved invoicing.
+            // Keep the actual sold quantity, even when the revised allocation is now smaller.
+            var last=effective.getLast();
+            last.setSoldQuantity((last.getSoldQuantity()==null?BigDecimal.ZERO:last.getSoldQuantity()).add(remainingToConsume));
+            quotaRepository.save(last);
         }
     }
 
@@ -303,17 +341,17 @@ public class ProductStaffQuotaService {
         }
 
         List<ProductStaffQuota> activeQuotas = quotaRepository.lockMatchingActiveQuotas(productId, userId, warehouseId);
-        if (!activeQuotas.isEmpty()) {
-            ProductStaffQuota quota = activeQuotas.get(0);
+        BigDecimal remainingToRestore = quantity;
+        for (ProductStaffQuota quota : activeQuotas) {
+            if (remainingToRestore.compareTo(BigDecimal.ZERO) <= 0) break;
             BigDecimal currentSold = quota.getSoldQuantity() != null ? quota.getSoldQuantity() : BigDecimal.ZERO;
-            BigDecimal newSold = currentSold.subtract(quantity);
-            if (newSold.compareTo(BigDecimal.ZERO) < 0) {
-                newSold = BigDecimal.ZERO;
-            }
-            quota.setSoldQuantity(newSold);
+            if (currentSold.compareTo(BigDecimal.ZERO) <= 0) continue;
+            BigDecimal restoreToThis = remainingToRestore.min(currentSold);
+            quota.setSoldQuantity(currentSold.subtract(restoreToThis));
+            remainingToRestore = remainingToRestore.subtract(restoreToThis);
             quotaRepository.save(quota);
             log.info("Restored {} units to quota ID {} for user {}. Total sold: {}/{}",
-                    quantity, quota.getId(), userId, quota.getSoldQuantity(), quota.getAllocatedQuantity());
+                    restoreToThis, quota.getId(), userId, quota.getSoldQuantity(), quota.getAllocatedQuantity());
         }
     }
 

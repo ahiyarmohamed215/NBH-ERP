@@ -31,6 +31,8 @@ public class CreateCustomerRequest {
 
     private BigDecimal creditLimit = BigDecimal.ZERO;
 
+    private Boolean draft;
+
     private Long customerGroupId;
 
     private Long routeId;

@@ -33,61 +33,95 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.nbh.erp.auth.repository.RefreshSessionRepository refreshSessions;
+    private final SessionActivityService sessionActivity;
     private final com.nbh.erp.role.repository.PermissionRepository permissionRepository;
 
     @Transactional
     public void signup(SignupRequest request) {
+        if (request == null) {
+            throw new BusinessException("Registration details are required.");
+        }
+
         String trimmedUsername = request.getUsername() != null ? request.getUsername().trim() : "";
-        String trimmedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        String trimmedFullName = request.getFullName() != null ? request.getFullName().trim() : "";
+        String trimmedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase(java.util.Locale.ROOT) : "";
+        String rawPhone = request.getPhone() != null ? request.getPhone().trim() : "";
+        String password = request.getPassword() != null ? request.getPassword() : "";
+        String confirmPassword = request.getConfirmPassword();
 
-        if (trimmedUsername.isEmpty() || trimmedEmail.isEmpty()) {
-            throw new BusinessException("Username and email are required.");
+        // 1. Username validation
+        if (trimmedUsername.isEmpty()) {
+            throw new BusinessException("Username is required.");
+        }
+        if (trimmedUsername.length() < 3 || trimmedUsername.length() > 50) {
+            throw new BusinessException("Username must be between 3 and 50 characters.");
+        }
+        if (!trimmedUsername.matches("^[a-zA-Z0-9._-]+$")) {
+            throw new BusinessException("Username can only contain letters, numbers, dots, hyphens, and underscores.");
         }
 
-        java.util.Optional<User> userByUsername = userRepository.findByUsernameIgnoreCase(trimmedUsername);
-        java.util.Optional<User> userByEmail = userRepository.findByEmailIgnoreCase(trimmedEmail);
-
-        if (userByUsername.isPresent() && userByEmail.isPresent()
-                && !userByUsername.get().getId().equals(userByEmail.get().getId())) {
-            throw new BusinessException("Username '" + trimmedUsername + "' and email '" + trimmedEmail + "' are already registered to different accounts. Please use different credentials or sign in.");
+        // 2. Full Name validation
+        if (trimmedFullName.isEmpty()) {
+            throw new BusinessException("Full name is required.");
+        }
+        if (trimmedFullName.length() < 2 || trimmedFullName.length() > 100) {
+            throw new BusinessException("Full name must be between 2 and 100 characters.");
         }
 
-        User existingUser = userByUsername.orElse(userByEmail.orElse(null));
-
-        if (existingUser != null) {
-            if ("REJECTED".equalsIgnoreCase(existingUser.getApprovalStatus())) {
-                // If the user was rejected earlier, allow them to re-apply with new/updated credentials
-                existingUser.setUsername(trimmedUsername);
-                existingUser.setEmail(trimmedEmail);
-                existingUser.setFullName(request.getFullName().trim());
-                existingUser.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
-                existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
-                existingUser.setIsActive(false);
-                existingUser.setApprovalStatus("PENDING");
-                existingUser.setUpdatedBy(trimmedUsername);
-                userRepository.save(existingUser);
-                log.info("Previously rejected user re-submitted registration pending approval: '{}'", trimmedUsername);
-                return;
-            } else if ("PENDING".equalsIgnoreCase(existingUser.getApprovalStatus())) {
-                String matchedField = userByUsername.isPresent()
-                        ? "Username '" + trimmedUsername + "'"
-                        : "Email '" + trimmedEmail + "'";
-                throw new BusinessException(matchedField + " is already submitted and pending administrator approval. Please wait for review or contact your administrator.");
-            } else {
-                if (userByUsername.isPresent()) {
-                    throw new BusinessException("Username '" + trimmedUsername + "' is already registered. Please sign in or choose another username.");
-                } else {
-                    throw new BusinessException("Email '" + trimmedEmail + "' is already registered. Please sign in or use another email.");
-                }
-            }
+        // 3. Email validation
+        if (trimmedEmail.isEmpty()) {
+            throw new BusinessException("Email address is required.");
+        }
+        if (trimmedEmail.length() > 100 || !trimmedEmail.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new BusinessException("Enter a valid email address.");
         }
 
+        // 4. Phone validation & normalization
+        if (rawPhone.isEmpty()) {
+            throw new BusinessException("Phone number is required.");
+        }
+        com.nbh.erp.common.validation.PhoneValidator phoneValidator = new com.nbh.erp.common.validation.PhoneValidator();
+        if (!phoneValidator.isValid(rawPhone, null)) {
+            throw new BusinessException("Enter a valid contact number (e.g. +94 77 123 4567).");
+        }
+        String normalizedPhone;
+        try {
+            normalizedPhone = com.nbh.erp.common.validation.PhoneValidator.normalize(rawPhone);
+        } catch (Exception ex) {
+            normalizedPhone = rawPhone;
+        }
+
+        // 5. Password & Confirm Password validation
+        if (password.isEmpty()) {
+            throw new BusinessException("Password is required.");
+        }
+        if (confirmPassword != null && !password.equals(confirmPassword)) {
+            throw new BusinessException("Passwords do not match.");
+        }
+        com.nbh.erp.common.validation.PasswordValidator.validate(password, trimmedUsername, trimmedEmail);
+
+        // 6. Uniqueness checks: Username, Email, Phone
+        if (userRepository.existsByUsernameIgnoreCase(trimmedUsername)) {
+            throw new BusinessException("Username '" + trimmedUsername + "' is already registered. Please choose another username.");
+        }
+
+        if (userRepository.findByEmailIgnoreCase(trimmedEmail).isPresent()) {
+            throw new BusinessException("This email address is already registered. If you already have an account, please sign in or use a different email address.");
+        }
+
+        String cleanDigits = rawPhone.replaceAll("[^0-9]", "");
+        List<User> phoneMatches = userRepository.findMatchingPhone(rawPhone, normalizedPhone, cleanDigits);
+        if (!phoneMatches.isEmpty()) {
+            throw new BusinessException("This phone number is already registered. Please use a different phone number and try again.");
+        }
+
+        // 7. Persist new user pending approval
         User user = User.builder()
                 .username(trimmedUsername)
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(passwordEncoder.encode(password))
                 .email(trimmedEmail)
-                .fullName(request.getFullName().trim())
-                .phone(request.getPhone() != null ? request.getPhone().trim() : null)
+                .fullName(trimmedFullName)
+                .phone(normalizedPhone != null ? normalizedPhone : rawPhone)
                 .isActive(false) // Inactive until approved by administrator
                 .approvalStatus("PENDING")
                 .roles(new HashSet<>())
@@ -98,54 +132,60 @@ public class AuthService {
         userRepository.save(user);
         user.setEmployeeCode(user.getEmployeeCode());
         userRepository.save(user);
-        log.info("New user registered and pending approval: '{}'", user.getUsername());
+        log.info("New user registered and pending approval: '{}' (email: {}, phone: {})", user.getUsername(), user.getEmail(), user.getPhone());
     }
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
         String usernameOrEmail = request.getUsername() != null ? request.getUsername().trim() : "";
 
-        // Pre-check user status using single fetch join query to provide helpful error message if pending or rejected
+        // Pre-check user status using single fetch join query to provide specific error messages
         User candidateUser = userRepository.findByUsernameOrEmailWithRolesAndPermissions(usernameOrEmail)
                 .orElse(null);
 
-        if (candidateUser != null) {
-            boolean isSuperAdmin = "admin".equalsIgnoreCase(candidateUser.getUsername()) ||
-                    (candidateUser.getRoles() != null && candidateUser.getRoles().stream().anyMatch(r ->
-                            "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
+        if (candidateUser == null) {
+            throw new BusinessException("Username is incorrect.");
+        }
 
-            if (!isSuperAdmin) {
-                if ("PENDING".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                    throw new BusinessException("Your account is pending administrator approval. Please contact your system admin.");
-                }
-                if ("REJECTED".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                    throw new BusinessException("Your account registration request has been rejected. Please contact support.");
-                }
-                if (Boolean.FALSE.equals(candidateUser.getIsActive())) {
-                    throw new BusinessException("Your account is deactivated. Please contact an administrator.");
-                }
-            } else {
-                // Self-heal: ensure super admin is permanently active and approved in DB
-                if (!Boolean.TRUE.equals(candidateUser.getIsActive()) || !"APPROVED".equals(candidateUser.getApprovalStatus())) {
-                    candidateUser.setIsActive(true);
-                    candidateUser.setApprovalStatus("APPROVED");
-                    userRepository.save(candidateUser);
-                    log.info("Auto-restored active and approved status for super administrator '{}'", candidateUser.getUsername());
-                }
+        boolean isSuperAdmin = "admin".equalsIgnoreCase(candidateUser.getUsername()) ||
+                (candidateUser.getRoles() != null && candidateUser.getRoles().stream().anyMatch(r ->
+                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
+
+        if (!isSuperAdmin) {
+            if ("PENDING".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
+                throw new BusinessException("Your account is pending administrator approval. Please contact your system admin.");
+            }
+            if ("REJECTED".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
+                throw new BusinessException("Your account registration request has been rejected. Please contact support.");
+            }
+            if (Boolean.FALSE.equals(candidateUser.getIsActive())) {
+                throw new BusinessException("Your account is deactivated. Please contact an administrator.");
+            }
+        } else {
+            // Self-heal: ensure super admin is permanently active and approved in DB
+            if (!Boolean.TRUE.equals(candidateUser.getIsActive()) || !"APPROVED".equals(candidateUser.getApprovalStatus())) {
+                candidateUser.setIsActive(true);
+                candidateUser.setApprovalStatus("APPROVED");
+                userRepository.save(candidateUser);
+                log.info("Auto-restored active and approved status for super administrator '{}'", candidateUser.getUsername());
             }
         }
 
+        if (!passwordEncoder.matches(request.getPassword(), candidateUser.getPassword())) {
+            throw new BusinessException("Password is incorrect.");
+        }
+
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(candidateUser.getUsername(), request.getPassword())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
 
-        String accessToken = tokenProvider.generateAccessToken(authentication);
         String refreshToken = newRefreshSession(userPrincipal);
+        String accessToken = tokenProvider.generateAccessToken(authentication, tokenProvider.claims(refreshToken).get("sid", String.class));
 
-        boolean isSuperAdmin = "admin".equalsIgnoreCase(userPrincipal.getUsername()) ||
+        isSuperAdmin = "admin".equalsIgnoreCase(userPrincipal.getUsername()) ||
                 userPrincipal.getAuthorities().stream().anyMatch(a ->
                         "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()) || "SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
 
@@ -193,13 +233,14 @@ public class AuthService {
             .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Session expired"));
         if (!session.getUsername().equals(username) || !session.getTokenId().equals(claims.getId()) || session.getExpiresAt().isBefore(java.time.Instant.now()))
             throw new org.springframework.security.authentication.BadCredentialsException("Refresh token already used or expired");
+        sessionActivity.requireActive(session);
         session.setTokenId(java.util.UUID.randomUUID().toString());
         session.setExpiresAt(java.time.Instant.now().plusMillis(tokenProvider.getRefreshMs()));
         refreshSessions.save(session);
         String rotated = tokenProvider.generateRefreshToken(username, user.getTokenVersion(), session.getId(), session.getTokenId());
         Authentication authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
 
-        String newAccessToken = tokenProvider.generateAccessToken(authentication);
+        String newAccessToken = tokenProvider.generateAccessToken(authentication, session.getId());
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)
@@ -347,4 +388,30 @@ public class AuthService {
     public void logout() {
         logout(null);
     }
+    @Transactional
+    public String requestPasswordReset(com.nbh.erp.auth.dto.ForgotPasswordRequest request) {
+        if (request == null || !org.springframework.util.StringUtils.hasText(request.getUsernameOrEmail())) {
+            throw new BusinessException("Username or registered email is required.");
+        }
+        String input = request.getUsernameOrEmail().trim();
+        User user = userRepository.findByUsernameOrEmailWithRolesAndPermissions(input)
+                .orElseThrow(() -> new BusinessException("No registered account found matching '" + input + "'."));
+
+        user.setPasswordResetRequested(true);
+        user.setPasswordResetNotes("Reset requested by user on " + java.time.LocalDateTime.now());
+        userRepository.save(user);
+
+        // Mask email for privacy (e.g. j***n@domain.com)
+        String email = user.getEmail() != null ? user.getEmail() : "";
+        String masked = email;
+        int atIdx = email.indexOf('@');
+        if (atIdx > 2) {
+            masked = email.charAt(0) + "***" + email.charAt(atIdx - 1) + email.substring(atIdx);
+        } else if (atIdx > 0) {
+            masked = email.charAt(0) + "***" + email.substring(atIdx);
+        }
+        log.info("Password reset request logged for user '{}' (email: {})", user.getUsername(), user.getEmail());
+        return masked;
+    }
+
 }

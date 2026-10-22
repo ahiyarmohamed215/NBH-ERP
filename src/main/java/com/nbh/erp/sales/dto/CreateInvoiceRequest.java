@@ -72,6 +72,7 @@ public class CreateInvoiceRequest {
 
         @NotNull(message = "Product ID is required")
         private Long productId;
+        private Long warehouseId;
 
         @NotNull(message = "Quantity is required")
         @Positive(message = "Quantity must be greater than zero")

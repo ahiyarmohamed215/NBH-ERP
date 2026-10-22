@@ -76,9 +76,11 @@ public class RoleService {
             }
         }
 
+        String status = request.getStatus() != null && !request.getStatus().isBlank() ? request.getStatus().trim().toUpperCase() : "ACTIVE";
         Role role = Role.builder()
                 .name(roleName)
                 .description(request.getDescription())
+                .status(status)
                 .permissions(permissions)
                 .build();
 
@@ -102,6 +104,9 @@ public class RoleService {
         com.nbh.erp.security.SecurityUtils.checkRoleGrant(role);
         com.nbh.erp.security.SecurityUtils.checkPermissionGrant(request.getPermissions());
         role.setDescription(request.getDescription());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            role.setStatus(request.getStatus().trim().toUpperCase());
+        }
 
         if (request.getPermissions() != null) {
             Set<Permission> permissions = new HashSet<>();

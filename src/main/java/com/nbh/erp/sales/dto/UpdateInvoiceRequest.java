@@ -18,6 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 public class UpdateInvoiceRequest {
 
+    private Long expectedVersion;
     private Long customerId;
     private String customerName;
     private Long warehouseId;
@@ -61,6 +62,7 @@ public class UpdateInvoiceRequest {
     public static class UpdateInvoiceItemRequest {
         private Long id;
         private Long productId;
+        private Long warehouseId;
         private String sku;
         private String name;
 

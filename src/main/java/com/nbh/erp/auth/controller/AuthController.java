@@ -27,6 +27,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.nbh.erp.auth.service.SessionActivityService sessionActivity;
     private final AuthCookieService cookieService;
     private final JwtTokenProvider tokenProvider;
 
@@ -92,6 +93,13 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Signed out successfully", null));
     }
 
+    @PostMapping("/activity")
+    public ResponseEntity<ApiResponse<Void>> activity(HttpServletRequest request, java.security.Principal principal) {
+        String token = request.getHeader("Authorization").substring(7);
+        sessionActivity.record(tokenProvider.claims(token).get("sid", String.class), principal.getName());
+        return ResponseEntity.ok(ApiResponse.ok("Activity recorded", null));
+    }
+
     @GetMapping("/csrf")
     @Operation(summary = "CSRF health check and token verification")
     public ResponseEntity<ApiResponse<Map<String, String>>> getCsrf() {
@@ -113,4 +121,13 @@ public class AuthController {
         UserProfileDto updated = authService.updateCurrentUserProfile(request);
         return ResponseEntity.ok(ApiResponse.ok("Profile updated successfully", updated));
     }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@jakarta.validation.Valid @RequestBody com.nbh.erp.auth.dto.ForgotPasswordRequest request) {
+        String maskedEmail = authService.requestPasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Password reset request submitted. An administrator has been notified to reset your password and send it to your registered email (" + maskedEmail + ").",
+                maskedEmail
+        ));
+    }
+
 }

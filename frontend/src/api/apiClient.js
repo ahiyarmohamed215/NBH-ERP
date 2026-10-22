@@ -19,26 +19,30 @@ const api = axios.create({
 
 // In-Memory Access Token Storage (Never in localStorage, sessionStorage, or IndexedDB)
 let inMemoryAccessToken = null;
+let sessionEpoch = 0;
+let sessionEnded = false;
 
 export const getAccessToken = () => {
   if (inMemoryAccessToken) return inMemoryAccessToken;
   if (typeof localStorage !== 'undefined') {
-    return localStorage.getItem('nbh_token') || null;
+    try { return localStorage.getItem('nbh_token') || null; } catch (_) {}
   }
   return null;
 };
 
 export const setAccessToken = (token) => {
+  sessionEpoch++;
   inMemoryAccessToken = token || null;
   if (token && typeof localStorage !== 'undefined') {
-    localStorage.removeItem('nbh_token');
+    try { localStorage.removeItem('nbh_token'); } catch (_) {}
   }
 };
 
 export const clearAccessToken = () => {
+  sessionEpoch++;
   inMemoryAccessToken = null;
   if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem('nbh_token');
+    try { localStorage.removeItem('nbh_token'); } catch (_) {}
   }
 };
 
@@ -49,7 +53,7 @@ export const IDLE_EXPIRED_MESSAGE = 'Your session has expired due to 30 minutes 
 let lastRecordedActivity = 0;
 export const recordUserActivity = () => {
   const now = Date.now();
-  if (now - lastRecordedActivity < 2000) return; // Throttle to at most once every 2 seconds
+  if (getLastUserActivity() && now - lastRecordedActivity < 2000) return; // Throttle to at most once every 2 seconds
   lastRecordedActivity = now;
   if (typeof localStorage !== 'undefined') {
     try {
@@ -62,10 +66,33 @@ export const getLastUserActivity = () => {
   if (typeof localStorage !== 'undefined') {
     try {
       const val = localStorage.getItem('nbh_last_active');
-      return val ? parseInt(val, 10) : 0;
+      const value = Number(val);
+      return Number.isFinite(value) && value > 0 ? value : 0;
     } catch (_) {}
   }
-  return 0;
+  return lastRecordedActivity;
+};
+
+export const beginUserSession = () => {
+  sessionEnded = false;
+  try { localStorage.removeItem('nbh_session_ended'); } catch (_) {}
+  lastRecordedActivity = 0;
+  recordUserActivity();
+};
+
+export const assertSessionActive = () => {
+  const last = getLastUserActivity();
+  if (last > 0 && Date.now() - last >= IDLE_TIMEOUT_MS) {
+    expireSession(IDLE_EXPIRED_MESSAGE);
+    throw Object.assign(new Error(IDLE_EXPIRED_MESSAGE), { code: 'SESSION_IDLE' });
+  }
+  let ended = sessionEnded;
+  try { ended = Boolean(localStorage.getItem('nbh_session_ended')); } catch (_) {}
+  if (ended) throw Object.assign(new Error('Please sign in again.'), { code: 'SESSION_ENDED' });
+};
+
+const guardRequest = config => {
+  if (!['/auth/login', '/auth/signup', '/auth/logout', '/auth/csrf', '/auth/forgot-password'].includes(config.url)) assertSessionActive();
 };
 
 // Deduplication & In-Memory TTL Cache for GET requests
@@ -110,6 +137,7 @@ api.request = function (configOrUrl, maybeConfig) {
   } else {
     config = configOrUrl ? { ...configOrUrl } : {};
   }
+  try { guardRequest(config); } catch (error) { return Promise.reject(error); }
   const method = (config.method || 'get').toLowerCase();
 
   const shouldBypassCache = Boolean(config.skipCache || config.force);
@@ -161,11 +189,8 @@ api.get = function (url, config = {}) {
 
 // Attach JWT token, correlation ID, idempotency key, and anti-CSRF header automatically
 api.interceptors.request.use((config) => {
-  // Only record user activity on explicit user-initiated actions or mutations,
-  // NOT on automated background queries, SSE cache refetches, or silent polling.
-  if (config.isUserAction || ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
-    recordUserActivity();
-  }
+  // Network traffic is never evidence of human interaction.
+  guardRequest(config);
   if (['post', 'put', 'patch'].includes(config.method?.toLowerCase()) && !config.headers['Idempotency-Key']) {
     config.headers['Idempotency-Key'] = crypto.randomUUID();
   }
@@ -202,7 +227,7 @@ api.interceptors.response.use(
 
     // If request was a mutation (POST, PUT, PATCH, DELETE), broadcast real-time update & invalidate cache
     const method = response.config?.method?.toLowerCase();
-    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    if (['post', 'put', 'patch', 'delete'].includes(method) && response.config?.url !== '/auth/activity') {
       const url = response.config?.url || '';
 
       // Invalidate relevant caches
@@ -246,15 +271,16 @@ api.interceptors.response.use(
     return response.data;
   },
   async (error) => {
+    if (['SESSION_IDLE', 'SESSION_ENDED', 'SESSION_CHANGED'].includes(error.code)) throw error;
     const config = error.config || {};
     // Only refresh on HTTP 401 (never on 403), avoid refreshing on auth endpoints, and retry at most once
-    if (error.response?.status === 401 && config && !config._retried && !config.url?.startsWith('/auth/')) {
+    if (error.response?.status === 401 && config && !config._retried && (!config.url?.startsWith('/auth/') || config.url === '/auth/activity')) {
       config._retried = true;
       try {
         await refreshSession();
         return api(config);
       } catch (refreshError) {
-        expireSession();
+        if (!['SESSION_CHANGED', 'SESSION_IDLE', 'SESSION_ENDED'].includes(refreshError.code)) expireSession();
         throw refreshError;
       }
     }
@@ -300,9 +326,15 @@ try {
     }
     authChannel.onmessage = (event) => {
       if (event.data?.type === 'LOGOUT') {
-        if (event.data?.message && typeof sessionStorage !== 'undefined') {
+        if (typeof sessionStorage !== 'undefined') {
           try {
-            sessionStorage.setItem('nbh_session_expired', event.data.message);
+            if (event.data?.reason === 'MANUAL') {
+              sessionStorage.removeItem('nbh_session_expired');
+              sessionStorage.setItem('nbh_signed_out', event.data.message || 'You have successfully signed out.');
+            } else if (event.data?.message) {
+              sessionStorage.removeItem('nbh_signed_out');
+              sessionStorage.setItem('nbh_session_expired', event.data.message);
+            }
           } catch (_) {}
         }
         handleCrossTabLogout();
@@ -312,6 +344,9 @@ try {
 } catch (_) {}
 
 const handleCrossTabLogout = () => {
+  sessionEnded = true;
+  lastRecordedActivity = 0;
+  try { localStorage.setItem('nbh_session_ended', String(Date.now())); } catch (_) {}
   clearAccessToken();
   clearApiCache();
   if (typeof localStorage !== 'undefined') {
@@ -327,13 +362,33 @@ const handleCrossTabLogout = () => {
   }
 };
 
-export const expireSession = (customMessage) => {
-  handleCrossTabLogout();
+export const manualLogout = (message = 'You have successfully signed out.') => {
   if (typeof sessionStorage !== 'undefined') {
     try {
+      sessionStorage.removeItem('nbh_session_expired');
+      sessionStorage.setItem('nbh_signed_out', message);
+    } catch (_) {}
+  }
+  handleCrossTabLogout();
+  if (authChannel) {
+    try {
+      authChannel.postMessage({
+        type: 'LOGOUT',
+        reason: 'MANUAL',
+        message: message,
+      });
+    } catch (_) {}
+  }
+};
+
+export const expireSession = (customMessage) => {
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.removeItem('nbh_signed_out');
       sessionStorage.setItem('nbh_session_expired', customMessage || 'Your session has expired. Please sign in again.');
     } catch (_) {}
   }
+  handleCrossTabLogout();
   if (authChannel) {
     try {
       authChannel.postMessage({
@@ -350,7 +405,13 @@ const acquireCrossTabLock = async (lockName, callback, timeoutMs = 8000) => {
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
     return navigator.locks.request(lockName, callback);
   }
-  if (typeof localStorage === 'undefined') {
+  let storageAvailable = false;
+  try {
+    localStorage.setItem('nbh_lock_probe', '1');
+    localStorage.removeItem('nbh_lock_probe');
+    storageAvailable = true;
+  } catch (_) {}
+  if (!storageAvailable) {
     return callback();
   }
   const lockKey = `nbh_lock_${lockName}`;
@@ -381,15 +442,24 @@ const acquireCrossTabLock = async (lockName, callback, timeoutMs = 8000) => {
 
 let refreshPromise;
 export const refreshSession = () => {
+  try { assertSessionActive(); } catch (error) { return Promise.reject(error); }
   if (!refreshPromise) {
+    const epoch = sessionEpoch;
+    const checkRefresh = () => {
+      if (epoch !== sessionEpoch) throw Object.assign(new Error('Session changed during refresh'), { code: 'SESSION_CHANGED' });
+      assertSessionActive();
+    };
     const perform = async () => {
+      checkRefresh();
       // Safe migration: check for legacy token in localStorage once inside the coordinated lock
-      const legacyRefreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('nbh_refresh') : null;
+      let legacyRefreshToken = null;
+      try { legacyRefreshToken = localStorage.getItem('nbh_refresh'); } catch (_) {}
       const payload = legacyRefreshToken ? { refreshToken: legacyRefreshToken } : {};
 
       // Short 15ms pause to allow multi-process browser cookie jar sync across tabs
       await new Promise((r) => setTimeout(r, 15));
 
+      checkRefresh();
       let res;
       try {
         res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, payload, {
@@ -407,6 +477,7 @@ export const refreshSession = () => {
           err.config = err.config || {};
           err.config._retriedRefresh = true;
           await new Promise((r) => setTimeout(r, 60));
+          checkRefresh();
           res = await axios.post(`${API_ORIGIN}/api/v1/auth/refresh`, {}, {
             timeout: 30000,
             withCredentials: true,
@@ -420,6 +491,7 @@ export const refreshSession = () => {
         }
       }
 
+      checkRefresh();
       const data = res.data?.data;
       if (data?.accessToken) {
         setAccessToken(data.accessToken);
@@ -427,8 +499,10 @@ export const refreshSession = () => {
 
       // Migration cleanup: once refresh succeeds, permanently purge legacy tokens from localStorage
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('nbh_token');
-        localStorage.removeItem('nbh_refresh');
+        try {
+          localStorage.removeItem('nbh_token');
+          localStorage.removeItem('nbh_refresh');
+        } catch (_) {}
       }
 
       return data;
@@ -440,8 +514,10 @@ export const refreshSession = () => {
       } catch (refreshError) {
         // DO NOT broadcast LOGOUT across BroadcastChannel on a failed silent refresh!
         // Only clear this tab's in-memory token and cache.
-        clearAccessToken();
-        clearApiCache();
+        if (epoch === sessionEpoch) {
+          clearAccessToken();
+          clearApiCache();
+        }
         throw refreshError;
       }
     };
@@ -481,7 +557,9 @@ export const authApi = {
   signup: (data) => api.post('/auth/signup', data),
   getMe: () => api.get('/auth/me', {skipCache:true,skipDedupe:true}),
   logout: () => api.post('/auth/logout'),
+  activity: () => api.post('/auth/activity'),
   updateProfile: (data) => api.put('/auth/profile', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
 };
 
 export const userApi = {
@@ -675,30 +753,34 @@ export const adjustmentApi = {
 };
 
 export const salesApi = {
-  getOfficePrinter: () => api.get('/invoices/held/office-printer',{skipCache:true}),
-  setOfficePrinter: printerName => api.put('/invoices/held/office-printer',{printerName}),
-  retryHeldPrinting: id => api.post(`/invoices/held/${id}/retry-print`),
-  assignHeld: (id,data) => api.post(`/invoices/held/${id}/assign`,data),
+
+
+
+  getPosStaffPerformance: (params={}) => api.get('/invoices/held/performance',{params,skipCache:true,skipDedupe:true}),
+  getHeldReviewLimits: id => api.get(`/invoices/held/${id}/review-limits`,{skipCache:true,skipDedupe:true}),
+  getPosStockLimits: params => api.get('/invoices/pos/stock-limits',{params,skipCache:true,skipDedupe:true}),
+  getHeldOriginals: params => api.get('/invoices/held/originals',{params,skipCache:true,skipDedupe:true}),
   sendHeld: (id,data) => api.post(`/invoices/held/${id}/send`,data),
   reviewHeld: (id,data) => api.post(`/invoices/held/${id}/review`,data),
-  getHeldPrintJobs: id => api.get(`/invoices/held/${id}/print-jobs`,{skipCache:true,skipDedupe:true}),
+
   printHeld: (id,warehouseId) => api.post(`/invoices/held/${id}/print`,undefined,{params:{warehouseId}}),
-  retryHeldPrint: (id,jobId) => api.post(`/invoices/held/${id}/print-jobs/${jobId}/retry`),
-  getWarehousePrinters: () => api.get('/invoices/held/printers',{skipCache:true}),
-  setWarehousePrinter: (id,printerName) => api.put(`/invoices/held/printers/${id}`,{printerName}),
+
+
+
   savePosDraft: (id,data) => api.put(`/invoices/held/${id}/draft`,data),
   getHeldWorkspace: (params) => api.get('/invoices/held/workspace',{params,skipCache:true,skipDedupe:true}),
   previewHeldMerge: (ids) => api.post('/invoices/held/merge-preview',{ids}),
   getPosProgress: (params) => api.get('/invoices/pos/progress',{params,skipCache:true,skipDedupe:true}),
-  completeHeld: (ids,expectedVersions) => api.post('/invoices/complete-held', { ids,expectedVersions }),
+  completeHeld: (ids,expectedVersions,packing) => api.post('/invoices/complete-held', { ids,expectedVersions,packing }),
   search: (params) => fetchAllPages('/invoices', params),
+  getCustomerOutstanding: (customerId, outstandingOnly = true) => api.get(`/invoices/customer/${customerId}/outstanding`, { params: { outstandingOnly }, skipCache: true, skipDedupe: true }),
   getHeld: (cashier) => api.get('/invoices/held', { params: cashier ? { cashier } : {} }),
   getCashierSalesSummary: (params) => api.get('/invoices/cashiers/summary', { params }),
   getById: (id) => api.get(`/invoices/${id}`),
   getByNumber: (number) => api.get(`/invoices/number/${number}`),
   create: (data) => api.post('/invoices', data),
   resumeHeld: (id, data) => api.post(`/invoices/held/${id}/resume`, data),
-  cancelHeld: (id) => api.post(`/invoices/held/${id}/cancel`),
+  cancelHeld: (id, data) => api.post(`/invoices/held/${id}/cancel`,data),
   deleteHeld: (id) => api.delete(`/invoices/held/${id}`),
   deleteHeldByNumber: (number) => api.delete(`/invoices/held/number/${number}`),
   update: (id, data) => api.put(`/invoices/${id}`, data),

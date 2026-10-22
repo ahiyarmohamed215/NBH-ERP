@@ -18,12 +18,21 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InvoiceDto {
+    private InvoicePacking packing;
     private Long id;
     private long recordVersion;
     private String invoiceNumber;
     private String heldNumber;
     private Long mergedInvoiceId;
+    private String assignedStaff;
+    private String reviewedBy;
+    private LocalDateTime reviewedAt;
+    private List<String> sourceHeldNumbers;
+    public record HeldBillSource(Long id,String number,String status,BigDecimal amount,long recordVersion) {}
+    private List<HeldBillSource> sourceHeldBills;
     private Boolean canResume;
+    private Boolean originalCopy;
+    private String cancellationReason;
     private Long customerId;
     private String customerCode;
     private String customerName;
@@ -34,6 +43,7 @@ public class InvoiceDto {
     private String salesmanName;
     private String status;
     private String paymentType;
+    private String paymentStatus;
     private String paymentMethod;
     private BigDecimal returnedAmount;
     private String deliveryStatus;
@@ -54,8 +64,11 @@ public class InvoiceDto {
     private BigDecimal balanceAmount;
     private LocalDate invoiceDate;
     private String notes;
+    private String posRemarks;
     private List<InvoiceItemDto> items;
     private String createdBy;
+    private String createdByName;
+    private String createdByEmployeeCode;
     private LocalDateTime createdAt;
 
     public static InvoiceDto from(Invoice inv) {
@@ -69,11 +82,13 @@ public class InvoiceDto {
                 ? (inv.getDelivery().getAssistantStaff().getFullName() != null ? inv.getDelivery().getAssistantStaff().getFullName() : inv.getDelivery().getAssistantStaff().getUsername()) : null;
 
         return InvoiceDto.builder()
+                .packing(new InvoicePacking(inv.getPackingBoxes(),inv.getPackingBags(),inv.getPackingPBags(),inv.getPackingOthers()))
                 .id(inv.getId())
                 .recordVersion(inv.getRecordVersion())
                 .invoiceNumber(inv.getInvoiceNumber())
                 .heldNumber(inv.getHeldNumber())
                 .mergedInvoiceId(inv.getMergedInvoiceId())
+                .assignedStaff(inv.getAssignedStaff()).reviewedBy(inv.getReviewedBy()).reviewedAt(inv.getReviewedAt())
                 .customerId(inv.getCustomer().getId())
                 .customerCode(inv.getCustomer().getCustomerCode())
                 .customerName(inv.getCustomer().getName())
@@ -83,7 +98,9 @@ public class InvoiceDto {
                 .salesmanId(inv.getSalesman() != null ? inv.getSalesman().getId() : null)
                 .salesmanName(inv.getSalesman() != null ? (inv.getSalesman().getFullName() != null ? inv.getSalesman().getFullName() : inv.getSalesman().getUsername()) : null)
                 .status(inv.getStatus())
+                .cancellationReason(inv.getCancellationReason())
                 .paymentType(inv.getPaymentType())
+                .paymentStatus(inv.getBalanceAmount().signum()==0?"PAID":inv.getPaidAmount().signum()>0?"PARTIAL":"PENDING")
                 .paymentMethod(inv.getPaymentMethod())
                 .returnedAmount(inv.getReturnedAmount())
                 .deliveryStatus(inv.getDeliveryStatus() != null ? inv.getDeliveryStatus() : "PENDING")
@@ -103,7 +120,7 @@ public class InvoiceDto {
                 .paidAmount(inv.getPaidAmount())
                 .balanceAmount(inv.getBalanceAmount())
                 .invoiceDate(inv.getInvoiceDate())
-                .notes(inv.getNotes())
+                .notes(inv.getNotes()).posRemarks(inv.getNotes())
                 .createdBy(inv.getCreatedBy())
                 .createdAt(inv.getCreatedAt())
                 .items(inv.getItems() != null
@@ -115,11 +132,13 @@ public class InvoiceDto {
     public static InvoiceDto fromSummary(Invoice inv) {
         if (inv == null) return null;
         return InvoiceDto.builder()
+                .packing(new InvoicePacking(inv.getPackingBoxes(),inv.getPackingBags(),inv.getPackingPBags(),inv.getPackingOthers()))
                 .id(inv.getId())
                 .recordVersion(inv.getRecordVersion())
                 .invoiceNumber(inv.getInvoiceNumber())
                 .heldNumber(inv.getHeldNumber())
                 .mergedInvoiceId(inv.getMergedInvoiceId())
+                .assignedStaff(inv.getAssignedStaff()).reviewedBy(inv.getReviewedBy()).reviewedAt(inv.getReviewedAt())
                 .customerId(inv.getCustomer() != null ? inv.getCustomer().getId() : null)
                 .customerCode(inv.getCustomer() != null ? inv.getCustomer().getCustomerCode() : null)
                 .customerName(inv.getCustomer() != null ? inv.getCustomer().getName() : null)
@@ -131,6 +150,7 @@ public class InvoiceDto {
                         ? (inv.getSalesRep().getFullName() != null ? inv.getSalesRep().getFullName() : inv.getSalesRep().getUsername()) : null)
                 .status(inv.getStatus())
                 .paymentType(inv.getPaymentType())
+                .paymentStatus(inv.getBalanceAmount().signum()==0?"PAID":inv.getPaidAmount().signum()>0?"PARTIAL":"PENDING")
                 .paymentMethod(inv.getPaymentMethod())
                 .returnedAmount(inv.getReturnedAmount())
                 .deliveryStatus(inv.getDeliveryStatus() != null ? inv.getDeliveryStatus() : "PENDING")
@@ -144,7 +164,7 @@ public class InvoiceDto {
                 .paidAmount(inv.getPaidAmount())
                 .balanceAmount(inv.getBalanceAmount())
                 .invoiceDate(inv.getInvoiceDate())
-                .notes(inv.getNotes())
+                .notes(inv.getNotes()).posRemarks(inv.getNotes())
                 .createdBy(inv.getCreatedBy())
                 .createdAt(inv.getCreatedAt())
                 .items(List.of())
@@ -158,6 +178,9 @@ public class InvoiceDto {
     public static class InvoiceItemDto {
         private Long id;
         private Long productId;
+        private Long warehouseId;
+        private String warehouseName;
+        private String warehouseCode;
         private String productSku;
         private String productBarcode;
         private String productName;
@@ -173,6 +196,9 @@ public class InvoiceDto {
             return InvoiceItemDto.builder()
                     .id(item.getId())
                     .productId(item.getProduct().getId())
+                    .warehouseId(item.fulfillmentWarehouse().getId())
+                    .warehouseName(item.fulfillmentWarehouse().getName())
+                    .warehouseCode(item.fulfillmentWarehouse().getCode())
                     .productSku(item.getProduct().getSku())
                     .productBarcode(item.getProduct().getBarcode())
                     .productName(item.getProduct().getName())

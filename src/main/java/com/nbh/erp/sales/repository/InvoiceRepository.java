@@ -15,6 +15,21 @@ import java.util.Optional;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
+    @Query("select i from Invoice i where i.originalHeldSnapshot is not null order by i.originalHeldCapturedAt desc")
+    List<Invoice> findWarehouseOriginals();
+
+    @Query("select i from Invoice i where (i.originalHeldSentAt is not null and i.originalHeldTotal is not null and i.status not in ('CANCELLED','VOIDED') and not exists (select v.id from Invoice v where v.id=i.mergedInvoiceId and v.status='VOIDED')) and i.invoiceDate between :start and :end")
+    List<Invoice> findPerformanceDocuments(@Param("start") LocalDate start,@Param("end") LocalDate end);
+
+    @Query("select coalesce(sum(i.originalHeldTotal),0) from Invoice i where (i.originalHeldSentAt is not null and i.originalHeldTotal is not null and i.status not in ('CANCELLED','VOIDED') and not exists (select v.id from Invoice v where v.id=i.mergedInvoiceId and v.status='VOIDED')) and (:startDate is null or i.invoiceDate>=:startDate) and (:endDate is null or i.invoiceDate<=:endDate) and i.customer.id=:customerId")
+    BigDecimal getCustomerPerformanceBetween(@Param("customerId") Long customerId,@Param("startDate") LocalDate startDate,@Param("endDate") LocalDate endDate);
+    @Query("select coalesce(sum(i.originalHeldTotal),0) from Invoice i where (i.originalHeldSentAt is not null and i.originalHeldTotal is not null and i.status not in ('CANCELLED','VOIDED') and not exists (select v.id from Invoice v where v.id=i.mergedInvoiceId and v.status='VOIDED')) and (:startDate is null or i.invoiceDate>=:startDate) and (:endDate is null or i.invoiceDate<=:endDate) and i.salesRep.id=:salesmanId")
+    BigDecimal getSalesmanPerformanceBetween(@Param("salesmanId") Long salesmanId,@Param("startDate") LocalDate startDate,@Param("endDate") LocalDate endDate);
+    @Query("select coalesce(sum(i.originalHeldTotal),0) from Invoice i where (i.originalHeldSentAt is not null and i.originalHeldTotal is not null and i.status not in ('CANCELLED','VOIDED') and not exists (select v.id from Invoice v where v.id=i.mergedInvoiceId and v.status='VOIDED')) and (:startDate is null or i.invoiceDate>=:startDate) and (:endDate is null or i.invoiceDate<=:endDate)")
+    BigDecimal getTotalPerformanceBetween(@Param("startDate") LocalDate startDate,@Param("endDate") LocalDate endDate);
+    @Query("select count(i) from Invoice i where (i.originalHeldSentAt is not null and i.originalHeldTotal is not null and i.status not in ('CANCELLED','VOIDED') and not exists (select v.id from Invoice v where v.id=i.mergedInvoiceId and v.status='VOIDED')) and (:startDate is null or i.invoiceDate>=:startDate) and (:endDate is null or i.invoiceDate<=:endDate) and i.customer.id=:customerId")
+    long countCustomerPerformanceBetween(@Param("customerId") Long customerId,@Param("startDate") LocalDate startDate,@Param("endDate") LocalDate endDate);
+
     java.util.List<Invoice> findByStatusIn(java.util.Collection<String> statuses);
     java.util.List<Invoice> findByStatusInAndCreatedBy(java.util.Collection<String> statuses,String createdBy);
 
@@ -26,6 +41,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
     Optional<Invoice> findByHeldNumber(String heldNumber);
     List<Invoice> findByMergedInvoiceId(Long mergedInvoiceId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Invoice i where i.mergedInvoiceId=:id order by i.id")
+    List<Invoice> lockMergedSources(@Param("id") Long id);
+    @Query("select i.mergedInvoiceId from Invoice i where i.id=:id")
+    Long findMergedParentId(@Param("id") Long id);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Invoice i where i.invoiceNumber = :number or i.heldNumber = :number")
     Optional<Invoice> findByNumberForUpdate(@Param("number") String number);
@@ -64,11 +84,19 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     List<Invoice> findByCustomerId(Long customerId);
 
+    @Query("SELECT i FROM Invoice i WHERE i.customer.id = :customerId AND i.balanceAmount > 0 AND i.status IN ('COMPLETED','PARTIAL','PAID') ORDER BY i.createdAt DESC")
+    List<Invoice> findOutstandingByCustomerId(@Param("customerId") Long customerId);
+
     @Query("SELECT i FROM Invoice i WHERE i.customer.isActive = true AND " +
             "i.status <> 'MERGED' AND (:warehouseId IS NULL OR i.warehouse.id = :warehouseId) AND " +
             "(:customerId IS NULL OR i.customer.id = :customerId) AND " +
-            "((:status IS NULL AND i.invoiceNumber IS NOT NULL) OR i.status = :status) AND " +
+            "((:status IS NULL AND i.invoiceNumber IS NOT NULL) OR " +
+            " (:status = 'PAID' AND (i.status = 'PAID' OR i.balanceAmount = 0)) OR " +
+            " (:status = 'PARTIAL' AND (i.status = 'PARTIAL' OR (i.paidAmount > 0 AND i.balanceAmount > 0))) OR " +
+            " (:status = 'PENDING' AND (i.status = 'PENDING' OR (i.paidAmount = 0 AND i.balanceAmount > 0))) OR " +
+            " (i.status = :status)) AND " +
             "(:paymentType IS NULL OR i.paymentType = :paymentType) AND " +
+            "(:paymentMethod IS NULL OR :paymentMethod = '' OR UPPER(i.paymentMethod) = :paymentMethod OR UPPER(i.paymentType) = :paymentMethod) AND " +
             "(:startDate IS NULL OR i.invoiceDate >= :startDate) AND " +
             "(:endDate IS NULL OR i.invoiceDate <= :endDate) AND " +
             "(:createdBy IS NULL OR i.createdBy = :createdBy) AND " +
@@ -79,6 +107,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             @Param("customerId") Long customerId,
             @Param("status") String status,
             @Param("paymentType") String paymentType,
+            @Param("paymentMethod") String paymentMethod,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             @Param("createdBy") String createdBy,
@@ -119,11 +148,11 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     );
 
     @Query("SELECT i.createdBy AS cashier, COUNT(i) AS heldCount, COALESCE(SUM(i.netTotal), 0) AS totalHeld " +
-            "FROM Invoice i WHERE i.status in ('HELD','SENT_TO_WAREHOUSE','STOCK_ADJUSTED') " +
+            "FROM Invoice i WHERE i.status in ('HELD','YET_TO_PRINT','SENT_TO_WAREHOUSE','STOCK_ADJUSTED') " +
             "GROUP BY i.createdBy")
     List<CashierHeldProjection> getCashierHeldSummary();
 
-    @Query("select i.createdBy as cashier, count(i) as heldCount, coalesce(sum(i.netTotal),0) as totalHeld from Invoice i where i.heldNumber is not null and i.status not in ('CANCELLED','VOIDED') and i.invoiceDate between :start and :end and (:excludeId is null or i.id <> :excludeId) group by i.createdBy")
+    @Query("select i.createdBy as cashier, count(i) as heldCount, coalesce(sum(i.originalHeldTotal),0) as totalHeld from Invoice i where i.heldNumber is not null and i.status not in ('CANCELLED','VOIDED') and i.invoiceDate between :start and :end and (:excludeId is null or i.id <> :excludeId) group by i.createdBy")
     List<CashierHeldProjection> getMonthlyHeldSummary(@Param("start") LocalDate start,@Param("end") LocalDate end,@Param("excludeId") Long excludeId);
 
     interface CashierSalesProjection {

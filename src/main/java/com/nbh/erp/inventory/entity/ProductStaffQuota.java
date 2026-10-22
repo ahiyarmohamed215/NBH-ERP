@@ -16,12 +16,7 @@ import java.time.LocalDate;
  * preventing team conflicts and ensuring fair distribution of high-demand inventory.
  */
 @Entity
-@Table(
-    name = "product_staff_quotas",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_prod_user_wh", columnNames = {"product_id", "user_id", "warehouse_id"})
-    }
-)
+@Table(name = "product_staff_quotas")
 @Getter
 @Setter
 @NoArgsConstructor

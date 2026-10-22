@@ -1,0 +1,11 @@
+.pos-held-backdrop {position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;z-index:1200;}
+.pos-held-dialog.purchase-inspection {width:min(1280px,calc(100vw - 24px));height:min(88dvh,calc(100dvh - 24px));max-height:calc(100dvh - 24px);font-family:var(--font-sans,var(--font-body,inherit));}
+.pos-held-dialog .purchase-inspection-header {border-bottom:1px solid #e2e8f0;}
+.pos-held-body {padding:20px 24px;flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;overflow:hidden;}
+.pos-held-body .onhold-directory {min-height:0;}
+.pos-held-body .onhold-directory-table {min-height:0;}
+.pos-held-error {margin:0;color:#b91c1c;font-size:var(--erp-text-body,.82rem);}
+@media(max-width:700px){.pos-held-dialog .purchase-inspection-header {padding:16px;}.pos-held-body {padding:12px;}.pos-held-body .onhold-directory-toolbar {max-height:34dvh;overflow:auto;}.pos-held-dialog.purchase-inspection {height:calc(100dvh - 24px);}}
+
+.pos-held-dialog .onhold-directory-table :is(.erp-table-code,.erp-table-date) {white-space:nowrap;word-break:normal;overflow-wrap:normal;}
+

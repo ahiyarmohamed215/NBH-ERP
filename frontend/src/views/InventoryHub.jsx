@@ -5,7 +5,7 @@ import AdjustmentDetailsModal from '../components/AdjustmentDetailsModal';
 import InventoryBalanceTable from '../components/InventoryBalanceTable';
 import {newestFirst} from '../utils/recordOrder';
 import AllocationDetailsModal from '../components/AllocationDetailsModal';
-import {canWriteTab,hasPermission} from '../utils/moduleAccess';
+import {canAccessTab,canWriteTab,hasPermission} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
@@ -104,7 +104,11 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
     { id: 'categories', label: 'Categories', icon: LayoutGrid },
   ];
 
-  const [currentTab, setCurrentTab] = useModuleTab('inventory',activeSubTab,'inventory-list',user);
+  const allowedTabs = INVENTORY_TABS.filter((tab) => canAccessTab(user, 'inventory', tab.id));
+  const defaultTab = allowedTabs[0]?.id || 'inventory-list';
+
+  const [currentTab, setCurrentTab] = useModuleTab('inventory', activeSubTab || defaultTab, defaultTab, user);
+  const activeTab = currentTab || defaultTab;
 
   // Sync subTab prop
   useEffect(() => {
@@ -112,6 +116,12 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       setCurrentTab(activeSubTab);
     }
   }, [activeSubTab]);
+
+  useEffect(() => {
+    if (activeTab && onSubTabChange && activeTab !== activeSubTab) {
+      onSubTabChange(activeTab);
+    }
+  }, [activeTab, activeSubTab, onSubTabChange]);
 
   const handleTabClick = (tabId) => {
     setCurrentTab(tabId);
@@ -181,7 +191,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           productId: first.productId,
           recordNo: adj.adjustmentNumber,
           date: adj.adjustmentDate,
-          type: adj.adjustmentType==='ORDER_REVIEW'?'Bill quantity':isReduction ? 'Reduction' : 'Addition',
+          type: isReduction ? 'Reduction' : 'Addition',
           adjustmentType: adj.adjustmentType,
           warehouse: adj.warehouseName,
           warehouseId: String(adj.warehouseId),
@@ -875,39 +885,52 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       return;
     }
 
-    const hasMultiItems = Array.isArray(createForm.items) && createForm.items.length > 0;
-    if (!hasMultiItems && !createForm.productId) {
-      addToast('Please select a product', 'error');
-      return;
+    const currentItems = Array.isArray(createForm.items) ? [...createForm.items] : [];
+    const stagedProduct = createForm.selectedProduct;
+    const stagedQuantity = Number(createForm.quantity || 0);
+
+    if (stagedProduct && stagedQuantity > 0) {
+      const existingIdx = currentItems.findIndex(
+        (it) => String(it.productId) === String(stagedProduct.productId)
+      );
+      const stagedItem = {
+        productId: String(stagedProduct.productId),
+        productName: stagedProduct.productName,
+        productCode: stagedProduct.productCode,
+        warehouseId: String(stagedProduct.warehouseId),
+        warehouseName: stagedProduct.warehouseName,
+        quantity: stagedQuantity,
+        reason: createForm.reason || 'Manual adjustment',
+      };
+      if (existingIdx >= 0) {
+        currentItems[existingIdx] = stagedItem;
+      } else {
+        currentItems.push(stagedItem);
+      }
     }
-    if (!hasMultiItems && !createForm.warehouseId) {
-      addToast('Please select a warehouse', 'error');
+
+    if (currentItems.length === 0) {
+      addToast('Please choose a product and enter the adjustment quantity', 'error');
       return;
     }
 
-    let itemsPayload = [];
-    let whId;
+    const whId = Number(
+      (currentItems[0] && currentItems[0].warehouseId) ||
+      createForm.warehouseId ||
+      (stagedProduct && stagedProduct.warehouseId) ||
+      (warehousesList[0] && warehousesList[0].id)
+    );
 
-    if (hasMultiItems) {
-      whId = Number(createForm.items[0].warehouseId || createForm.warehouseId);
-      itemsPayload = createForm.items.map((it) => ({
-        productId: Number(it.productId),
-        quantity: Number(it.quantity),
-        reason: it.reason || createForm.reason,
-      }));
-    } else {
-      const quantityError = numberError(createForm.quantity, 'Quantity', { positive: true, decimals: 2, max: 9999999999 });
-      if (quantityError) { addToast(quantityError, 'error'); return; }
-      if (!createForm.reason) { addToast('Please select a valid reason', 'error'); return; }
-      whId = Number(createForm.warehouseId);
-      itemsPayload = [
-        {
-          productId: Number(createForm.productId),
-          quantity: Number(createForm.quantity),
-          reason: createForm.reason,
-        },
-      ];
+    if (!whId) {
+      addToast('Please select a valid warehouse', 'error');
+      return;
     }
+
+    const itemsPayload = currentItems.map((it) => ({
+      productId: Number(it.productId),
+      quantity: Number(it.quantity),
+      reason: it.reason || createForm.reason || 'Manual adjustment',
+    }));
 
     if ((createForm.remarks || '').length > 5000) { addToast('Remarks must be 5000 characters or fewer.', 'error'); return; }
 
@@ -986,8 +1009,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
         </div>
 
         {/* Action Button matching current active tab */}
-        {currentTab === 'pos-quotas' ? (
-          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
+        {activeTab === 'pos-quotas' ? (
+          <button disabled={!canWriteTab(user,'inventory',activeTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={() => handleOpenQuotaModal()}
             style={{
@@ -1000,8 +1023,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           >
             <Plus size={17} /> New Allocation
           </button>
-        ) : currentTab === 'adjustments' ? (
-          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
+        ) : activeTab === 'adjustments' ? (
+          <button disabled={!canWriteTab(user,'inventory',activeTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleOpenCreateRecord}
             style={{
@@ -1014,8 +1037,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           >
             <Plus size={17} /> New Adjustment
           </button>
-        ) : currentTab === 'inventory-list' ? (
-          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
+        ) : activeTab === 'inventory-list' ? (
+          <button disabled={!canWriteTab(user,'inventory',activeTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleNavigateGTN}
             style={{
@@ -1029,7 +1052,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
         ) : (
-          <button disabled={!canWriteTab(user,'inventory',currentTab)} className="erp-button erp-button-primary"
+          <button disabled={!canWriteTab(user,'inventory',activeTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAdd}
             style={{
@@ -1040,7 +1063,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               cursor: 'pointer',
             }}
           >
-            <Plus size={17} /> New {currentTab === 'products' ? 'Product' : currentTab === 'brands' ? 'Brand' : currentTab === 'warehouses' ? 'Warehouse' : 'Category'}
+            <Plus size={17} /> New {activeTab === 'products' ? 'Product' : activeTab === 'brands' ? 'Brand' : activeTab === 'warehouses' ? 'Warehouse' : 'Category'}
           </button>
         )}
       </div>
@@ -1054,9 +1077,9 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
           flexShrink: 0,
         }}
       >
-        {INVENTORY_TABS.map((tab) => {
+        {allowedTabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = currentTab === tab.id;
+          const isActive = activeTab === tab.id;
 
           return (
             <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
@@ -1075,7 +1098,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 1. INVENTORY LIST TAB (Live Stock Balances with Qty, Cost, Selling, Valuation) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'inventory-list' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'inventory-list' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
           {/* Search Bar & Action Buttons (Matched with Products Table Layout) */}
           <div className="inventory-toolbar"
@@ -1280,7 +1303,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 2. PRODUCTS TAB (Master Product Directory) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'products' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'products' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1297,7 +1320,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 2b. BRANDS TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'brands' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'brands' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1314,7 +1337,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 3. WAREHOUSES TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'warehouses' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'warehouses' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1331,7 +1354,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 4. CATEGORIES TAB */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'categories' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'categories' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <MastersView
             ref={mastersRef}
@@ -1348,7 +1371,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       {/* ------------------------------------------------------------- */}
       {/* 5. STOCK ADJUSTMENT TAB (Last Navigation Item) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'adjustments' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'adjustments' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
           {/* Search Bar & Filter Controls (Matched with Products Table Layout) */}
@@ -1389,7 +1412,6 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
                 <option value="ALL">All Types</option>
                 <option value="Addition">Addition</option>
                 <option value="Reduction">Reduction</option>
-                <option value="Bill quantity">Bill quantity</option>
               </FilterSelect>
 
               <FilterSelect value={adjustmentStatusFilter} onChange={event=>setAdjustmentStatusFilter(event.target.value)} title="Filter stock adjustments by status" style={{width:140}}>
@@ -1501,13 +1523,13 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
             </div>
           </div>
 
-          <AdjustmentTable rows={filteredAdjustments} loading={adjustmentsLoading} canEdit={canEditInventory} onView={setViewingRecord} onEdit={handleOpenEditRecord}/>
+          <AdjustmentTable rows={filteredAdjustments} loading={adjustmentsLoading} canEdit={canEditInventory} onView={setViewingRecord} onEdit={handleOpenEditRecord} onCancel={(rec) => requestAdjustmentTransition(rec, 'CANCELLED')}/>
         </div>
       )}
       {/* ------------------------------------------------------------- */}
       {/* 6. INVENTORY ALLOCATION TAB (Product Quantity Allocated per Staff Member) */}
       {/* ------------------------------------------------------------- */}
-      {currentTab === 'pos-quotas' && !showQuotaModal && !showCreateModal && (
+      {activeTab === 'pos-quotas' && !showQuotaModal && !showCreateModal && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
           {/* Search Bar & Filter Controls */}          <div className="inventory-toolbar"

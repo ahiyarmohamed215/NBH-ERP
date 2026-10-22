@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
+import {CustomerRangeBadgeProvider} from '../components/CustomerRangeBadge';
 import {
   authApi,
   refreshSession,
@@ -8,7 +9,9 @@ import {
   setAccessToken,
   clearAccessToken,
   expireSession,
+  manualLogout,
   recordUserActivity,
+  beginUserSession,
   getLastUserActivity,
   IDLE_TIMEOUT_MS,
   IDLE_EXPIRED_MESSAGE,
@@ -33,6 +36,9 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const sessionGeneration = useRef(0);
+  const userRef = useRef(user);
+  userRef.current = user;
+  const signedIn = Boolean(user);
 
   const clear = useCallback(() => {
     sessionGeneration.current++;
@@ -48,18 +54,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async (isIdle = false) => {
-    try {
-      if (getAccessToken()) await authApi.logout();
-    } catch (_) {
-      // Ignore network errors during logout
-    } finally {
-      if (isIdle) {
-        expireSession(IDLE_EXPIRED_MESSAGE);
-      } else {
-        expireSession();
-      }
-      clear();
+    // Start cookie revocation, but clear the local session without waiting on the network.
+    const request = authApi.logout().catch(() => {});
+    if (isIdle) {
+      expireSession(IDLE_EXPIRED_MESSAGE);
+    } else {
+      manualLogout('You have successfully signed out.');
     }
+    clear();
+    await request;
   }, [clear]);
 
   useEffect(() => {
@@ -102,14 +105,14 @@ export function AuthProvider({ children }) {
         sessionToken = token;
 
         // Fetch user profile only on initial load, when null, or on explicit role/user update events
-        if (isInitial || !user || forceFetchProfile) {
+        if (isInitial || !userRef.current || forceFetchProfile) {
           const res = await authApi.getMe();
           if (active && generation === sessionGeneration.current && sessionToken === getAccessToken()) {
             clearApiCache();
             setUser(res.data);
-            if (typeof localStorage !== 'undefined' && localStorage.getItem('nbh_user')) {
-              localStorage.setItem('nbh_user', JSON.stringify(res.data));
-            }
+            try {
+              if (localStorage.getItem('nbh_user')) localStorage.setItem('nbh_user', JSON.stringify(res.data));
+            } catch (_) {}
             if (getLastUserActivity() === 0) {
               recordUserActivity();
             }
@@ -126,43 +129,46 @@ export function AuthProvider({ children }) {
       if (active) setLoading(false);
     });
 
-    const onFocus = () => check(false, false);
     const onRolesUpdated = () => check(false, true);
     const onUsersUpdated = () => check(false, true);
 
-    const timer = setInterval(() => check(false, false), 60000);
-    if (timer && typeof timer.unref === 'function') {
-      timer.unref();
-    }
     window.addEventListener('nbh:session_expired', clear);
-    window.addEventListener('focus', onFocus);
     window.addEventListener('erp:roles_updated', onRolesUpdated);
     window.addEventListener('erp:users_updated', onUsersUpdated);
 
     return () => {
       active = false;
-      clearInterval(timer);
       window.removeEventListener('nbh:session_expired', clear);
-      window.removeEventListener('focus', onFocus);
       window.removeEventListener('erp:roles_updated', onRolesUpdated);
       window.removeEventListener('erp:users_updated', onUsersUpdated);
     };
-  }, [clear, logout, user]);
+  }, [clear, logout]);
 
   // 30-Minute Idle Inactivity Auto-Logout Effect
   useEffect(() => {
-    if (!user) return;
-
-    recordUserActivity();
-
-    const onUserInteraction = () => {
+    if (!signedIn) return;
+    let heartbeatAt = getLastUserActivity();
+    let heartbeatPending = false;
+    const heartbeat = () => {
+      const last = getLastUserActivity();
+      if (heartbeatPending || last <= heartbeatAt) return;
+      heartbeatPending = true;
+      authApi.activity().then(() => { heartbeatAt = last; }).catch(() => {}).finally(() => { heartbeatPending = false; });
+    };
+    const onUserInteraction = event => {
+      if (!event.isTrusted) return;
+      const last = getLastUserActivity();
+      // A wake-up click cannot revive a session that expired while the tab slept.
+      if (last > 0 && Date.now() - last >= IDLE_TIMEOUT_MS) { logout(true); return; }
       recordUserActivity();
+      scheduleIdle();
+      if (Date.now() - heartbeatAt >= 60000) heartbeat();
     };
 
-    const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
+    const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'click', 'wheel'];
     if (typeof window !== 'undefined') {
       ACTIVITY_EVENTS.forEach(event => {
-        window.addEventListener(event, onUserInteraction, { passive: true });
+        window.addEventListener(event, onUserInteraction, { passive: true, capture: true });
       });
     }
 
@@ -170,8 +176,21 @@ export function AuthProvider({ children }) {
       const lastActive = getLastUserActivity();
       if (lastActive > 0 && Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
         logout(true);
+      } else {
+        heartbeat();
+        scheduleIdle();
       }
     };
+
+    // Schedule the actual deadline, and re-read shared activity when it fires.
+    // The interval also catches clock changes and activity from another tab.
+    let idleDeadlineTimer;
+    const scheduleIdle = () => {
+      clearTimeout(idleDeadlineTimer);
+      const last = getLastUserActivity();
+      if (last > 0) idleDeadlineTimer = setTimeout(checkIdle, Math.max(1, last + IDLE_TIMEOUT_MS - Date.now()));
+    };
+    scheduleIdle();
 
     const idleInterval = setInterval(checkIdle, 10000); // Check every 10 seconds
     if (idleInterval && typeof idleInterval.unref === 'function') {
@@ -192,7 +211,7 @@ export function AuthProvider({ children }) {
     return () => {
       if (typeof window !== 'undefined') {
         ACTIVITY_EVENTS.forEach(event => {
-          window.removeEventListener(event, onUserInteraction);
+          window.removeEventListener(event, onUserInteraction, true);
         });
         window.removeEventListener('focus', onVisibilityOrFocus);
       }
@@ -200,8 +219,9 @@ export function AuthProvider({ children }) {
         document.removeEventListener('visibilitychange', onVisibilityOrFocus);
       }
       clearInterval(idleInterval);
+      clearTimeout(idleDeadlineTimer);
     };
-  }, [user, logout]);
+  }, [signedIn, logout]);
 
   const login = useCallback(async (username, password) => {
     sessionGeneration.current++;
@@ -212,7 +232,7 @@ export function AuthProvider({ children }) {
 
     // Store access token in JavaScript memory ONLY!
     setAccessToken(data.accessToken);
-    recordUserActivity();
+    beginUserSession();
 
     // Clean up any legacy localStorage tokens
     if (typeof localStorage !== 'undefined') {
@@ -225,6 +245,7 @@ export function AuthProvider({ children }) {
     setUser(profile);
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('nbh_session_expired');
+      sessionStorage.removeItem('nbh_signed_out');
     }
     return data;
   }, []);
@@ -243,7 +264,7 @@ export function AuthProvider({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthContext.Provider value={authValue}>
-        {children}
+        <CustomerRangeBadgeProvider user={user}>{children}</CustomerRangeBadgeProvider>
       </AuthContext.Provider>
     </QueryClientProvider>
   );

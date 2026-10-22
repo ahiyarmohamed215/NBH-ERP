@@ -4,6 +4,7 @@ import {purchaseSellingPrice} from '../utils/purchaseSellingPrice';
 import {newestFirst} from '../utils/recordOrder';
 import {documentErrors,numberError} from '../utils/purchasingValidation';
 import FilterSelect from '../components/FilterSelect';
+import SupplierSearch from '../components/SupplierSearch';
 import '../components/PurchasingAppearance.css';
 import { availableStock, loadPurchaseInventory } from '../utils/purchaseInventory';
 import StatusBadge from '../components/StatusBadge';
@@ -587,7 +588,7 @@ const PurchaseOrdersView = React.forwardRef(function PurchaseOrdersView(props, r
                   <div className="prn-return-card-metrics"><div><span>Selling price</span><b>{product && intakeProduct ? `LKR ${purchaseSellingPrice(intakeProduct,products).toFixed(2)}` : '—'}</b></div>
                     <div><span>Stock in system</span><b>{product && intakeProduct && inventoryLoaded ? stockQuantity(intakeProduct) : '—'}</b></div></div>
                 </div>}
-                intakeFields={<label className="po-supplier-field">Supplier *<FilterSelect variant="field" aria-label="Supplier" value={formData.supplierId} onChange={event=>setFormData(previous=>({...previous,supplierId:event.target.value}))}><option value="">Choose supplier</option>{selectableSuppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</FilterSelect></label>}
+                intakeFields={<div className="po-supplier-field"><SupplierSearch suppliers={selectableSuppliers} value={formData.supplierId} onChange={id=>setFormData(previous=>({...previous,supplierId:id}))} ariaLabel="Supplier" label="Supplier *" placeholder="Search supplier..." /></div>}
                 onProductSelect={selectOrderProduct} validateItem={validateOrderItem} addDisabled={!canOrderProduct(intakeProduct) || !formData.supplierId}
                 addHint={intakeProduct && !canOrderProduct(intakeProduct) ? 'Ordering needs an active product with a delivery warehouse set in Inventory.' : undefined}
                 buildItemData={()=>({warehouseName:productWarehouseName(intakeProduct),supplierId:Number(formData.supplierId),supplierName:suppliers.find(supplier=>String(supplier.id)===String(formData.supplierId))?.name})} onItemAdded={()=>{setIntakeProduct(null);setFormData(previous=>({...previous,supplierId:''}));}}

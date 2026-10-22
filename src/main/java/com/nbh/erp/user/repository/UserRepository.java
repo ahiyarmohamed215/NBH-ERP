@@ -15,6 +15,7 @@ public interface UserRepository extends com.nbh.erp.common.repository.Recyclable
     java.util.List<User> findByIsActiveTrueAndApprovalStatusOrderByFullNameAsc(String approvalStatus);
 
     Optional<User> findByUsername(String username);
+    java.util.List<User> findByUsernameIn(java.util.Collection<String> usernames);
     Optional<User> findByEmail(String email);
     Optional<User> findByUsernameIgnoreCase(String username);
     Optional<User> findByEmailIgnoreCase(String email);
@@ -30,6 +31,20 @@ public interface UserRepository extends com.nbh.erp.common.repository.Recyclable
     boolean existsByEmail(String email);
     boolean existsByUsernameIgnoreCase(String username);
     boolean existsByEmailIgnoreCase(String email);
+
+    Optional<User> findByPhone(String phone);
+    boolean existsByPhone(String phone);
+
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u WHERE u.phone IS NOT NULL AND (" +
+            "u.phone = :phone OR " +
+            "(:normalizedPhone IS NOT NULL AND u.phone = :normalizedPhone) OR " +
+            "(:cleanDigits IS NOT NULL AND :cleanDigits <> '' AND " +
+            "REPLACE(REPLACE(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), '(', ''), ')', '') = :cleanDigits))")
+    java.util.List<User> findMatchingPhone(
+            @org.springframework.data.repository.query.Param("phone") String phone,
+            @org.springframework.data.repository.query.Param("normalizedPhone") String normalizedPhone,
+            @org.springframework.data.repository.query.Param("cleanDigits") String cleanDigits);
+
     org.springframework.data.domain.Page<User> findByApprovalStatusAndDeletedAtIsNull(String approvalStatus, org.springframework.data.domain.Pageable pageable);
     long countByApprovalStatusAndDeletedAtIsNull(String approvalStatus);
 }

@@ -14,3 +14,8 @@
 .date-range-trigger>svg{flex-shrink:0}
 .date-range-popover{box-sizing:border-box;width:340px;max-width:calc(100vw - 24px);overscroll-behavior:contain}
 @media(max-height:600px){.date-range-popover{padding:12px}.date-range-popover header{margin-bottom:10px}.date-range-summary{margin-bottom:10px}.date-range-summary>div{padding:7px 8px}.date-range-month{margin-bottom:7px}.date-range-day{height:28px}.date-range-popover footer{margin-top:8px;padding-top:8px}}
+.date-picker-trigger{display:inline-flex;align-items:center;gap:8px;height:36px;width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font-family:inherit;font-size:var(--erp-text-field);font-weight:500;cursor:pointer;text-align:left}
+.date-picker-trigger:hover{border-color:#94a3b8}
+.date-picker-trigger:focus-visible{outline:2px solid var(--erp-accent);outline-offset:2px}
+.date-picker-trigger.input-glass{background:rgba(255,255,255,0.85)}
+

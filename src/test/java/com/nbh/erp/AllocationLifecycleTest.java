@@ -48,9 +48,11 @@ class AllocationLifecycleTest {
   assertEquals("INACTIVE",service.updateQuota(42L,UpdateProductStaffQuotaRequest.builder().allocatedQuantity(new BigDecimal("12")).build()).getStatus());
   verify(audit).log(eq("ALLOCATION_STATUS"),eq("ProductStaffQuota"),eq("42"),contains("Staff allocation paused"));
  }
- @Test void existingAllocationCannotBeReplacedWithDraft(){
-  var q=quota("ACTIVE");when(products.findById(1L)).thenReturn(Optional.of(product));when(users.findById(7L)).thenReturn(Optional.of(user));when(quotas.findByProductIdAndUserIdAndWarehouseId(1L,7L,10L)).thenReturn(Optional.of(q));
-  assertThrows(BusinessException.class,()->service.createOrUpdateQuota(CreateProductStaffQuotaRequest.builder().productId(1L).userId(7L).allocatedQuantity(BigDecimal.ONE).status("DRAFT").build()));assertTrue(q.getIsActive());
+ @Test void staffCanHaveMultipleAllocations(){
+  var q=quota("ACTIVE");when(products.findById(1L)).thenReturn(Optional.of(product));when(users.findById(7L)).thenReturn(Optional.of(user));
+  when(quotas.save(any())).thenAnswer(call->{ProductStaffQuota saved=call.getArgument(0);saved.setId(99L);return saved;});
+  var dto=service.createOrUpdateQuota(CreateProductStaffQuotaRequest.builder().productId(1L).userId(7L).allocatedQuantity(BigDecimal.ONE).status("DRAFT").build());
+  assertEquals("DRAFT",dto.getStatus());assertEquals(99L,dto.getId());assertTrue(q.getIsActive());
  }
  @Test void notesOnlyDraftCanBeSavedAndMustBeCompletedBeforeActivation(){
   when(quotas.save(any())).thenAnswer(call->{ProductStaffQuota q=call.getArgument(0);q.setId(43L);return q;});
@@ -76,5 +78,26 @@ class AllocationLifecycleTest {
   var q=quota("DRAFT");q.setNotes("Keep for tomorrow");
   var dto=service.updateQuota(42L,UpdateProductStaffQuotaRequest.builder().status("DRAFT").replaceDraftFields(true).notes("Keep for tomorrow").build());
   assertNull(dto.getProductId());assertNull(dto.getUserId());assertNull(dto.getAllocatedQuantity());assertEquals("DRAFT",dto.getStatus());
+ }
+ @Test void multipleActiveAllocationsAggregateLimitsAndConsumeSequentially(){
+  var q1=ProductStaffQuota.builder().id(101L).product(product).user(user).warehouse(warehouse).allocatedQuantity(new BigDecimal("5")).soldQuantity(BigDecimal.ZERO).isActive(true).allocationStatus("ACTIVE").build();
+  var q2=ProductStaffQuota.builder().id(102L).product(product).user(user).warehouse(warehouse).allocatedQuantity(new BigDecimal("10")).soldQuantity(BigDecimal.ZERO).isActive(true).allocationStatus("ACTIVE").build();
+  when(quotas.findMatchingActiveQuotas(1L,7L,10L)).thenReturn(java.util.List.of(q1,q2));
+  when(quotas.lockMatchingActiveQuotas(1L,7L,10L)).thenReturn(java.util.List.of(q1,q2));
+
+  var check=service.checkStaffProductQuota(1L,7L,10L,new BigDecimal("12"));
+  assertTrue(check.isAllowed());
+  assertEquals(new BigDecimal("15"),check.getAllocatedQuantity());
+  assertEquals(new BigDecimal("15"),check.getRemainingQuantity());
+
+  service.consumeStaffQuota(1L,7L,10L,new BigDecimal("8"));
+  assertEquals(new BigDecimal("5"),q1.getSoldQuantity());
+  assertEquals(new BigDecimal("3"),q2.getSoldQuantity());
+
+  var check2=service.checkStaffProductQuota(1L,7L,10L,new BigDecimal("7"));
+  assertTrue(check2.isAllowed());
+  assertEquals(new BigDecimal("7"),check2.getRemainingQuantity());
+
+  assertThrows(BusinessException.class,()->service.consumeStaffQuota(1L,7L,10L,new BigDecimal("8")));
  }
 }

@@ -28,6 +28,11 @@ public class CustomerDto {
     private BigDecimal creditLimit;
     private BigDecimal currentBalance;
     private Boolean isActive;
+    private Boolean draft;
+
+    public String getStatus() {
+        return Boolean.TRUE.equals(draft) ? "DRAFT" : Boolean.TRUE.equals(isActive) ? "ACTIVE" : "INACTIVE";
+    }
     private Long customerGroupId;
     private String customerGroupName;
     private String customerGroupCode;
@@ -87,6 +92,7 @@ public class CustomerDto {
                 .creditLimit(c.getCreditLimit())
                 .currentBalance(c.getCurrentBalance())
                 .isActive(c.getIsActive())
+                .draft(c.getDraft())
                 .customerGroupId(groupId)
                 .customerGroupName(groupName)
                 .customerGroupCode(groupCode)

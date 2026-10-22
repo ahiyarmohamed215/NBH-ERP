@@ -113,7 +113,7 @@ class SecurityHardeningTask3Test {
         }
 
         @Test
-        @DisplayName("Access token expires in 15 minutes (900,000 ms) and Refresh token in 7 days (604,800,000 ms)")
+        @DisplayName("Access token expires in 15 minutes (900,000 ms) and Refresh token in 30 minutes (1,800,000 ms)")
         void tokenLifetimesMatchRequirements() {
             var principal = UserPrincipal.create(testUser);
             var auth = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
@@ -131,7 +131,7 @@ class SecurityHardeningTask3Test {
             Date refreshIssued = refreshClaims.getIssuedAt();
             Date refreshExpiry = refreshClaims.getExpiration();
             long refreshDurationMs = refreshExpiry.getTime() - refreshIssued.getTime();
-            assertTrue(Math.abs(refreshDurationMs - 604800000L) < 5000L, "Refresh token lifetime must be 7 days");
+            assertTrue(Math.abs(refreshDurationMs - 1800000L) < 5000L, "Refresh token lifetime must be 30 minutes");
         }
     }
 

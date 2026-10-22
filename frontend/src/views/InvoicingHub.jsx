@@ -3,14 +3,27 @@ import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import {Edit2} from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import FilterSelect from '../components/FilterSelect';
+import '../components/PurchasingAppearance.css';
+import DateRangePicker, { matchesDateRange } from '../components/DateRangePicker';
+import { printA4Report } from '../utils/printReport';
+
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import { invoiceTotal } from '../utils/invoiceMapping';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { salesApi, salesReturnApi, pdfApi, customerApi, paymentApi, quotationApi } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { useDataSync } from '../hooks/useDataSync';
 import PosView from './PosView';
+import OnholdBillEditor from './OnholdBillEditor';
+import HeldBillDetails from '../components/HeldBillDetails';
+import OnholdBillsTable from '../components/OnholdBillsTable';
+import HeldBillPrintDialog from '../components/HeldBillPrintDialog';
+import HeldInvoiceDialog from '../components/HeldInvoiceDialog';
+import MergedHeldBills from '../components/MergedHeldBills';
+import {usePurchasingStatusChange} from '../hooks/usePurchasingStatusChange';
+import {printHeldWarehouseSheets} from '../utils/heldWarehousePrint';
 import SalesReturnsView from './SalesReturnsView';
 import { canEditModule } from '../utils/permissionUtils';
 import {
@@ -50,6 +63,7 @@ import {
 export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange }) {
   const { addToast } = useToast();
   const { user } = useAuth();
+  const {requestStatusChange,statusChangeDialog}=usePurchasingStatusChange();
   const canEditSales = canEditModule(user, 'SALES');
   const canEditQuotation = canEditModule(user, 'QUOTATION');
 
@@ -57,7 +71,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // sales, hold bills, sales return, quotation
   const INVOICING_TABS = [
     { id: 'sales', label: 'Sales Invoices', icon: FileText },
-    { id: 'hold-bills', label: 'Hold Bills', icon: PauseCircle },
+    { id: 'held-history', label: 'Held Bills', icon: Clock },
+    { id: 'hold-bills', label: 'Onhold Bills', icon: PauseCircle },
     { id: 'refunds', label: 'Sales Returns', icon: RotateCcw },
     { id: 'quotations', label: 'Quotations', icon: FileText },
   ];
@@ -66,11 +81,13 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   useEffect(() => {
     if (activeSubTab) {
+      setSelectedHeldIds([]);setHeldStatusFilter('ALL');setEditingOnhold(null);
       setCurrentTab(activeSubTab);
     }
   }, [activeSubTab]);
 
   const handleTabClick = (tabId) => {
+    setSelectedHeldIds([]);setHeldStatusFilter('ALL');setEditingOnhold(null);
     setCurrentTab(tabId);
     if (onSubTabChange) {
       onSubTabChange(tabId);
@@ -86,7 +103,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // Filters matching screenshot
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
-  const [filterPaymentType, setFilterPaymentType] = useState('ALL');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -135,12 +152,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         displayDate: inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
         paymentType: inv.paymentType || (Number(inv.balanceAmount || 0) === 0 ? 'Full Payment' : 'Installment'),
         paymentMethod: inv.paymentMethod || 'Cash',
+        paymentStatus: inv.paymentStatus || (Number(inv.balanceAmount || 0)===0?'PAID':Number(inv.paidAmount || 0)>0?'PARTIAL':'PENDING'),
         totalAmount: invoiceTotal(inv),
         paidAmount: Number(inv.paidAmount || 0),
         balanceAmount: Number(inv.balanceAmount || 0),
         status: inv.status || (Number(inv.balanceAmount || 0) === 0 ? 'PAID' : 'PARTIAL'),
         salesman: inv.salesman || inv.salesmanName || (inv.user ? inv.user.fullName : (user?.fullName || 'Sales Executive')),
         items: inv.items || inv.invoiceItems || inv.lines || [],
+        sourceHeldNumbers: inv.sourceHeldNumbers || [],
+        sourceHeldBills: inv.sourceHeldBills || [],
+        packing: inv.packing,
       }));
       setInvoices(formattedLive);
     } catch (err) {
@@ -152,7 +173,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   useEffect(() => {
     loadBackendInvoices();
-  }, []);
+  }, [user]);
 
   useDataSync(loadBackendInvoices, ['erp:data_changed', 'erp:sales_updated']);
 
@@ -167,43 +188,63 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // Advance Payments filtering & export
   const [advanceSearchQuery, setAdvanceSearchQuery] = useState('');
 
-  // Date range presets
-  const handleDatePreset = (preset) => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-
-    if (preset === 'today') {
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (preset === 'this-week') {
-      const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-      setStartDate(firstDay.toISOString().split('T')[0]);
-      setEndDate(todayStr);
-    } else if (preset === 'this-month') {
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      setStartDate(firstDayOfMonth.toISOString().split('T')[0]);
-      setEndDate(todayStr);
-    }
+  // Print Sales Invoices Directory (A4) like GRN
+  const handlePrintInvoiceDirectory = () => {
+    const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[character]));
+    printA4Report({
+      title: 'Sales Invoices',
+      metaItems: [
+        { label: 'Search', value: escapeText(searchQuery) || 'All Invoices' },
+        { label: 'Status', value: filterStatus === 'ALL' ? 'All' : filterStatus },
+        { label: 'Payment Method', value: filterPaymentMethod === 'ALL' ? 'All' : filterPaymentMethod },
+        { label: 'Date Range', value: (startDate || endDate) ? `${startDate || 'Start'} to ${endDate || 'End'}` : 'All Dates' },
+      ],
+      columns: [
+        { header: 'Invoice #', accessor: 'number' },
+        { header: 'Customer', accessor: 'customer' },
+        { header: 'Date', accessor: 'date' },
+        { header: 'Payment Method', accessor: 'method' },
+        { header: 'Total (LKR)', accessor: 'total', align: 'right' },
+        { header: 'Paid (LKR)', accessor: 'paid', align: 'right' },
+        { header: 'Balance (LKR)', accessor: 'balance', align: 'right' },
+        { header: 'Status', accessor: 'status' },
+      ],
+      data: filteredInvoices.map((inv) => ({
+        number: escapeText(inv.invoiceNumber),
+        customer: escapeText(inv.customerName),
+        date: escapeText(inv.displayDate || inv.invoiceDate),
+        method: escapeText(inv.paymentMethod || 'Cash'),
+        total: Number(invoiceTotal(inv)).toFixed(2),
+        paid: Number(inv.paidAmount || 0).toFixed(2),
+        balance: Number(inv.balanceAmount || 0).toFixed(2),
+        status: escapeText(inv.status || inv.paymentStatus),
+      })),
+    });
   };
 
   // Filtered invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       if (filterStatus !== 'ALL') {
-        if (filterStatus === 'PAID' && inv.status !== 'PAID') return false;
-        if (filterStatus === 'PARTIAL' && inv.status !== 'PARTIAL') return false;
-        if (filterStatus === 'PENDING' && inv.status !== 'PENDING') return false;
+        const match = inv.status === filterStatus || inv.paymentStatus === filterStatus;
+        if (!match) return false;
       }
 
-      if (filterPaymentType !== 'ALL' && inv.paymentType !== filterPaymentType) {
-        return false;
+      if (filterPaymentMethod !== 'ALL') {
+        const normFilter = filterPaymentMethod.toUpperCase().replace(/\s+/g, '_');
+        const methodNorm = (inv.paymentMethod || '').toUpperCase().replace(/\s+/g, '_');
+        const typeNorm = (inv.paymentType || '').toUpperCase().replace(/\s+/g, '_');
+        if (methodNorm !== normFilter && typeNorm !== normFilter) {
+          return false;
+        }
       }
 
-      if (startDate && inv.invoiceDate && inv.invoiceDate < startDate) {
-        return false;
-      }
-      if (endDate && inv.invoiceDate && inv.invoiceDate > endDate) {
-        return false;
+      if (startDate || endDate) {
+        if (!matchesDateRange(inv.invoiceDate, startDate, endDate)) {
+          return false;
+        }
       }
 
       if (searchQuery.trim()) {
@@ -211,29 +252,28 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         const num = (inv.invoiceNumber || '').toLowerCase();
         const cust = (inv.customerName || '').toLowerCase();
         const method = (inv.paymentMethod || '').toLowerCase();
-        const ptype = (inv.paymentType || '').toLowerCase();
-        if (!num.includes(q) && !cust.includes(q) && !method.includes(q) && !ptype.includes(q)) {
+        if (!num.includes(q) && !cust.includes(q) && !method.includes(q)) {
           return false;
         }
       }
 
       return true;
     });
-  }, [invoices, filterStatus, filterPaymentType, startDate, endDate, searchQuery]);
+  }, [invoices, filterStatus, filterPaymentMethod, startDate, endDate, searchQuery]);
 
   // CSV Export matching top-right button in screenshot
   const handleExportCSV = () => {
-    const headers = ['Invoice #', 'Customer', 'Delivery', 'Date', 'Payment Type', 'Payment Method', 'Total', 'Paid', 'Balance'];
+    const headers = ['Invoice #', 'Customer', 'Delivery', 'Date', 'Payment Method', 'Total', 'Paid', 'Balance', 'Status'];
     const rows = filteredInvoices.map((inv) => [
       inv.invoiceNumber,
       `"${inv.customerName}"`,
       inv.deliveryStatus,
       inv.displayDate || inv.invoiceDate,
-      inv.paymentType,
-      inv.paymentMethod,
+      inv.paymentMethod || 'Cash',
       inv.totalAmount,
       inv.paidAmount,
       inv.balanceAmount,
+      inv.status || inv.paymentStatus,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -595,19 +635,25 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // HELD BILLS DATA & WORKFLOW ACTIONS (100% Backend REST API)
   // -------------------------------------------------------------
   const [heldBills, setHeldBills] = useState([]);
+  const heldRequest=useRef(0),heldScope=useRef('');
+
   const [heldOwnerScope,setHeldOwnerScope]=useState('mine');
   const [creatingMergedInvoice,setCreatingMergedInvoice]=useState(false);
   const [heldWorkspace,setHeldWorkspace]=useState(null);
   const [loadingHeldBills, setLoadingHeldBills] = useState(false);
   const [heldSearchQuery, setHeldSearchQuery] = useState('');
   const [heldStatusFilter, setHeldStatusFilter] = useState('ALL');
+  const showPosOnhold=currentTab==='held-history';
+  heldScope.current=`${currentTab}:${heldOwnerScope}:${heldSearchQuery}`;
   const [selectedHeldDetail, setSelectedHeldDetail] = useState(null);
-  const [heldToResume, setHeldToResume] = useState(null);
+  const [editingOnhold,setEditingOnhold]=useState(null);
+  const [printingOnholdId,setPrintingOnholdId]=useState(null);
+  const [pendingHeldPrint,setPendingHeldPrint]=useState(null);
 
   // Workflow states: selection, warehouse adjustment, and dispatch note
   const [selectedHeldIds, setSelectedHeldIds] = useState([]);
-  const [adjustingHeldBill, setAdjustingHeldBill] = useState(null);
   const [dispatchNoteData, setDispatchNoteData] = useState(null);
+  const [heldMergeError,setHeldMergeError]=useState('');
 
   // Modal states for creating / recording items
   const [showCreateQuotationModal, setShowCreateQuotationModal] = useState(false);
@@ -620,83 +666,84 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   });
 
   const loadHeldBills = async () => {
+    const request=++heldRequest.current,scope=heldScope.current;
     try {
       setLoadingHeldBills(true);
-      const res = await salesApi.getHeldWorkspace({scope:heldOwnerScope,query:heldSearchQuery});
+      const res = await (showPosOnhold?salesApi.getHeldOriginals:salesApi.getHeldWorkspace)({scope:heldOwnerScope,query:heldSearchQuery,history:currentTab==='held-history'});
+      if(request!==heldRequest.current || scope!==heldScope.current)return;
       const workspace=res.data?.data || res.data;
       setHeldWorkspace(workspace);setHeldBills(workspace?.bills || []);
     } catch (err) {
+      if(request!==heldRequest.current || scope!==heldScope.current)return;
       console.error('Failed to load held bills:', err);
+      setHeldBills([]);addToast(err.message || 'Unable to load held bills. Refresh to try again.','error');
     } finally {
-      setLoadingHeldBills(false);
+      if(request===heldRequest.current && scope===heldScope.current)setLoadingHeldBills(false);
     }
   };
 
   useEffect(() => {
-    if(currentTab!=='hold-bills')return;
+    if(!['hold-bills','held-history'].includes(currentTab))return;
     const timer=setTimeout(loadHeldBills,200);
     return()=>{clearTimeout(timer);};
   },[currentTab,heldOwnerScope,heldSearchQuery]);
-  useDataSync(() => currentTab === 'hold-bills' ? loadHeldBills() : undefined,
+  useDataSync(() => ['hold-bills','held-history'].includes(currentTab) ? loadHeldBills() : undefined,
     ['erp:sales_updated'], [], ['sales']);
 
-  const handleResumeHeldBill = (heldInv) => {
-    setHeldToResume(heldInv);
-    handleTabClick('pos');
-  };
+
+  useEffect(()=>{
+    if(!['hold-bills','held-history'].includes(currentTab) || !heldBills.some(b=>b.status==='YET_TO_PRINT'))return;
+    const timer=setInterval(loadHeldBills,5000);return()=>clearInterval(timer);
+  },[currentTab,heldBills,heldOwnerScope,heldSearchQuery]);
 
   // Workflow Action 1: Send bill to warehouse
   const handleSendToWarehouse = async (heldBill) => {
-    try { await salesApi.update(heldBill.id, { status: 'SENT_TO_WAREHOUSE' }); await loadHeldBills();
+    try { await salesApi.sendHeld(heldBill.id, { expectedVersion:heldBill.recordVersion }); await loadHeldBills();
       addToast(`Bill ${heldBill.heldNumber} sent for warehouse verification`, 'success');
     } catch (err) { addToast(err.message, 'error'); }
   };
 
   // Workflow Action 2: Open warehouse stock adjustment modal
-  const handleOpenStockAdjustment = (heldBill) => {
-    setAdjustingHeldBill({
-      ...heldBill,
-      items: (heldBill.items || []).map((it) => ({
-        ...it,
-        quantity: Number(it.quantity || 1),
-        unitPrice: Number(it.unitPrice || 0),
-        totalPrice: Number(it.totalPrice || (it.quantity * it.unitPrice) || 0),
-      })),
-      adjustmentRemarks: heldBill.adjustmentRemarks || '',
-    });
+  const handleOpenStockAdjustment = async heldBill => {
+    try {const res=await salesApi.getById(heldBill.id);const fresh=res.data?.data || res.data;
+      if(fresh.status!=='SENT_TO_WAREHOUSE')throw new Error('Print every warehouse sheet before editing this onhold bill.');
+      setSelectedHeldDetail(null);setEditingOnhold(fresh);
+    }catch(error){addToast(error.message,'error');}
+  };
+  const handlePrintOnhold = async bill => {
+    if(printingOnholdId)return;
+    if(bill.status==='YET_TO_PRINT'){setPendingHeldPrint(bill);return;}setPrintingOnholdId(bill.id);
+    try{
+      printHeldWarehouseSheets(bill);
+      try{await salesApi.printHeld(bill.id);}catch(_){}
+      await loadHeldBills();
+      addToast('Warehouse sheets opened for printing.','success');
+    }
+    catch(error){addToast(error.message,'error');}finally{setPrintingOnholdId(null);}
   };
 
-  // Workflow Action 3: Save verified / adjusted stock
-  const handleSaveStockAdjustment = async () => {
-    if (!adjustingHeldBill) return;
-    try {
-      await salesApi.update(adjustingHeldBill.id, {
-        status: 'STOCK_ADJUSTED', notes: adjustingHeldBill.adjustmentRemarks,
-        items: adjustingHeldBill.items.map(it => ({ productId: it.productId, quantity: Number(it.quantity), unitPrice: Number(it.unitPrice), discountRate: Number(it.discountRate || 0), discountAmount: Number(it.discountAmount || 0) })),
-      });
-      await loadHeldBills(); setAdjustingHeldBill(null);
-      addToast('Verified quantities saved. Inventory will be deducted when the invoice is completed.', 'success');
-    } catch (err) { addToast(err.message, 'error'); }
-  };
+  const handleCancelOnhold = bill => requestStatusChange({type:'Onhold Bill',number:bill.heldNumber,current:bill.status,target:'CANCELLED',
+    description:['MERGED','INVOICE_CREATED'].includes(bill.status)?'Remove this bill from its invoice and restore its sold stock. Payment and delivery must both be pending. Cancelling the last bill voids the invoice. Enter the reason.':'Cancel this saved bill and release its reserved stock. The original POS copy remains available. Enter the reason for cancellation.',
+    onConfirm:async reason=>{await salesApi.cancelHeld(bill.id,{reason,expectedVersion:bill.recordVersion});setSelectedHeldDetail(null);setSelectedHeldIds(ids=>ids.filter(id=>id!==bill.id));await Promise.all([loadHeldBills(),loadBackendInvoices()]);if(selectedInvoice){const res=await salesApi.getById(selectedInvoice.id);const fresh=res.data?.data || res.data;setSelectedInvoice(previous=>({...previous,...fresh,totalAmount:invoiceTotal(fresh)}));}addToast('Onhold bill cancelled. Stock and invoice totals updated.','success');}});
 
   // Workflow Action 4: Merge multiple bills & open dispatch note
   const openHeldMergePreview = async (ids) => {
     try {
       const response=await salesApi.previewHeldMerge(ids);
-      setDispatchNoteData(response.data?.data || response.data);
+      setHeldMergeError('');setDispatchNoteData(response.data?.data || response.data);
     } catch(error) {addToast(error.message || 'Unable to prepare the selected held bills.','error');}
   };
   const handleOpenMergeDispatchModal = () => openHeldMergePreview(selectedHeldIds);
   const handleOpenSingleDispatchModal = (bill) => {setSelectedHeldIds([bill.id]);openHeldMergePreview([bill.id]);};
 
   // Workflow Action 5: Confirm Dispatch Note, mark bills as Dispatched, create Commercial Invoice
-  const handleConfirmDispatch = async () => {
+  const handleConfirmDispatch = async (packing) => {
     if (!dispatchNoteData || creatingMergedInvoice) return;
     setCreatingMergedInvoice(true);
     const targetIds = dispatchNoteData.sourceBillIds || [];
 
     try {
-      const response=await salesApi.completeHeld(targetIds,dispatchNoteData.expectedVersions);
+      const response=await salesApi.completeHeld(targetIds,dispatchNoteData.expectedVersions,packing);
       const created=(response.data?.data || response.data)?.[0];
       addToast(`Invoice ${created?.invoiceNumber || ''} created from the selected held bills. Assign its delivery in Delivery.`, 'success');
       setSelectedHeldIds([]);
@@ -704,7 +751,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       await Promise.all([loadHeldBills(), loadBackendInvoices()]);
       setCurrentTab('sales');
     } catch (err) {
-      addToast('Failed to create invoice: ' + err.message, 'error');
+      setHeldMergeError(err.response?.data?.message || err.message || 'Unable to create invoice. Please try again.');
     } finally {setCreatingMergedInvoice(false);}
   };
 
@@ -748,7 +795,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    addToast('Held bills exported to CSV', 'success');
+    addToast('Onhold Bills exported to CSV', 'success');
   };
 
   // -------------------------------------------------------------
@@ -892,16 +939,18 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
 
 
+  if(editingOnhold)return <OnholdBillEditor key={editingOnhold.id} bill={editingOnhold} user={user}
+    onBack={()=>{setEditingOnhold(null);loadHeldBills();}}
+    onSaved={()=>{setEditingOnhold(null);setSelectedHeldIds([]);loadHeldBills();addToast('Warehouse review saved.','success');}}/>;
+
   // Dedicated POS Full-Screen Mode (No navigation, no header, pure POS desk)
   if (currentTab === 'pos') {
     return (
       <div style={{ flex: 1, minHeight: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
         <PosView
           onExitPos={() => {
-            setHeldToResume(null);
             handleTabClick('sales');
           }}
-          initialHeldInvoice={heldToResume}
         />
       </div>
     );
@@ -1010,7 +1059,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* ------------------------------------------------------------- */}
       {currentTab === 'sales' && (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-          {/* Search Bar & Action Controls (Matched with InventoryHub Toolbar Layout) */}
+          {/* Search Bar & Action Controls (GRN Style Theme) */}
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -1042,7 +1091,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               />
               <input className="erp-field"
                 type="text"
-                placeholder="Search invoice #, customer, reference, or payment method..."
+                placeholder="Search by invoice number, customer, payment method..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -1054,16 +1103,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   backgroundColor: '#ffffff',
                   color: '#0f172a',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.15s ease',
                 }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               />
               {searchQuery && (
@@ -1087,159 +1136,47 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               )}
             </div>
 
-            {/* Right Controls: Status, Payment Type, Date Range, Presets, Columns, Reset, CSV, Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              {/* Status filter */}
-              <select className="erp-field"
+            {/* Right Controls: Filters, Print, Refresh (GRN Theme) */}
+            <div className="purchase-date-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              <DateRangePicker documentType="INVOICE" from={startDate} to={endDate} onChange={(from, to) => { setStartDate(from); setEndDate(to); }} />
+
+              <FilterSelect
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 26px 0 10px',
-                  width: '120px',
-                  minWidth: '110px',
-                  border: '1px solid #cbd5e1',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                }}
+                style={{ width: '140px' }}
               >
                 <option value="ALL">All Statuses</option>
                 <option value="PAID">Paid</option>
                 <option value="PARTIAL">Partial</option>
                 <option value="PENDING">Pending</option>
-              </select>
+                <option value="COMPLETED">Completed</option>
+                <option value="VOIDED">Voided</option>
+                <option value="CANCELLED">Cancelled</option>
+              </FilterSelect>
 
-              {/* Payment Type filter */}
-              <select className="erp-field"
-                value={filterPaymentType}
-                onChange={(e) => setFilterPaymentType(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 26px 0 10px',
-                  width: '135px',
-                  minWidth: '125px',
-                  border: '1px solid #cbd5e1',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                }}
+              <FilterSelect
+                value={filterPaymentMethod}
+                onChange={(e) => setFilterPaymentMethod(e.target.value)}
+                style={{ width: '160px' }}
               >
-                <option value="ALL">All Types</option>
-                <option value="Full Payment">Full Payment</option>
-                <option value="Installment">Installment</option>
-              </select>
+                <option value="ALL">All Payment Methods</option>
+                <option value="CASH">Cash</option>
+                <option value="CARD">Card</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+                <option value="ONLINE">Online</option>
+                <option value="CREDIT">Credit</option>
+              </FilterSelect>
 
-              {/* Date inputs */}
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  height: '38px',
-                  padding: '0 8px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <Calendar size={14} color="#0284c7" />
-                <input className="erp-field"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    border: 'none',
-                    outline: 'none',
-                    color: '#334155',
-                    backgroundColor: 'transparent',
-                  }}
-                  title="Start date"
-                />
-                <span style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>-</span>
-                <input className="erp-field"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    border: 'none',
-                    outline: 'none',
-                    color: '#334155',
-                    backgroundColor: 'transparent',
-                  }}
-                  title="End date"
-                />
-              </div>
-
-              {/* Date Presets Dropdown */}
-              <select className="erp-field"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleDatePreset(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                defaultValue=""
-                style={{
-                  height: '38px',
-                  padding: '0 26px 0 10px',
-                  width: '115px',
-                  border: '1px solid #cbd5e1',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                }}
-                title="Quick date ranges"
-              >
-                <option value="" disabled>Presets</option>
-                <option value="today">Today</option>
-                <option value="this-week">This Week</option>
-                <option value="this-month">This Month</option>
-              </select>
-
-              {/* Reset Filters button */}
-              {(searchQuery || filterStatus !== 'ALL' || filterPaymentType !== 'ALL' || startDate || endDate) && (
+              {(filterStatus !== 'ALL' || filterPaymentMethod !== 'ALL' || searchQuery || startDate || endDate) && (
                 <button className="erp-button"
                   type="button"
                   onClick={() => {
-                    setSearchQuery('');
                     setFilterStatus('ALL');
-                    setFilterPaymentType('ALL');
+                    setFilterPaymentMethod('ALL');
                     setStartDate('');
                     setEndDate('');
+                    setSearchQuery('');
                   }}
                   style={{
                     height: '38px',
@@ -1255,32 +1192,36 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                     flexShrink: 0,
                     boxSizing: 'border-box',
                   }}
-                  title="Reset all filters"
+                  title="Reset all filters to default"
                 >
                   <X size={13} /> Reset
                 </button>
               )}
 
-              {/* Refresh Records - Icon button */}
               <button
                 type="button"
-                onClick={loadBackendInvoices}
+                onClick={handlePrintInvoiceDirectory}
                 style={{
                   height: '38px',
                   width: '38px',
+                  minWidth: '38px',
+                  padding: 0,
                   backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e1',
                   borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
+                  color: '#334155',
+                  fontSize: 'var(--erp-text-body)',
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
                   flexShrink: 0,
+                  transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1290,622 +1231,313 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#ffffff';
                   e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#64748b';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                title="Print Sales Invoices Directory (A4)"
+                aria-label="Print Sales Invoices Directory (A4)"
+              >
+                <Printer size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={loadBackendInvoices}
+                style={{
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
+                  padding: 0,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  color: '#334155',
+                  fontSize: 'var(--erp-text-body)',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.color = '#334155';
                 }}
                 title="Refresh invoice records"
+                aria-label="Refresh invoice records"
+                disabled={loadingInvoices}
               >
-                <RefreshCw size={15} className={loadingInvoices ? 'spin' : ''} />
+                <RefreshCw size={15} className={loadingInvoices ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
 
-          {/* Invoices Table Card (Fixed Frame, Sticky Header matching InventoryHub) */}
+          {/* Invoices Table Card (Fixed Table Frame, Sticky Header, Internal Scroll for Data Rows Only - GRN Theme) */}
           <div className="erp-table-frame"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '8px',
+              overflow: 'hidden',
               width: '100%',
               maxWidth: '100%',
               boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               flex: 1,
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'hidden',
             }}
           >
             <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    {visibleColumns.invoiceNumber && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>INVOICE #</th>}
-                    {visibleColumns.customer && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>}
-                    {visibleColumns.date && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE</th>}
-                    {visibleColumns.paymentType && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT TYPE</th>}
-                    {visibleColumns.paymentMethod && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAYMENT METHOD</th>}
-                    {visibleColumns.total && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>}
-                    {visibleColumns.paid && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>PAID</th>}
-                    {visibleColumns.balance && <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>BALANCE</th>}
-                    {visibleColumns.delivery && <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DELIVERY</th>}
-                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((inv, idx) => (
-                    <tr
-                      key={inv.id || idx}
-                      onClick={() => setSelectedInvoice(inv)}
-                      style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        transition: 'background-color 0.15s ease',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      {/* Invoice # */}
-                      {visibleColumns.invoiceNumber && (
-                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
-                          {inv.invoiceNumber}
-                        </td>
-                      )}
-
-                      {/* Customer */}
-                      {visibleColumns.customer && (
-                        <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
-                          {inv.customerName}
-                        </td>
-                      )}
-
-                      {/* Date */}
-                      {visibleColumns.date && (
-                        <td className="erp-table-cell" style={{ color: '#475569', whiteSpace: 'nowrap' }}>
-                          {inv.displayDate || inv.invoiceDate}
-                        </td>
-                      )}
-
-                      {/* Payment Type */}
-                      {visibleColumns.paymentType && (
-                        <td className="erp-table-cell" style={{ color: '#334155' }}>
-                          {inv.paymentType}
-                        </td>
-                      )}
-
-                      {/* Payment Method */}
-                      {visibleColumns.paymentMethod && (
-                        <td className="erp-table-cell" style={{ color: '#334155' }}>
-                          {inv.paymentMethod}
-                        </td>
-                      )}
-
-                      {/* Total */}
-                      {visibleColumns.total && (
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
-                          LKR {invoiceTotal(inv).toFixed(2)}
-                        </td>
-                      )}
-
-                      {/* Paid */}
-                      {visibleColumns.paid && (
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
-                          LKR {Number(inv.paidAmount || 0).toFixed(2)}
-                        </td>
-                      )}
-
-                      {/* Balance */}
-                      {visibleColumns.balance && (
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: Number(inv.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
-                          LKR {Number(inv.balanceAmount || 0).toFixed(2)}
-                        </td>
-                      )}
-
-                      {/* Delivery Status */}
-                      {visibleColumns.delivery && (
-                        <td className="erp-table-cell">
-                          <StatusBadge status={inv.deliveryStatus || 'PENDING'} label={inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? `ON ROUTE${inv.deliveryNumber ? ` (${inv.deliveryNumber})` : ''}` : inv.deliveryStatus === 'DELIVERED' ? 'DELIVERED' : 'PENDING DELIVERY'}/>
-                        </td>
-                      )}
-
-                      {/* Actions */}
-                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          {canEditSales && (
-                            <button aria-label="Edit Invoice"
-                              type="button"
-                              className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingInvoice({ ...inv });
-                              }}
-                              title="Edit Invoice"
-                              style={{ padding: '4px 8px', color: '#0284c7' }}
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {filteredInvoices.length === 0 && (
-                    <tr>
-                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#64748b' }}>
-                        {loadingInvoices ? 'Loading invoices...' : 'No invoices match the selected filter criteria.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* TAB: HOLD BILLS (Standardized Inventory Structure) */}
-      {/* ------------------------------------------------------------- */}
-      {currentTab === 'hold-bills' && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-          {heldWorkspace?<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:'var(--erp-text-body)',color:'#64748b'}}><span>{heldWorkspace.periodStart} — {heldWorkspace.periodEnd}</span><span>{heldOwnerScope==='mine'?'My held bills this month':'Other staff held bills this month'}: <strong style={{color:'#1e293b'}}>Rs. {Number(heldOwnerScope==='mine'?heldWorkspace.mineAmount:heldWorkspace.othersAmount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong></span></div>:null}
-          {/* Toolbar Card */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              flexWrap: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            <select className="erp-field" aria-label="Held bill owner" value={heldOwnerScope} onChange={e=>{setHeldOwnerScope(e.target.value);setSelectedHeldIds([]);}} style={{height:38,width:130}}><option value="mine">My bills</option><option value="others">Other bills</option></select>
-            {/* Left Control: Search Input */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '11px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search held bills by held #, customer, cashier, or warehouse..."
-                value={heldSearchQuery}
-                onChange={(e) => setHeldSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #cbd5e1',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
-                }}
-              />
-              {heldSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setHeldSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </div>
-
-            {/* Right Controls: Status filter, Total summary badge, Reset, Export CSV, & Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select className="erp-field"
-                value={heldStatusFilter}
-                onChange={(e) => setHeldStatusFilter(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 26px 0 10px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#334155',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="HELD">Held at POS</option>
-                <option value="SENT_TO_WAREHOUSE">Sent to Warehouse</option>
-                <option value="STOCK_ADJUSTED">Stock Adjusted</option>
-                <option value="DISPATCHED">Dispatched</option>
-              </select>
-
-              <div
-                style={{
-                  height: '38px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '0 14px',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                  backgroundColor: '#f8fafc',
-                  fontSize: 'var(--erp-text-body)',
-                  color: '#64748b',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Open bills total:&nbsp;<strong style={{ color: '#0f172a' }}>Rs. {Number(heldWorkspace?.visibleAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-              </div>
-
-              {(heldSearchQuery || heldStatusFilter !== 'ALL') && (
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => {
-                    setHeldSearchQuery('');
-                    setHeldStatusFilter('ALL');
-                  }}
-                  style={{
-                    height: '38px',
-                    padding: '0 12px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f1f5f9',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    boxSizing: 'border-box',
-                  }}
-                  title="Reset filter and search"
-                >
-                  <X size={13} /> Reset
-                </button>
-              )}
-
-              {/* Export CSV - Icon button */}
-              <button
-                type="button"
-                onClick={handleExportHeldBillsCSV}
-                style={{
-                  height: '38px',
-                  width: '38px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title="Export held bills to CSV"
-              >
-                <Download size={15} />
-              </button>
-
-              {/* Refresh Records - Icon button */}
-              <button
-                type="button"
-                onClick={loadHeldBills}
-                style={{
-                  height: '38px',
-                  width: '38px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
-                }}
-                title="Refresh held bills"
-              >
-                <RefreshCw size={15} className={loadingHeldBills ? 'spin' : ''} />
-              </button>
-            </div>
-          </div>
-
-          {/* Merge & Bulk Actions Banner (appears when bills are checked) */}
-          {selectedHeldIds.length > 0 && (
-            <div
-              style={{
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '8px',
-                padding: '10px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <CheckSquare size={18} color="#2563eb" />
-                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#1e40af' }}>
-                  {selectedHeldIds.length} Held Bill{selectedHeldIds.length > 1 ? 's' : ''} Selected
-                </span>
-
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setSelectedHeldIds([])}
-                  style={{
-                    padding: '6px 12px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Clear Selection
-                </button>
-                <button className="erp-button erp-button-primary"
-                  type="button"
-                  onClick={handleOpenMergeDispatchModal}
-                  style={{
-                    padding: '6px 16px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <Truck size={15} /> Merge & Create Invoice
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Table Container (Matching InventoryHub) */}
-          <div className="erp-table-frame"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-              flex: 1,
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      <input
-                        type="checkbox"
-                        checked={
-                          filteredHeldBills.length > 0 &&
-                          filteredHeldBills.every((b) => selectedHeldIds.includes(b.id))
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedHeldIds(filteredHeldBills.filter(b=>b.canResume).map((b) => b.id));
-                          } else {
-                            setSelectedHeldIds([]);
-                          }
-                        }}
-                      />
+                    {visibleColumns.invoiceNumber && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        INVOICE #
+                      </th>
+                    )}
+                    {visibleColumns.customer && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        CUSTOMER
+                      </th>
+                    )}
+                    {visibleColumns.date && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        DATE
+                      </th>
+                    )}
+                    {visibleColumns.paymentMethod && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        PAYMENT METHOD
+                      </th>
+                    )}
+                    {visibleColumns.total && (
+                      <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        TOTAL
+                      </th>
+                    )}
+                    {visibleColumns.paid && (
+                      <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        PAID
+                      </th>
+                    )}
+                    {visibleColumns.balance && (
+                      <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        BALANCE
+                      </th>
+                    )}
+                    {visibleColumns.status && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        STATUS
+                      </th>
+                    )}
+                    {visibleColumns.delivery && (
+                      <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                        DELIVERY
+                      </th>
+                    )}
+                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+                      ACTIONS
                     </th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>HOLD BILL #</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>DATE & TIME</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ITEMS</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CASHIER / STAFF</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL AMOUNT</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loadingHeldBills ? (
+                  {loadingInvoices ? (
                     <tr>
-                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#64748b' }}>
-                        Loading held bills...
+                      <td className="erp-table-cell" colSpan="10" style={{ textAlign: 'center', color: '#64748b' }}>
+                        Loading invoices...
                       </td>
                     </tr>
-                  ) : filteredHeldBills.length === 0 ? (
+                  ) : filteredInvoices.length === 0 ? (
                     <tr>
-                      <td className="erp-table-cell" colSpan={9} style={{ textAlign: 'center', color: '#94a3b8' }}>
-                        <PauseCircle size={34} style={{ opacity: 0.35, marginBottom: '8px' }} />
-                        <div style={{ fontWeight: 600, color: '#475569', fontSize: 'var(--erp-text-button)' }}>No held bills found</div>
-                        <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8', marginTop: '3px' }}>
-                          Bills placed on hold during POS billing or filtered by status will appear here.
-                        </div>
+                      <td className="erp-table-cell" colSpan="10" style={{ textAlign: 'center', color: '#64748b' }}>
+                        No invoices match the selected filter criteria.
                       </td>
                     </tr>
                   ) : (
-                    filteredHeldBills.map((hb) => (
+                    filteredInvoices.map((inv, idx) => (
                       <tr
-                        key={hb.id}
-                        style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                        key={inv.id || idx}
+                        onClick={async () => {
+                          try {
+                            const res = await salesApi.getById(inv.id);
+                            setSelectedInvoice({ ...inv, ...(res.data?.data || res.data) });
+                          } catch (e) {
+                            addToast(e.message, 'error');
+                          }
+                        }}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.1s ease',
+                        }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                        onClick={() => setSelectedHeldDetail(hb)}
-                        title="Click to view hold bill details"
+                        title="Click row to view complete invoice details"
                       >
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            disabled={!hb.canResume}
-                            checked={selectedHeldIds.includes(hb.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedHeldIds([...selectedHeldIds, hb.id]);
-                              } else {
-                                setSelectedHeldIds(selectedHeldIds.filter((id) => id !== hb.id));
-                              }
-                            }}
-                          />
-                        </td>
-                        <td className="erp-table-cell">
-                          <span className="erp-table-code"
-                            style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', fontSize: 'var(--erp-text-button)' }}
-                            title="Click to inspect items"
-                          >
-                            {hb.heldNumber}
-                          </span>
-                        </td>
-                        <td className="erp-table-cell">
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>
-                            {hb.customerName || 'Walk-in Customer'}
-                          </div>
-                          {hb.customerPhone && (
-                            <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', marginTop: '1px' }}>
-                              {hb.customerPhone}
-                            </div>
-                          )}
-                        </td>
-                        <td className="erp-table-cell" style={{ color: '#475569', whiteSpace: 'nowrap' }}>
-                          {hb.createdAt ? new Date(hb.createdAt).toLocaleString() : (hb.invoiceDate ? new Date(hb.invoiceDate).toLocaleDateString() : '—')}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: 'var(--erp-text-caption)', padding: '2px 8px', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
-                            {(hb.items?.length || 1)} items
-                          </span>
-                        </td>
-                        <td className="erp-table-cell">
-                          <span style={{ fontSize: 'var(--erp-text-caption)', padding: '2px 8px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}>
-                            {hb.salesman || hb.salesmanName || hb.createdBy || 'Staff'}
-                          </span>
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
-                          Rs. {Number(hb.netTotal || hb.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                          <StatusBadge status={hb.status || 'HELD_AT_POS'}/>
-                        </td>
-                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                            {/* 1. Resume in POS (Primary Action) */}
-                            <button disabled={!hb.canResume || !hasPermission(user,'SALES_CREATE')} aria-label="Resume billing in POS" className="erp-button erp-button-primary erp-table-icon-action"
-                              type="button"
-                              onClick={() => handleResumeHeldBill(hb)}
-                              style={{
-                                padding: '5px 10px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.15s ease',
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-                              title="Resume billing in POS"
-                            ><PlayCircle size={13} /></button>
+                        {/* Invoice # */}
+                        {visibleColumns.invoiceNumber && (
+                          <td className="erp-table-cell">
+                            <span className="erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+                              {inv.invoiceNumber}
+                            </span>
+                          </td>
+                        )}
 
-                            {/* 2. View details */}
-                            <button aria-label="View bill items & details" className="erp-button erp-table-icon-action"
+                        {/* Customer */}
+                        {visibleColumns.customer && (
+                          <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>
+                            {inv.customerName}
+                          </td>
+                        )}
+
+                        {/* Date */}
+                        {visibleColumns.date && (
+                          <td className="erp-table-cell erp-table-date" style={{ color: '#475569', whiteSpace: 'nowrap' }}>
+                            {inv.displayDate || inv.invoiceDate || '—'}
+                          </td>
+                        )}
+
+                        {/* Payment Method */}
+                        {visibleColumns.paymentMethod && (
+                          <td className="erp-table-cell" style={{ color: '#334155' }}>
+                            {inv.paymentMethod || 'Cash'}
+                          </td>
+                        )}
+
+                        {/* Total */}
+                        {visibleColumns.total && (
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
+                            LKR {Number(invoiceTotal(inv)).toFixed(2)}
+                          </td>
+                        )}
+
+                        {/* Paid */}
+                        {visibleColumns.paid && (
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a', fontFamily: 'monospace' }}>
+                            LKR {Number(inv.paidAmount || 0).toFixed(2)}
+                          </td>
+                        )}
+
+                        {/* Balance */}
+                        {visibleColumns.balance && (
+                          <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: Number(inv.balanceAmount || 0) > 0 ? '#dc2626' : '#64748b', fontFamily: 'monospace' }}>
+                            LKR {Number(inv.balanceAmount || 0).toFixed(2)}
+                          </td>
+                        )}
+
+                        {/* Status */}
+                        {visibleColumns.status && (
+                          <td className="erp-table-cell">
+                            <StatusBadge status={inv.status || inv.paymentStatus || 'PENDING'} />
+                          </td>
+                        )}
+
+                        {/* Delivery Status */}
+                        {visibleColumns.delivery && (
+                          <td className="erp-table-cell">
+                            <StatusBadge status={inv.deliveryStatus || 'PENDING'} label={inv.deliveryStatus === 'OUT_FOR_DELIVERY' ? `ON ROUTE${inv.deliveryNumber ? ` (${inv.deliveryNumber})` : ''}` : inv.deliveryStatus === 'DELIVERED' ? 'DELIVERED' : 'PENDING DELIVERY'}/>
+                          </td>
+                        )}
+
+                        {/* Actions (GRN Theme) */}
+                        <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button aria-label="View Invoice" className="erp-table-icon-action"
                               type="button"
-                              onClick={() => setSelectedHeldDetail(hb)}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const res = await salesApi.getById(inv.id);
+                                  setSelectedInvoice({ ...inv, ...(res.data?.data || res.data) });
+                                } catch (err) {
+                                  addToast(err.message, 'error');
+                                }
+                              }}
                               style={{
-                                padding: '5px 8px',
-                                backgroundColor: '#ffffff',
-                                color: '#475569',
-                                border: '1px solid #cbd5e1',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
                                 cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 transition: 'all 0.15s ease',
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.borderColor = '#94a3b8';
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                                e.currentTarget.style.backgroundColor = '#ffffff';
-                              }}
-                              title="View bill items & details"
-                            ><Eye size={13} /></button>
-
-                            {/* Optional Warehouse helper if already in warehouse workflow */}
-                            {hb.status === 'SENT_TO_WAREHOUSE' && (
-                              <button disabled={!hb.canResume || !hasPermission(user,'INVENTORY_ADJUST')} aria-label="Adjust warehouse stock quantities" className="erp-button erp-table-icon-action"
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="View Invoice Details"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            {canEditSales && (
+                              <button aria-label="Edit Invoice" className="erp-table-icon-action"
                                 type="button"
-                                onClick={() => handleOpenStockAdjustment(hb)}
-                                style={{
-                                  padding: '5px 8px',
-                                  backgroundColor: '#f3e8ff',
-                                  color: '#7c3aed',
-                                  border: '1px solid #d8b4fe',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  cursor: 'pointer',
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingInvoice({ ...inv });
                                 }}
-                                title="Adjust warehouse stock quantities"
-                              ><Edit2 size={11} /></button>
-                            )}
-                            {hb.status === 'STOCK_ADJUSTED' && (
-                              <button disabled={!hb.canResume || !hasPermission(user,'SALES_EDIT')} aria-label="Create invoice from held bill" className="erp-button erp-table-icon-action"
-                                type="button"
-                                onClick={() => handleOpenSingleDispatchModal(hb)}
                                 style={{
-                                  padding: '5px 8px',
-                                  backgroundColor: '#dcfce7',
-                                  color: '#15803d',
-                                  border: '1px solid #86efac',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
+                                  width: '30px',
+                                  height: '30px',
+                                  background: '#ffffff',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '6px',
                                   cursor: 'pointer',
+                                  color: '#0284c7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease',
                                 }}
-                                title="Generate Dispatch Note"
-                              ><Truck size={11} /></button>
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                                title="Edit Invoice"
+                              >
+                                <Edit2 size={13} />
+                              </button>
                             )}
+                            <button aria-label="Print Invoice PDF" className="erp-table-icon-action"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintInvoice(inv);
+                              }}
+                              style={{
+                                width: '30px',
+                                height: '30px',
+                                background: '#ffffff',
+                                border: '1px solid #bae6fd',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#0284c7',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0f9ff')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                              title="Print Invoice PDF"
+                            >
+                              <Printer size={13} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1917,6 +1549,17 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           </div>
         </div>
       )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB: HOLD BILLS (Standardized Inventory Structure) */}
+      {/* ------------------------------------------------------------- */}
+      {['hold-bills','held-history'].includes(currentTab) && <OnholdBillsTable bills={heldBills} loading={loadingHeldBills} user={user}
+        scope={heldOwnerScope} onScopeChange={value=>{setHeldOwnerScope(value);setSelectedHeldIds([]);}}
+        query={heldSearchQuery} onQueryChange={setHeldSearchQuery} status={heldStatusFilter} onStatusChange={setHeldStatusFilter}
+        onRefresh={loadHeldBills} onView={setSelectedHeldDetail} onPrint={handlePrintOnhold} onEdit={handleOpenStockAdjustment} onCancel={handleCancelOnhold}
+        selected={selectedHeldIds} onSelect={setSelectedHeldIds} onMerge={handleOpenMergeDispatchModal} merging={creatingMergedInvoice}
+        archive={showPosOnhold} history={currentTab==='held-history'} workspace={heldWorkspace}
+/>}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 1: QUOTATIONS (Standardized Inventory Structure) */}
@@ -2126,10 +1769,10 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                       </td>
                       <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
                       <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                        {qt.date ? new Date(qt.date).toLocaleDateString() : '—'}
+                        {qt.date ? new Date(qt.date).toLocaleDateString() : 'â€”'}
                       </td>
                       <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                        {qt.validUntil ? new Date(qt.validUntil).toLocaleDateString() : '—'}
+                        {qt.validUntil ? new Date(qt.validUntil).toLocaleDateString() : 'â€”'}
                       </td>
                       <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
                         LKR {Number(qt.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -2299,17 +1942,8 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{
-                  fontWeight: 800,
-                  fontSize: 'var(--erp-text-small)',
-                  padding: '4px 12px',
-                  borderRadius: '9999px',
-                  textTransform: 'uppercase',
-                  backgroundColor: selectedInvoice.status === 'PAID' ? '#dcfce7' : selectedInvoice.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
-                  color: selectedInvoice.status === 'PAID' ? '#15803d' : selectedInvoice.status === 'PARTIAL' ? '#b45309' : '#b91c1c',
-                }}>
-                  {selectedInvoice.status || 'PAID'}
-                </span>
+                <StatusBadge status={['VOIDED','CANCELLED'].includes(selectedInvoice.status)?selectedInvoice.status:selectedInvoice.paymentStatus || 'PENDING'} label={selectedInvoice.paymentStatus==='PENDING'?'PAYMENT PENDING':undefined}/>
+                <StatusBadge status={selectedInvoice.deliveryStatus || 'PENDING'} label={(!selectedInvoice.deliveryStatus || selectedInvoice.deliveryStatus==='PENDING')?'DELIVERY PENDING':undefined}/>
                 <button
                   type="button"
                   onClick={() => setSelectedInvoice(null)}
@@ -2361,7 +1995,9 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                 </h4>
               </div>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
+                {selectedInvoice.packing && <p className="onhold-directory-help">Packing: Box {selectedInvoice.packing.boxes || 0} · Bag {selectedInvoice.packing.bags || 0} · P. Bag {selectedInvoice.packing.pBags || 0} · Others {selectedInvoice.packing.others || 0}</p>}
+                {selectedInvoice.sourceHeldBills?.length>0 ? <MergedHeldBills bills={selectedInvoice.sourceHeldBills} user={user} onView={async bill=>{try{const res=await salesApi.getById(bill.id);setSelectedHeldDetail(res.data?.data || res.data);}catch(e){addToast(e.message,'error');}}} onCancel={handleCancelOnhold}/> : selectedInvoice.sourceHeldNumbers?.length>0 && <p>Merged held bills: {selectedInvoice.sourceHeldNumbers.join(', ')}</p>}
+            <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--erp-text-field)' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>
                       <th className="erp-table-heading" style={{ width: '38px', textAlign: 'center' }}>#</th>
@@ -2689,417 +2325,16 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Held Bill Inspection */}
       {/* ------------------------------------------------------------- */}
-      {selectedHeldDetail && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1050, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{ width: '100%', maxWidth: '680px', padding: '24px', borderRadius: '14px', backgroundColor: '#ffffff' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', fontWeight: 800 }}>
-                  Held Bill: {selectedHeldDetail.heldNumber}
-                </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                  Customer: <strong>{selectedHeldDetail.customerName || 'Walk-in'}</strong> • Salesman: <strong>{selectedHeldDetail.salesman || selectedHeldDetail.salesmanName || selectedHeldDetail.createdBy || 'Staff'}</strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedHeldDetail(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {statusChangeDialog}
+      {pendingHeldPrint && <HeldBillPrintDialog bill={pendingHeldPrint} onClose={()=>setPendingHeldPrint(null)} onPrinted={async()=>{setPendingHeldPrint(null);await loadHeldBills();addToast('All warehouse sheets printed. Bill sent to warehouse.','success');}}/>}
+      {selectedHeldDetail && <HeldBillDetails key={selectedHeldDetail.id} bill={selectedHeldDetail} user={user} onClose={()=>setSelectedHeldDetail(null)} onChanged={loadHeldBills} onEdit={handleOpenStockAdjustment} onCancel={handleCancelOnhold}/>}
 
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
-                    <th className="erp-table-heading">Code</th>
-                    <th className="erp-table-heading">Product</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center' }}>Qty</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Price</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedHeldDetail.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
-                        {it.productSku || it.sku || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
-                        {it.productName || it.name || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 700 }}>
-                        {it.quantity}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                        Rs. {Number(it.unitPrice || 0).toFixed(2)}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
-                        Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Total Bill Amount:</span>
-              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#2563eb', fontFamily: 'var(--font-heading)' }}>
-                Rs. {Number(selectedHeldDetail.netTotal || selectedHeldDetail.totalAmount || 0).toFixed(2)}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass btn-sm erp-button"
-                  onClick={() => setSelectedHeldDetail(null)}
-                  style={{ padding: '7px 16px' }}
-                >
-                  Close
-                </button>
-                <button className="erp-button erp-button-primary"
-                  type="button"
-                  onClick={() => {
-                    const bill = selectedHeldDetail;
-                    setSelectedHeldDetail(null);
-                    handleResumeHeldBill(bill);
-                  }}
-                  style={{
-                    padding: '7px 18px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s ease',
-                  }}
-                  title="Load into POS to checkout"
-                >
-                  <PlayCircle size={15} /> Resume in POS
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Warehouse Stock Adjustment */}
       {/* ------------------------------------------------------------- */}
-      {adjustingHeldBill && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '720px',
-              padding: '24px',
-              borderRadius: '14px',
-              backgroundColor: '#ffffff',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Edit3 size={18} color="#7c3aed" /> Warehouse Stock Adjustment
-                </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: 'var(--erp-text-small)', color: '#64748b' }}>
-                  Bill: <strong>{adjustingHeldBill.heldNumber}</strong> • Customer: <strong>{adjustingHeldBill.customerName || 'Walk-in'}</strong> • Warehouse: <strong>{adjustingHeldBill.warehouseCode || 'WH'}</strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAdjustingHeldBill(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '16px', fontSize: 'var(--erp-text-body)', color: '#475569' }}>
-              Verify actual warehouse stock physical availability. Correct the product quantities below before dispatch.
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
-              <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
-                    <th className="erp-table-heading">Code</th>
-                    <th className="erp-table-heading">Product</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', width: '110px' }}>Adjusted Qty</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Price</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right' }}>Total</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', width: '40px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(adjustingHeldBill.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#2563eb' }}>
-                        {it.productSku || it.sku || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ fontWeight: 600 }}>
-                        {it.productName || it.name || '-'}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <input className="erp-field"
-                          type="number"
-                          min="1"
-                          value={it.quantity}
-                          onChange={(e) => {
-                            const newQty = parseInt(e.target.value) || 1;
-                            const updatedItems = [...adjustingHeldBill.items];
-                            updatedItems[idx] = {
-                              ...it,
-                              quantity: newQty,
-                              totalPrice: newQty * Number(it.unitPrice || 0),
-                            };
-                            const newNet = updatedItems.reduce((sum, item) => sum + Number(item.totalPrice || (item.quantity * item.unitPrice) || 0), 0);
-                            setAdjustingHeldBill({
-                              ...adjustingHeldBill,
-                              items: updatedItems,
-                              netTotal: newNet,
-                              totalAmount: newNet,
-                            });
-                          }}
-                          style={{
-                            width: '70px',
-                            padding: '4px 8px',
-                            border: '1px solid #cbd5e1',
-                            textAlign: 'center',
-                            fontWeight: 700,
-                          }}
-                        />
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                        Rs. {Number(it.unitPrice || 0).toFixed(2)}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 800 }}>
-                        Rs. {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
-                      </td>
-                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                        {adjustingHeldBill.items.length > 1 && (
-                          <button data-tone="danger" aria-label="Remove line item" className="erp-table-icon-action"
-                            type="button"
-                            onClick={() => {
-                              const updatedItems = adjustingHeldBill.items.filter((_, i) => i !== idx);
-                              const newNet = updatedItems.reduce((sum, item) => sum + Number(item.totalPrice || (item.quantity * item.unitPrice) || 0), 0);
-                              setAdjustingHeldBill({
-                                ...adjustingHeldBill,
-                                items: updatedItems,
-                                netTotal: newNet,
-                                totalAmount: newNet,
-                              });
-                            }}
-                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                            title="Remove line item"
-                          >
-                            <X size={13} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px' }}>
-              <span style={{ fontSize: 'var(--erp-text-field)', fontWeight: 700, color: '#475569' }}>Adjusted Total Value:</span>
-              <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#7c3aed', fontFamily: 'monospace' }}>
-                Rs. {Number(adjustingHeldBill.netTotal || adjustingHeldBill.totalAmount || 0).toFixed(2)}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn btn-glass btn-sm erp-button"
-                onClick={() => setAdjustingHeldBill(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm erp-button"
-                onClick={handleSaveStockAdjustment}
-                style={{ gap: '6px', backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
-              >
-                <CheckSquare size={14} /> Confirm Stock Adjustment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ------------------------------------------------------------- */}
-      {/* MODAL: Order Dispatch Note (ODN) & Merge */}
-      {/* ------------------------------------------------------------- */}
-      {dispatchNoteData && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1150, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '820px',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '28px',
-              borderRadius: '14px',
-              backgroundColor: '#ffffff',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', borderBottom: '2px solid #0284c7', paddingBottom: '12px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Truck size={22} color="#0284c7" />
-                  <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
-                    Create invoice from held bills
-                  </h2>
-                </div>
-                <p style={{ margin: '4px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
-                  Review selected held bills before creating one invoice.
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <button
-                  type="button"
-                  onClick={() => setDispatchNoteData(null)}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-                >
-                  <X size={20} />
-                </button>
-                <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '6px' }}>
-                  Date: <strong>{dispatchNoteData.date}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: 'var(--erp-text-body)' }}>
-                <div>
-                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Customer Name:</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-nav)' }}>{dispatchNoteData.customerName}</div>
-                </div>
-                <div>
-                  <div style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase', fontWeight: 600 }}>Merged Held Bills ({dispatchNoteData.sourceBillIds?.length || 0}):</div>
-                  <div style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{dispatchNoteData.sourceBills?.join(', ')}</div>
-                </div>
-              </div>
-
-              {/* Aggregated Items Table */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                <div className="erp-table-frame erp-table-scroll"><table className="erp-table" style={{ width: '100%', fontSize: 'var(--erp-text-body)', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f1f5f9', color: '#475569', textAlign: 'left', borderBottom: '1px solid #e2e8f0', fontSize: 'var(--erp-text-caption)', textTransform: 'uppercase' }}>
-                      <th className="erp-table-heading">Code / SKU</th>
-                      <th className="erp-table-heading">Product Description</th>
-                      <th className="erp-table-heading" style={{ textAlign: 'center' }}>Dispatch Qty</th>
-                      <th className="erp-table-heading" style={{ textAlign: 'right' }}>Unit Rate</th>
-                      <th className="erp-table-heading" style={{ textAlign: 'right' }}>Amount (LKR)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(dispatchNoteData.items || []).map((it, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
-                          {it.productSku || it.sku || '-'}
-                        </td>
-                        <td className="erp-table-cell" style={{ fontWeight: 600 }}>
-                          {it.productName || it.name || '-'}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>
-                          {it.quantity}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right' }}>
-                          {Number(it.unitPrice || 0).toFixed(2)}
-                        </td>
-                        <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {Number(it.totalPrice || (it.quantity * it.unitPrice) || 0).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table></div>
-              </div>
-
-              {/* Total & Summary */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#e0f2fe', borderRadius: '8px' }}>
-                <span style={{ fontSize: 'var(--erp-text-button)', fontWeight: 700, color: '#0369a1' }}>Invoice total:</span>
-                <span style={{ fontSize: 'var(--erp-text-dialog)', fontWeight: 900, color: '#0284c7', fontFamily: 'monospace' }}>
-                  Rs. {Number(dispatchNoteData.totalAmount || 0).toFixed(2)}
-                </span>
-              </div>
-
-              {/* Handover & Sign-off Notice */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', padding: '16px 0', borderTop: '1px dashed #cbd5e1', marginTop: '8px' }}>
-                <div>
-                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Dispatched By (Warehouse / Staff):</div>
-                  <div style={{ height: '36px', borderBottom: '1px solid #94a3b8', marginTop: '16px' }}></div>
-                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '4px' }}>Signature & Date</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Received by Customer:</div>
-                  <div style={{ height: '36px', borderBottom: '1px solid #94a3b8', marginTop: '16px' }}></div>
-                  <div style={{ fontSize: 'var(--erp-text-caption)', color: '#94a3b8', marginTop: '4px' }}>Customer Signature / Seal & Date</div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px', flexShrink: 0 }}>
-              <button
-                type="button"
-                className="btn btn-glass erp-button"
-                onClick={() => window.print()}
-                style={{ gap: '6px' }}
-              >
-                <Printer size={15} /> Print Dispatch Note
-              </button>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass erp-button"
-                  onClick={() => setDispatchNoteData(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary erp-button"
-                  disabled={creatingMergedInvoice}
-                  onClick={handleConfirmDispatch}
-                  style={{ gap: '6px', backgroundColor: '#16a34a', borderColor: '#16a34a' }}
-                >
-                  <Check size={16} /> {creatingMergedInvoice?'Creating…':'Create Invoice'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {dispatchNoteData && <HeldInvoiceDialog preview={dispatchNoteData} busy={creatingMergedInvoice} error={heldMergeError} onClose={()=>setDispatchNoteData(null)} onConfirm={handleConfirmDispatch}/>}
 
 
 

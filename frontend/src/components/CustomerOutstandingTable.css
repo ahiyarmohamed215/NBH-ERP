@@ -1,0 +1,16 @@
+.customer-outstanding-table.erp-table {width:100%;min-width:900px;border-collapse:collapse;text-align:left;margin:0;}
+.customer-outstanding-table > thead {position:sticky;top:0;z-index:1;background:#fafbfc;}
+.customer-outstanding-table th {white-space:nowrap;}
+.customer-outstanding-table .customer-outstanding-number {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.customer-outstanding-table .customer-outstanding-action {text-align:center;}
+.customer-outstanding-date {white-space:nowrap;}
+.customer-outstanding-row {cursor:pointer;border-bottom:1px solid #f1f5f9;}
+.customer-outstanding-row:hover,.customer-outstanding-row.expanded {background:#f8fafc;}
+.customer-outstanding-row:focus-visible {outline:2px solid #0284c7;outline-offset:-2px;}
+.customer-outstanding-payment {display:inline-block;padding:3px 9px;border:1px solid #bae6fd;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:var(--erp-text-caption,.74rem);font-weight:600;text-transform:lowercase;}
+.customer-outstanding-table td.customer-outstanding-paid {color:#15803d;}
+.customer-outstanding-table td.customer-outstanding-due {color:#b91c1c;font-weight:600;}
+.customer-outstanding-table .customer-outstanding-empty {text-align:center;padding:32px 16px;color:#15803d;}
+.customer-outstanding-empty svg {display:block;margin:0 auto 10px;}
+.customer-outstanding-table td.customer-outstanding-expanded {padding:0;}
+.customer-outstanding-table .erp-table-code {white-space:nowrap;word-break:normal;overflow-wrap:normal;min-width:155px;}

@@ -187,10 +187,15 @@ public class CustomerRangeService {
 
     @Transactional
     public CustomerMonthlyProgressDto getCustomerProgress(Long customerId, BigDecimal hypotheticalCartTotal) {
+        return getCustomerProgress(customerId,hypotheticalCartTotal,getCurrentYearMonth());
+    }
+
+    @Transactional
+    public CustomerMonthlyProgressDto getCustomerProgress(Long customerId, BigDecimal hypotheticalCartTotal, String requestedMonth) {
         Customer customer = customerRepository.findByIdAndIsActiveTrue(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", customerId));
 
-        String currentMonth = getCurrentYearMonth();
+        String currentMonth = YearMonth.parse(requestedMonth).toString();
         CustomerMonthlySummary summary = getOrRecalculateSummary(customer, currentMonth);
 
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
@@ -472,8 +477,8 @@ public class CustomerRangeService {
 
     @Transactional
     public CustomerMonthlySummary getOrRecalculateSummary(Customer customer, String yearMonth) {
-        return summaryRepository.findByCustomerIdAndYearMonth(customer.getId(), yearMonth)
-                .orElseGet(() -> recalculateSummary(customer, yearMonth, null));
+        // Warehouse submission and cancellation also change qualification, before any invoice exists.
+        return recalculateSummary(customer, yearMonth, null);
     }
 
     @Transactional
@@ -482,8 +487,8 @@ public class CustomerRangeService {
         LocalDate start = ym.atDay(1);
         LocalDate end = ym.atEndOfMonth();
 
-        // 1. Compute gross sales from qualifying invoices (COMPLETED, PAID, PARTIAL)
-        BigDecimal grossSales = invoiceRepository.getCustomerSalesBetween(customer.getId(), start, end);
+        // 1. Use immutable original totals from POS bills sent to the warehouse.
+        BigDecimal grossSales = invoiceRepository.getCustomerPerformanceBetween(customer.getId(), start, end);
         if (grossSales == null) grossSales = BigDecimal.ZERO;
 
         // 2. Subtract completed sales returns / credit notes
@@ -491,7 +496,7 @@ public class CustomerRangeService {
         if (totalReturns == null) totalReturns = BigDecimal.ZERO;
 
         BigDecimal qualifying = grossSales.subtract(totalReturns).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-        long invCount = invoiceRepository.countCustomerInvoicesBetween(customer.getId(), start, end);
+        long invCount = invoiceRepository.countCustomerPerformanceBetween(customer.getId(), start, end);
 
         List<CustomerRangeConfig> activeRanges = getActiveRanges();
         CustomerRangeConfig matchedRange = determineRangeForAmount(activeRanges, qualifying);
@@ -677,12 +682,12 @@ public class CustomerRangeService {
                 existing = summaryRepository.findForUpdate(c.getId(), targetMonth);
             }
             if (existing.isEmpty()) {
-                BigDecimal gross = invoiceRepository.getCustomerSalesBetween(c.getId(), start, end);
+                BigDecimal gross = invoiceRepository.getCustomerPerformanceBetween(c.getId(), start, end);
                 if (gross == null) gross = BigDecimal.ZERO;
                 BigDecimal ret = salesReturnRepository.getCustomerReturnsBetween(c.getId(), start, end);
                 if (ret == null) ret = BigDecimal.ZERO;
                 BigDecimal qualifying = gross.subtract(ret).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-                long invCount = invoiceRepository.countCustomerInvoicesBetween(c.getId(), start, end);
+                long invCount = invoiceRepository.countCustomerPerformanceBetween(c.getId(), start, end);
                 CustomerRangeConfig range = determineRangeForAmount(activeRanges, qualifying);
 
                 User staff = c.getEffectiveAssignedStaff();

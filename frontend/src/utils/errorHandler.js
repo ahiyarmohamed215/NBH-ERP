@@ -123,8 +123,13 @@ export const getUserFriendlyErrorMessage = (error, context = '') => {
     case 504:
       return "The request is taking too long. Please try again.";
 
-    case 409:
+    case 409: {
+      const backendMsg = error?.response?.data?.message;
+      if (backendMsg && !isTechnicalError(backendMsg)) {
+        return backendMsg;
+      }
       return "The record has been modified or already exists. Please refresh and try again.";
+    }
 
     case 422: {
       const backendMsg = error?.response?.data?.message;

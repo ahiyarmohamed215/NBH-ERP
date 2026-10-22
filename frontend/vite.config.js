@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Test middleware servers must not replace the running app's optimized dependencies.
+  cacheDir: process.env.NODE_TEST_CONTEXT
+    ? `node_modules/.vite-tests/${process.pid}`
+    : 'node_modules/.vite-dev',
   server: {
     port: 5173,
     proxy: {

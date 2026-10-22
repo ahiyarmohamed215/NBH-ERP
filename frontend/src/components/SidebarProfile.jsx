@@ -277,8 +277,9 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
         aria-expanded={menuOpen}
         onKeyDown={event => {if(event.key==='Enter' || event.key===' '){event.preventDefault();setMenuOpen(open=>!open);}}}
         style={{
-          padding: isCollapsed ? '12px 0' : '10px 18px 10px 10px',
+          padding: isCollapsed ? '8px 4px 7px 4px' : '10px 18px 10px 10px',
           display: 'flex',
+          flexDirection: isCollapsed ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           cursor: 'pointer',
@@ -296,20 +297,21 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
         <div
           style={{
             display: 'flex',
+            flexDirection: isCollapsed ? 'column' : 'row',
             alignItems: 'center',
-            gap: isCollapsed ? '0' : '9px',
+            gap: isCollapsed ? '3px' : '9px',
             minWidth: 0,
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
-            flex: isCollapsed ? 'none' : 1,
+            justifyContent: 'center',
             width: isCollapsed ? '100%' : 'auto',
+            flex: isCollapsed ? 'none' : 1,
           }}
         >
           {/* Avatar Circle */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: isCollapsed ? '26px' : '36px',
+                height: isCollapsed ? '26px' : '36px',
                 borderRadius: '50%',
                 backgroundColor: '#2563eb',
                 color: '#ffffff',
@@ -317,7 +319,7 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 700,
-                fontSize: 'var(--erp-text-button)',
+                fontSize: isCollapsed ? '0.68rem' : 'var(--erp-text-button)',
                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
               }}
             >
@@ -330,18 +332,35 @@ export default function SidebarProfile({ isCollapsed = false, onNavigate, onOpen
                   position: 'absolute',
                   bottom: '-1px',
                   right: '-1px',
-                  width: '10px',
-                  height: '10px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
                   backgroundColor: '#10b981',
-                  border: '2px solid #ffffff',
+                  border: '1.5px solid #ffffff',
                   display: 'block',
-                  boxShadow: '0 0 5px rgba(16, 185, 129, 0.7)',
+                  boxShadow: '0 0 4px rgba(16, 185, 129, 0.7)',
                 }}
                 title="System Connected"
               />
             )}
           </div>
+          {isCollapsed && (
+            <span
+              style={{
+                fontSize: 'var(--erp-text-caption, 11px)',
+                fontWeight: 600,
+                color: '#475569',
+                textAlign: 'center',
+                lineHeight: 1.2,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Profile
+            </span>
+          )}
 
           {/* Profile Name & Connected Status (Shown when sidebar is expanded) */}
           {!isCollapsed && (

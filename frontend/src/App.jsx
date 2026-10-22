@@ -3,10 +3,11 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'rea
 import { useAuth } from './context/AuthContext';
 import LoginView from './views/LoginView';
 import SidebarProfile from './components/SidebarProfile';
+import NbhLogo from './components/NbhLogo';
 import {canUseRecycleBin} from './utils/recycleBinAccess';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import useErpShortcuts from './hooks/useErpShortcuts';
-import {canAccessModule,canAccessTab,resolveModuleTab} from './utils/moduleAccess';
+import {canAccessModule,canAccessTab,resolveModuleTab,DEFAULT_MODULE_TABS} from './utils/moduleAccess';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import WorkspaceFallback from './components/WorkspaceFallback';
 
@@ -51,7 +52,8 @@ export default function App() {
   const [subTab, setSubTab] = useState(() => {
     const p = new URLSearchParams(window.location.hash.slice(1));
     const initialView = p.get('view') || 'dashboard';
-    return initialView === 'dashboard' ? '' : (p.get('tab') || '');
+    if (initialView === 'dashboard' || initialView === 'recycle-bin') return '';
+    return p.get('tab') || DEFAULT_MODULE_TABS[initialView] || '';
   });
 
   const [purchaseCreateRequest,setPurchaseCreateRequest]=useState(null);
@@ -63,7 +65,9 @@ export default function App() {
     rememberedTabs.current = {};
     tabOwner.current = identity;
   }
-  rememberedTabs.current[currentView] = subTab;
+  if (subTab) {
+    rememberedTabs.current[currentView] = subTab;
+  }
 
   useEffect(() => {
     if (currentView === 'dashboard') {
@@ -88,7 +92,7 @@ export default function App() {
       const p = new URLSearchParams(window.location.hash.slice(1));
       const nextView = p.get('view') || 'dashboard';
       setCurrentView(nextView);
-      setSubTab(nextView === 'dashboard' ? '' : (p.get('tab') || ''));
+      setSubTab(nextView === 'dashboard' || nextView === 'recycle-bin' ? '' : (p.get('tab') || DEFAULT_MODULE_TABS[nextView] || ''));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -128,7 +132,7 @@ export default function App() {
 
   // Fullscreen & Distraction-Free States
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isCompactViewport, setIsCompactViewport] = useState(() => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(max-width: 700px)').matches));
   useEffect(() => {
     const query = window.matchMedia?.('(max-width: 700px)');
@@ -170,8 +174,8 @@ export default function App() {
         permissions: ['SALES_CREATE', 'SALES_VIEW', 'SALES_VIEW_ALL', 'SALES_RETURN', 'QUOTATION_VIEW'],
         subItems: [
           { id: 'sales', label: 'Sales Invoices', permission: 'SALES_VIEW' },
+          { id: 'held-history', label: 'Held Bills', permission: 'SALES_VIEW' },
           { id: 'hold-bills', label: 'Onhold Bills', permission: 'SALES_CREATE' },
-          { id: 'held-history', label: 'Onhold Bill History', permission: 'SALES_VIEW' },
           { id: 'refunds', label: 'Sales Returns', permission: 'SALES_RETURN' },
           { id: 'quotations', label: 'Quotations', permission: 'QUOTATION_VIEW' },
         ],
@@ -203,28 +207,28 @@ export default function App() {
         id: 'inventory',
         label: 'Inventory',
         icon: Boxes,
-        permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST'],
+        permissions: ['INVENTORY_VIEW', 'WAREHOUSE_MANAGE', 'PRODUCT_MANAGE', 'INVENTORY_ADJUST', 'BRAND_VIEW', 'CATEGORY_VIEW'],
         subItems: [
           { id: 'inventory-list', label: 'Inventory List', permission: 'INVENTORY_VIEW' },
           { id: 'adjustments', label: 'Stock Adjustment', permission: 'INVENTORY_ADJUST' },
           { id: 'pos-quotas', label: 'Inventory Allocation', permission: 'INVENTORY_VIEW' },
           { id: 'products', label: 'Products', permission: 'PRODUCT_MANAGE' },
           { id: 'warehouses', label: 'Warehouses', permission: 'WAREHOUSE_MANAGE' },
-          { id: 'brands', label: 'Brands', permission: 'PRODUCT_MANAGE' },
-          { id: 'categories', label: 'Categories', permission: 'PRODUCT_MANAGE' },
+          { id: 'brands', label: 'Brands', permission: 'BRAND_VIEW' },
+          { id: 'categories', label: 'Categories', permission: 'CATEGORY_VIEW' },
         ],
       },
       {
         id: 'purchasing',
         label: 'Purchasing',
         icon: ShoppingCart,
-        permissions: ['SUPPLIER_MANAGE', 'GRN_PROCESS', 'GTN_PROCESS', 'PRN_PROCESS'],
+        permissions: ['SUPPLIER_MANAGE', 'SUPPLIER_VIEW', 'GRN_PROCESS', 'GRN_VIEW', 'GTN_PROCESS', 'GTN_VIEW', 'PRN_PROCESS', 'PRN_VIEW', 'PURCHASE_MANAGE'],
         subItems: [
-          { id: 'suppliers', label: 'Suppliers Directory', permission: 'SUPPLIER_MANAGE' },
-          { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_PROCESS' },
-          { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_PROCESS' },
-          { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_PROCESS' },
-          { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_MANAGE' },
+          { id: 'suppliers', label: 'Suppliers Directory', permission: 'SUPPLIER_VIEW' },
+          { id: 'grn', label: 'Goods Received (GRN)', permission: 'GRN_VIEW' },
+          { id: 'gtn', label: 'Stock Transfers (GTN)', permission: 'GTN_VIEW' },
+          { id: 'prn', label: 'Purchase Returns (PRN)', permission: 'PRN_VIEW' },
+          { id: 'purchase-orders', label: 'Purchase Orders', permission: 'SUPPLIER_VIEW' },
         ],
       },
       {
@@ -296,7 +300,7 @@ export default function App() {
   const navigateTo = useCallback((view, sub = '', action = '') => {
     if((view==='pos' || (view==='invoicing' && sub==='pos')) && !canAccessTab(user,'invoicing','pos'))return;
     setPurchaseCreateRequest(view==='purchasing' && sub==='gtn' && action==='create' ? {tab:'gtn',id:++purchaseCreateSequence.current} : null);
-    if (!sub && Object.prototype.hasOwnProperty.call(rememberedTabs.current, view)) {
+    if (!sub && rememberedTabs.current[view]) {
       setCurrentView(view);
       setSubTab(rememberedTabs.current[view]);
       return;
@@ -346,6 +350,9 @@ export default function App() {
     } else if (view === 'pending-approvals' || view === 'pending_approvals') {
       setCurrentView('employees');
       setSubTab('pending-approvals');
+    } else if (view === 'purchasing') {
+      setCurrentView('purchasing');
+      setSubTab(sub || 'suppliers');
     } else if (view === 'grn' || view === 'gtn' || view === 'prn' || view === 'suppliers' || view === 'purchase-orders') {
       setCurrentView('purchasing');
       setSubTab(view);
@@ -394,7 +401,7 @@ export default function App() {
         setSubTab('suppliers');
       } else if (sub === 'warehouses' || sub === 'categories') {
         setCurrentView('inventory');
-        setSubTab(sub === 'warehouses' ? 'warehouses' : 'products');
+        setSubTab(sub === 'warehouses' ? 'warehouses' : 'categories');
       } else {
         setCurrentView('inventory');
         setSubTab('products');
@@ -417,8 +424,9 @@ export default function App() {
       if (!allowedModuleIds.includes(currentView)) {
         navigateTo(allowedModuleIds[0]);
       } else if (currentView !== 'dashboard' && currentView !== 'recycle-bin') {
-        const allowedTab=resolveModuleTab(user,currentView,subTab);
-        if(allowedTab!==subTab)setSubTab(allowedTab || '');
+        const fallback = DEFAULT_MODULE_TABS[currentView];
+        const allowedTab = resolveModuleTab(user, currentView, subTab, fallback);
+        if (allowedTab && allowedTab !== subTab) setSubTab(allowedTab);
       }
     }
   }, [user, allowedModuleIds, currentView,subTab, navigateTo]);
@@ -482,11 +490,14 @@ export default function App() {
   }
 
   if (!user) {
-    return authMode === 'signup' ? (
-      <Suspense fallback={<WorkspaceFallback id="signup" />}>
-        <SignupView onSwitchToLogin={() => setAuthMode('login')} />
-      </Suspense>
-    ) : (
+    if (authMode === 'signup') {
+      return (
+        <Suspense fallback={<WorkspaceFallback id="signup" />}>
+          <SignupView onSwitchToLogin={() => setAuthMode('login')} />
+        </Suspense>
+      );
+    }
+    return (
       <LoginView onSwitchToSignup={() => setAuthMode('signup')} />
     );
   }
@@ -500,8 +511,8 @@ export default function App() {
         <aside
           className={`glass-sidebar ${isSidebarCompact ? 'collapsed' : ''}`}
           style={{
-            width: isSidebarCompact ? '56px' : '205px',
-            minWidth: isSidebarCompact ? '56px' : '205px',
+            width: isSidebarCompact ? '92px' : '205px',
+            minWidth: isSidebarCompact ? '92px' : '205px',
             height: '100vh',
             maxHeight: '100vh',
             position: 'sticky',
@@ -514,25 +525,21 @@ export default function App() {
             borderRight: '1px solid #e2e8f0',
           }}
         >
-          <div style={{ padding: isSidebarCompact ? '14px 6px' : '14px 10px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: isSidebarCompact ? '8px 4px 6px 4px' : '14px 10px', overflowY: isSidebarCompact ? 'hidden' : 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', flex: 1, minHeight: 0 }}>
             {/* Logo & Brand Header */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: isSidebarCompact ? 'center' : 'space-between',
-                padding: isSidebarCompact ? '0' : '2px 4px',
-                marginBottom: isSidebarCompact ? '12px' : '16px',
+                padding: isSidebarCompact ? '0 0 8px 0' : '2px 4px',
+                marginBottom: isSidebarCompact ? '8px' : '16px',
+                borderBottom: isSidebarCompact ? '1px solid #f1f5f9' : 'none',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: isSidebarCompact ? 'center' : 'flex-start', width: isSidebarCompact ? '100%' : 'auto' }}>
                 <div
                   style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '7px',
-                    backgroundColor: '#0284c7',
-                    color: 'white',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -543,13 +550,8 @@ export default function App() {
                   onClick={isSidebarCompact ? toggleSidebar : undefined}
                   title={isSidebarCompact ? 'Click to expand sidebar (Ctrl+B)' : 'NBH ERP'}
                 >
-                  <Package size={17} />
+                  <NbhLogo size={isSidebarCompact ? 18 : 20} />
                 </div>
-                {!isSidebarCompact && (
-                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0284c7', letterSpacing: '-0.02em' }}>
-                    NBH ERP
-                  </div>
-                )}
               </div>
 
               {/* Minimize button inside sidebar */}
@@ -578,7 +580,7 @@ export default function App() {
             </div>
 
             {/* Standard Navigation Buttons */}
-            <nav className="erp-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <nav className="erp-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: isSidebarCompact ? '3px' : '2px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {accessibleModules.map((mod) => {
                 const Icon = mod.icon;
                 const isCurrentModule = currentView === mod.id;
@@ -586,6 +588,7 @@ export default function App() {
                 return (
                   <button
                     key={mod.id}
+                    className="erp-sidebar-module"
                     type="button"
                     title={isSidebarCompact ? mod.label : undefined}
                     aria-label={mod.label}
@@ -595,19 +598,22 @@ export default function App() {
                     }}
                     style={{
                       display: 'flex',
+                      flexDirection: isSidebarCompact ? 'column' : 'row',
                       alignItems: 'center',
                       justifyContent: isSidebarCompact ? 'center' : 'space-between',
                       width: '100%',
-                      padding: isSidebarCompact ? '8px 0' : '8px 10px',
+                      padding: isSidebarCompact ? '5px 4px 5px 4px' : '8px 10px',
                       borderRadius: '8px',
                       border: 'none',
                       backgroundColor: isCurrentModule ? '#f0f9ff' : 'transparent',
                       color: isCurrentModule ? '#0284c7' : '#475569',
                       fontWeight: isCurrentModule ? 600 : 500,
-                      fontSize: '0.86rem',
+                      fontSize: isSidebarCompact ? 'var(--erp-text-caption, 11px)' : '0.86rem',
                       cursor: 'pointer',
                       position: 'relative',
-                      textAlign: 'left',
+                      textAlign: isSidebarCompact ? 'center' : 'left',
+                      gap: isSidebarCompact ? '3px' : '9px',
+                      transition: 'background-color 0.15s ease, color 0.15s ease',
                     }}
                     onMouseEnter={(e) => {
                       if (!isCurrentModule) e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -624,28 +630,77 @@ export default function App() {
                       if (!isCurrentModule) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
-                      <Icon
-                        size={17}
-                        style={{ flexShrink: 0 }}
-                      />
-                      {!isSidebarCompact && (
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {isSidebarCompact ? (
+                      <>
+                        {/* Icon with soft pill container in the middle */}
+                        <div
+                          style={{
+                            width: '38px',
+                            height: '24px',
+                            borderRadius: '12px',
+                            backgroundColor: 'transparent',
+                            color: isCurrentModule ? '#0284c7' : '#475569',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <Icon
+                            size={18}
+                            strokeWidth={1.8}
+                            style={{ flexShrink: 0 }}
+                          />
+                        </div>
+
+                        {/* Label underneath in the middle */}
+                        <span
+                          style={{
+                            fontSize: 'var(--erp-text-caption, 11px)',
+                            fontWeight: isCurrentModule ? 600 : 500,
+                            lineHeight: 1.2,
+                            textAlign: 'center',
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            color: isCurrentModule ? '#0284c7' : '#475569',
+                            display: 'block',
+                          }}
+                        >
                           {mod.label}
                         </span>
-                      )}
-                    </div>
 
-                    {!isSidebarCompact && isCurrentModule && (
-                      <span
-                        style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: '#0284c7',
-                          flexShrink: 0,
-                        }}
-                      />
+                        {/* Shared selection line for every compact sidebar module. */}
+                        {isCurrentModule && (
+                          <span className="erp-sidebar-selection-line" aria-hidden="true" />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                          <Icon
+                            size={17}
+                            style={{ flexShrink: 0 }}
+                          />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {mod.label}
+                          </span>
+                        </div>
+
+                        {isCurrentModule && (
+                          <span
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: '#0284c7',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                      </>
                     )}
                   </button>
                 );
@@ -723,11 +778,12 @@ export default function App() {
             />
           ) : (
             <RetainedWorkspaces key={identity} current={currentView} allowed={allowedModuleIds} render={view => {
+              const activeSub = view === currentView ? (subTab || DEFAULT_MODULE_TABS[view] || '') : (rememberedTabs.current[view] || DEFAULT_MODULE_TABS[view] || '');
               const props = {
-                activeSubTab: view === currentView ? subTab : rememberedTabs.current[view],
+                activeSubTab: activeSub,
                 onSubTabChange: tab => {
-                  rememberedTabs.current[view] = tab;
-                  if (view === currentView) setSubTab(tab);
+                  if (tab) rememberedTabs.current[view] = tab;
+                  if (view === currentView && tab) setSubTab(tab);
                 },
               };
               switch (view) {

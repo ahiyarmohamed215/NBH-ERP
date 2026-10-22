@@ -1,0 +1,32 @@
+.pos-view .pos-line-dialog {width:min(440px,calc(100vw - 24px));max-width:440px;height:auto;max-height:calc(100dvh - 24px);border:1px solid var(--erp-border);border-radius:8px;background:#fff;color:var(--erp-text);font-family:var(--font-sans);}
+.pos-line-dialog .pos-dialog-heading {padding:14px 16px;align-items:center;gap:10px;border-bottom:1px solid var(--erp-border);}
+.pos-line-dialog .pos-dialog-heading h2 {margin:0;font-size:var(--erp-text-section);font-weight:700;color:var(--erp-heading);}
+.pos-line-dialog .pos-dialog-heading > button {flex-shrink:0;}
+.pos-line-dialog .pos-dialog-body {padding:12px 16px;}
+.pos-line-identity {display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.pos-line-dialog .pos-line-product {font-size:var(--erp-text-body);font-weight:700;color:var(--erp-heading);line-height:1.5;overflow-wrap:anywhere;}
+.pos-line-dialog .pos-line-code {font-size:var(--erp-text-caption);color:var(--erp-muted);overflow-wrap:anywhere;}
+.pos-line-facts {display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px;margin:0;background:var(--erp-canvas);border:1px solid var(--erp-border);border-radius:var(--erp-control-radius);}
+.pos-line-facts dt {font-size:var(--erp-text-caption);color:var(--erp-muted);line-height:1.4;}
+.pos-line-facts dd {margin:5px 0 0;font-size:var(--erp-text-body);font-weight:600;color:var(--erp-heading);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.pos-line-dialog .pos-edit-fields {grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0;}
+.pos-line-dialog .pos-edit-fields label:first-child {grid-column:auto;}
+.pos-line-dialog .pos-edit-fields label {min-width:0;font-size:var(--erp-text-caption);font-weight:600;color:var(--erp-text);gap:6px;}
+.pos-line-dialog .pos-edit-fields input {width:100%;min-width:0;height:var(--erp-control-height);box-sizing:border-box;padding:0 10px;border:1px solid var(--erp-field-border);background:#fff;color:var(--erp-heading);font-size:var(--erp-text-field) !important;font-variant-numeric:tabular-nums;}
+.pos-line-dialog .pos-edit-fields input:disabled {background:var(--erp-canvas);color:var(--erp-muted);cursor:wait;}
+.pos-line-summary {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px 0 0;margin:0;border-top:1px solid var(--erp-border);font-variant-numeric:tabular-nums;}
+.pos-line-summary dt {font-size:var(--erp-text-caption);color:var(--erp-muted);line-height:1.4;}
+.pos-line-summary dd {margin:6px 0 0;font-size:var(--erp-text-body);font-weight:600;color:var(--erp-heading);overflow-wrap:anywhere;}
+.pos-line-summary > div:last-child dd {color:var(--erp-accent);font-weight:700;}
+@media(max-width:400px) {.pos-line-dialog .pos-edit-fields {grid-template-columns:repeat(2,minmax(0,1fr));}.pos-line-dialog .pos-edit-fields label:first-child {grid-column:1 / -1;}.pos-line-identity {flex-wrap:wrap;gap:3px;}}
+.pos-line-dialog .pos-dialog-footer {padding:12px 16px;gap:8px;background:var(--erp-canvas);border-top:1px solid var(--erp-border);}
+.pos-line-dialog .pos-dialog-footer button {flex:0 0 auto;min-width:0;min-height:var(--erp-control-height);font-size:var(--erp-text-button) !important;box-sizing:border-box;}
+.pos-line-dialog .pos-dialog-footer button[type="button"] {width:1in;}
+.pos-line-dialog .pos-dialog-footer button[type="submit"] {width:1.7in;}
+.pos-line-dialog .pos-dialog-heading > .erp-table-icon-action {display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #bae6fd;border-radius:5px;background:#fff;color:var(--erp-accent);}
+.pos-line-dialog .pos-dialog-heading > .erp-table-icon-action:hover {background:var(--erp-accent-soft);}
+.pos-line-dialog .pos-dialog-heading > .erp-table-icon-action:focus-visible {outline:2px solid var(--erp-accent);outline-offset:2px;}
+.pos-line-dialog .pos-dialog-footer button[type="button"] {background:#fff;border:1px solid var(--erp-field-border);color:var(--erp-text);}
+.pos-line-dialog .pos-dialog-footer button[type="button"]:hover:not(:disabled) {background:#f1f5f9;}
+.pos-view .pos-line-dialog .pos-dialog-footer button[type="submit"] {background:var(--erp-accent) !important;border:1px solid var(--erp-accent) !important;color:#fff;}
+.pos-view .pos-line-dialog .pos-dialog-footer button[type="submit"]:hover:not(:disabled) {background:var(--erp-accent-hover) !important;border-color:var(--erp-accent-hover) !important;}

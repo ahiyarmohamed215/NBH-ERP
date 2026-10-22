@@ -39,6 +39,11 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
+    public List<CustomerDto> getDirectoryCustomers() {
+        return customerRepository.findAll().stream().map(CustomerDto::from).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<CustomerDto> getActiveCustomers() {
         return customerRepository.findByIsActiveTrue().stream()
                 .map(CustomerDto::from)
@@ -94,7 +99,8 @@ public class CustomerService {
                 .currentBalance(BigDecimal.ZERO)
                 .customerGroup(primaryGroup)
                 .customerGroups(groups)
-                .isActive(true)
+                .draft(Boolean.TRUE.equals(request.getDraft()))
+                .isActive(!Boolean.TRUE.equals(request.getDraft()))
                 .build();
 
         Customer saved = customerRepository.save(customer);
@@ -107,8 +113,13 @@ public class CustomerService {
 
     @Transactional
     public CustomerDto updateCustomer(Long id, CreateCustomerRequest request) {
-        Customer customer = customerRepository.findByIdForUpdate(id)
+        Customer customer = customerRepository.findAnyByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", "id", id));
+
+        if (!Boolean.TRUE.equals(customer.getDraft())) {
+            CustomerRepository.requireActive(customer);
+            if (Boolean.TRUE.equals(request.getDraft())) throw new BusinessException("An existing customer cannot be changed to a draft");
+        }
 
         // Enforce that only authorized staff can edit
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer: " + customer.getName());
@@ -128,6 +139,10 @@ public class CustomerService {
         customer.setPhone(request.getPhone());
         customer.setEmail(request.getEmail());
         customer.setAddress(request.getAddress());
+        if (request.getDraft() != null && Boolean.TRUE.equals(customer.getDraft())) {
+            customer.setDraft(request.getDraft());
+            customer.setIsActive(!request.getDraft());
+        }
         if (request.getCreditLimit() != null) {
             customer.setCreditLimit(request.getCreditLimit());
         }
@@ -148,6 +163,7 @@ public class CustomerService {
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer: " + customer.getName());
 
         customer.setIsActive(!customer.getIsActive());
+        if (Boolean.TRUE.equals(customer.getIsActive())) customer.setDraft(false);
         customerRepository.save(customer);
 
         auditLogService.log("CUSTOMER_STATUS", "CUSTOMERS", "Customer", customer.getCustomerCode(),

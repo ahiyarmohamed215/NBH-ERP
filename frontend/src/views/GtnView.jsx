@@ -766,8 +766,24 @@ const GtnView = React.forwardRef(function GtnView(props, ref) {
                 extraColumns={[{label:'Source',value:item=>item.sourceWarehouseName || '—'},{label:'Destination',value:item=>item.destinationWarehouseName || '—'}]} validateItem={validateTransferItem} quantityLabel="Transfer qty"
                 addDisabled={!formData.destinationWarehouseId || Boolean(isSameWarehouse)} addHint={!formData.destinationWarehouseId ? 'Select the destination warehouse before adding products.' : undefined}
                 searchProducts={transferSearchProducts} resultQuantity={product=>product.availableQuantity} searchEmptyMessage="No matching products with available stock."
-                quantityDetails={(product, editing) => <><span>Available qty</span><strong>{!product ? '—' : stockError ? 'Unavailable' : remainingStock(product, editing) ?? 'Loading...'}</strong></>}
-                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields"><label>Source warehouse<input className="erp-field" readOnly value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'}/></label><label>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea className="erp-field" maxLength={5000} rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
+                quantityDetails={(product, editing) => {
+                  const currentSourceWarehouse = warehouses.find(w => String(w.id) === String(formData.sourceWarehouseId))?.name;
+                  return (
+                    <div className="prn-return-card gtn-product-card">
+                      <small className="po-card-caption">Source warehouse</small>
+                      <h4 title={currentSourceWarehouse || undefined}>
+                        {product ? (currentSourceWarehouse || 'Not configured') : 'Select a product to fill automatically'}
+                      </h4>
+                      <div className="prn-return-card-metrics">
+                        <div>
+                          <span>Available qty</span>
+                          <b>{!product ? '—' : stockError ? 'Unavailable' : remainingStock(product, editing) ?? 'Loading...'}</b>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }}
+                onChange={items=>setFormData(previous=>({...previous,items}))} intakeFields={<><div className="purchase-fields gtn-warehouse-fields gtn-destination-line" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: 0, border: 0 }}><input type="text" readOnly className="erp-field" style={{ display: 'none' }} value={warehouses.find(w=>String(w.id)===String(formData.sourceWarehouseId))?.name || 'Select a product to fill automatically'} /><label style={{ width: '100%' }}>Destination warehouse *<FilterSelect variant="field" aria-label="Destination warehouse" value={formData.destinationWarehouseId} onChange={e=>setFormData({...formData, destinationWarehouseId:e.target.value})}><option value="">Select destination warehouse</option>{warehouses.filter(w=>String(w.id)!==String(formData.sourceWarehouseId)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</FilterSelect></label></div><StaffSearch staff={staff} value={formData.responsibleStaffId} onChange={responsibleStaffId=>setFormData(previous=>({...previous,responsibleStaffId}))}/></>} documentFields={<div className="purchase-fields"><label className="purchase-remarks">Remarks / transfer reason<textarea className="erp-field" maxLength={5000} rows={3} value={formData.remarks || ''} onChange={e=>setFormData({...formData, remarks:e.target.value})}/></label></div>}
                 actions={              <div style={{ display: 'flex', gap: '10px' }}>
                 <button className="erp-button"
                   type="button"

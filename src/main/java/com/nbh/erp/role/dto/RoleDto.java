@@ -17,6 +17,7 @@ public class RoleDto {
     private Long id;
     private String name;
     private String description;
+    private String status;
     private List<String> permissions;
 
     public static RoleDto from(Role role) {
@@ -24,6 +25,7 @@ public class RoleDto {
                 .id(role.getId())
                 .name(role.getName())
                 .description(role.getDescription())
+                .status(role.getStatus() != null ? role.getStatus() : "ACTIVE")
                 .permissions(role.getPermissions() != null
                         ? role.getPermissions().stream().map(p -> p.getName()).collect(Collectors.toList())
                         : List.of())

@@ -8,7 +8,7 @@ import './PurchasingAppearance.css';
 const optionText=node=>Array.isArray(node) ? node.map(optionText).join('') : React.isValidElement(node) ? optionText(node.props.children) : String(node ?? '');
 const readOptions=children=>React.Children.toArray(children).flatMap(child=>!React.isValidElement(child) ? [] : child.type===React.Fragment ? readOptions(child.props.children) : [{value:String(child.props.value ?? optionText(child.props.children)),label:optionText(child.props.children),disabled:child.props.disabled}]);
 
-export default function FilterSelect({value,onChange,children,selectedLabel,style={},title,onFocus,onBlur,variant='filter',className='',disabled=false,required=false,name:fieldName,id:fieldId,'aria-label':ariaLabel}) {
+export default function FilterSelect({value,onChange,children,selectedLabel,style={},title,onFocus,onBlur,variant='filter',className='',disabled=false,required=false,name:fieldName,id:fieldId,'aria-label':ariaLabel,searchable=true}) {
   const options=readOptions(children), selected=options.find(option=>option.value===String(value));
   const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[active,setActive]=useState(0),[position,setPosition]=useState({});
   const trigger=useRef(null),popup=useRef(null),list=useRef(null),search=useRef(null),id=useId();
@@ -47,12 +47,12 @@ export default function FilterSelect({value,onChange,children,selectedLabel,styl
     </button>
     {variant==='field' && <select className="modern-select-native erp-field" aria-hidden="true" tabIndex={-1} value={value} onChange={onChange} required={required} disabled={disabled} name={fieldName} onInvalid={event=>{event.preventDefault();trigger.current?.focus();if(!open)toggle();}}>{children}</select>}
     {open && createPortal(<div ref={popup} className="modern-filter-popup purchasing-no-shadows" style={position} onKeyDown={keydown}>
-      {options.length>=8 && <div className="modern-filter-search"><Search size={14}/><input className="erp-field" ref={search} type="text" aria-label={`Search ${name} options`} placeholder="Search options..." value={query} onChange={event=>{setQuery(event.target.value);setActive(0);}}/></div>}
+      {searchable && options.length>=8 && <div className="modern-filter-search"><Search size={14}/><input className="erp-field" ref={search} type="text" aria-label={`Search ${name} options`} placeholder="Search options..." value={query} onChange={event=>{setQuery(event.target.value);setActive(0);}}/></div>}
       <div ref={list} id={id} role="listbox" tabIndex={-1} aria-label={`${name} options`} aria-activedescendant={matches[active] ? `${id}-${active}` : undefined} className="modern-filter-options">
         {matches.map((option,index)=><button key={option.value} type="button" role="option" tabIndex={-1} id={`${id}-${index}`} aria-selected={option.value===String(value)} data-value={option.value} disabled={option.disabled} data-active={index===active}
           onMouseEnter={()=>setActive(index)} onClick={()=>choose(option)}><span>{option.label}</span>{option.value===String(value) && <Check size={14}/>}</button>)}
         {!matches.length && <p>No matching options</p>}
       </div>
-    </div>,document.body)}
+    </div>,trigger.current?.closest('dialog') || document.body)}
   </>;
 }

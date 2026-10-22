@@ -38,6 +38,20 @@ public class Invoice extends BaseEntity {
     @Column(name = "held_number", unique = true, length = 50)
     private String heldNumber;
 
+    @Column(name="packing_boxes") @Builder.Default private Integer packingBoxes=0;
+    @Column(name="packing_bags") @Builder.Default private Integer packingBags=0;
+    @Column(name="packing_p_bags") @Builder.Default private Integer packingPBags=0;
+    @Column(name="packing_others") @Builder.Default private Integer packingOthers=0;
+    private String assignedStaff;
+    private String reviewedBy;
+    private java.time.LocalDateTime reviewedAt;
+
+    @Column(columnDefinition="LONGTEXT") private String originalHeldSnapshot;
+    @Column(precision=19,scale=2) private BigDecimal originalHeldTotal;
+    private java.time.LocalDateTime originalHeldCapturedAt;
+    private java.time.LocalDateTime originalHeldSentAt;
+    @Column(length=1000) private String cancellationReason;
+
     @Column(name = "merged_invoice_id")
     private Long mergedInvoiceId;
 

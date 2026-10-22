@@ -1,0 +1,3 @@
+.pos-bill-remarks label{display:block;margin-bottom:6px;font-size:var(--erp-text-field);font-weight:600;color:var(--erp-text);}
+.pos-bill-remarks textarea.erp-field{width:100%;height:auto;min-height:110px;resize:vertical;padding:10px 12px;box-sizing:border-box;font:inherit;color:var(--erp-text);}
+.pos-bill-remarks-count{display:block;margin-top:6px;text-align:right;color:var(--erp-muted);font-size:var(--erp-text-small);}

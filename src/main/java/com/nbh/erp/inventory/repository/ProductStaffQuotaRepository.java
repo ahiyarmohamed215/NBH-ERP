@@ -21,7 +21,7 @@ public interface ProductStaffQuotaRepository extends com.nbh.erp.common.reposito
     @Query("SELECT q FROM ProductStaffQuota q WHERE q.product.id = :productId AND q.user.id = :userId " +
            "AND (:warehouseId IS NULL OR q.warehouse.id = :warehouseId OR q.warehouse IS NULL) " +
            "AND q.isActive = true " +
-           "ORDER BY CASE WHEN q.warehouse.id = :warehouseId THEN 1 ELSE 2 END")
+           "ORDER BY CASE WHEN q.warehouse.id = :warehouseId THEN 1 ELSE 2 END, q.createdAt ASC, q.id ASC")
     List<ProductStaffQuota> findMatchingActiveQuotas(
             @Param("productId") Long productId,
             @Param("userId") Long userId,
@@ -32,7 +32,7 @@ public interface ProductStaffQuotaRepository extends com.nbh.erp.common.reposito
     @Query("SELECT q FROM ProductStaffQuota q WHERE q.product.id = :productId AND q.user.id = :userId " +
            "AND (:warehouseId IS NULL OR q.warehouse.id = :warehouseId OR q.warehouse IS NULL) " +
            "AND q.isActive = true " +
-           "ORDER BY CASE WHEN q.warehouse.id = :warehouseId THEN 1 ELSE 2 END")
+           "ORDER BY CASE WHEN q.warehouse.id = :warehouseId THEN 1 ELSE 2 END, q.createdAt ASC, q.id ASC")
     List<ProductStaffQuota> lockMatchingActiveQuotas(
             @Param("productId") Long productId,
             @Param("userId") Long userId,
@@ -40,10 +40,10 @@ public interface ProductStaffQuotaRepository extends com.nbh.erp.common.reposito
     );
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseId(Long productId, Long userId, Long warehouseId);
+    List<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseId(Long productId, Long userId, Long warehouseId);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    Optional<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseIsNull(Long productId, Long userId);
+    List<ProductStaffQuota> findByProductIdAndUserIdAndWarehouseIsNull(Long productId, Long userId);
 
     List<ProductStaffQuota> findByProductId(Long productId);
 

@@ -169,6 +169,7 @@ public class StockAdjustmentService {
         if(reason==null || reason.isBlank() || reason.length()>1000)throw new BusinessException("Enter a cancellation reason of up to 1000 characters");
         var adjustment=adjustmentRepository.findByIdForUpdate(id)
                 .orElseThrow(()->new ResourceNotFoundException("Stock Adjustment","id",id));
+        if(adjustment.getSourceHeldBillId()!=null)throw new BusinessException("This count belongs to a reviewed held bill. Record a new stock correction to preserve its review history.");
         if(!java.util.Set.of("DRAFT","PROCESSED").contains(adjustment.getStatus()))throw new BusinessException("This adjustment is already cancelled");
         if("PROCESSED".equals(adjustment.getStatus())){
             Long warehouseId=adjustment.getWarehouse().getId();

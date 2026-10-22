@@ -8,6 +8,8 @@ import PurchaseProductSearch from '../components/PurchaseProductSearch';
 import FilterSelect from '../components/FilterSelect';
 import '../components/PurchasingAppearance.css';
 import DateRangePicker, {matchesDateRange} from '../components/DateRangePicker';
+import SupplierSearch from '../components/SupplierSearch';
+import DatePicker from '../components/DatePicker';
 import StatusBadge from '../components/StatusBadge';
 import { mergeGrnItems, calculateGrnStaging, buildGrnItemsPayload } from '../utils/grnItems';
 import './GrnView.css';
@@ -1280,12 +1282,24 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
             </button>
             {editingLineIndex !== null && <button type="button" className="btn btn-glass erp-button" onClick={resetStagingItem}>Cancel line edit</button>}
           <div className="grn-header-fields">
-            <label>Supplier *<FilterSelect variant="field" aria-label="Supplier" className="input-glass" value={formData.supplierId} onChange={e => setFormData({...formData, supplierId:e.target.value})}>
-              <option value="">Select supplier</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              {editingGrnId && formData.supplierId && !suppliers.some(s => String(s.id) === String(formData.supplierId)) && <option value={formData.supplierId}>{formData.supplierName}</option>}
-            </FilterSelect></label>
-            <label>GRN date *<input className="input-glass erp-field" type="date" required value={formData.grnDate} onChange={e => setFormData({...formData, grnDate:e.target.value})} /></label>
+            <SupplierSearch
+              suppliers={editingGrnId && formData.supplierId && !suppliers.some(s => String(s.id) === String(formData.supplierId))
+                ? [...suppliers, { id: formData.supplierId, name: formData.supplierName }]
+                : suppliers}
+              value={formData.supplierId}
+              onChange={id => setFormData(prev => ({ ...prev, supplierId: id }))}
+              label="Supplier *"
+              ariaLabel="Supplier"
+              placeholder="Search supplier..."
+            />
+            <DatePicker
+              value={formData.grnDate}
+              onChange={date => setFormData(prev => ({ ...prev, grnDate: date }))}
+              required
+              ariaLabel="GRN date"
+              label="GRN date *"
+              className="input-glass"
+            />
             <label className="grn-entry-remarks">Remarks / notes<textarea className="input-glass erp-field" name="remarks" maxLength={5000} rows={3} placeholder="Delivery note or remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks:e.target.value})} /></label>
           </div>
           </div>

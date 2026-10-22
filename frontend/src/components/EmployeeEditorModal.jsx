@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Save, LoaderCircle, UserCheck, ShieldCheck } from 'lucide-react';
+import { X, Save, LoaderCircle, UserCheck, ShieldCheck, KeyRound } from 'lucide-react';
 import { staffCode } from '../utils/staffCode';
 import StatusBadge from './StatusBadge';
 import './SupplierEditorModal.css';
@@ -143,6 +143,32 @@ export default function EmployeeEditorModal({
         <form ref={formRef} noValidate onSubmit={(e) => submit(e, false)} aria-busy={saving}>
           <div className="allocation-workspace-body">
             <fieldset disabled={saving} className="supplier-editor-fields">
+              {selectedEmployee?.passwordResetRequested && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  padding: '12px 14px',
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '8px',
+                  color: '#92400e',
+                  fontSize: '13px',
+                  lineHeight: 1.4,
+                  marginBottom: '10px',
+                }}>
+                  <KeyRound size={18} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ display: 'block', color: '#78350f', marginBottom: '2px' }}>
+                      Password Reset Requested by Employee
+                    </strong>
+                    <span>
+                      This user submitted a password reset request{selectedEmployee.passwordResetNotes ? (': "' + selectedEmployee.passwordResetNotes + '"') : '.'} Enter a new password below. When saved, the reset request will automatically clear, and the new password will be sent to the employee's registered email ({form.email || selectedEmployee.email}).
+                    </span>
+                  </div>
+                </div>
+              )}
               <label className="supplier-editor-field" htmlFor="employee-fullName">
                 <span>
                   Full Name {!isDraft && <span className="supplier-required">*</span>}

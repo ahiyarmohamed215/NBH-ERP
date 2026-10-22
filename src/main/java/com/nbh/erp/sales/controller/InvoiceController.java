@@ -27,20 +27,25 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Sales & Invoicing", description = "Point of Sale, Billing, and Held Carts APIs")
 public class InvoiceController {
-    public record CompleteHeldRequest(@jakarta.validation.constraints.NotEmpty java.util.List<@jakarta.validation.constraints.NotNull Long> ids,java.util.Map<Long,Long> expectedVersions) {}
+    public record CompleteHeldRequest(@jakarta.validation.constraints.NotEmpty java.util.List<@jakarta.validation.constraints.NotNull Long> ids,java.util.Map<Long,Long> expectedVersions,com.nbh.erp.sales.dto.InvoicePacking packing) {}
     @PostMapping("/complete-held")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_EDIT')")
     public com.nbh.erp.common.dto.ApiResponse<?> completeHeld(@Valid @RequestBody CompleteHeldRequest request) {
-        return com.nbh.erp.common.dto.ApiResponse.ok(invoiceService.completeHeldInvoices(request.ids(),request.expectedVersions()));
+        return com.nbh.erp.common.dto.ApiResponse.ok(invoiceService.completeHeldInvoices(request.ids(),request.expectedVersions(),request.packing()));
     }
 
 
     private final InvoiceService invoiceService;
+    private final com.nbh.erp.sales.service.PosAllocationService posAllocations;
+    @GetMapping("/pos/stock-limits")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_CREATE','SALES_EDIT')")
+    public ApiResponse<?> posStockLimits(@RequestParam(required=false) Long excludeId){return ApiResponse.ok(posAllocations.current(excludeId));}
+
     private final com.nbh.erp.sales.service.PosProgressService posProgress;
 
     @GetMapping("/held/workspace")
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
-    public ApiResponse<?> heldWorkspace(@RequestParam(defaultValue="mine") String scope,@RequestParam(required=false) String query,@RequestParam(required=false) Long excludeId){return ApiResponse.ok(invoiceService.heldWorkspace(scope,query,excludeId));}
+    public ApiResponse<?> heldWorkspace(@RequestParam(defaultValue="mine") String scope,@RequestParam(required=false) String query,@RequestParam(required=false) Long excludeId,@RequestParam(defaultValue="false") boolean history){return ApiResponse.ok(invoiceService.heldWorkspace(scope,query,excludeId,history));}
 
     @PostMapping("/held/merge-preview")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_EDIT')")
@@ -48,7 +53,7 @@ public class InvoiceController {
 
     @GetMapping("/pos/progress")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_CREATE')")
-    public ApiResponse<?> progress(@RequestParam Long customerId,@RequestParam(required=false) Long billId){return ApiResponse.ok(posProgress.progress(customerId,billId));}
+    public ApiResponse<?> progress(@RequestParam Long customerId,@RequestParam(required=false) Long billId,@RequestParam(required=false) String month){return ApiResponse.ok(posProgress.progress(customerId,billId,month));}
 
     @GetMapping
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
@@ -58,6 +63,7 @@ public class InvoiceController {
             @RequestParam(required = false) Long customerId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String paymentType,
+            @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String cashier,
@@ -65,7 +71,7 @@ public class InvoiceController {
             @PageableDefault(size = 20) Pageable pageable
     ) {
         PagedResponse<InvoiceDto> response = invoiceService.searchInvoices(
-                warehouseId, customerId, status, paymentType, startDate, endDate, cashier, query, pageable
+                warehouseId, customerId, status, paymentType, paymentMethod, startDate, endDate, cashier, query, pageable
         );
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -95,6 +101,16 @@ public class InvoiceController {
     @Operation(summary = "Get invoice by ID")
     public ResponseEntity<ApiResponse<InvoiceDto>> getInvoiceById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(invoiceService.getInvoiceById(id)));
+    }
+
+    @GetMapping("/customer/{customerId}/outstanding")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('SALES') or T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
+    @Operation(summary = "Get customer outstanding unpaid invoices or full invoice ledger for POS")
+    public ResponseEntity<ApiResponse<List<InvoiceDto>>> getCustomerOutstanding(
+            @PathVariable Long customerId,
+            @RequestParam(defaultValue = "true") boolean outstandingOnly
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(invoiceService.getCustomerInvoices(customerId, outstandingOnly)));
     }
 
     @GetMapping("/number/{number}")
@@ -129,11 +145,12 @@ public class InvoiceController {
         return ResponseEntity.ok(ApiResponse.ok("Held invoice completed successfully", completed));
     }
 
+    public record CancelHeldRequest(String reason,Long expectedVersion) {}
     @PostMapping("/held/{id}/cancel")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN') or hasAuthority('ROLE_ADMIN') or hasAuthority('SALES_CREATE') or hasAuthority('SALES_EDIT')")
     @Operation(summary = "Discard/cancel a held sales invoice")
-    public ResponseEntity<ApiResponse<Void>> cancelHeldInvoice(@PathVariable Long id) {
-        invoiceService.cancelHeldInvoice(id);
+    public ResponseEntity<ApiResponse<Void>> cancelHeldInvoice(@PathVariable Long id,@RequestBody(required=false) CancelHeldRequest request) {
+        invoiceService.cancelHeldInvoice(id,request==null?null:request.reason(),request==null?null:request.expectedVersion());
         return ResponseEntity.ok(ApiResponse.ok("Held invoice discarded", null));
     }
 

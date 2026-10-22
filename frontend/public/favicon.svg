@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <defs>
+    <linearGradient id="nbhFavBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="45%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#1e40af" />
+    </linearGradient>
+  </defs>
+
+  <!-- Clean White Background with subtle rounded squircle corners -->
+  <rect width="48" height="48" rx="10" fill="#ffffff" />
+  <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="9.25" stroke="#e2e8f0" stroke-width="1.5" />
+
+  <!-- Luxury NBH Lettermark in Blue -->
+  <text
+    x="21.5"
+    y="29.5"
+    font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif"
+    font-size="14.5"
+    font-weight="800"
+    fill="url(#nbhFavBlue)"
+    text-anchor="middle"
+    letter-spacing="1.5"
+  >
+    NBH
+  </text>
+
+  <!-- Registered Trademark Emblem (®) -->
+  <g transform="translate(39.5, 17)">
+    <circle cx="0" cy="0" r="2.8" stroke="url(#nbhFavBlue)" stroke-width="0.8" fill="none" />
+    <text
+      x="0"
+      y="1.1"
+      font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif"
+      font-size="3.2"
+      font-weight="700"
+      fill="url(#nbhFavBlue)"
+      text-anchor="middle"
+    >
+      R
+    </text>
+  </g>
+</svg>

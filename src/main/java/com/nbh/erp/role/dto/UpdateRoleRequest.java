@@ -13,5 +13,7 @@ public class UpdateRoleRequest {
 
     private String description;
 
+    private String status;
+
     private List<String> permissions;
 }

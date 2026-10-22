@@ -87,6 +87,17 @@ public class CustomerTargetService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<CustomerTargetProgressDto> getCustomerTargetProgress(Long customerId, LocalDate monthStart, LocalDate asOf) {
+        Customer customer=customerRepository.findByIdAndIsActiveTrue(customerId).orElseThrow(() -> new ResourceNotFoundException("Customer","id",customerId));
+        Set<Long> groups=customer.getCustomerGroups()==null?Set.of():customer.getCustomerGroups().stream().map(CustomerGroup::getId).collect(Collectors.toSet());
+        return targetRepository.findAllWithTiers().stream()
+            .filter(target->Boolean.TRUE.equals(target.getIsActive()) && !target.getStartDate().isAfter(asOf) && !target.getEndDate().isBefore(monthStart))
+            .filter(target->target.getCustomer()!=null?target.getCustomer().getId().equals(customerId):target.getCustomerGroup()==null || groups.contains(target.getCustomerGroup().getId()))
+            .map(target->mapToProgressDto(target,customerId,customer.getName(),asOf))
+            .sorted(Comparator.comparing(CustomerTargetProgressDto::getTargetName)).toList();
+    }
+
     @Transactional
     public CustomerTargetDto createTarget(CreateCustomerTargetRequest request) {
         SecurityUtils.enforceCanEdit("CUSTOMER_TARGET", "Customer Target");
@@ -285,21 +296,21 @@ public class CustomerTargetService {
 
     private BigDecimal calculateAchievedSales(CustomerTarget target, Long customerId) {
         if (customerId != null) {
-            return invoiceRepository.getCustomerSalesBetween(customerId, target.getStartDate(), target.getEndDate());
+            return invoiceRepository.getCustomerPerformanceBetween(customerId, target.getStartDate(), target.getEndDate());
         }
         if (target.getCustomer() != null) {
-            return invoiceRepository.getCustomerSalesBetween(target.getCustomer().getId(), target.getStartDate(), target.getEndDate());
+            return invoiceRepository.getCustomerPerformanceBetween(target.getCustomer().getId(), target.getStartDate(), target.getEndDate());
         }
         if (target.getSalesman() != null) {
-            return invoiceRepository.getSalesmanSalesBetween(target.getSalesman().getId(), target.getStartDate(), target.getEndDate());
+            return invoiceRepository.getSalesmanPerformanceBetween(target.getSalesman().getId(), target.getStartDate(), target.getEndDate());
         }
-        return invoiceRepository.getTotalSalesBetween(target.getStartDate(), target.getEndDate());
+        return invoiceRepository.getTotalPerformanceBetween(target.getStartDate(), target.getEndDate());
     }
 
     private long calculateInvoiceCount(CustomerTarget target, Long customerId) {
         Long cId = customerId != null ? customerId : (target.getCustomer() != null ? target.getCustomer().getId() : null);
         if (cId != null) {
-            return invoiceRepository.countCustomerInvoicesBetween(cId, target.getStartDate(), target.getEndDate());
+            return invoiceRepository.countCustomerPerformanceBetween(cId, target.getStartDate(), target.getEndDate());
         }
         return 0L;
     }
@@ -395,8 +406,13 @@ public class CustomerTargetService {
     }
 
     private CustomerTargetProgressDto mapToProgressDto(CustomerTarget target, Long customerId, String customerName) {
-        BigDecimal achieved = invoiceRepository.getCustomerSalesBetween(customerId, target.getStartDate(), target.getEndDate());
-        long count = invoiceRepository.countCustomerInvoicesBetween(customerId, target.getStartDate(), target.getEndDate());
+        return mapToProgressDto(target,customerId,customerName,target.getEndDate());
+    }
+
+    private CustomerTargetProgressDto mapToProgressDto(CustomerTarget target, Long customerId, String customerName, LocalDate asOf) {
+        LocalDate through=target.getEndDate().isBefore(asOf)?target.getEndDate():asOf;
+        BigDecimal achieved = invoiceRepository.getCustomerPerformanceBetween(customerId, target.getStartDate(), through);
+        long count = invoiceRepository.countCustomerPerformanceBetween(customerId, target.getStartDate(), through);
 
         BigDecimal goal = target.getTargetAmount();
         BigDecimal percentage = BigDecimal.ZERO;

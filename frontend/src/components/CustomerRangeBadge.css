@@ -1,0 +1,3 @@
+.customer-range-badge {display:inline-flex;align-items:center;justify-content:center;gap:4px;max-width:100%;box-sizing:border-box;padding:3px 7px;border:1px solid var(--range-badge-border);border-radius:var(--erp-control-radius,5px);background:var(--range-badge-bg);color:var(--range-badge-text);font-family:inherit;font-size:var(--erp-text-caption,.74rem);font-weight:600;line-height:1.35;white-space:nowrap;vertical-align:middle;}
+.customer-range-badge > svg {flex-shrink:0;color:inherit;stroke:currentColor;}
+.pos-view .customer-range-badge {font-size:.69rem;padding:1px 6px;}

@@ -39,12 +39,22 @@ public class PosProgressService {
     }
     @Transactional
     public Progress progress(Long customerId,Long billId) {
+        return progress(customerId,billId,null);
+    }
+    @Transactional
+    public Progress progress(Long customerId,Long billId,String requestedMonth) {
+        var today=LocalDate.now(businessClock);
+        java.time.YearMonth month;
+        try{month=requestedMonth==null || requestedMonth.isBlank()?java.time.YearMonth.from(today):java.time.YearMonth.parse(requestedMonth);}
+        catch(java.time.DateTimeException error){throw new BusinessException("Choose a valid month (YYYY-MM)");}
+        if(month.isAfter(java.time.YearMonth.from(today)))throw new BusinessException("Choose the current month or an earlier month");
+        LocalDate through=month.atEndOfMonth().isAfter(today)?today:month.atEndOfMonth();
         BigDecimal bill=BigDecimal.ZERO;
         if(billId!=null){var saved=invoices.getInvoiceById(billId);if(!"HELD".equals(saved.getStatus()) || !customerId.equals(saved.getCustomerId()))throw new BusinessException("Save the current customer on the held bill before loading its progress");bill=saved.getNetTotal();}
         final BigDecimal currentBill=bill;
-        var monthly=ranges.getCustomerProgress(customerId,bill);
+        var monthly=ranges.getCustomerProgress(customerId,bill,month.toString());
         var milestones=ranges.getActiveRanges().stream().map(range->milestone(range.getName(),range.getMinSpend(),monthly.getMonthlyPurchases(),currentBill,"")).toList();
-        var campaigns=targets.getCustomerTargetProgress(customerId).stream().map(target->{
+        var campaigns=targets.getCustomerTargetProgress(customerId,month.atDay(1),through).stream().map(target->{
             var levels=new java.util.ArrayList<Milestone>();
             levels.add(milestone("Overall target",target.getTargetAmount(),target.getCurrentAchievedAmount(),currentBill,""));
             for(var tier:target.getTiers()){
@@ -54,9 +64,8 @@ public class PosProgressService {
             }
             return new Campaign(target.getTargetName(),target.getEndDate(),levels);
         }).toList();
-        LocalDate today=LocalDate.now(businessClock);
         return new Progress(monthly.getCurrentRangeName(),monthly.getNextRangeName(),Boolean.TRUE.equals(monthly.getIsHighestRange()),
-            today.withDayOfMonth(1),today.withDayOfMonth(today.lengthOfMonth()),monthly.getMonthlyPurchases(),bill,monthly.getMonthlyPurchases().add(bill),
+            month.atDay(1),month.atEndOfMonth(),monthly.getMonthlyPurchases(),bill,monthly.getMonthlyPurchases().add(bill),
             milestone(monthly.getNextRangeName(),monthly.getNextRangeThreshold(),monthly.getMonthlyPurchases(),bill,""),milestones,campaigns);
     }
 }

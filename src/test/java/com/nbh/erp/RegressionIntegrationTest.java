@@ -1,4 +1,5 @@
 package com.nbh.erp;
+import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.sales.dto.*;
 import com.nbh.erp.sales.service.*;
 import com.nbh.erp.sales.repository.*;
@@ -167,11 +168,19 @@ class RegressionIntegrationTest {
  @Test void rotatedRefreshCannotBeReused() { var login=new com.nbh.erp.auth.dto.LoginRequest();login.setUsername(admin.getUsername());login.setPassword("safe-test-password");var response=auth.login(login);var req=new com.nbh.erp.auth.dto.RefreshTokenRequest();req.setRefreshToken(response.getRefreshToken());var rotated=auth.refreshToken(req);assertNotEquals(response.getRefreshToken(),rotated.getRefreshToken());assertThrows(RuntimeException.class,()->auth.refreshToken(req)); }
  @Test void ordinaryUserCannotGrantAdministrator() { var p=UserPrincipal.builder().username("clerk").active(true).authorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_MANAGE"))).build();SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));assertThrows(org.springframework.security.access.AccessDeniedException.class,()->SecurityUtils.checkRoleGrant(roles.findByName("ROLE_ADMIN").orElseThrow())); }
  @Test void testSignupAndDuplicateHandling() {
-  auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "secret123", "testnewuser@example.com", "New User", "0771234567"));
+  auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "testnewuser@example.com", "New User", "0771234567"));
+  // Duplicate username
   assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
-      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "secret123", "other@example.com", "Other", "0771234567")));
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "other@example.com", "Other", "0779998888")));
+  // Duplicate email
   assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
-      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("differentuser", "secret123", "testnewuser@example.com", "Other", "0771234567")));
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("differentuser", "SecurePass123!", "testnewuser@example.com", "Other", "0779998888")));
+  // Duplicate phone
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("phoneuser", "SecurePass123!", "phoneuser@example.com", "Other", "0771234567")));
+  // Weak password rejected
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("weakuser", "123456", "weakuser@example.com", "Other", "0779997777")));
  }
 
 
@@ -509,13 +518,13 @@ class RegressionIntegrationTest {
  }
 
  @Test void warehouseCheckpointsDoNotPostStockUntilCompletion() {
-  var invoice=invoices.createInvoice(sale(true));var update=new UpdateInvoiceRequest();update.setStatus("SENT_TO_WAREHOUSE");invoices.updateInvoice(invoice.getId(),update);
-  update.setStatus("STOCK_ADJUSTED");invoices.updateInvoice(invoice.getId(),update);
+  var invoice=invoices.createInvoice(sale(true));var update=new UpdateInvoiceRequest();update.setStatus("SENT_TO_WAREHOUSE");assertThrows(BusinessException.class,()->invoices.updateInvoice(invoice.getId(),update));
+  update.setStatus("STOCK_ADJUSTED");assertThrows(BusinessException.class,()->invoices.updateInvoice(invoice.getId(),update));
   assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
   assertTrue(invoices.getHeldInvoices(null).stream().anyMatch(i->i.getId().equals(invoice.getId())));
-  invoices.completeHeldInvoices(List.of(invoice.getId()));
-  assertEquals(0,n("98").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
-  assertEquals(0,n("20").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance()));
+  assertThrows(BusinessException.class,()->invoices.completeHeldInvoices(List.of(invoice.getId())));
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertEquals(0,n("0").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance()));
  }
 
  @Test void grnCancellationRestoresOriginalStock() {

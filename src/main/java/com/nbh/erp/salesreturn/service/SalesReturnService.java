@@ -145,7 +145,7 @@ public class SalesReturnService {
             // If condition is restockable, increase stock in warehouse
             if (isRestockable) {
                 stockService.increaseStock(
-                        warehouseId,
+                        original.fulfillmentWarehouse().getId(),
                         product.getId(),
                         itemReq.getQuantity(),
                         original.getCostPrice(),

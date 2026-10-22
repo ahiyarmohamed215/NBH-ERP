@@ -24,6 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final CustomUserDetailsService userDetailsService;
+    private final com.nbh.erp.auth.service.SessionActivityService sessionActivity;
 
     @Override
     protected void doFilterInternal(
@@ -37,6 +38,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt, "ACCESS")) {
                 String username = tokenProvider.getUsernameFromToken(jwt);
 
+                String sessionId = tokenProvider.claims(jwt).get("sid", String.class);
+                if (sessionId != null) sessionActivity.requireActive(sessionId, username);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 if (!userDetails.isEnabled() || !tokenProvider.matchesVersion(jwt, ((com.nbh.erp.security.UserPrincipal) userDetails).getTokenVersion())) {
                     filterChain.doFilter(request, response);
@@ -51,6 +54,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
+        } catch (org.springframework.security.authentication.BadCredentialsException ex) {
+            log.debug("Session authentication rejected: {}", ex.getMessage());
         } catch (Exception ex) {
             log.error("Could not set user authentication in security context", ex);
         }

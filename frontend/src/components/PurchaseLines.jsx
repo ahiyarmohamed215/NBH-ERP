@@ -66,9 +66,9 @@ export default function PurchaseLines({ products, items, onChange, quantityField
         {!inlineIntakeFields && intakeFields}
       </>}
       <div className="purchase-entry-fields">
+        <label>{quantityLabel} *<input className="erp-field" type="number" data-purchase-field="quantity" inputMode="decimal" min={quantityPrecision===3?"0.001":"0.01"} step={quantityPrecision===3?"0.001":"0.01"} value={quantity} aria-invalid={Boolean(touched.quantity && quantityError)} onBlur={()=>setTouched(previous=>({...previous,quantity:true}))} onFocus={event=>event.target.select()} onChange={e=>setQuantity(readNumericInput(e))}/>{touched.quantity && quantityError && <small className="purchase-field-error">{quantityError}</small>}</label>
         {inlineIntakeFields && intakeFields}
         {intakeLayout !== 'gtn' && quantityDetails && <div className="purchase-stock-details">{quantityDetails(product, editing)}</div>}
-        <label>{quantityLabel} *<input className="erp-field" type="number" data-purchase-field="quantity" inputMode="decimal" min={quantityPrecision===3?"0.001":"0.01"} step={quantityPrecision===3?"0.001":"0.01"} value={quantity} aria-invalid={Boolean(touched.quantity && quantityError)} onBlur={()=>setTouched(previous=>({...previous,quantity:true}))} onFocus={event=>event.target.select()} onChange={e=>setQuantity(readNumericInput(e))}/>{touched.quantity && quantityError && <small className="purchase-field-error">{quantityError}</small>}</label>
         {withCost && showCostField && <label>Unit cost (LKR) *<input className="erp-field" type="number" data-purchase-field="cost" inputMode="decimal" min="0" step="0.01" aria-invalid={Boolean(touched.cost && costError)} onBlur={()=>setTouched(previous=>({...previous,cost:true}))} readOnly={costReadOnly} value={costReadOnly && !product ? '' : cost} onFocus={event=>event.target.select()} onChange={e=>setCost(readNumericInput(e))}/>{touched.cost && costError && <small className="purchase-field-error">{costError}</small>}</label>}
       </div>
       {intakeLayout === 'gtn' && documentFields}

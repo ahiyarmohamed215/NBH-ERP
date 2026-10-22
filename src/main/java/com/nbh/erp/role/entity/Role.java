@@ -27,6 +27,10 @@ public class Role {
     @Column(length = 255)
     private String description;
 
+    @Column(length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "role_permissions",

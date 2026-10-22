@@ -1,0 +1,2 @@
+ALTER TABLE roles ADD COLUMN status VARCHAR(20) NULL;
+UPDATE roles SET status = 'ACTIVE' WHERE status IS NULL;

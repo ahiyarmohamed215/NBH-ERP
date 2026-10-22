@@ -58,6 +58,21 @@ public class UserService {
             throw new DuplicateResourceException("User", "email", request.getEmail());
         }
 
+        String normalizedPhone = null;
+        if (StringUtils.hasText(request.getPhone())) {
+            String rawPhone = request.getPhone().trim();
+            try {
+                normalizedPhone = com.nbh.erp.common.validation.PhoneValidator.normalize(rawPhone);
+            } catch (Exception ignored) {
+                normalizedPhone = rawPhone;
+            }
+            String cleanDigits = rawPhone.replaceAll("[^0-9]", "");
+            java.util.List<User> matching = userRepository.findMatchingPhone(rawPhone, normalizedPhone, cleanDigits);
+            if (!matching.isEmpty()) {
+                throw new DuplicateResourceException("User", "phone", request.getPhone());
+            }
+        }
+
         Set<Role> roles = new HashSet<>();
         for (String roleName : request.getRoles()) {
             Role role = roleRepository.findByName(roleName)
@@ -71,7 +86,7 @@ public class UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
                 .fullName(request.getFullName())
-                .phone(request.getPhone())
+                .phone(normalizedPhone != null ? normalizedPhone : request.getPhone())
                 .isActive(true)
                 .approvalStatus("APPROVED")
                 .roles(roles)
@@ -105,9 +120,26 @@ public class UserService {
                     }
                 });
 
+        if (StringUtils.hasText(request.getPhone())) {
+            String rawPhone = request.getPhone().trim();
+            String normalizedPhone;
+            try {
+                normalizedPhone = com.nbh.erp.common.validation.PhoneValidator.normalize(rawPhone);
+            } catch (Exception ignored) {
+                normalizedPhone = rawPhone;
+            }
+            String cleanDigits = rawPhone.replaceAll("[^0-9]", "");
+            java.util.List<User> matching = userRepository.findMatchingPhone(rawPhone, normalizedPhone, cleanDigits);
+            if (matching.stream().anyMatch(u -> !u.getId().equals(id))) {
+                throw new DuplicateResourceException("User", "phone", request.getPhone());
+            }
+            user.setPhone(normalizedPhone != null ? normalizedPhone : rawPhone);
+        } else {
+            user.setPhone(null);
+        }
+
         user.setEmail(request.getEmail());
         user.setFullName(request.getFullName());
-        user.setPhone(request.getPhone());
         user.setEmployeeCode(user.getEmployeeCode());
 
         boolean isSuperAdmin = SecurityUtils.isSuperAdmin(user);
@@ -124,6 +156,8 @@ public class UserService {
 
         if (StringUtils.hasText(request.getPassword())) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setPasswordResetRequested(false);
+            user.setPasswordResetNotes(null);
         }
 
         if (request.getRoles() != null && (!isSuperAdmin || !request.getRoles().isEmpty())) {

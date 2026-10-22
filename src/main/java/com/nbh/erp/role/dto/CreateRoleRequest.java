@@ -17,5 +17,14 @@ public class CreateRoleRequest {
 
     private String description;
 
+    private String status;
+
     private List<String> permissions;
+
+    public CreateRoleRequest(String name, String description, List<String> permissions) {
+        this.name = name;
+        this.description = description;
+        this.status = "ACTIVE";
+        this.permissions = permissions;
+    }
 }

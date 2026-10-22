@@ -341,9 +341,10 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: none;
-  border-color: var(--primary-600);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  outline: none !important;
+  border-color: #93c5fd !important;
+  background-color: #f8fbff;
+  box-shadow: none !important;
 }
 
 .input-glass:disabled,
@@ -539,13 +540,12 @@ textarea:disabled {
 
 /* Collapsed Sidebar in Distraction-Free / Full Screen Mode */
 .glass-sidebar.collapsed {
-  width: 56px !important;
-  min-width: 56px !important;
+  width: 92px !important;
+  min-width: 92px !important;
 }
 
 .glass-sidebar.collapsed .sidebar-brand-text,
 .glass-sidebar.collapsed .sidebar-section-title,
-.glass-sidebar.collapsed .sidebar-nav-btn span,
 .glass-sidebar.collapsed .forward-icon,
 .glass-sidebar.collapsed .profile-details {
   display: none !important;
@@ -553,7 +553,8 @@ textarea:disabled {
 
 .glass-sidebar.collapsed .sidebar-nav-btn {
   justify-content: center !important;
-  padding: 8px 0 !important;
+  padding: 8px 2px !important;
+  flex-direction: column !important;
 }
 
 .glass-sidebar.collapsed .nav-icon-wrap {
@@ -738,4 +739,38 @@ aside *:active,
     break-after: avoid !important;
     margin-bottom: 0 !important;
   }
+}
+
+
+/* Hide sidebar scrollbars across all browsers */
+.glass-sidebar,
+.glass-sidebar *,
+.glass-sidebar .erp-sidebar-nav {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.glass-sidebar::-webkit-scrollbar,
+.glass-sidebar *::-webkit-scrollbar,
+.glass-sidebar .erp-sidebar-nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Whole-pixel row spacing keeps the fractional underline equally sharp in every module. */
+.glass-sidebar.collapsed .erp-sidebar-module {
+  height:52px;
+  min-height:52px;
+  flex-shrink:0;
+  box-sizing:border-box;
+}
+.erp-sidebar-selection-line {
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:2px;
+  background:var(--erp-accent,#0284c7);
+  border-radius:0 0 8px 8px;
+  pointer-events:none;
 }

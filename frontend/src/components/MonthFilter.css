@@ -1,0 +1,10 @@
+.erp-month-filter.date-range-trigger {flex-shrink:0;}
+.erp-month-filter.date-range-trigger:disabled {opacity:.55;cursor:not-allowed;}
+.month-filter-popover header {align-items:center;}
+.month-filter-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.month-filter-cell.date-range-day {height:36px;font-weight:500;}
+.month-filter-cell:disabled,.month-filter-popover .date-range-month button:disabled {opacity:.4;cursor:not-allowed;}
+.month-filter-popover .month-filter-year {display:inline-flex;align-items:center;gap:6px;padding:6px 10px;color:#334155;font-family:inherit;font-size:var(--erp-text-body,.82rem);font-weight:600;}
+.month-filter-popover .month-filter-year:hover {background:#eff6ff;}
+.month-filter-popover .month-filter-year:focus-visible {outline:2px solid var(--erp-accent,#0284c7);outline-offset:1px;}
+.month-filter-popover footer > span {color:#64748b;}

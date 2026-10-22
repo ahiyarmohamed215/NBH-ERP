@@ -13,6 +13,9 @@ import java.util.Optional;
 @Repository
 public interface SalesReturnRepository extends JpaRepository<SalesReturn, Long> {
 
+    @Query("select r from SalesReturn r where r.status='COMPLETED' and r.returnDate between :start and :end")
+    java.util.List<SalesReturn> findCompletedForPerformance(@Param("start") java.time.LocalDate start,@Param("end") java.time.LocalDate end);
+
     Optional<SalesReturn> findByReturnNumber(String returnNumber);
     @Query("select coalesce(sum(i.quantity),0) from SalesReturnItem i where i.invoiceItemId=:lineId and i.salesReturn.status='COMPLETED'")
     java.math.BigDecimal returnedQuantity(@Param("lineId") Long lineId);

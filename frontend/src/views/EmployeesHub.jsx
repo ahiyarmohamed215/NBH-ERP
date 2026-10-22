@@ -19,7 +19,7 @@ import FilterSelect from '../components/FilterSelect';
 import EmployeeDetailsModal from '../components/EmployeeDetailsModal';
 import EmployeeEditorModal from '../components/EmployeeEditorModal';
 import './EmployeeDialogs.css';
-import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info, Trash2, Printer, RefreshCw } from 'lucide-react';
+import { Plus, Search, Edit2, CheckCircle, X, Phone, Mail, Shield, ShieldCheck, Clock, ListFilter, Check, UserCheck, UserX, Info, Trash2, Printer, RefreshCw, KeyRound } from 'lucide-react';
 
 export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
   const { user: currentUser } = useAuth();
@@ -682,7 +682,13 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           roles: rolesToSave,
           isActive: isSuperAdminUser(selectedEmployee) ? true : undefined,
         });
-        addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
+        const resetNoted = selectedEmployee.passwordResetRequested && formData.password;
+        addToast(
+          resetNoted
+            ? `Employee "${formData.fullName || selectedEmployee.username}" password updated. Reset request resolved and credentials sent to ${formData.email || selectedEmployee.email}.`
+            : `Employee "${formData.fullName || selectedEmployee.username}" updated`,
+          'success'
+        );
         setModalMode(null);
         loadData();
       } catch (err) {
@@ -791,9 +797,9 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
 
   return (
-    <div className="erp-page"
+    <div className={`erp-page${modalMode === 'add' || modalMode === 'edit' ? ' inventory-allocation-focus' : ''}`}
       style={{
-        padding: '24px 32px',
+        padding: (modalMode === 'add' || modalMode === 'edit') ? '12px' : '24px 32px',
         flex: 1,
         height: '100%',
         maxHeight: '100%',
@@ -807,7 +813,23 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
         overflow: 'hidden',
       }}
     >
-      {/* Page Header (Fixed / Sticky at Top) */}
+      {(modalMode === 'add' || modalMode === 'edit') ? (
+        <EmployeeEditorModal
+          form={formData}
+          setForm={setFormData}
+          editing={modalMode === 'edit'}
+          selectedEmployee={selectedEmployee}
+          saving={submitting}
+          roles={roles}
+          onClose={() => {
+            setModalMode(null);
+            setSelectedEmployee(null);
+          }}
+          onSubmit={handleSaveEmployee}
+        />
+      ) : (
+        <>
+          {/* Page Header (Fixed / Sticky at Top) */}
       <div className="erp-page-header"
         style={{
           display: 'flex',
@@ -1110,32 +1132,12 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                           </td>
 
                           <td className="erp-table-cell">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '50%',
-                                  backgroundColor: '#f0fdf4',
-                                  color: '#16a34a',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 700,
-                                  fontSize: 'var(--erp-text-body)',
-                                  border: '1px solid #bbf7d0',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {(emp.fullName || emp.username).slice(0, 1).toUpperCase()}
+                            <div>
+                              <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                                {emp.fullName || emp.username}
                               </div>
-                              <div>
-                                <div style={{ fontWeight: 600, color: '#0f172a' }}>
-                                  {emp.fullName || emp.username}
-                                </div>
-                                <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                                  @{emp.username}
-                                </div>
+                              <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
+                                @{emp.username}
                               </div>
                             </div>
                           </td>
@@ -1171,6 +1173,27 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
                               status={status}
                               title={`Status: ${status}`}
                             />
+                            {emp.passwordResetRequested && (
+                              <div style={{ marginTop: '4px' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    padding: '2px 6px',
+                                    backgroundColor: '#fffbeb',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: '4px',
+                                    color: '#b45309',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                  }}
+                                  title={emp.passwordResetNotes ? `Reset Requested: ${emp.passwordResetNotes}` : 'Password reset requested by user'}
+                                >
+                                  <KeyRound size={11} /> Reset Requested
+                                </span>
+                              </div>
+                            )}
                           </td>
 
                           <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
@@ -1609,22 +1632,7 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           <RolesView onRoleChange={loadData} />
         </div>
       )}
-
-      {/* Employee Editor Modal (New / Edit) */}
-      {(modalMode === 'add' || modalMode === 'edit') && (
-        <EmployeeEditorModal
-          form={formData}
-          setForm={setFormData}
-          editing={modalMode === 'edit'}
-          selectedEmployee={selectedEmployee}
-          saving={submitting}
-          roles={roles}
-          onClose={() => {
-            setModalMode(null);
-            setSelectedEmployee(null);
-          }}
-          onSubmit={handleSaveEmployee}
-        />
+        </>
       )}
 
       {/* Complete & Approve Modal - Split 2-Column Layout */}

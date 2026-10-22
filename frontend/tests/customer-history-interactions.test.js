@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createServer } from 'vite';
 import { Window } from 'happy-dom';
 
-test('inactive customers stay hidden and history rows open details while actions print', async () => {
+test('customer directory includes inactive customers and history rows open details while actions print', async () => {
   const window = new Window();
   Object.assign(globalThis, { window, document: window.document, localStorage: window.localStorage, IS_REACT_ACT_ENVIRONMENT: true });
   const { createRoot } = await import('react-dom/client');
@@ -20,10 +20,14 @@ test('inactive customers stay hidden and history rows open details while actions
     localStorage.setItem('nbh_token', `header.${Buffer.from(JSON.stringify({ exp: 2200000000 })).toString('base64url')}.signature`);
     apis.authApi.getMe = async () => ({ data: { username: 'admin', roles: ['ROLE_ADMIN'] } });
     apis.customerGroupApi.getAll = async () => ({ data: [{ id: 9, groupName: 'Test customer group', customerIds: [1], isActive: true }] });
-    apis.customerApi.getAll = async () => ({ data: [
-      { id: 1, name: 'Active customer', customerCode: 'C-1', isActive: true },
+    const directory = [
+      { id: 1, name: 'Active customer', customerCode: 'C-1', isActive: true, creditLimit: 25000 },
       { id: 2, name: 'Hidden customer', customerCode: 'C-2', isActive: false },
-    ] });
+      { id: 6, name: 'Saved draft', customerCode: 'C-6', isActive: false, draft: true },
+    ];
+    apis.customerApi.getAll = async config => {assert.equal(config.params.includeInactive, true); return {data: directory};};
+    let savedDraft;
+    apis.customerApi.update = async (id, payload) => {savedDraft = payload; Object.assign(directory.find(c => c.id === id), payload, {isActive: !payload.draft}); return {data: {}};};
     const invoice = { id: 3, customerId: 1, invoiceNumber: 'INV-3', netTotal: 150, paidAmount: 0, balanceAmount: 150, status: 'COMPLETED', invoiceDate: '2026-10-09' };
     apis.salesApi.search = async () => ({ data: { content: [invoice] } });
     apis.salesApi.getById = async () => ({ data: { ...invoice, createdAt: '2026-10-09T10:11:12', notes: 'Complete invoice details', items: [{ productName: 'Test rice', quantity: 3, unitPrice: 50 }] } });
@@ -40,13 +44,45 @@ test('inactive customers stay hidden and history rows open details while actions
     const { default: CustomersHub } = await server.ssrLoadModule('/src/views/CustomersHub.jsx');
     await act(async () => root.render(React.createElement(AuthProvider, null, React.createElement(ToastProvider, null, React.createElement(CustomersHub)))));
     assert.ok(host.textContent.includes('Active customer'));
-    assert.ok(!host.textContent.includes('Hidden customer'));
+    assert.ok(host.textContent.includes('Hidden customer'));
+    assert.equal(host.querySelectorAll('thead th').length, 7);
+    assert.ok(host.querySelector('thead').textContent.includes('CUSTOMER NAME & CODE'));
+    assert.equal(host.querySelector('[title="View customer details"]'), null);
+    assert.ok(!host.querySelector('thead').textContent.includes('CREDIT LIMIT'));
+    const choose = async (label, value) => {
+      await act(async () => host.querySelector(`[aria-label="${label}"]`).click());
+      await act(async () => document.querySelector(`[role="option"][data-value="${value}"]`).click());
+    };
+    await choose('Customer status filter', 'INACTIVE');
+    assert.ok(host.querySelector('tbody').textContent.includes('Hidden customer'));
+    assert.ok(!host.querySelector('tbody').textContent.includes('Saved draft'));
+    await choose('Customer status filter', 'DRAFT');
+    assert.ok(host.querySelector('tbody').textContent.includes('Saved draft'));
+    assert.ok(!host.querySelector('tbody').textContent.includes('Active customer'));
+    await act(async () => host.querySelector('tbody tr').click());
+    await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent.includes('Continue Draft')).click());
+    await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save Draft').click());
+    assert.equal(savedDraft.draft, true);
+    await act(async () => host.querySelector('tbody tr').click());
+    await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent.includes('Continue Draft')).click());
+    assert.ok([...host.querySelectorAll('button')].some(b => b.textContent === 'Activate Customer'));
+    await act(async () => host.querySelector('form').dispatchEvent(new window.Event('submit', {bubbles:true,cancelable:true})));
+    assert.equal(savedDraft.draft, false);
+    assert.ok(!host.querySelector('tbody').textContent.includes('Saved draft'), 'activated draft leaves the draft filter');
+    await act(async () => host.querySelector('[title="Reset all filters to default"]').click());
+    await choose('Customer group filter', '9');
+    assert.ok(!host.querySelector('tbody').textContent.includes('Hidden customer'));
+    await act(async () => host.querySelector('[title="Reset all filters to default"]').click());
     const customerRow = [...host.querySelectorAll('tbody tr')].find((r) => r.textContent.includes('Active customer'));
     await act(async () => customerRow.click());
     const customerPopup = host.querySelector('.modal-backdrop');
+    assert.ok(customerPopup.querySelector('.master-details-modal.master-details-uniform'));
+    assert.ok(customerPopup.textContent.includes('Credit Limit'));
+    assert.ok(customerPopup.textContent.includes('25,000.00'));
     assert.equal(customerPopup.querySelectorAll('[title="Print Customer Statement (A4)"]').length, 1, 'Customer popup has only its footer print');
-    await act(async () => customerPopup.querySelector('[title="Close"]').click());
+    await act(async () => customerPopup.querySelector('[aria-label="Close customer details"]').click());
     await act(async () => host.querySelector('[title="View Customer History & Ledger"]').click());
+    assert.ok(host.querySelector('[aria-label="History status filter"]').classList.contains('modern-filter-trigger'));
     const row = host.querySelector('tr[aria-label="View invoice INV-3"]');
     assert.ok(row, 'Invoice row should be available');
     assert.ok(row.textContent.includes('150.00'), 'Invoice amount uses netTotal');
@@ -84,6 +120,7 @@ test('inactive customers stay hidden and history rows open details while actions
     assert.ok(update.parentElement.textContent.includes('Close'));
     assert.equal(host.querySelector('.modal-backdrop').querySelectorAll('[title="Print Customer Group (A4)"]').length, 1, 'Group popup has only its footer print');
   } finally {
+    await act(async () => new Promise(resolve => setTimeout(resolve, 5100)));
     await act(async () => root.unmount()); await server.close(); await window.happyDOM.close();
     for (const key of ['window', 'document', 'localStorage', 'IS_REACT_ACT_ENVIRONMENT']) delete globalThis[key];
   }

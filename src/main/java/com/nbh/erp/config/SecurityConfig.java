@@ -59,7 +59,7 @@ public class SecurityConfig {
                                 && "/api/v1/events".equals(request.getServletPath())).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
-                                "/api/v1/auth/login", "/api/v1/auth/signup", "/api/v1/auth/refresh",
+                                "/api/v1/auth/login", "/api/v1/auth/signup", "/api/v1/auth/forgot-password", "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout", "/api/v1/auth/csrf",
                                 "/health/live", "/health/ready",
                                 "/v3/api-docs/**",

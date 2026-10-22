@@ -9,4 +9,5 @@ public class RefreshSession {
  @Column(nullable=false) private String tokenId;
  @Column(nullable=false) private Instant expiresAt;
  @Column(nullable=false) private long tokenVersion;
+ @Column(nullable=false) private Instant lastActivityAt = Instant.now();
 }

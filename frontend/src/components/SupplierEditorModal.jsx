@@ -62,7 +62,7 @@ export default function SupplierEditorModal({form,setForm,editing,saving,onClose
       </fieldset>
       <aside className="allocation-receipt allocation-inline-review" aria-label="Supplier summary">
         <div className="allocation-receipt-heading"><span className="allocation-receipt-symbol"><Truck size={23}/></span><h3>Supplier summary</h3><p>Check the details before saving.</p></div>
-        <div className="allocation-receipt-section"><h4>Supplier</h4><strong>{form.name || '—'}</strong><dl><div><dt>Status</dt><dd><StatusBadge status={editing ? form.status || ((form.isActive ?? form.active)?'ACTIVE':'INACTIVE') : 'ACTIVE'}/></dd></div>{editing && <div><dt>Supplier code</dt><dd>{form.code || form.supplierCode}</dd></div>}</dl></div>
+        <div className="allocation-receipt-section"><h4>Supplier</h4><strong>{form.name || '—'}</strong><dl>{editing && <div><dt>Status</dt><dd><StatusBadge status={form.status || ((form.isActive ?? form.active)?'ACTIVE':'INACTIVE')}/></dd></div>}{editing && <div><dt>Supplier code</dt><dd>{form.code || form.supplierCode}</dd></div>}</dl></div>
         <div className="allocation-receipt-section"><h4>Contact details</h4><dl>{[['Contact person',form.contactPerson],['Phone',form.phone],['Email',form.email]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value || '—'}</dd></div>)}</dl></div>
         <div className="allocation-receipt-notes"><h4>Address</h4><p>{form.address || 'No address entered'}</p></div>
         <div className="allocation-receipt-notes"><h4>Remarks</h4><p>{form.remarks || '—'}</p></div>

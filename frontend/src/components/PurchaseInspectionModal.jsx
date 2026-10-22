@@ -35,11 +35,11 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
   const detailsSection = unifiedDetails || cardActions.length > 0 ? <div className="purchase-inspection-details-card">
     {detailsList}
     {cardActions.length > 0 && <div className="purchase-inspection-detail-actions" aria-label={`${type} details actions`}>
-      {cardActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
+      {cardActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={label} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
     </div>}
   </div> : detailsList;
   const managementSection = managementActions.length > 0 && <div className="purchase-inspection-header-actions" aria-label={`${type} management actions`}>
-{managementActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
+{managementActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={label} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
           </div>;
   return (
     <div className="modal-backdrop" style={{ padding: '12px', zIndex: 1100 }}>

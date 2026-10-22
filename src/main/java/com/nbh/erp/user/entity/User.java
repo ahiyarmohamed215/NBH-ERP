@@ -56,6 +56,13 @@ public class User extends com.nbh.erp.common.entity.RecyclableEntity {
     @Builder.Default
     private String approvalStatus = "PENDING";
 
+    @Column(name = "password_reset_requested")
+    @Builder.Default
+    private Boolean passwordResetRequested = false;
+
+    @Column(name = "password_reset_notes", length = 255)
+    private String passwordResetNotes;
+
     @Column(nullable = false)
     @Builder.Default
     private long tokenVersion = 0;

@@ -28,6 +28,14 @@ public class InvoiceItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private com.nbh.erp.warehouse.entity.Warehouse warehouse;
+
+    public com.nbh.erp.warehouse.entity.Warehouse fulfillmentWarehouse() {
+        return warehouse != null ? warehouse : invoice.getWarehouse();
+    }
+
     @Column(nullable = false)
     private BigDecimal quantity;
 

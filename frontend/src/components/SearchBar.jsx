@@ -15,6 +15,8 @@ export default function SearchBar({
   style = {},
   inputStyle = {},
   disabled = false,
+  inputRef,
+  onKeyDown,
 }) {
   return (
     <div
@@ -37,6 +39,8 @@ export default function SearchBar({
         }}
       />
       <input
+        ref={inputRef}
+        onKeyDown={onKeyDown}
         type="text"
         className="erp-field erp-search-input"
         aria-label={ariaLabel || placeholder}

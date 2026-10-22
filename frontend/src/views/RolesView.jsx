@@ -5,8 +5,10 @@ import { useDataSync } from '../hooks/useDataSync';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { canEditModule } from '../utils/permissionUtils';
-import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye, Printer, FileDown } from 'lucide-react';
+import { ShieldCheck, Plus, Edit2, X, Check, Search, Shield, ChevronRight, Eye, Printer, FileDown, RefreshCw } from 'lucide-react';
 import { ToolbarActions } from '../components/ToolbarActions';
+import StatusBadge from '../components/StatusBadge';
+import FilterSelect from '../components/FilterSelect';
 import { printA4Report } from '../utils/printReport';
 
 export default function RolesView({ onRoleChange }) {
@@ -17,6 +19,7 @@ export default function RolesView({ onRoleChange }) {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -25,9 +28,35 @@ export default function RolesView({ onRoleChange }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    status: 'ACTIVE',
     permissions: [],
   });
   const [saving, setSaving] = useState(false);
+
+  const roleStatus = (r) => {
+    if (!r) return 'ACTIVE';
+    if (r.status) return r.status.toUpperCase();
+    return 'ACTIVE';
+  };
+
+  const toolbarBtnStyle = {
+    height: '38px',
+    width: '38px',
+    minWidth: '38px',
+    backgroundColor: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    color: '#334155',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+    boxShadow: 'none',
+    transition: 'all 0.15s ease',
+    padding: 0,
+    outline: 'none',
+  };
 
   const fetchData = async () => {
     try {
@@ -137,6 +166,7 @@ export default function RolesView({ onRoleChange }) {
     setFormData({
       name: '',
       description: '',
+      status: 'ACTIVE',
       permissions: [],
     });
     setShowModal(true);
@@ -151,6 +181,7 @@ export default function RolesView({ onRoleChange }) {
     setFormData({
       name: role.name,
       description: role.description || '',
+      status: roleStatus(role),
       permissions: role.permissions || [],
     });
     setShowModal(true);
@@ -203,6 +234,7 @@ export default function RolesView({ onRoleChange }) {
       if (editingRole) {
         await roleApi.update(editingRole.id, {
           description: formData.description.trim(),
+          status: formData.status || 'ACTIVE',
           permissions: formData.permissions,
         });
         addToast('Role updated successfully', 'success');
@@ -210,6 +242,7 @@ export default function RolesView({ onRoleChange }) {
         await roleApi.create({
           name: formData.name.trim(),
           description: formData.description.trim(),
+          status: formData.status || 'ACTIVE',
           permissions: formData.permissions,
         });
         addToast('Custom role created successfully', 'success');
@@ -235,10 +268,16 @@ export default function RolesView({ onRoleChange }) {
     return acc;
   }, {});
 
-  const filteredRoles = roles.filter((r) =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredRoles = roles.filter((r) => {
+    const status = roleStatus(r);
+    if (statusFilter !== 'ALL' && status !== statusFilter) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      (r.description && r.description.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div
@@ -355,19 +394,78 @@ export default function RolesView({ onRoleChange }) {
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-            {filteredRoles.length} Role{filteredRoles.length === 1 ? '' : 's'} Configured
-          </div>
-          <ToolbarActions
-            onExportCsv={handleExportRolesCSV}
-            onPrint={handlePrintRolesReport}
-            onRefresh={fetchData}
-            loading={loading}
-            exportTitle="Export roles to CSV"
-            printTitle="Print Roles Summary (A4)"
-            refreshTitle="Refresh roles"
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <FilterSelect
+            variant="filter"
+            aria-label="Status filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ width: '130px' }}
+            title="Filter by status"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </FilterSelect>
+
+          {(statusFilter !== 'ALL' || searchQuery) && (
+            <button
+              className="erp-button"
+              type="button"
+              onClick={() => {
+                setStatusFilter('ALL');
+                setSearchQuery('');
+              }}
+              style={{
+                height: '38px',
+                padding: '0 12px',
+                border: '1px solid #e2e8f0',
+                backgroundColor: '#f1f5f9',
+                color: '#64748b',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+              }}
+              title="Reset all filters to default"
+            >
+              <X size={13} /> Reset
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleExportRolesCSV}
+            style={toolbarBtnStyle}
+            title="Export roles to CSV"
+            aria-label="Export roles to CSV"
+          >
+            <FileDown size={15} />
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintRolesReport}
+            style={toolbarBtnStyle}
+            title="Print Roles Summary (A4)"
+            aria-label="Print Roles Summary (A4)"
+          >
+            <Printer size={15} />
+          </button>
+
+          <button
+            type="button"
+            onClick={fetchData}
+            style={toolbarBtnStyle}
+            title="Refresh roles"
+            aria-label="Refresh roles"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
 
@@ -449,6 +547,7 @@ export default function RolesView({ onRoleChange }) {
                           {role.name}
                         </span>
                       </div>
+                      <StatusBadge status={roleStatus(role)} />
                     </div>
 
                     <p
@@ -689,6 +788,7 @@ export default function RolesView({ onRoleChange }) {
                     <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
                       {viewingRole.name}
                     </h2>
+                    <StatusBadge status={roleStatus(viewingRole)} />
                     {viewingRole.name === 'ROLE_ADMIN' && (
                       <span
                         style={{
@@ -958,6 +1058,21 @@ export default function RolesView({ onRoleChange }) {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#475569', marginBottom: '5px' }}>
+                    STATUS
+                  </label>
+                  <FilterSelect
+                    variant="field"
+                    value={formData.status || 'ACTIVE'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="DRAFT">Draft</option>
+                  </FilterSelect>
                 </div>
 
                 <div>

@@ -41,6 +41,9 @@ public class StockAdjustment extends BaseEntity {
     @Column(name = "adjustment_date", nullable = false)
     private LocalDate adjustmentDate;
 
+    private Long sourceHeldBillId;
+    private String sourceHeldBillNumber;
+
     @Column(columnDefinition = "TEXT")
     private String reason;
 

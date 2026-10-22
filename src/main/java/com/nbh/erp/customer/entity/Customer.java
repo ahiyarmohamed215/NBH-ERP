@@ -51,6 +51,10 @@ public class Customer extends com.nbh.erp.common.entity.RecyclableEntity {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean draft = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "customer_group_mappings",

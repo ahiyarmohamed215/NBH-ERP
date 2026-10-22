@@ -27,6 +27,8 @@ public class StockAdjustmentDto {
     private String adjustmentType;
     private LocalDate adjustmentDate;
     private String reason;
+    private Long sourceHeldBillId;
+    private String sourceHeldBillNumber;
     private String approvedBy;
     private LocalDateTime approvedAt;
     private List<StockAdjustmentItemDto> items;
@@ -43,7 +45,7 @@ public class StockAdjustmentDto {
                 .status(sa.getStatus())
                 .adjustmentType(sa.getAdjustmentType())
                 .adjustmentDate(sa.getAdjustmentDate())
-                .reason(sa.getReason())
+                .reason(sa.getReason()).sourceHeldBillId(sa.getSourceHeldBillId()).sourceHeldBillNumber(sa.getSourceHeldBillNumber())
                 .approvedBy(sa.getApprovedBy())
                 .approvedAt(sa.getApprovedAt())
                 .createdBy(sa.getCreatedBy())

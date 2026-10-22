@@ -1,7 +1,6 @@
 import React from 'react';
-import { UserRound, Calendar, MessageSquare, ShieldCheck, Printer } from 'lucide-react';
+import { UserRound, Calendar, MessageSquare, ShieldCheck, Edit2, Ban, CheckCircle, Trash2 } from 'lucide-react';
 import PurchaseInspectionModal from './PurchaseInspectionModal';
-import RecordActions from './RecordActions';
 import { allocationCode } from './AllocationTable';
 import { printA4Report } from '../utils/printReport';
 import { staffCode } from '../utils/staffCode';
@@ -15,6 +14,40 @@ export default function AllocationDetailsModal({ allocation: q, status, canManag
   const staff = q.userFullName || q.username || 'Staff not selected';
   const staffCd = q.userEmployeeCode || (q.userId ? staffCode({ id: q.userId }) : '—');
   const items = q.items && q.items.length > 0 ? q.items : [q];
+
+  const actions = [];
+  if (canManage) {
+    if (onEdit) actions.push({ label: 'Edit Allocation', icon: Edit2, onClick: onEdit, disabled: busy });
+    if (status !== 'DRAFT' && onStatusChange) {
+      if (status === 'ACTIVE') {
+        actions.push({
+          label: 'Deactivate Allocation',
+          icon: Ban,
+          onClick: () => onStatusChange('INACTIVE'),
+          disabled: busy,
+          tone: 'warning',
+        });
+      } else {
+        const activationDisabled = busy || (!q.productId && (!q.items || q.items.length === 0));
+        actions.push({
+          label: `${status === 'INACTIVE' ? 'Reactivate' : 'Activate'} Allocation`,
+          icon: CheckCircle,
+          onClick: () => onStatusChange('ACTIVE'),
+          disabled: activationDisabled,
+          tone: 'success',
+        });
+      }
+    }
+    if (onDelete) {
+      actions.push({
+        label: 'Delete Allocation',
+        icon: Trash2,
+        onClick: onDelete,
+        disabled: busy,
+        tone: 'danger',
+      });
+    }
+  }
 
   const print = () => {
     if (items.length > 1) {
@@ -77,10 +110,12 @@ export default function AllocationDetailsModal({ allocation: q, status, canManag
       number={allocationCode(q)}
       status={status}
       rows={items}
+      detailActions={actions}
       onPrint={print}
       onClose={onClose}
       tableToolbar
-      tablePrint={status !== 'DRAFT'}
+      tablePrint={true}
+      tableSearchPlaceholder="Search product code, name or warehouse..."
       actionsPosition="bottom"
       detailsPosition="header"
       showHeaderClose
@@ -122,31 +157,6 @@ export default function AllocationDetailsModal({ allocation: q, status, canManag
           },
         },
       ]}
-      footer={
-        <footer className="master-details-footer" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', background: '#fafbfc' }}>
-          <RecordActions
-            name="Allocation"
-            status={status}
-            canManage={canManage}
-            disabled={busy}
-            activationDisabled={!q.productId && (!q.items || q.items.length === 0)}
-            onEdit={onEdit}
-            onStatusChange={onStatusChange}
-            onDelete={onDelete}
-            className="master-details-management"
-          />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {status !== 'DRAFT' && (
-              <button type="button" className="btn btn-glass erp-button" onClick={print}>
-                <Printer size={14} /> Print
-              </button>
-            )}
-            <button type="button" className="btn btn-glass erp-button" onClick={onClose}>
-              Close
-            </button>
-          </div>
-        </footer>
-      }
     />
   );
 }

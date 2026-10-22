@@ -28,7 +28,7 @@ class PosReservationIntegrationTest {
  record Fixture(Long customer,Long warehouse,Long product) {}
  Fixture fixture(){
   String key=UUID.randomUUID().toString().substring(0,8);
-  var customer=customers.save(com.nbh.erp.customer.entity.Customer.builder().customerCode(key).name("POS customer").creditLimit(BigDecimal.ZERO).currentBalance(BigDecimal.ZERO).isActive(true).build());
+  var customer=customers.save(com.nbh.erp.customer.entity.Customer.builder().customerCode(key).name("POS customer").creditLimit(BigDecimal.valueOf(1000)).currentBalance(BigDecimal.ZERO).isActive(true).build());
   var warehouse=warehouses.save(com.nbh.erp.warehouse.entity.Warehouse.builder().code(key).name("POS warehouse").isActive(true).build());
   var category=categories.save(com.nbh.erp.category.entity.Category.builder().code(key).name("POS category").build());
   var product=products.save(com.nbh.erp.product.entity.Product.builder().sku(key).name("POS product").category(category).defaultWarehouse(warehouse).sellingPrice(BigDecimal.TEN).costPrice(BigDecimal.ONE).isActive(true).build());
@@ -42,12 +42,12 @@ class PosReservationIntegrationTest {
   var edit=request(f,5);edit.setExpectedVersion(bill.getRecordVersion());var updated=invoices.savePosDraft(bill.getId(),edit);available(f,5);
   assertThrows(BusinessException.class,()->invoices.savePosDraft(bill.getId(),edit));available(f,5);
   invoices.cancelHeldInvoice(updated.getId());available(f,10);
-  var second=invoices.createInvoice(request(f,4));var checkout=request(f,4);checkout.setHold(false);checkout.setExpectedVersion(second.getRecordVersion());
-  invoices.resumeHeldInvoice(second.getId(),checkout);available(f,6);
+  var second=invoices.createInvoice(request(f,4));var customer=customers.findById(f.customer()).orElseThrow();customer.setCreditLimit(BigDecimal.ZERO);customers.saveAndFlush(customer);var checkout=request(f,4);checkout.setHold(false);checkout.setExpectedVersion(second.getRecordVersion());
+  assertThrows(BusinessException.class,()->invoices.resumeHeldInvoice(second.getId(),checkout));available(f,6);
   assertThrows(BusinessException.class,()->invoices.resumeHeldInvoice(second.getId(),checkout));available(f,6);
  }
  @Test void concurrentBillsCannotReserveTheSameStock() throws Exception {
-  var f=fixture();var other=customers.save(com.nbh.erp.customer.entity.Customer.builder().customerCode(UUID.randomUUID().toString().substring(0,8)).name("Second POS customer").creditLimit(BigDecimal.ZERO).currentBalance(BigDecimal.ZERO).isActive(true).build());
+  var f=fixture();var other=customers.save(com.nbh.erp.customer.entity.Customer.builder().customerCode(UUID.randomUUID().toString().substring(0,8)).name("Second POS customer").creditLimit(BigDecimal.valueOf(1000)).currentBalance(BigDecimal.ZERO).isActive(true).build());
   var ready=new CountDownLatch(2);var start=new CountDownLatch(1);var sequence=new java.util.concurrent.atomic.AtomicInteger();
   Callable<Boolean> action=()->{ready.countDown();assertTrue(start.await(10,TimeUnit.SECONDS));try{var bill=request(f,7);if(sequence.getAndIncrement()>0)bill.setCustomerId(other.getId());invoices.createInvoice(bill);return true;}catch(BusinessException expected){return false;}};
   try(var executor=Executors.newFixedThreadPool(2)){

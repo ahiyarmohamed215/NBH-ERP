@@ -17,6 +17,7 @@ test('range dashboard shows load errors, retries and supports read-only refresh 
   assert.ok(host.querySelector('[role="alert"]').textContent.includes('Unable to load ranges'));assert.ok(!host.textContent.includes('No customers found matching'));
   fail=false;await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent==='Retry loading customer ranges').click());
   assert.equal(host.querySelector('[role="alert"]'),null);assert.ok(host.querySelector('tbody').textContent.includes('Dashboard customer'));assert.ok(host.querySelector('tbody').textContent.includes('120,000'));
+  assert.ok(host.querySelector('tbody .customer-range-badge'));
   const before=loads;await act(async()=>host.querySelector('[title="Refresh customer ranges"]').click());assert.ok(loads>before);assert.equal(syncs,0);
   await act(async()=>root.render(React.createElement(Hub,{canEdit:true,salesmen:[{id:1,name:'Staff'}]})));await act(async()=>host.querySelector('[title="Synchronize & Recalculate Month"]').click());assert.equal(syncs,1);
  } finally {await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}

@@ -1,5 +1,7 @@
 import {useDataSync} from '../hooks/useDataSync';
 import StatusBadge from '../components/StatusBadge';
+import CustomerRangeBadge,{useCustomerBadgeRanges} from '../components/CustomerRangeBadge';
+import {getRangeBadgeAppearance} from '../utils/customerRangeBadges';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   customerMonthlyRangeApi,
@@ -451,26 +453,9 @@ export default function CustomerMonthlyRangeHub({
     if (addToast) addToast('Staff performance report exported to CSV', 'success');
   };
 
-  // Tier color styling helper (Matches clean pastel badges in Customer History)
-  const getTierBadgeStyle = (tierCode = '', tierName = '') => {
-    const code = (tierCode || tierName).toUpperCase();
-    if (code.includes('5') || code.includes('DIAMOND')) {
-      return { bg: '#fae8ff', text: '#86198f', border: '#f0abfc', badge: '#a21caf' };
-    }
-    if (code.includes('4') || code.includes('PLATINUM')) {
-      return { bg: '#f1f5f9', text: '#1e293b', border: '#cbd5e1', badge: '#475569' };
-    }
-    if (code.includes('3') || code.includes('GOLD')) {
-      return { bg: '#fef3c7', text: '#92400e', border: '#fde68a', badge: '#b45309' };
-    }
-    if (code.includes('2') || code.includes('SILVER')) {
-      return { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd', badge: '#0284c7' };
-    }
-    if (code.includes('1') || code.includes('BRONZE')) {
-      return { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa', badge: '#ea580c' };
-    }
-    return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0', badge: '#64748b' };
-  };
+  const sharedBadgeRanges=useCustomerBadgeRanges();
+  const badgeRanges=ranges.length?ranges:dashboardData?.configuredRanges?.length?dashboardData.configuredRanges:sharedBadgeRanges;
+  const getTierBadgeStyle=(code='',name='')=>getRangeBadgeAppearance({code,name},badgeRanges);
 
   return (
     <div
@@ -1268,7 +1253,6 @@ export default function CustomerMonthlyRangeHub({
                     </tr>
                   ) : (
                     displayedCustomers.map((c) => {
-                      const tierStyle = getTierBadgeStyle(c.currentRangeCode, c.currentRangeName);
                       const purchases = Number(c.monthlyPurchases || 0);
                       const remaining = Number(c.remainingAmount || 0);
                       const nextTarget = Number(c.nextTargetAmount || 0);
@@ -1348,30 +1332,14 @@ export default function CustomerMonthlyRangeHub({
 
                           {/* Current Range Badge */}
                           <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                                fontSize: 'var(--erp-text-caption)',
-                                fontWeight: 600,
-                                background: tierStyle.bg,
-                                color: tierStyle.text,
-                                border: `1px solid ${tierStyle.border}`,
-                              }}
-                            >
-                              <Award size={11} color={tierStyle.badge} />
-                              {c.currentRangeName}
-                            </span>
+                            <CustomerRangeBadge name={c.currentRangeName} code={c.currentRangeCode} ranges={badgeRanges}/>
                           </td>
 
                           {/* Progress to Next Target */}
                           <td className="erp-table-cell" style={{ minWidth: '170px' }}>
                             {c.isHighestRange ? (
                               <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#86198f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                🏆 Highest Range Tier
+                                <CustomerRangeBadge name={c.currentRangeName} code={c.currentRangeCode} ranges={badgeRanges}/> Highest range
                               </div>
                             ) : (
                               <div>
@@ -1584,7 +1552,6 @@ export default function CustomerMonthlyRangeHub({
                     </tr>
                   ) : (
                     ranges.map((r) => {
-                      const tierStyle = getTierBadgeStyle(r.rangeCode, r.name);
                       const isBaseline = r.rangeCode === 'RANGE_0' || r.displayOrder === 0;
 
                       return (
@@ -1610,23 +1577,7 @@ export default function CustomerMonthlyRangeHub({
 
                           {/* Range Name */}
                           <td className="erp-table-cell">
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                                fontSize: 'var(--erp-text-caption)',
-                                fontWeight: 600,
-                                background: tierStyle.bg,
-                                color: tierStyle.text,
-                                border: `1px solid ${tierStyle.border}`,
-                              }}
-                            >
-                              <Award size={12} color={tierStyle.badge} />
-                              {r.name}
-                            </span>
+                            <CustomerRangeBadge name={r.name} code={r.rangeCode} ranges={badgeRanges}/>
                           </td>
 
                           {/* Monthly Spend Threshold */}
@@ -1766,7 +1717,7 @@ export default function CustomerMonthlyRangeHub({
                     }}
                   >
                     <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: tierStyle.text }}>
-                      {rangeName}
+                      <CustomerRangeBadge name={rangeName} ranges={badgeRanges}/>
                     </div>
                     <div style={{ fontSize: 'var(--erp-text-section)', fontWeight: 700, color: tierStyle.text, fontFamily: 'monospace', marginTop: '2px' }}>
                       {count}
@@ -2301,7 +2252,6 @@ export default function CustomerMonthlyRangeHub({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {customerHistory.map((h) => {
-                  const tierStyle = getTierBadgeStyle(h.finalRangeCode, h.finalRangeName);
                   return (
                     <div
                       key={h.yearMonth}
@@ -2330,24 +2280,7 @@ export default function CustomerMonthlyRangeHub({
                         <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', fontFamily: 'monospace' }}>
                           LKR {Number(h.qualifyingPurchases || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '1px 6px',
-                            borderRadius: '9999px',
-                            fontSize: 'var(--erp-text-badge)',
-                            fontWeight: 600,
-                            background: tierStyle.bg,
-                            color: tierStyle.text,
-                            border: `1px solid ${tierStyle.border}`,
-                            marginTop: '2px',
-                          }}
-                        >
-                          <Award size={10} color={tierStyle.badge} />
-                          {h.finalRangeName}
-                        </span>
+                        <CustomerRangeBadge name={h.finalRangeName} code={h.finalRangeCode} ranges={badgeRanges}/>
                       </div>
                     </div>
                   );

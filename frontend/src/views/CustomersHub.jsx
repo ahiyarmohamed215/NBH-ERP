@@ -1,8 +1,15 @@
+import CustomerOutstandingTable from '../components/CustomerOutstandingTable';
+import {customerOutstandingInvoices,outstandingPaymentStatus} from '../utils/customerOutstanding';
 import {hasPermission} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import { Trash2 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import CustomerDetailsModal from '../components/CustomerDetailsModal';
+import CustomerEditorModal from '../components/CustomerEditorModal';
+import FilterSelect from '../components/FilterSelect';
+import SearchBar from '../components/SearchBar';
+import './CustomersHub.css';
 import useRecordDeletion from '../hooks/useRecordDeletion';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
@@ -230,7 +237,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     setLoading(true);
     try {
       const [cRes, sRes, uRes, rRes] = await Promise.allSettled([
-        customerApi.getAll(),
+        customerApi.getAll({params: {includeInactive: true}}),
         salesmanApi.getAll(),
         userApi.getStaffLookup(),
         customerGroupApi.getAll(true),
@@ -239,12 +246,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       let loadedCustomers = [];
       if (cRes.status === 'fulfilled') {
         loadedCustomers = cRes.value.data || cRes.value || [];
-        loadedCustomers = loadedCustomers.filter((c) => Boolean(c.isActive ?? c.active));
         setCustomers(loadedCustomers);
-        const activeIds = new Set(loadedCustomers.map((c) => String(c.id)));
-        setViewingCustomer((c) => c && activeIds.has(String(c.id)) ? c : null);
-        setSelectedHistoryCustomerId((id) => activeIds.has(String(id)) ? id : '');
-        setPreviewModalDoc((doc) => doc && activeIds.has(String(doc.data.customerId)) ? doc : null);
+        const directoryIds = new Set(loadedCustomers.map((c) => String(c.id)));
+        setViewingCustomer(c => c ? loadedCustomers.find(customer => String(customer.id) === String(c.id)) || null : null);
+        setSelectedHistoryCustomerId((id) => directoryIds.has(String(id)) ? id : '');
+        setPreviewModalDoc((doc) => doc && directoryIds.has(String(doc.data.customerId)) ? doc : null);
       }
 
       const rawSalesmen = sRes.status === 'fulfilled' ? (sRes.value.data || sRes.value || []) : [];
@@ -376,7 +382,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     return null;
   };
 
-  const isCustomerActive = (c) => Boolean(c?.isActive ?? c?.active ?? false);
+  const customerStatus = c => c?.draft || c?.status === 'DRAFT' ? 'DRAFT' : (c?.isActive ?? c?.active) ? 'ACTIVE' : 'INACTIVE';
+  const isCustomerActive = c => customerStatus(c) === 'ACTIVE';
 
   const handleSelectCustomerForHistory = (c) => {
     if (!c) {
@@ -475,7 +482,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       }
       if (invoiceSearchQuery.trim()) {
         const q = invoiceSearchQuery.toLowerCase().trim();
-        const num = (inv.invoiceNumber || inv.id || '').toLowerCase();
+        const num = String(inv.invoiceNumber || inv.id || '').toLowerCase();
         const pt = (inv.paymentType || '').toLowerCase();
         const pm = (inv.paymentMethod || '').toLowerCase();
         if (!num.includes(q) && !pt.includes(q) && !pm.includes(q)) return false;
@@ -551,18 +558,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   // Raw Customer Outstanding (Invoices with balanceAmount > 0)
   const rawCustomerOutstanding = useMemo(() => {
-    return rawCustomerInvoices.filter((inv) => Number(inv.balanceAmount || 0) > 0);
-  }, [rawCustomerInvoices]);
+    return customerOutstandingInvoices(rawCustomerInvoices,selectedHistoryCustomer?.id);
+  }, [rawCustomerInvoices,selectedHistoryCustomer?.id]);
 
   // Filtered Customer Outstanding
   const filteredCustomerOutstanding = useMemo(() => {
     return rawCustomerOutstanding.filter((inv) => {
       if (outstandingStatusFilter !== 'ALL') {
-        if ((inv.status || '').toUpperCase() !== outstandingStatusFilter.toUpperCase()) return false;
+        if (outstandingPaymentStatus(inv) !== outstandingStatusFilter.toUpperCase()) return false;
       }
       if (outstandingSearchQuery.trim()) {
         const q = outstandingSearchQuery.toLowerCase().trim();
-        const num = (inv.invoiceNumber || inv.id || '').toLowerCase();
+        const num = String(inv.invoiceNumber || inv.id || '').toLowerCase();
         const pt = (inv.paymentType || '').toLowerCase();
         if (!num.includes(q) && !pt.includes(q)) return false;
       }
@@ -717,9 +724,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Filtered customers list
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
-      const active = isCustomerActive(c);
-      if (statusFilter === 'ACTIVE' && !active) return false;
-      if (statusFilter === 'INACTIVE' && active) return false;
+      if (statusFilter !== 'ALL' && customerStatus(c) !== statusFilter) return false;
 
       const cRoutes = getCustomerRoutes(c.id);
 
@@ -817,14 +822,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   // Save Customer
-  const handleSaveCustomer = async (e) => {
-    e.preventDefault();
+  const handleSaveCustomer = async (e, draft = false) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (editingCustomer && !canEditCustomer) {
       addToast('Permission denied: Only authorized staff can edit existing customer records.', 'error');
       return;
     }
-    if (!customerForm.name.trim()) {
-      addToast('Customer Name is required', 'error');
+    if (!draft && customerForm.name.trim().length < 2) {
+      addToast('Customer name must contain at least 2 characters', 'error');
       return;
     }
 
@@ -839,14 +844,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         email: customerForm.email.trim(),
         address: customerForm.address.trim(),
         creditLimit: parseFloat(customerForm.creditLimit) || 0,
+        draft,
       };
 
       if (editingCustomer) {
         await customerApi.update(editingCustomer.id, payload);
-        addToast('Customer updated successfully', 'success');
+        addToast(draft ? 'Customer draft saved' : editingCustomer.draft ? 'Customer activated successfully' : 'Customer updated successfully', 'success');
       } else {
         await customerApi.create(payload);
-        addToast('Customer created successfully', 'success');
+        addToast(draft ? 'Customer draft saved' : 'Customer created successfully', 'success');
       }
 
       setShowCustomerModal(false);
@@ -1090,7 +1096,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       return;
     }
     const headers = ['Code', 'Name', 'Customer Group', 'Contact Person', 'Phone', 'Email', 'Address', 'Credit Limit', 'Current Balance', 'Status'];
-    const rows = (filteredCustomers.length > 0 ? filteredCustomers : customers).map((c) => {
+    const rows = filteredCustomers.map((c) => {
       const assignedRoutes = getCustomerRoutes(c.id);
       const routeNames = assignedRoutes.map((r) => r.name).join('; ') || 'Unassigned';
       return [
@@ -1103,7 +1109,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         `"${(c.address || '').replace(/"/g, '""')}"`,
         c.creditLimit || 0,
         c.currentBalance || 0,
-        isCustomerActive(c) ? 'Active' : 'Inactive',
+        customerStatus(c),
       ];
     });
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -1176,7 +1182,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   const handlePrintCustomerDirectoryReport = () => {
-    const list = filteredCustomers.length > 0 ? filteredCustomers : customers;
+    const list = filteredCustomers;
     if (list.length === 0) {
       addToast('No customers available to print', 'info');
       return;
@@ -1245,9 +1251,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   return (
-    <div className="erp-page"
+    <div className={`erp-page customers-page purchasing-no-shadows${showCustomerModal ? ' inventory-allocation-focus' : ''}`}
       style={{
-        padding: '24px 32px',
+        padding: showCustomerModal ? '12px' : '24px 32px',
         flex: 1,
         height: '100%',
         maxHeight: '100%',
@@ -1262,7 +1268,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         overflow: 'hidden',
       }}
     >
-      {/* Page Header (Fixed / Sticky to Desktop Screen) */}
+      {showCustomerModal ? (
+        <CustomerEditorModal
+          form={customerForm}
+          setForm={setCustomerForm}
+          editing={editingCustomer}
+          saving={savingCustomer}
+          canEditCustomer={canEditCustomer}
+          onClose={() => setShowCustomerModal(false)}
+          onSubmit={handleSaveCustomer}
+        />
+      ) : (
+        <>
+          {/* Page Header (Fixed / Sticky to Desktop Screen) */}
       <div className="erp-page-header"
         style={{
           display: 'flex',
@@ -1358,265 +1376,21 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             overflow: 'hidden',
           }}
         >
-          {/* Top Filter & Actions Bar (White Card Look - Matching Employees Page Theme) */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              flexWrap: 'wrap',
-              flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-            }}
-          >
-            {/* Left Control: Search Input extending directly up to All Routes dropdown */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '11px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search customers by code, name, phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '34px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #e2e8f0',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
-                }}
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Right Controls: Filters (to the left of Export CSV), Export CSV (icon only), & Refresh */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              {/* Customer Group Filter Dropdown */}
-              <select className="erp-field"
-                value={groupFilter}
-                onChange={(e) => setGroupFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '145px',
-                  minWidth: '120px',
-                  border: '1px solid #e2e8f0',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
-                title="Filter customers by customer group"
-              >
+          <div className="customers-toolbar">
+            <SearchBar value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onClear={() => setSearchTerm('')}
+              placeholder="Search customers by code, name, phone..." ariaLabel="Search customers" />
+            <div className="customers-toolbar-actions">
+              <FilterSelect value={groupFilter} onChange={e => setGroupFilter(e.target.value)} aria-label="Customer group filter" style={{width: 180}}>
                 <option value="ALL">All Groups</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={String(r.id)}>
-                    {r.name || r.groupName || r.routeName}
-                  </option>
-                ))}
-              </select>
-
-              {/* Status Filter Dropdown */}
-              <select className="erp-field"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '135px',
-                  minWidth: '115px',
-                  border: '1px solid #e2e8f0',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
-                title="Filter customers by status"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="ACTIVE">Active Only</option>
-
-              </select>
-
-              {/* Reset Filters button */}
-              {isFiltered && (
-                <button className="erp-button"
-                  type="button"
-                  onClick={handleResetFilters}
-                  style={{
-                    height: '34px',
-                    padding: '0 12px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f1f5f9',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    boxSizing: 'border-box',
-                  }}
-                  title="Reset all filters to default"
-                >
-                  <X size={13} /> Reset
-                </button>
-              )}
-
-              {/* Print Customer Directory A4 (Icon Only) */}
-              <button
-                type="button"
-                onClick={handlePrintCustomerDirectoryReport}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Print Customer Directory (A4)"
-              >
-                <Printer size={14} />
-              </button>
-
-              {/* Refresh Customer Records (Icon Only) */}
-              <button
-                type="button"
-                onClick={loadInitialData}
-                style={{
-                  height: '34px',
-                  width: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  color: '#334155',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease',
-                  padding: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#ffffff';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.color = '#334155';
-                }}
-                title="Refresh customer records"
-              >
-                <RefreshCw size={14} />
-              </button>
+                {routes.map(r => <option key={r.id} value={String(r.id)}>{r.name || r.groupName || r.routeName}</option>)}
+              </FilterSelect>
+              <FilterSelect value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Customer status filter" style={{width: 140}}>
+                <option value="ALL">All Statuses</option><option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option><option value="DRAFT">Draft</option>
+              </FilterSelect>
+              {isFiltered && <button type="button" className="erp-button customers-reset" onClick={handleResetFilters} title="Reset all filters to default"><X size={13}/> Reset</button>}
+              <button type="button" className="customers-icon-button" onClick={handlePrintCustomerDirectoryReport} title="Print Customer Directory (A4)" aria-label="Print customer directory"><Printer size={16}/></button>
+              <button type="button" className="customers-icon-button" onClick={loadInitialData} disabled={loading} title="Refresh customer records" aria-label="Refresh customer records"><RefreshCw size={16} className={loading ? 'animate-spin' : undefined}/></button>
             </div>
           </div>
 
@@ -1638,11 +1412,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             }}
           >
             <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      CUSTOMER
+                      CUSTOMER NAME & CODE
                     </th>
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       CUSTOMER GROUP
@@ -1656,11 +1430,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       ADDRESS
                     </th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
-                      CREDIT LIMIT
-                    </th>
-
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
+<th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
                       STATUS
                     </th>
                     <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>
@@ -1671,13 +1441,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         Loading customer records...
                       </td>
                     </tr>
                   ) : filteredCustomers.length === 0 ? (
                     <tr>
-                      <td className="erp-table-cell" colSpan="8" style={{ textAlign: 'center', color: '#64748b' }}>
+                      <td className="erp-table-cell" colSpan="7" style={{ textAlign: 'center', color: '#64748b' }}>
                         No customers found matching criteria.
                       </td>
                     </tr>
@@ -1700,25 +1470,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           title="Click row to view customer profile"
                         >
                           <td className="erp-table-cell">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '50%',
-                                  backgroundColor: '#e0f2fe',
-                                  color: '#0284c7',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 600,
-                                  fontSize: 'var(--erp-text-body)',
-                                  border: '1px solid #bae6fd',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {(c.name || 'C').slice(0, 1).toUpperCase()}
-                              </div>
                               <div>
                                 <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-field)', lineHeight: '1.25' }}>
                                   {c.name}
@@ -1727,7 +1478,6 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                   {code || 'NO CODE'}
                                 </div>
                               </div>
-                            </div>
                           </td>
 
                           <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500 }}>
@@ -1778,16 +1528,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             )}
                           </td>
 
-                          <td className="erp-table-cell" style={{ color: '#334155', fontWeight: 500, textAlign: 'right' }}>
-                            LKR {Number(c.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-
-
                           <td className="erp-table-cell">
-                            <StatusBadge status={active ? 'Active' : 'Inactive'} onClick={(e) => {
+                            <StatusBadge status={customerStatus(c)} onClick={(e) => {
                                 e.stopPropagation();
                                 setConfirmStatusModal({ isOpen: true, customer: c });
-                              }} title={`Status: ${active ? 'Active' : 'Inactive'} (Click to change status)`}/>
+                              }} disabled={!canEditCustomer} title={`Status: ${customerStatus(c)} (Click to change status)`}/>
                           </td>
 
                           <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
@@ -1854,7 +1599,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
                               {/* Edit */}
                               {canEditCustomer && <button type="button" className="erp-table-icon-action" data-tone="danger" aria-label="Delete Customer" title="Delete Customer" onClick={event=>{event.stopPropagation();customerDeletion.requestDeletion(c);}}><Trash2 size={13}/></button>}
-                              <button aria-label="Edit Customer" className="erp-table-icon-action"
+                              {canEditCustomer && <button disabled={customerStatus(c) === 'INACTIVE'} aria-label="Edit Customer" className="erp-table-icon-action"
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1875,7 +1620,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 title="Edit Customer"
                               >
                                 <Edit2 size={13} />
-                              </button>
+                              </button>}
                             </div>
                           </td>
                         </tr>
@@ -4136,7 +3881,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     const hasActiveFilter = Boolean(currentSearchVal || currentStatusVal !== 'ALL');
 
                     return (
-                      <div
+                      <div className="customers-history-toolbar"
                         style={{
                           backgroundColor: '#ffffff',
                           borderRadius: '8px',
@@ -4148,10 +3893,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           gap: '8px',
                           width: '100%',
                           boxSizing: 'border-box',
-                          flexWrap: 'nowrap',
+                          flexWrap: 'wrap',
                           flexShrink: 0,
                           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                          overflowX: 'auto',
+                          overflowX: 'visible',
                         }}
                       >
                         {/* Sub-nav tabs */}
@@ -4219,93 +3964,18 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            flexShrink: 0,
+                            gap: '8px',
+                            flexShrink: 1,
+                            flexWrap: 'wrap',
+                            minWidth: 0,
                             marginLeft: 'auto',
                           }}
                         >
-                          {/* Search Input (Generous width) */}
-                          <div style={{ position: 'relative', width: '210px', minWidth: '160px' }}>
-                            <Search
-                              size={13}
-                              style={{
-                                position: 'absolute',
-                                left: '8px',
-                                top: '9px',
-                                color: '#94a3b8',
-                                pointerEvents: 'none',
-                              }}
-                            />
-                            <input className="erp-field"
-                              type="text"
-                              placeholder={currentSearchPlaceholder}
-                              value={currentSearchVal}
-                              onChange={(e) => currentSearchSetter(e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: '32px',
-                                padding: '0 24px 0 26px',
-                                border: '1px solid #e2e8f0',
-                                outline: 'none',
-                                backgroundColor: '#ffffff',
-                                color: '#0f172a',
-                                boxSizing: 'border-box',
-                                transition: 'border-color 0.15s ease',
-                              }}
-                              onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
-                              onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
-                            />
-                            {currentSearchVal && (
-                              <button
-                                type="button"
-                                onClick={() => currentSearchSetter('')}
-                                style={{
-                                  position: 'absolute',
-                                  right: '6px',
-                                  top: '8px',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  color: '#94a3b8',
-                                  padding: 0,
-                                }}
-                              >
-                                <X size={13} />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Filter Select */}
-                          <select className="erp-field"
-                            value={currentStatusVal}
-                            onChange={(e) => currentStatusSetter(e.target.value)}
-                            style={{
-                              height: '32px',
-                              padding: '0 24px 0 8px',
-                              width: '105px',
-                              minWidth: '95px',
-                              border: '1px solid #e2e8f0',
-                              fontWeight: 500,
-                              color: '#334155',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              boxSizing: 'border-box',
-                              appearance: 'none',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 6px center',
-                              transition: 'border-color 0.15s ease',
-                            }}
-                            onFocus={(e) => (e.currentTarget.style.borderColor = '#0284c7')}
-                            onBlur={(e) => (e.currentTarget.style.borderColor = '#e2e8f0')}
-                          >
-                            {currentStatusOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
+                          <SearchBar value={currentSearchVal} onChange={e => currentSearchSetter(e.target.value)} onClear={() => currentSearchSetter('')}
+                            placeholder={currentSearchPlaceholder} ariaLabel="Search customer history" style={{width: 250, minWidth: 180}}/>
+                          <FilterSelect value={currentStatusVal} onChange={e => currentStatusSetter(e.target.value)} aria-label="History status filter" style={{width: 140}}>
+                            {currentStatusOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                          </FilterSelect>
 
                           {/* Reset Button */}
                           {hasActiveFilter && (
@@ -4316,7 +3986,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                 currentStatusSetter('ALL');
                               }}
                               style={{
-                                height: '32px',
+                                height: '38px',
                                 padding: '0 8px',
                                 border: '1px solid #e2e8f0',
                                 backgroundColor: '#f1f5f9',
@@ -4344,9 +4014,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               }
                             }}
                             style={{
-                              height: '32px',
-                              width: '32px',
-                              minWidth: '32px',
+                              height: '38px',
+                              width: '38px',
+                              minWidth: '38px',
                               backgroundColor: '#ffffff',
                               border: '1px solid #e2e8f0',
                               borderRadius: '6px',
@@ -4369,7 +4039,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               e.currentTarget.style.borderColor = '#e2e8f0';
                               e.currentTarget.style.color = '#334155';
                             }}
-                            title="Print Customer Ledger History (A4)"
+                            aria-label="Print customer history" title="Print Customer Ledger History (A4)"
                           >
                             <Printer size={13} />
                           </button>
@@ -4379,9 +4049,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             type="button"
                             onClick={loadInitialData}
                             style={{
-                              height: '32px',
-                              width: '32px',
-                              minWidth: '32px',
+                              height: '38px',
+                              width: '38px',
+                              minWidth: '38px',
                               backgroundColor: '#ffffff',
                               border: '1px solid #e2e8f0',
                               borderRadius: '6px',
@@ -4404,7 +4074,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               e.currentTarget.style.borderColor = '#e2e8f0';
                               e.currentTarget.style.color = '#334155';
                             }}
-                            title="Refresh Customer Records"
+                            aria-label="Refresh customer history" title="Refresh Customer Records" disabled={loading}
                           >
                             <RefreshCw size={13} />
                           </button>
@@ -4776,93 +4446,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                       <div className="erp-table-frame" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', width: '100%', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div className="erp-table-scroll" style={{ width: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-                          <table className="erp-table" style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                              <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                                <th className="erp-table-heading">INVOICE #</th>
-                                <th className="erp-table-heading">DATE</th>
-                                <th className="erp-table-heading">PAYMENT TYPE</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>TOTAL AMOUNT</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>PAID AMOUNT</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'right' }}>OUTSTANDING BALANCE</th>
-                                <th className="erp-table-heading" style={{ textAlign: 'center' }}>STATUS</th>
-                                <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center' }}>ACTIONS</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {filteredCustomerOutstanding.length === 0 ? (
-                                <tr>
-                                  <td className="erp-table-cell" colSpan={8} style={{ textAlign: 'center', color: '#16a34a' }}>
-                                    <CheckCircle size={36} color="#86efac" style={{ margin: '0 auto 10px auto', display: 'block' }} />
-                                    All clear! No outstanding payments pending for {selectedHistoryCustomer?.name || 'this customer'}.
-                                  </td>
-                                </tr>
-                              ) : (
-                                filteredCustomerOutstanding.map((inv) => {
-                                  const bal = Number(inv.balanceAmount || 0);
-                                  return (
-                                    <tr
-                                      key={inv.id || inv.invoiceNumber}
-                                      tabIndex={0}
-                                      aria-label={`View outstanding invoice ${historyDocumentReference(inv)}`}
-                                      onClick={() => openHistoryDocument('Outstanding Invoice', inv)}
-                                      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openHistoryDocument('Outstanding Invoice', inv); } }}
-                                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background-color 0.12s ease' }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                                    >
-                                      <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7', cursor: 'pointer' }} >
-                                        {inv.invoiceNumber || inv.id}
-                                      </td>
-                                      <td className="erp-table-cell" style={{ color: '#334155', whiteSpace: 'nowrap' }}>
-                                        {inv.displayDate || inv.invoiceDate}
-                                      </td>
-                                      <td className="erp-table-cell">
-                                        <span style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, padding: '3px 9px', borderRadius: '9999px', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', textTransform: 'lowercase' }}>
-                                          {inv.paymentType || 'installment'}
-                                        </span>
-                                      </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>
-                                        LKR {Number(inv.totalAmount || 0).toFixed(2)}
-                                      </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#16a34a' }}>
-                                        LKR {Number(inv.paidAmount || 0).toFixed(2)}
-                                      </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#dc2626' }}>
-                                        LKR {bal.toFixed(2)}
-                                      </td>
-                                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                                        <span
-                                          style={{
-                                            fontSize: 'var(--erp-text-caption)',
-                                            fontWeight: 600,
-                                            padding: '2px 8px',
-                                            borderRadius: '9999px',
-                                            backgroundColor: Number(inv.paidAmount || 0) > 0 ? '#e0f2fe' : '#fee2e2',
-                                            color: Number(inv.paidAmount || 0) > 0 ? '#0284c7' : '#b91c1c',
-                                            border: Number(inv.paidAmount || 0) > 0 ? '1px solid #bae6fd' : '1px solid #fecaca',
-                                            textTransform: 'lowercase',
-                                          }}
-                                        >
-                                          {Number(inv.paidAmount || 0) > 0 ? 'partial' : 'unpaid'}
-                                        </span>
-                                      </td>
-                                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                                        <button aria-label="Print outstanding invoice" className="erp-table-icon-action"
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); printHistoryDocument('Outstanding Invoice', inv); }}
-                                          style={{ border: '1px solid #e2e8f0', backgroundColor: '#ffffff', borderRadius: '5px', padding: '4px 8px', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                                          title="Print outstanding invoice"
-                                        >
-                                          <Printer size={14} />
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              )}
-                            </tbody>
-                          </table>
+                          <CustomerOutstandingTable invoices={filteredCustomerOutstanding} customerName={selectedHistoryCustomer?.name}
+                            onView={invoice=>openHistoryDocument('Outstanding Invoice',invoice)} onPrint={invoice=>printHistoryDocument('Outstanding Invoice',invoice)}/>
+
                         </div>
                       </div>
                     </div>
@@ -4890,325 +4476,12 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Customer Profile View Popup (When clicking any row)   */}
       {/* ------------------------------------------------------------- */}
-      {viewingCustomer && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '740px',
-              padding: '24px 28px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Profile Header */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingBottom: '16px',
-                borderBottom: '1px solid #e2e8f0',
-                marginBottom: '18px',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0284c7',
-                    border: '1px solid #bae6fd',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: 'var(--erp-text-section)',
-                    flexShrink: 0,
-                  }}
-                >
-                  {(viewingCustomer.name || 'C').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h2 className="erp-dialog-title" style={{ margin: 0, color: '#0f172a' }}>
-                      {viewingCustomer.name}
-                    </h2>
-                    <span
-                      style={{
-                        fontFamily: 'monospace',
-                        fontWeight: 600,
-                        fontSize: 'var(--erp-text-small)',
-                        backgroundColor: '#f8fafc',
-                        color: '#475569',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      {viewingCustomer.code || viewingCustomer.customerCode || 'NO CODE'}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 600,
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        backgroundColor: isCustomerActive(viewingCustomer) ? '#dcfce7' : '#fee2e2',
-                        color: isCustomerActive(viewingCustomer) ? '#15803d' : '#b91c1c',
-                      }}
-                    >
-                      {isCustomerActive(viewingCustomer) ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 'var(--erp-text-small)', color: '#64748b', marginTop: '3px' }}>
-                    {(() => {
-                      const cRoutes = getCustomerRoutes(viewingCustomer.id);
-                      if (cRoutes.length === 0) {
-                        return <span>Group: <strong style={{ color: '#334155' }}>Unassigned</strong></span>;
-                      }
-                      return (
-                        <span>
-                          Customer Group: <strong style={{ color: '#334155' }}>{cRoutes.map((r) => r.name).join(', ')}</strong>
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons in Modal Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => {
-                    const c = viewingCustomer;
-                    setViewingCustomer(null);
-                    handleOpenEditCustomer(c);
-                  }}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    padding: '6px 12px',
-                    color: '#334155',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Edit2 size={13} /> Edit
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewingCustomer(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Profile Details Cards in Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Contact Information
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Contact Person</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.contactPerson || '—'}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Phone Number</span>
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{viewingCustomer.phone || '—'}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Email Address</span>
-                    <span style={{ color: '#334155' }}>{viewingCustomer.email || '—'}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Physical Address</span>
-                    <span style={{ color: '#334155' }}>{viewingCustomer.address || '—'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Financial & Credit Terms
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Credit Limit</span>
-                    <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 'var(--erp-text-nav)', fontFamily: 'monospace' }}>
-                      LKR {Number(viewingCustomer.creditLimit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Current Balance</span>
-                    <span style={{ fontWeight: 700, color: Number(viewingCustomer.currentBalance || 0) > 0 ? '#dc2626' : '#0f172a', fontSize: 'var(--erp-text-nav)', fontFamily: 'monospace' }}>
-                      LKR {Number(viewingCustomer.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Credit Status</span>
-                    <span style={{ fontWeight: 600, color: Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? '#dc2626' : '#15803d' }}>
-                      {Number(viewingCustomer.currentBalance || 0) > Number(viewingCustomer.creditLimit || 0) ? 'Exceeded Limit' : 'Within Limit'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 600, fontSize: 'var(--erp-text-field)', color: '#0f172a', marginBottom: '10px' }}>
-                  Customer Group & Assigned Staff
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--erp-text-body)' }}>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block', marginBottom: '4px' }}>
-                      Assigned Customer Group(s)
-                    </span>
-                    {(() => {
-                      const cRoutes = getCustomerRoutes(viewingCustomer.id);
-                      if (cRoutes.length === 0) {
-                        return <span style={{ color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>Unassigned</span>;
-                      }
-                      return (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {cRoutes.map((r) => (
-                            <span
-                              key={r.id}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                backgroundColor: '#eff6ff',
-                                color: '#1d4ed8',
-                                border: '1px solid #dbeafe',
-                                borderRadius: '4px',
-                                padding: '2px 8px',
-                                fontSize: 'var(--erp-text-caption)',
-                                fontWeight: 500,
-                              }}
-                            >
-                              <Users size={11} color="#2563eb" /> {r.name}
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Assigned Staff Member</span>
-                    <span style={{ fontWeight: 500, color: '#0f172a' }}>
-                      {(() => {
-                        const cRoutes = getCustomerRoutes(viewingCustomer.id);
-                        const reps = [...new Set(cRoutes.map((r) => r.assignedStaffName || r.salesmanName).filter(Boolean))];
-                        return reps.length > 0 ? reps.join(', ') : 'None assigned';
-                      })()}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b', fontSize: 'var(--erp-text-caption)', display: 'block' }}>Customer ID</span>
-                    <span style={{ fontFamily: 'monospace', color: '#64748b', fontSize: 'var(--erp-text-caption)' }}>
-                      {viewingCustomer.id}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-              <button className="erp-button erp-button-primary"
-                type="button"
-                onClick={() => {
-                  const cust = viewingCustomer;
-                  setViewingCustomer(null);
-                  handleViewCustomerHistory(cust);
-                }}
-                style={{
-                  padding: '7px 16px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <History size={13} /> View Financial History
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => handlePrintSingleCustomer(viewingCustomer)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    color: '#0284c7',
-                    border: '1px solid #bae6fd',
-                    padding: '7px 16px',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f9ff';
-                    e.currentTarget.style.borderColor = '#0284c7';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ffffff';
-                    e.currentTarget.style.borderColor = '#bae6fd';
-                  }}
-                  title="Print Customer Statement (A4)"
-                >
-                  <Printer size={13} /> Print
-                </button>
-
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setViewingCustomer(null)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    color: '#475569',
-                    border: '1px solid #e2e8f0',
-                    padding: '7px 16px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {viewingCustomer && <CustomerDetailsModal customer={viewingCustomer} status={customerStatus(viewingCustomer)} groups={getCustomerRoutes(viewingCustomer.id)} canManage={canEditCustomer}
+        onClose={() => setViewingCustomer(null)}
+        onEdit={() => {const customer = viewingCustomer; setViewingCustomer(null); handleOpenEditCustomer(customer);}}
+        onStatusChange={() => {setConfirmStatusModal({isOpen:true,customer:viewingCustomer});setViewingCustomer(null);}}
+        onHistory={() => {const customer = viewingCustomer; setViewingCustomer(null); handleViewCustomerHistory(customer);}}
+        onPrint={() => handlePrintSingleCustomer(viewingCustomer)}/>}
 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Customer History Document Preview Modal                */}
@@ -5241,188 +4514,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {showCustomerModal && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '800px',
-              padding: '28px 32px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 20px 35px -8px rgba(15, 23, 42, 0.2), 0 10px 15px -6px rgba(15, 23, 42, 0.08)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-dialog)', fontWeight: 700, color: '#0f172a' }}>
-                    {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: 'var(--erp-text-body)', color: '#64748b' }}>
-                    Enter customer directory details and contact information
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCustomerModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Customer Code
-                  </label>
-                  <input className="erp-field"
-                    type="text"
-                    placeholder="Auto (e.g. CUST-001)"
-                    value={customerForm.code}
-                    onChange={(e) => setCustomerForm({ ...customerForm, code: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Customer Name *
-                  </label>
-                  <input className="erp-field"
-                    type="text"
-                    placeholder="e.g. Apex Supermarket"
-                    value={customerForm.name}
-                    onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Contact Person & Phone */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Contact Person
-                  </label>
-                  <input className="erp-field"
-                    type="text"
-                    placeholder="e.g. John Doe"
-                    value={customerForm.contactPerson}
-                    onChange={(e) => setCustomerForm({ ...customerForm, contactPerson: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Phone Number
-                  </label>
-                  <input className="erp-field"
-                    type="text"
-                    placeholder="e.g. 077 123 4567"
-                    value={customerForm.phone}
-                    onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              {/* Email & Credit Limit */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Email Address
-                  </label>
-                  <input className="erp-field"
-                    type="email"
-                    placeholder="e.g. info@apex.com"
-                    value={customerForm.email}
-                    onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                    Approved Credit Limit (LKR)
-                  </label>
-                  <input className="erp-field"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={customerForm.creditLimit}
-                    onChange={(e) => setCustomerForm({ ...customerForm, creditLimit: e.target.value })}
-                    style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              {/* Address (Full Width) */}
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Physical Address
-                </label>
-                <input className="erp-field"
-                  type="text"
-                  placeholder="e.g. 123 Main Street, Colombo 03"
-                  value={customerForm.address}
-                  onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
-                  style={{ width: '100%', padding: '9px 12px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => setShowCustomerModal(false)}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    padding: '8px 16px',
-                    color: '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingCustomer}
-                  style={{
-                    backgroundColor: '#0284c7',
-                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '8px 20px',
-                    fontSize: 'var(--erp-text-field)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
-                >
-                  {savingCustomer ? 'Saving...' : editingCustomer ? 'Update Customer' : 'Create Customer'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        </>
       )}
 
       {/* ------------------------------------------------------------- */}

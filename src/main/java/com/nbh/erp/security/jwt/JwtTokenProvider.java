@@ -15,7 +15,7 @@ public class JwtTokenProvider {
  public JwtTokenProvider(
    @Value("${app.jwt.secret:}") String secret,
    @Value("${app.jwt.access-token-expiration-ms:900000}") long accessMs,
-   @Value("${app.jwt.refresh-token-expiration-ms:604800000}") long refreshMs) {
+   @Value("${app.jwt.refresh-token-expiration-ms:1800000}") long refreshMs) {
   if (secret == null || secret.trim().isEmpty()) {
    throw new IllegalStateException("JWT signing secret is missing. Set the JWT_SECRET environment variable with a Base64-encoded key of at least 32 bytes (256 bits).");
   }
@@ -35,6 +35,10 @@ public class JwtTokenProvider {
  public String generateAccessToken(Authentication authentication) {
   UserPrincipal p=(UserPrincipal)authentication.getPrincipal();
   return builder(p.getUsername(),p.getTokenVersion(),"ACCESS",accessMs).compact();
+ }
+ public String generateAccessToken(Authentication authentication, String sessionId) {
+  UserPrincipal p=(UserPrincipal)authentication.getPrincipal();
+  return builder(p.getUsername(),p.getTokenVersion(),"ACCESS",accessMs).claim("sid",sessionId).compact();
  }
  public String generateRefreshToken(String username,long version,String sessionId,String tokenId) {
   return builder(username,version,"REFRESH",refreshMs).claim("sid",sessionId).id(tokenId).compact();

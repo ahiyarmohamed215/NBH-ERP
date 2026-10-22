@@ -75,13 +75,15 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
 
   // Filter accessible tabs
   const allowedTabs = subTabs.filter(tab=>canAccessTab(user,'purchasing',tab.id));
+  const defaultTab = allowedTabs[0]?.id || 'suppliers';
 
-  const [currentTab, setCurrentTab] = useModuleTab('purchasing',activeSubTab,'suppliers',user);
+  const [currentTab, setCurrentTab] = useModuleTab('purchasing',activeSubTab || defaultTab,defaultTab,user);
+  const effectiveTab = currentTab || defaultTab;
 
-  const focusedDocument = Boolean(editingForms[currentTab]);
+  const focusedDocument = Boolean(editingForms[effectiveTab]);
 
-  const [visitedTabs, setVisitedTabs] = useState(() => new Set([currentTab]));
-  useEffect(()=>{if(currentTab)setVisitedTabs(previous=>previous.has(currentTab)?previous:new Set([...previous,currentTab]));},[currentTab]);
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([effectiveTab]));
+  useEffect(()=>{if(effectiveTab)setVisitedTabs(previous=>previous.has(effectiveTab)?previous:new Set([...previous,effectiveTab]));},[effectiveTab]);
 
   useEffect(() => {
     if (activeSubTab && allowedTabs.some((t) => t.id === activeSubTab)) {
@@ -90,15 +92,21 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
     }
   }, [activeSubTab]);
 
+  useEffect(() => {
+    if (effectiveTab && onSubTabChange && effectiveTab !== activeSubTab) {
+      onSubTabChange(effectiveTab);
+    }
+  }, [effectiveTab, activeSubTab, onSubTabChange]);
+
   // Consume the navigation action after the GTN view has mounted, including retained tabs.
   useEffect(()=>{
-    if(!createRequest || createRequest.id===handledCreateRequest.current || createRequest.tab!==currentTab || !allowedTabs.some(tab=>tab.id===currentTab))return;
+    if(!createRequest || createRequest.id===handledCreateRequest.current || createRequest.tab!==effectiveTab || !allowedTabs.some(tab=>tab.id===effectiveTab))return;
     if(createRequest.tab==='gtn' && gtnRef.current?.openCreate){
       handledCreateRequest.current=createRequest.id;
       gtnRef.current.openCreate();
       onCreateRequestHandled?.(createRequest.id);
     }
-  },[createRequest,currentTab,visitedTabs,onCreateRequestHandled,user]);
+  },[createRequest,effectiveTab,visitedTabs,onCreateRequestHandled,user]);
 
   const handleTabClick = (tabId) => {
     setCurrentTab(tabId);
@@ -109,18 +117,18 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
   };
 
   const handleHeaderAction = () => {
-    if (currentTab === 'suppliers') {
+    if (effectiveTab === 'suppliers') {
       mastersRef.current?.openAdd();
-    } else if (currentTab === 'grn') {
+    } else if (effectiveTab === 'grn') {
       if (grnRef.current?.openCreate) grnRef.current.openCreate();
       else grnRef.current?.openIntake?.();
-    } else if (currentTab === 'gtn') {
+    } else if (effectiveTab === 'gtn') {
       if (gtnRef.current?.openCreate) gtnRef.current.openCreate();
       else gtnRef.current?.focusForm?.();
-    } else if (currentTab === 'prn') {
+    } else if (effectiveTab === 'prn') {
       if (prnRef.current?.openCreate) prnRef.current.openCreate();
       else prnRef.current?.focusForm?.();
-    } else if (currentTab === 'purchase-orders') {
+    } else if (effectiveTab === 'purchase-orders') {
       poRef.current?.openCreate?.();
     }
   };
@@ -153,9 +161,7 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
         }}
       >
         <div>
-          <h1 className="erp-page-title"
-
-          >
+          <h1 className="erp-page-title">
             Purchasing Management
           </h1>
           <p className="erp-page-description">
@@ -164,8 +170,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
         </div>
 
         {/* Dynamic Action Button (CustomerHub Styled Button) */}
-        {currentTab === 'suppliers' ? (
-          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
+        {effectiveTab === 'suppliers' ? (
+          <button disabled={!canWriteTab(user,'purchasing',effectiveTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -181,8 +187,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           >
             <Plus size={17} /> New Supplier
           </button>
-        ) : currentTab === 'grn' ? (
-          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
+        ) : effectiveTab === 'grn' ? (
+          <button disabled={!canWriteTab(user,'purchasing',effectiveTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -198,8 +204,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           >
             <Plus size={17} /> New Goods Received
           </button>
-        ) : currentTab === 'gtn' ? (
-          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
+        ) : effectiveTab === 'gtn' ? (
+          <button disabled={!canWriteTab(user,'purchasing',effectiveTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -215,8 +221,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           >
             <ArrowRightLeft size={16} /> New Stock Transfer
           </button>
-        ) : currentTab === 'prn' ? (
-          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
+        ) : effectiveTab === 'prn' ? (
+          <button disabled={!canWriteTab(user,'purchasing',effectiveTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -232,8 +238,8 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
           >
             <RotateCcw size={16} /> New Purchase Return
           </button>
-        ) : currentTab === 'purchase-orders' ? (
-          <button disabled={!canWriteTab(user,'purchasing',currentTab)} className="erp-button erp-button-primary"
+        ) : effectiveTab === 'purchase-orders' ? (
+          <button disabled={!canWriteTab(user,'purchasing',effectiveTab)} className="erp-button erp-button-primary"
             type="button"
             onClick={handleHeaderAction}
             style={{
@@ -263,13 +269,12 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
       >
         {allowedTabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = currentTab === tab.id;
+          const isActive = effectiveTab === tab.id;
           return (
             <ErpTab tabId={tab.id} data-active={isActive} aria-pressed={isActive}
               key={tab.id}
               type="button"
               onClick={() => handleTabClick(tab.id)}
-
             >
               <Icon size={16} />
               {tab.label}
@@ -281,9 +286,9 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
       </>}
       {/* View Content (Kept mounted once visited so pages do not reload, reset, or move) */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-        {visitedTabs.has('suppliers') && (
-          <div style={{ display: currentTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <WorkspaceActivity active={currentTab === 'suppliers'}><MastersView
+        {(visitedTabs.has('suppliers') || effectiveTab === 'suppliers') && (
+          <div style={{ display: effectiveTab === 'suppliers' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceActivity active={effectiveTab === 'suppliers'}><MastersView
               ref={mastersRef}
               onFormModeChange={formCallbacks.suppliers}
               activeSubTab="suppliers"
@@ -293,24 +298,24 @@ export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequ
             /></WorkspaceActivity>
           </div>
         )}
-        {visitedTabs.has('grn') && (
-          <div style={{ display: currentTab === 'grn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <WorkspaceActivity active={currentTab === 'grn'}><GrnView ref={grnRef} onFormModeChange={formCallbacks.grn} /></WorkspaceActivity>
+        {(visitedTabs.has('grn') || effectiveTab === 'grn') && (
+          <div style={{ display: effectiveTab === 'grn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceActivity active={effectiveTab === 'grn'}><GrnView ref={grnRef} onFormModeChange={formCallbacks.grn} /></WorkspaceActivity>
           </div>
         )}
-        {visitedTabs.has('gtn') && (
-          <div style={{ display: currentTab === 'gtn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <WorkspaceActivity active={currentTab === 'gtn'}><GtnView ref={gtnRef} onFormModeChange={formCallbacks.gtn} /></WorkspaceActivity>
+        {(visitedTabs.has('gtn') || effectiveTab === 'gtn') && (
+          <div style={{ display: effectiveTab === 'gtn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceActivity active={effectiveTab === 'gtn'}><GtnView ref={gtnRef} onFormModeChange={formCallbacks.gtn} /></WorkspaceActivity>
           </div>
         )}
-        {visitedTabs.has('prn') && (
-          <div style={{ display: currentTab === 'prn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <WorkspaceActivity active={currentTab === 'prn'}><PrnView ref={prnRef} onFormModeChange={formCallbacks.prn} /></WorkspaceActivity>
+        {(visitedTabs.has('prn') || effectiveTab === 'prn') && (
+          <div style={{ display: effectiveTab === 'prn' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceActivity active={effectiveTab === 'prn'}><PrnView ref={prnRef} onFormModeChange={formCallbacks.prn} /></WorkspaceActivity>
           </div>
         )}
-        {visitedTabs.has('purchase-orders') && (
-          <div style={{ display: currentTab === 'purchase-orders' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
-            <WorkspaceActivity active={currentTab === 'purchase-orders'}><PurchaseOrdersView ref={poRef} onFormModeChange={formCallbacks['purchase-orders']} /></WorkspaceActivity>
+        {(visitedTabs.has('purchase-orders') || effectiveTab === 'purchase-orders') && (
+          <div style={{ display: effectiveTab === 'purchase-orders' ? 'flex' : 'none', flex: 1, minHeight: 0, flexDirection: 'column', overflow: 'hidden' }}>
+            <WorkspaceActivity active={effectiveTab === 'purchase-orders'}><PurchaseOrdersView ref={poRef} onFormModeChange={formCallbacks['purchase-orders']} /></WorkspaceActivity>
           </div>
         )}
       </div>

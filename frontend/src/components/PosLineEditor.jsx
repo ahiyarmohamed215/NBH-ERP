@@ -1,6 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { posMoney } from "./PosRangeProgress";
+import './PosLineEditor.css';
 export default function PosLineEditor({
   item,
   busy,
@@ -28,10 +29,7 @@ export default function PosLineEditor({
       >
         <header className="pos-dialog-heading">
           <div>
-            <h2 id="pos-line-title">Edit bill item</h2>
-            <p>
-              {item.sku} · {item.name}
-            </p>
+            <h2 id="pos-line-title">Edit product</h2>
           </div>
           <button
             type="button"
@@ -44,60 +42,69 @@ export default function PosLineEditor({
           </button>
         </header>
         <div className="pos-dialog-body">
-          <div className="pos-range-summary">
-            <div>
-              <span>Unit price</span>
-              <strong>{posMoney(item.unitPrice)}</strong>
-            </div>
-            <div>
-              <span>Available for this bill</span>
-              <strong>{item.availableQty}</strong>
-            </div>
+          <div className="pos-line-identity">
+            <strong className="pos-line-product">{item.name}</strong>
+            <span className="pos-line-code">{item.sku}</span>
           </div>
+          <dl className="pos-line-facts">
+            <div>
+              <dt>Unit price</dt>
+              <dd>{posMoney(item.unitPrice)}</dd>
+            </div>
+            <div>
+              <dt>Available quantity</dt>
+              <dd>{item.availableQty}</dd>
+            </div>
+          </dl>
           <div className="pos-edit-fields">
             <label>
-              Quantity
+              Selling quantity
               <input
                 autoFocus
                 required
+                disabled={busy}
                 type="number"
                 min="0.01"
                 step="0.01"
                 max={item.availableQty}
                 className="input-glass erp-field"
-                value={item.editQty}
+                value={item.editQty ?? ''}
+                onFocus={event=>event.target.select()}
                 onChange={(e) => onQty(e.target.value)}
               />
             </label>
             <label>
               Discount (%)
               <input
+                disabled={busy}
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
                 className="input-glass erp-field"
-                value={item.editDiscRate}
+                value={item.editDiscRate ?? ''}
                 onChange={(e) => onRate(e.target.value)}
               />
             </label>
             <label>
               Discount (Rs.)
               <input
+                disabled={busy}
                 type="number"
                 min="0"
                 max={item.editQty * item.unitPrice}
                 step="0.01"
                 className="input-glass erp-field"
-                value={item.editDiscAmt}
+                value={item.editDiscAmt ?? ''}
                 onChange={(e) => onAmount(e.target.value)}
               />
             </label>
           </div>
-          <div className="pos-split pos-line-total">
-            <span>Line total</span>
-            <strong>{posMoney(item.editTotal)}</strong>
-          </div>
+          <dl className="pos-line-summary">
+            <div><dt>Total before discount</dt><dd>{posMoney(Number(item.editQty || 0) * Number(item.unitPrice || 0))}</dd></div>
+            <div><dt>Discount</dt><dd>{posMoney(item.editDiscAmt)}</dd></div>
+            <div><dt>Line total</dt><dd>{posMoney(item.editTotal)}</dd></div>
+          </dl>
         </div>
         <footer className="pos-dialog-footer">
           <button

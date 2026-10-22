@@ -68,8 +68,18 @@
 .erp-field::placeholder { font-size:inherit; color:var(--erp-muted); }
 .erp-field:not(textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not(.modern-select-native) { height:var(--erp-control-height) !important; }
 .erp-application label { font-size:var(--erp-text-caption); font-weight:600; color:#475569; }
-:is(.erp-field,.erp-button,.erp-tab,.btn):focus-visible { outline:2px solid var(--erp-accent); outline-offset:2px; }
-.erp-field[aria-invalid="true"] { border-color:var(--danger); }
+:is(.erp-button,.erp-tab,.btn):focus-visible { outline:2px solid var(--erp-accent); outline-offset:2px; }
+:is(.erp-field,input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),textarea,select):focus,
+:is(.erp-field,input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),textarea,select):focus-visible {
+  outline: none !important;
+  border-color: #93c5fd !important;
+  background: #f8fbff !important;
+  box-shadow: none !important;
+}
+.erp-field[aria-invalid="true"],
+input[aria-invalid="true"] { border-color:var(--danger) !important; }
+.erp-field[aria-invalid="true"]:focus,
+input[aria-invalid="true"]:focus { border-color:#ef4444 !important; background:#fef2f2 !important; box-shadow:none !important; }
 
 /* Shared table styling lives in ErpTables.css. */
 

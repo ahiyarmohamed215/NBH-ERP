@@ -73,7 +73,7 @@ export default function useErpShortcuts({
       // F3: Quick Jump to Sales / POS
       if (e.key === 'F3') {
         e.preventDefault();
-        navigateTo('sales', 'pos');
+        navigateTo('invoicing', 'pos');
         return;
       }
 

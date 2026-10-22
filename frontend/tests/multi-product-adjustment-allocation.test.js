@@ -235,8 +235,10 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
     assert.ok(allocPopup, 'Allocation popup view must open on row click');
     assert.ok(allocPopup.querySelector('.purchase-inspection-table table'), 'Popup view must contain products table like GRN');
     assert.ok(allocPopup.textContent.includes('Cashier One'), 'Popup header must show staff member');
-    assert.ok(allocPopup.textContent.includes('SKU-001'), 'Popup table must list product code');
-    const closeAllocPopupBtn = [...allocPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
+    assert.ok(allocPopup.querySelector('.purchase-inspection-table-search input'), 'Allocation popup must include table search bar');
+    assert.ok(allocPopup.querySelector('.purchase-inspection-table-print'), 'Allocation popup must include table print button');
+    assert.ok(allocPopup.querySelector('.purchase-inspection-detail-actions'), 'Allocation details actions must be in details card');
+    const closeAllocPopupBtn = [...allocPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close' || b.getAttribute('aria-label')?.includes('Close') || b.title === 'Close');
     assert.ok(closeAllocPopupBtn);
     await click(closeAllocPopupBtn);
     assert.equal(host.querySelector('[aria-label="Inventory allocation details"]'), null, 'Popup closes on click');
@@ -315,7 +317,7 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
     const adjThs = [...host.querySelectorAll('.adjustment-table th')];
     assert.ok(adjThs.length > 0);
     const adjHeaders = adjThs.map((th) => th.textContent.trim());
-    assert.deepEqual(adjHeaders, ['Adjustment code', 'Type', 'Warehouse', 'Total products', 'Date', 'Status', 'Reason', 'Actions']);
+    assert.deepEqual(adjHeaders, ['Adjustment code', 'Type', 'Total products', 'Date', 'Status', 'Adjusted through', 'Reason', 'Actions']);
 
     // Check row display
     const firstAdjRow = host.querySelector('.adjustment-table tbody tr');
@@ -329,9 +331,13 @@ test('multi-product stock adjustment and inventory allocation in GRN style with 
     assert.ok(adjPopup, 'Stock adjustment popup view must open on row click');
     assert.ok(adjPopup.querySelector('.purchase-inspection-table table'), 'Popup view must contain products table like GRN');
     assert.ok(adjPopup.textContent.includes('Main Warehouse'), 'Popup header must show warehouse');
+    assert.ok([...adjPopup.querySelectorAll('.purchase-inspection-table th')].some(th => th.textContent.includes('Warehouse')), 'Popup table must include warehouse column');
     assert.ok(adjPopup.textContent.includes('SKU-001'), 'Popup table must list product 1');
     assert.ok(adjPopup.textContent.includes('SKU-002'), 'Popup table must list product 2');
-    const closeAdjPopupBtn = [...adjPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
+    assert.ok(adjPopup.querySelector('.purchase-inspection-table-search input'), 'Adjustment popup must include table search bar');
+    assert.ok(adjPopup.querySelector('.purchase-inspection-table-print'), 'Adjustment popup must include table print button');
+    assert.ok(adjPopup.querySelector('.purchase-inspection-detail-actions'), 'Adjustment details actions must be in details card');
+    const closeAdjPopupBtn = [...adjPopup.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close' || b.getAttribute('aria-label')?.includes('Close') || b.title === 'Close');
     assert.ok(closeAdjPopupBtn);
     await click(closeAdjPopupBtn);
     assert.equal(host.querySelector('[aria-label="Stock adjustment details"]'), null, 'Popup closes on click');

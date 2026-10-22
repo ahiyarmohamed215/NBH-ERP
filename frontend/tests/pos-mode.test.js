@@ -59,7 +59,7 @@ test('POS opens from invoicing, loads products, adds a priced item and exits',as
   // Reopening POS uses the same saved server bill, as a browser reload does.
   await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('Open POS')).click());
   assert.ok([...host.querySelectorAll('tbody tr')].some(row=>row.textContent.includes('POS test product')));
-  await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('Hold Bill (F12)')).click());
+  await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('Onhold Bill') || button.textContent.includes('Hold Bill')).click());
   assert.ok(!host.querySelector('[aria-label="Delete POS test product"]'));
   await act(async()=>host.querySelector('[title="Inspect Held Bills"]').click());
   await act(async()=>new Promise(resolve=>setTimeout(resolve,250)));

@@ -118,11 +118,11 @@ class SecurityHardeningTask2Test {
         @DisplayName("Refuses startup when secret is null or blank")
         void refusesMissingSecret() {
             Exception ex1 = assertThrows(IllegalStateException.class,
-                    () -> new JwtTokenProvider(null, 900000, 604800000));
+                    () -> new JwtTokenProvider(null, 900000, 1800000));
             assertTrue(ex1.getMessage().contains("JWT signing secret is missing"));
 
             Exception ex2 = assertThrows(IllegalStateException.class,
-                    () -> new JwtTokenProvider("   ", 900000, 604800000));
+                    () -> new JwtTokenProvider("   ", 900000, 1800000));
             assertTrue(ex2.getMessage().contains("JWT signing secret is missing"));
         }
 
@@ -130,7 +130,7 @@ class SecurityHardeningTask2Test {
         @DisplayName("Refuses startup when secret is not valid Base64")
         void refusesNonBase64Secret() {
             Exception ex = assertThrows(IllegalStateException.class,
-                    () -> new JwtTokenProvider("this-is-not-valid-base64!@#$%", 900000, 604800000));
+                    () -> new JwtTokenProvider("this-is-not-valid-base64!@#$%", 900000, 1800000));
             assertTrue(ex.getMessage().contains("JWT_SECRET must be a valid Base64-encoded string"));
         }
 
@@ -139,7 +139,7 @@ class SecurityHardeningTask2Test {
         void refusesWeakSecret() {
             // "c2hvcnQ=" decodes to "short" (5 bytes)
             Exception ex = assertThrows(IllegalStateException.class,
-                    () -> new JwtTokenProvider("c2hvcnQ=", 900000, 604800000));
+                    () -> new JwtTokenProvider("c2hvcnQ=", 900000, 1800000));
             assertTrue(ex.getMessage().contains("JWT_SECRET is too weak"));
             assertTrue(ex.getMessage().contains("at least 32 bytes"));
         }
@@ -149,9 +149,9 @@ class SecurityHardeningTask2Test {
         void acceptsValidSecret() {
             // 32-byte key: "test-only-secret-key-32-bytes-long-123456" Base64 encoded
             String validSecret = "dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZy0xMjM0NTY=";
-            JwtTokenProvider provider = new JwtTokenProvider(validSecret, 900000, 604800000);
+            JwtTokenProvider provider = new JwtTokenProvider(validSecret, 900000, 1800000);
 
-            assertEquals(604800000L, provider.getRefreshMs());
+            assertEquals(1800000L, provider.getRefreshMs());
 
             User user = User.builder().id(1L).username("testuser").tokenVersion(0L).build();
             UserPrincipal principal = UserPrincipal.create(user);

@@ -26,8 +26,8 @@ public class CustomerController {
     @GetMapping
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "List all customers")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers() {
-        return ResponseEntity.ok(ApiResponse.ok(customerService.getAllCustomers()));
+    public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers(@RequestParam(defaultValue = "false") boolean includeInactive) {
+        return ResponseEntity.ok(ApiResponse.ok(includeInactive ? customerService.getDirectoryCustomers() : customerService.getAllCustomers()));
     }
 
     @GetMapping("/active")

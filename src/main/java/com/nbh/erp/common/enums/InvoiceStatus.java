@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 public enum InvoiceStatus {
     HELD,
     MERGED,
+    YET_TO_PRINT,
     SENT_TO_WAREHOUSE,
     STOCK_ADJUSTED,
     COMPLETED,

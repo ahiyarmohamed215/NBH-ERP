@@ -298,6 +298,7 @@ export default function AdjustmentWorkspace({
 
   return (
     <form
+      noValidate
       className="allocation-workspace purchase-document master-workspace adjustment-workspace"
       aria-label="New stock adjustment"
       onSubmit={(event) => {
@@ -474,11 +475,15 @@ export default function AdjustmentWorkspace({
                 type="number"
                 min="0.01"
                 step="0.01"
-                required
                 value={form.quantity || ""}
                 onFocus={() => setOpen(false)}
                 onChange={(event) => change("quantity", event.target.value)}
               />
+              {stagedHasExceed && (
+                <p className="adjustment-error" role="alert" style={{ margin: "4px 0 0", color: "#e11d48", fontSize: "var(--erp-text-caption)" }}>
+                  Reduction exceeds available stock.
+                </p>
+              )}
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "var(--erp-text-caption)", fontWeight: 600, color: "#475569" }}>
               Reason *
@@ -511,11 +516,11 @@ export default function AdjustmentWorkspace({
             />
           </label>
 
-          {/* Staged calculation review card (always present when selected to satisfy tests and provide immediate calculation feedback) */}
+          {/* Staged calculation review card removed from visual display as requested */}
           <aside
             className="allocation-receipt allocation-inline-review"
             aria-label="Stock adjustment summary"
-            style={{ padding: "10px 14px", margin: "2px 0", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px" }}
+            style={{ display: "none" }}
           >
             <div className="allocation-receipt-section" style={{ padding: 0, border: "none" }}>
               <dl style={{ margin: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -599,7 +604,7 @@ export default function AdjustmentWorkspace({
           </div>
 
           <div className="grn-table-scroll erp-table-scroll erp-table-frame" style={{ flex: 1, minHeight: 0, overflow: "auto", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
-            <table className="glass-table erp-table" style={{ margin: 0, minWidth: "620px", width: "100%" }}>
+            <table className="glass-table erp-table" style={{ margin: 0, width: "100%" }}>
               <thead>
                 <tr>
                   <th className="erp-table-heading">Product code</th>

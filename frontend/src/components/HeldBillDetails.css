@@ -1,0 +1,26 @@
+.onhold-inspection-content{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;gap:14px;}
+.onhold-inspection-content .purchase-inspection-table{flex:1;min-height:160px;}
+.onhold-inspection-content .erp-table{min-width:560px;table-layout:auto;}
+.onhold-inspection-content .purchase-inspection-table-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:2px;}
+.onhold-message{padding:8px 16px;margin:0;font-size:var(--erp-text-body);color:#475569;}
+.onhold-error{color:#b91c1c;}
+.onhold-inspection .purchase-inspection-details-card{height:auto;min-height:128px;}
+.purchase-inspection.onhold-inspection .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{height:auto;max-height:none;overflow:visible;}
+@media(max-width:700px){
+ .onhold-inspection .purchase-inspection-number-row{flex-wrap:wrap;gap:6px;}
+ .onhold-inspection .purchase-inspection-title h2{overflow-wrap:normal;word-break:normal;}
+ .onhold-inspection-content .purchase-inspection-table-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;}
+ .onhold-inspection-content .erp-search-group{grid-column:1 / -1;min-width:0 !important;}
+ .onhold-inspection-content .purchase-inspection-table-toolbar .modern-filter-trigger{width:100% !important;min-width:0;}
+}
+
+.purchase-inspection.onhold-inspection .purchase-inspection-details-card{background:#f8fafc;border-color:#e2e8f0;border-radius:8px;}
+.onhold-inspection .grn-inspection-symbol{background:#fff;border:1px solid #e2e8f0;}
+
+.onhold-inspection-content .onhold-product{white-space:normal;overflow-wrap:anywhere;}
+.onhold-product-name,.onhold-product-code{display:block;font:inherit;}
+.onhold-product-code{margin-top:2px;color:var(--erp-muted);}
+
+.purchase-inspection.onhold-inspection .purchase-inspection-table td.onhold-product{font-family:var(--font-sans);font-weight:400;color:var(--erp-text);}
+.purchase-inspection.onhold-inspection .onhold-product-name{color:var(--erp-text);font-weight:600;}
+.purchase-inspection.onhold-inspection .onhold-product-code{font-size:var(--erp-text-small);font-weight:400;}

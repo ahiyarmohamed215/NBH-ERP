@@ -24,6 +24,8 @@ public class UserDto {
     private java.math.BigDecimal commissionRate;
     private Boolean isActive;
     private String approvalStatus;
+    private Boolean passwordResetRequested;
+    private String passwordResetNotes;
     private List<String> roles;
     private List<String> permissions;
     private LocalDateTime createdAt;
@@ -49,6 +51,8 @@ public class UserDto {
                 .commissionRate(user.getCommissionRate())
                 .isActive(user.getIsActive())
                 .approvalStatus(user.getApprovalStatus())
+                .passwordResetRequested(user.getPasswordResetRequested())
+                .passwordResetNotes(user.getPasswordResetNotes())
                 .roles(user.getRoles().stream().map(r -> r.getName()).collect(Collectors.toList()))
                 .permissions(perms)
                 .createdAt(user.getCreatedAt())

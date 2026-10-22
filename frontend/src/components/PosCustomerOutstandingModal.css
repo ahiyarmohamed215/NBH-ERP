@@ -1,0 +1,52 @@
+.pos-outstanding-dialog.purchase-inspection {
+  position:fixed; inset:0; margin:auto !important; box-sizing:border-box; padding:0;
+  border:1px solid #e2e8f0; border-radius:16px; width:min(1280px,calc(100vw - 32px));
+  height:min(88dvh,calc(100dvh - 32px)); max-height:calc(100dvh - 32px);
+  background:#fff; color:#0f172a; overflow:hidden;
+  font-family:var(--font-body,inherit); box-shadow:none;
+}
+.pos-outstanding-dialog[open] {display:flex;flex-direction:column;}
+.pos-outstanding-dialog::backdrop {background:rgb(15 23 42 / 45%);}
+.pos-outstanding-dialog button,.pos-outstanding-dialog input {font-family:inherit;}
+.pos-outstanding-dialog .pos-out-summary {grid-template-columns:minmax(0,1fr) auto auto;gap:24px;padding:18px;margin:0;}
+.pos-outstanding-dialog .purchase-inspection-header-details {max-height:44dvh;}
+.pos-out-content {display:flex;flex-direction:column;flex:1;min-height:0;gap:14px;}
+.pos-out-customer {min-width:0;}
+.pos-out-customer-name {display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.92rem;}
+.pos-out-customer-meta {display:flex;align-items:center;gap:14px;margin-top:6px;font-size:var(--erp-text-caption,.74rem);color:#64748b;flex-wrap:wrap;}
+.pos-out-customer-meta span {display:inline-flex;align-items:center;gap:5px;}
+.pos-out-finances {display:flex;gap:24px;margin:0;flex-shrink:0;}
+.pos-out-finances div {display:flex;flex-direction:column;gap:5px;}
+.pos-out-finances dt {font-size:var(--erp-text-caption,.74rem);color:#64748b;}
+.pos-out-finances dd {margin:0;font-size:.98rem;font-weight:700;font-variant-numeric:tabular-nums;}
+.pos-outstanding-dialog .pos-out-due {color:#b91c1c;font-weight:600;}
+.pos-out-controls {display:flex;align-items:center;gap:10px;padding:0;background:transparent;border:0;flex-shrink:0;flex-wrap:wrap;}
+.pos-out-controls .erp-button {display:inline-flex;align-items:center;justify-content:center;gap:7px;height:38px;white-space:nowrap;padding:0 12px;}
+.pos-out-controls .erp-search-group > svg {top:calc(50% - 8.5px) !important;transform:none !important;}
+.pos-out-body {overflow:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;}
+.pos-outstanding-dialog .pos-out-subtable th {padding:11px 14px;background:#fafbfc;border-bottom:1px solid #e2e8f0;font-size:var(--erp-text-label,.74rem);font-weight:600;color:#475569;white-space:nowrap;}
+.pos-outstanding-dialog .pos-out-subtable td {padding:11px 14px;border-bottom:1px solid #eef2f6;vertical-align:middle;}
+.pos-outstanding-dialog .pos-out-number {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.pos-out-items-tray {padding:14px 20px;background:#f8fafc;}
+.pos-out-items-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.78rem;margin-bottom:10px;}
+.pos-out-items-heading span {color:#64748b;}
+.pos-outstanding-dialog .pos-out-subtable {width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;font-size:var(--erp-text-body,.82rem);}
+.pos-out-subtable small {display:block;color:#64748b;font-size:.72rem;margin-top:3px;}
+.pos-out-message {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:48px 20px;min-height:130px;color:#64748b;font-size:.84rem;text-align:center;}
+.pos-out-message p {margin:0;}
+.pos-out-message strong {color:#334155;font-weight:600;}
+.pos-outstanding-dialog button:focus-visible {outline:2px solid #0284c7;outline-offset:2px;}
+@media (max-width:760px) {
+  .pos-outstanding-dialog.purchase-inspection {width:calc(100vw - 16px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);}
+  .pos-outstanding-dialog .pos-out-summary {grid-template-columns:1fr;gap:16px;padding:12px;}
+  .pos-outstanding-dialog .purchase-inspection-header-details {max-height:50dvh;}
+  .pos-out-finances {width:100%;gap:20px;}
+  .pos-out-finances div {flex:1;}
+  .pos-out-controls .erp-search-group {flex-basis:100% !important;}
+}
+
+.pos-out-print-error {margin:0;color:#b91c1c;font-size:var(--erp-text-body,.82rem);}
+
+.pos-outstanding-dialog .customer-outstanding-table td.customer-outstanding-empty {font-family:var(--font-sans,var(--font-body,inherit));font-weight:400;}
+.pos-outstanding-dialog .pos-out-message {font-family:var(--font-sans,var(--font-body,inherit));}
+
