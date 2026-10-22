@@ -1,10 +1,498 @@
-.held-invoice-backdrop{z-index:1150;padding:16px;}
-.held-invoice-dialog{width:min(820px,100%);max-height:90dvh;display:flex;flex-direction:column;background:#fff;border:1px solid var(--erp-border);border-radius:12px;color:var(--erp-text);font-family:inherit;overflow:hidden;}
-.held-invoice-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--erp-border);}
-.held-invoice-heading{display:flex;align-items:center;gap:12px;}.held-invoice-heading>svg{color:var(--erp-accent);flex-shrink:0;}.held-invoice-heading h2{margin:0;}.held-invoice-heading p,.held-invoice-packing p{margin:5px 0 0;color:var(--erp-muted);font-size:var(--erp-text-small);}
-.held-invoice-body{min-height:0;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:18px;}
-.held-invoice-summary{display:grid;grid-template-columns:1fr 1.2fr auto;gap:16px;margin:0;}.held-invoice-summary dt{color:var(--erp-muted);font-size:var(--erp-text-small);}.held-invoice-summary dd{margin:5px 0 0;font-size:var(--erp-text-body);font-weight:600;overflow-wrap:anywhere;}
-.held-invoice-items{max-height:230px;flex-shrink:0;}.held-invoice-items table{width:100%;}.held-invoice-items small{display:block;color:var(--erp-muted);font-size:var(--erp-text-caption);}.held-invoice-items th:nth-child(n+3),.held-invoice-items td:nth-child(n+3){text-align:right;white-space:nowrap;}
-.held-invoice-packing h3{margin:0;font-size:var(--erp-text-body);font-weight:600;}.held-invoice-packing-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px;}.held-invoice-packing-fields label{display:flex;flex-direction:column;gap:6px;font-size:var(--erp-text-small);font-weight:600;}.held-invoice-packing-fields input{width:100%;box-sizing:border-box;height:38px;border:1px solid var(--erp-field-border);border-radius:6px;padding:8px 10px;background:#fff;}.held-invoice-packing-fields input:focus{border-color:var(--erp-accent);outline:2px solid #e0f2fe;}
-.held-invoice-total{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid var(--erp-border);padding-top:16px;font-size:var(--erp-text-body);}.held-invoice-total strong{font-size:1.15rem;color:var(--erp-accent);font-variant-numeric:tabular-nums;}.held-invoice-note{margin:0;color:var(--erp-muted);font-size:var(--erp-text-small);}.held-invoice-error{margin:0;padding:10px 12px;border:1px solid #fecaca;border-radius:6px;background:#fff1f2;color:#9f1239;font-size:var(--erp-text-body);}.held-invoice-dialog>footer{display:flex;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid var(--erp-border);}
-@media(max-width:600px){.held-invoice-summary{grid-template-columns:1fr;gap:10px;}.held-invoice-packing-fields{grid-template-columns:repeat(2,minmax(0,1fr));}.held-invoice-body,.held-invoice-dialog>header{padding:16px;}.held-invoice-dialog>footer{padding:12px 16px;}.held-invoice-items{overflow:auto;}.held-invoice-items table{min-width:520px;}}
+.held-invoice-backdrop {
+  z-index: 1150;
+  padding: 16px;
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.held-invoice-dialog {
+  width: min(calc(840px + 3in), 96vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  color: #0f172a;
+  font-family: inherit;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+  animation: heldModalIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes heldModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.held-invoice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.held-invoice-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.held-invoice-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.held-invoice-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.held-invoice-title-row h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 750;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.held-merge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.held-invoice-heading p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: var(--erp-text-small, 0.85rem);
+}
+
+.held-invoice-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.held-invoice-close:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.held-invoice-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Metadata grid */
+.held-invoice-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.held-meta-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.held-meta-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.held-meta-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Merged onhold bills section */
+.held-source-bills-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  flex-wrap: wrap;
+}
+
+.held-source-bills-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #166534;
+  flex-shrink: 0;
+}
+
+.held-source-bills-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.held-bill-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #ffffff;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+/* Items Table */
+.held-invoice-items-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.held-items-table-header {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.held-invoice-items {
+  max-height: 220px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow-y: auto;
+}
+
+.held-invoice-items table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.held-item-name {
+  display: block;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.held-item-sku {
+  display: block;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.held-wh-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+/* Packing Quantities Card */
+.held-invoice-packing {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.held-packing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.held-packing-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.held-packing-icon {
+  color: #0284c7;
+}
+
+.held-invoice-packing h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.held-quick-zero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0284c7;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.held-quick-zero-btn:hover:not(:disabled) {
+  background: #bae6fd;
+  color: #0369a1;
+}
+
+.held-packing-instruction {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.held-invoice-packing-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.held-packing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #ffffff;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.held-packing-field.is-valid {
+  border-color: #94a3b8;
+}
+
+.held-field-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.held-packing-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #f8fbff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0f172a;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.15s ease;
+}
+
+.held-packing-input:focus {
+  border-color: #93c5fd !important;
+  background: #ffffff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.35) !important;
+}
+
+/* Total & Status Card */
+.held-invoice-total-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 14px 20px;
+}
+
+.held-total-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.held-total-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+}
+
+.held-total-status-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.held-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+.held-status-pill.pending-payment {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.held-status-pill.pending-delivery {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.held-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.held-total-right {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.held-currency-tag {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+.held-grand-total {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Error */
+.held-invoice-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 0.85rem;
+}
+
+/* Footer */
+.held-invoice-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.held-btn-cancel {
+  padding: 8px 16px;
+  font-weight: 600;
+}
+
+.held-btn-submit {
+  padding: 8px 20px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+@media (max-width: 680px) {
+  .held-invoice-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .held-invoice-packing-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .held-invoice-total-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .held-invoice-body,
+  .held-invoice-header,
+  .held-invoice-footer {
+    padding: 14px 16px;
+  }
+}

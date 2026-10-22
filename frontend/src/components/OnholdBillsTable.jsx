@@ -14,6 +14,7 @@ import {hasPermission} from '../utils/moduleAccess';
 
 import {printA4Report} from '../utils/printReport';
 import {posRemarks} from '../utils/billRemarks';
+import {printHeldBill} from '../utils/heldBillPrint';
 
 import './OnholdBillsTable.css';
 
@@ -46,7 +47,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
       columns:[{header:'Onhold bill number',accessor:'number'},{header:'Customer',accessor:'customer'},{header:'Bill date',accessor:'date'},
 
-        {header:'Staff',accessor:'staff'},{header:'Total products',accessor:'products',align:'right'},{header:'Total (LKR)',accessor:'total',align:'right'},{header:'Status',accessor:'status'},{header:'Remarks',accessor:'remarks'}],
+        {header:'Staff',accessor:'staff'},{header:'Total products',accessor:'products',align:'right'},{header:'Total (LKR)',accessor:'total',align:'right'},{header:'Status',accessor:'status'},...(showRemarks?[{header:'Remarks',accessor:'remarks'}]:[])],
 
       data:visible.map(b=>({number:escape(b.heldNumber),customer:escape(b.customerName),date:escape((b.createdAt || b.invoiceDate)?.slice(0,10)),staff:escape([b.createdByName || b.createdBy,b.createdByEmployeeCode].filter(Boolean).join(' · ')),
 
@@ -62,7 +63,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
 
 
-  const showActions=!archive;
+  const showRemarks=!archive;
   const showSelection=!archive && !history && !posOnly && status==='STOCK_ADJUSTED';
   const changeStatus=value=>{onSelect?.([]);onStatusChange(value);};
 
@@ -125,7 +126,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
       {showSelection && <th className="erp-table-heading">Select</th>}
 
-      {['Onhold bill number','Customer','Bill date','Staff','Total products','Total','Status','Remarks',...(showActions?['Actions']:[])].map(label=><th key={label} className={`erp-table-heading ${label==='Actions'?'erp-table-actions':['Total products','Total'].includes(label)?'onhold-money':''}`}>{label}</th>)}
+      {['Onhold bill number','Customer','Bill date','Staff','Total products','Total','Status',...(showRemarks?['Remarks']:[]),'Actions'].map(label=><th key={label} className={`erp-table-heading ${label==='Actions'?'erp-table-actions':['Total products','Total'].includes(label)?'onhold-money':''}`}>{label}</th>)}
 
     </tr></thead><tbody>
 
@@ -141,22 +142,22 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
         <td className="erp-table-cell"><StatusBadge status={displayStatus(b)} label={!archive && displayStatus(b)==='CANCELLED'?'ONHOLD BILL CANCELLED':undefined}/></td>
 
-        <td className="erp-table-cell onhold-remarks" title={posRemarks(b)}>{posRemarks(b) || '—'}</td>
+        {showRemarks && <td className="erp-table-cell onhold-remarks" title={posRemarks(b)}>{posRemarks(b) || '—'}</td>}
 
 
-        {showActions && <td className="erp-table-cell erp-table-actions" onClick={e=>e.stopPropagation()}><div>
+        <td className="erp-table-cell erp-table-actions" onClick={e=>e.stopPropagation()}><div>
 
-          {b.status!=='CANCELLED' && <button type="button" className="erp-table-icon-action" aria-label={`Print ${b.heldNumber}`} title="Print warehouse sheets" disabled={b.canResume===false} onClick={()=>onPrint(b)}><Printer size={13}/></button>}
+          {(archive || b.status!=='CANCELLED') && <button type="button" className="erp-table-icon-action" aria-label={`Print ${b.heldNumber}`} title={archive?'Print held bill':'Print warehouse sheets'} disabled={!archive && b.canResume===false} onClick={()=>archive?printHeldBill(b):onPrint(b)}><Printer size={13}/></button>}
 
-          {editable(b) && !posOnly && b.status==='SENT_TO_WAREHOUSE' && hasPermission(user,'SALES_EDIT') && <button type="button" className="erp-table-icon-action" aria-label={`Adjust ${b.heldNumber}`} title="Record warehouse adjustments" onClick={()=>onEdit(b)}><Edit2 size={13}/></button>}
+          {editable(b) && !posOnly && b.status==='SENT_TO_WAREHOUSE' && hasPermission(user,'SALES_EDIT') && <button type="button" className="erp-table-icon-action" aria-label={`Adjust ${b.heldNumber}`} title="Warehouse Review" onClick={()=>onEdit(b)}><Edit2 size={13}/></button>}
 
 
 
-        </div></td>}
+        </div></td>
 
       </tr>)}
 
-      {!visible.length && <tr><td className="erp-table-cell" colSpan={8+(showActions?1:0)+(showSelection?1:0)}>{loading?'Loading onhold bills…':'No onhold bills match these filters.'}</td></tr>}
+      {!visible.length && <tr><td className="erp-table-cell" colSpan={8+(showRemarks?1:0)+(showSelection?1:0)}>{loading?'Loading onhold bills…':'No onhold bills match these filters.'}</td></tr>}
 
     </tbody></table></div>
 

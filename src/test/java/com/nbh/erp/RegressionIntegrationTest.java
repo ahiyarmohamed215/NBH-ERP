@@ -44,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 @SpringBootTest @Transactional
 class RegressionIntegrationTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.nbh.erp.customer.service.PosCustomerAccess posCustomerAccess;
  @Autowired InvoiceService invoices; @Autowired InvoiceRepository invoiceRepository;
  @Autowired CustomerRepository customers; @Autowired WarehouseRepository warehouses; @Autowired ProductRepository products; @Autowired CategoryRepository categories;
  @Autowired SupplierRepository suppliers; @Autowired PaymentService payments; @Autowired SalesReturnService returns; @Autowired StockService stock;

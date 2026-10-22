@@ -14,6 +14,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest @Transactional
 class PosStaffPerformanceIntegrationTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.nbh.erp.customer.service.PosCustomerAccess posCustomerAccess;
  @Autowired PosStaffPerformanceService performance;@Autowired InvoiceService invoices;@Autowired HeldWarehouseWorkflow workflow;@Autowired com.nbh.erp.sales.repository.InvoiceRepository records;
  @Autowired com.nbh.erp.customer.repository.CustomerRepository customers;@Autowired com.nbh.erp.warehouse.repository.WarehouseRepository warehouses;@Autowired com.nbh.erp.category.repository.CategoryRepository categories;@Autowired com.nbh.erp.product.repository.ProductRepository products;@Autowired com.nbh.erp.inventory.service.StockService stock;@Autowired Clock clock;
  @AfterEach void clear(){SecurityContextHolder.clearContext();}

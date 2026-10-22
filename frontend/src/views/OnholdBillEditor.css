@@ -10,15 +10,14 @@
 .onhold-editor table{min-width:950px;}
 .onhold-editor small{display:block;font-size:var(--erp-text-small);color:var(--erp-muted);margin-top:4px;}
 .onhold-editor-product strong{font-weight:600;color:var(--erp-text);}
-.onhold-editor input[type=number]{width:110px;text-align:right;box-sizing:border-box;}
+.onhold-editor input[type=number],.onhold-editor .onhold-quantity-input{width:110px;text-align:right;box-sizing:border-box;}
 .onhold-editor-number{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .onhold-editor table.erp-table tr[data-removed=true]>td{background:#fff7ed;}
-.onhold-editor-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:24px;padding:16px;border:1px solid var(--erp-border);border-radius:8px;background:#fff;flex-shrink:0;}
-.onhold-editor-summary label{display:grid;gap:6px;min-width:0;font-size:var(--erp-text-caption);font-weight:600;color:var(--erp-text);}
-.onhold-editor-summary textarea.erp-field{width:100%;min-height:76px;height:76px;padding:10px 12px;box-sizing:border-box;resize:vertical;font-weight:400;}
-.onhold-editor-total{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.onhold-editor-total{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .onhold-editor-total span{font-size:var(--erp-text-small);color:var(--erp-muted);}
 .onhold-editor-total strong{font-size:var(--erp-text-section);font-variant-numeric:tabular-nums;color:var(--erp-heading);}
-.onhold-editor footer{display:flex;justify-content:flex-end;gap:10px;padding:12px 0 0;border-top:1px solid var(--erp-border);flex-shrink:0;}
+.onhold-editor .onhold-editor-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;padding:12px 0 0;border-top:1px solid var(--erp-border);flex-shrink:0;}
+.onhold-editor-actions{display:flex;align-items:center;gap:10px;margin-left:auto;}
+.onhold-editor-filters .onhold-editor-reset{height:38px;padding:0 12px;border:1px solid var(--erp-border);background:#f1f5f9;color:var(--erp-muted);gap:4px;}
 .onhold-editor .held-error{margin:0;font-size:var(--erp-text-body);color:#b91c1c;}
-@media(max-width:700px){.onhold-editor .erp-page-header{align-items:flex-start;}.onhold-editor-toolbar>.erp-search-group{min-width:0 !important;flex-basis:100%;}.onhold-editor-summary{grid-template-columns:minmax(0,1fr);gap:16px;}.onhold-editor footer{position:sticky;bottom:0;background:var(--erp-canvas);padding:12px 0;}.onhold-editor .erp-table-frame.onhold-editor-lines{flex-basis:300px;}}
+@media(max-width:700px){.onhold-editor .erp-page-header{align-items:flex-start;}.onhold-editor-toolbar>.erp-search-group{min-width:0 !important;flex-basis:100%;}.onhold-editor .onhold-editor-footer{position:sticky;bottom:0;background:var(--erp-canvas);padding:12px 0;}.onhold-editor-actions{flex-wrap:wrap;}.onhold-editor .erp-table-frame.onhold-editor-lines{flex-basis:300px;}}

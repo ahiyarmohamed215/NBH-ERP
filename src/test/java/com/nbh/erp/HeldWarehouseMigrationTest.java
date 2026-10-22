@@ -4,6 +4,19 @@ import org.flywaydb.core.Flyway;
 import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
 class HeldWarehouseMigrationTest {
+ @Test void stockIssueMarkerPreservesLegacyReviewedReservations() throws Exception {
+  String url="jdbc:h2:mem:review-stock-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
+  try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()){
+   s.execute("create table invoices(id bigint primary key,status varchar(30),stock_reserved boolean)");
+   s.execute("insert into invoices values(1,'STOCK_ADJUSTED',true),(2,'MERGED',false)");
+  }
+  var flyway=Flyway.configure().dataSource(url,"sa","").baselineOnMigrate(true).baselineVersion("43").target("44").load();
+  assertEquals(1,flyway.migrate().migrationsExecuted);assertEquals(0,flyway.migrate().migrationsExecuted);
+  try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement();var r=s.executeQuery("select stock_reserved,stock_deducted from invoices where id=1")){
+   assertTrue(r.next());assertTrue(r.getBoolean(1));assertFalse(r.getBoolean(2));
+  }
+ }
+
  @Test void originalCopiesUpgradeKeepsExistingBillsAndDoesNotInventReviewedOriginals() throws Exception {
   String url="jdbc:h2:mem:held-original-migration;MODE=MySQL;DB_CLOSE_DELAY=-1";
   try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()){

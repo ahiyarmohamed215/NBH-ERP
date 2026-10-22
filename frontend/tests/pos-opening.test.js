@@ -29,7 +29,7 @@ test('POS opens from sales, displays inventory, and returns to sales', async () 
     apis.categoryApi.getActive = async () => ({data:[{id:1,name:'Building materials'}]});
     apis.inventoryApi.getBalances = async () => ({data:{content:[{productId:1,warehouseId:1,quantity:10,availableQuantity:10}]}});
     apis.warehouseApi.getActive = async () => ({data:[{id:1,name:'Main'}]});
-    apis.customerApi.getActive = async () => ({data:[{id:1,customerCode:'CUST-0001',name:'POS customer',phone:'0771234567',address:'Kandy',currentBalance:50,creditLimit:100000}]});
+    apis.customerApi.getPosCustomers = async () => ({data:[{id:1,customerCode:'CUST-0001',name:'POS customer',phone:'0771234567',address:'Kandy',currentBalance:50,creditLimit:100000}]});
     const {AuthProvider} = await server.ssrLoadModule('/src/context/AuthContext.jsx');
     const {ToastProvider} = await server.ssrLoadModule('/src/context/ToastContext.jsx');
     const {default:Hub} = await server.ssrLoadModule('/src/App.jsx');
@@ -162,7 +162,7 @@ test('POS opens from sales, displays inventory, and returns to sales', async () 
     await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());await changeEditor(2,'5000');await saveEditor();
     await add('Second warehouse product');await add('Third warehouse product');
     assert.equal(host.querySelectorAll('.pos-cart-table tbody tr').length,3);assert.equal(savedRequests.length,0);assert.equal(localStorage.getItem('nbh_pos_working_bill_cashier'),null);
-    apis.customerApi.getActive=async()=>({data:[{id:1,customerCode:'CUST-0001',name:'POS customer',currentBalance:100,creditLimit:100}]});
+    apis.customerApi.getPosCustomers=async()=>({data:[{id:1,customerCode:'CUST-0001',name:'POS customer',currentBalance:100,creditLimit:100}]});
     await act(async()=>window.dispatchEvent(new window.CustomEvent('erp:payments_updated')));
     await act(async()=>new Promise(resolve=>setTimeout(resolve,400)));
     assert.match(host.querySelector('.pos-credit-block').textContent,/Credit limit reached/);

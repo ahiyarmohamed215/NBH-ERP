@@ -52,6 +52,7 @@ public class InvoiceService {
 
     private final CustomerRepository customerRepository;
     private final CustomerCreditPolicy creditPolicy;
+    private final com.nbh.erp.customer.service.PosCustomerAccess posCustomers;
     private final HeldBillStaff heldStaff;
     private final HeldOriginalsService heldOriginals;
     private final WarehouseRepository warehouseRepository;
@@ -215,7 +216,7 @@ public class InvoiceService {
         if(ids==null || ids.isEmpty() || ids.size()>100 || new HashSet<>(ids).size()!=ids.size())throw new BusinessException("Select 1 to 100 distinct held bills");
         var bills=ids.stream().map(id->invoiceRepository.findById(id).orElseThrow(()->new BusinessException("Unknown held bill"))).toList();
         var first=bills.getFirst();
-        for(var bill:bills){enforceAccess(bill);if(!"STOCK_ADJUSTED".equals(bill.getStatus()))throw new BusinessException("Only stock adjusted held bills can be invoiced");
+        for(var bill:bills){enforceAccess(bill);if(!"STOCK_ADJUSTED".equals(bill.getStatus()))throw new BusinessException("Only warehouse-reviewed held bills can be invoiced");
             if(!bill.getCustomer().getId().equals(first.getCustomer().getId()))throw new BusinessException("Select held bills for the same customer");}
         return new MergePreview(ids,bills.stream().map(Invoice::getDocumentNumber).toList(),first.getCustomer().getName(),
             bills.stream().flatMap(b->b.getItems().stream()).map(InvoiceDto.InvoiceItemDto::from).toList(),bills.stream().map(Invoice::getNetTotal).reduce(BigDecimal.ZERO,BigDecimal::add),LocalDate.now(businessClock).toString(),bills.stream().collect(Collectors.toMap(Invoice::getId,Invoice::getRecordVersion)));
@@ -251,6 +252,7 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto createInvoice(CreateInvoiceRequest request) {
+        posCustomers.requireAssigned(request.getCustomerId());
         var ticket=idempotency.reserve("createInvoice",request);
         if(ticket!=null && ticket.getResourceId()!=null) return getInvoiceById(ticket.getResourceId());
 
@@ -390,6 +392,7 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto savePosDraft(Long id,CreateInvoiceRequest request) {
+        posCustomers.requireAssigned(request.getCustomerId());
         Invoice invoice=invoiceRepository.findByIdForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Invoice","id",id));
         enforceAccess(invoice);
         verifyPosVersion(invoice,request);
@@ -424,7 +427,7 @@ public class InvoiceService {
         return quantities;
     }
     private void reserveInvoiceStock(Invoice invoice){
-        if(Boolean.TRUE.equals(invoice.getStockReserved()))return;
+        if(Boolean.TRUE.equals(invoice.getStockReserved()) || Boolean.TRUE.equals(invoice.getStockDeducted()))return;
         for(var line:stockQuantities(invoice).entrySet())stockService.changeReservation(line.getKey().warehouse(),line.getKey().product(),line.getValue());
         invoice.setStockReserved(true);invoiceRepository.save(invoice);
     }
@@ -432,6 +435,13 @@ public class InvoiceService {
         if(!Boolean.TRUE.equals(invoice.getStockReserved()))return;
         for(var line:stockQuantities(invoice).entrySet())stockService.changeReservation(line.getKey().warehouse(),line.getKey().product(),line.getValue().negate());
         invoice.setStockReserved(false);
+    }
+
+    private void restoreReviewedStock(Invoice invoice,String reason){
+        if(!Boolean.TRUE.equals(invoice.getStockDeducted()))return;
+        for(var item:invoice.getItems())
+            stockService.increaseStock(item.fulfillmentWarehouse().getId(),item.getProduct().getId(),item.getQuantity(),item.getCostPrice(),"CANCEL_HELD_SALE",invoice.getHeldNumber(),reason);
+        invoice.setStockDeducted(false);
     }
 
     @Transactional
@@ -479,7 +489,8 @@ public class InvoiceService {
         }
 
         String currentUser=getCurrentUsername();
-        if("MERGED".equals(invoice.getStatus()))removeHeldBillFromInvoice(invoice,parent,reason);
+        if("MERGED".equals(invoice.getStatus())){removeHeldBillFromInvoice(invoice,parent,reason);invoice.setStockDeducted(false);}
+        else restoreReviewedStock(invoice,reason);
 
         releaseInvoiceStock(invoice);
         invoice.setStatus("CANCELLED");invoice.setBalanceAmount(BigDecimal.ZERO);
@@ -569,7 +580,7 @@ public class InvoiceService {
     private InvoiceDto performVoidInvoice(Invoice invoice, String reason) {
         SecurityUtils.requirePermission("SALES_VOID");
         enforceAccess(invoice);
-        if (reason == null || reason.isBlank()) throw new BusinessException("A void reason is required");
+        if (reason == null || reason.isBlank() || reason.trim().length()>1000) throw new BusinessException("Enter a void reason, up to 1000 characters");
         if (invoice.getReturnedAmount().signum() > 0) throw new BusinessException("An invoice with returns cannot be voided");
         if (invoice.getPaidAmount().signum() > 0) throw new BusinessException("Reverse payments or issue a sales return before voiding a paid invoice");
         String currentStatus = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "COMPLETED";
@@ -577,7 +588,7 @@ public class InvoiceService {
             throw new BusinessException("Invoice " + invoice.getDocumentNumber() + " is already " + currentStatus);
         }
 
-        if(UNPOSTED.contains(currentStatus)){customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();releaseInvoiceStock(invoice);}
+        if(UNPOSTED.contains(currentStatus)){customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();releaseInvoiceStock(invoice);restoreReviewedStock(invoice,reason);}
         if (!UNPOSTED.contains(currentStatus) && !InvoiceBalances.POSTED.contains(currentStatus)) throw new BusinessException("Unsupported invoice state for voiding");
         if (invoice.getDelivery()!=null) throw new BusinessException("Cancel the delivery assignment before voiding");
         customerRepository.findByIdForUpdate(invoice.getCustomer().getId()).orElseThrow();
@@ -623,6 +634,7 @@ public class InvoiceService {
 
         String voidInfo = String.format(" [VOIDED on %s by %s: %s]",
                 LocalDate.now(), getCurrentUsername(), reason != null && !reason.isBlank() ? reason.trim() : "Manual void");
+        invoice.setCancellationReason(reason.trim());
         invoice.setNotes(invoice.getNotes() != null ? invoice.getNotes() + voidInfo : voidInfo);
 
         invoice.setBalanceAmount(BigDecimal.ZERO);
@@ -668,6 +680,7 @@ public class InvoiceService {
         enforceAccess(invoice);
         if(request.getExpectedVersion()!=null && request.getExpectedVersion()!=invoice.getRecordVersion())throw new BusinessException("This bill changed. Reopen it before saving.");
         String currentStatus=invoice.getStatus();
+        if("HELD".equals(currentStatus))posCustomers.requireAssigned(request.getCustomerId()!=null?request.getCustomerId():invoice.getCustomer().getId());
         if(invoice.getOriginalHeldSnapshot()!=null && UNPOSTED.contains(currentStatus))throw new BusinessException("Saved onhold bills are locked. Use warehouse review or cancel with a reason.");
         if ("MERGED".equals(currentStatus) || "VOIDED".equals(currentStatus) || "CANCELLED".equals(currentStatus)) throw new BusinessException("Terminal invoice cannot be edited");
         String target=request.getStatus()==null ? currentStatus : request.getStatus().toUpperCase();
@@ -701,7 +714,7 @@ public class InvoiceService {
             if(request.getCustomerId()!=null && !request.getCustomerId().equals(invoice.getCustomer().getId())) customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow();
             boolean wasReserved=Boolean.TRUE.equals(invoice.getStockReserved());
             releaseInvoiceStock(invoice);
-            if ("CANCELLED".equals(target)) { invoice.setStatus("CANCELLED"); }
+            if ("CANCELLED".equals(target)) { restoreReviewedStock(invoice,request.getNotes());invoice.setStatus("CANCELLED"); }
             else {
                 if (request.getCustomerId()!=null) invoice.setCustomer(customerRepository.findByIdForUpdate(request.getCustomerId()).orElseThrow(() -> new BusinessException("Unknown customer")));
                 if (request.getWarehouseId()!=null) invoice.setWarehouse(warehouseRepository.findById(request.getWarehouseId()).orElseThrow(() -> new BusinessException("Unknown warehouse")));
@@ -776,7 +789,7 @@ public class InvoiceService {
             enforceAccess(source);
             if(expectedVersions!=null && !Objects.equals(expectedVersions.get(id),source.getRecordVersion()))throw new BusinessException("A selected held bill changed. Reopen the merge preview before creating the invoice.");
             if(!"STOCK_ADJUSTED".equals(source.getStatus()) || source.getMergedInvoiceId()!=null)
-                throw new BusinessException("Only stock adjusted held bills can be invoiced");
+                throw new BusinessException("Only warehouse-reviewed held bills can be invoiced");
             sources.add(source);
         }
         Invoice first=sources.getFirst();
@@ -791,6 +804,12 @@ public class InvoiceService {
             .notes("Held bills: "+sources.stream().map(Invoice::getHeldNumber).collect(Collectors.joining(", "))).build();
         for(Invoice source:sources) {
             releaseInvoiceStock(source);
+            // Legacy reviewed bills have not issued stock yet. New reviews already have.
+            if(!Boolean.TRUE.equals(source.getStockDeducted())){
+                for(var item:source.getItems())
+                    stockService.decreaseStock(item.fulfillmentWarehouse().getId(),item.getProduct().getId(),item.getQuantity(),item.getCostPrice(),"SALE",merged.getDocumentNumber(),"Legacy reviewed bill invoiced: "+source.getHeldNumber());
+                source.setStockDeducted(true);
+            }
             merged.setSubtotal(merged.getSubtotal().add(source.getSubtotal()));
             merged.setDiscountAmount(merged.getDiscountAmount().add(source.getDiscountAmount()));
             merged.setTaxAmount(merged.getTaxAmount().add(source.getTaxAmount()));
@@ -806,6 +825,7 @@ public class InvoiceService {
         merged.setBalanceAmount(merged.getNetTotal());
         invoiceRepository.saveAndFlush(merged);
         for(Invoice source:sources){source.setStatus("MERGED");source.setMergedInvoiceId(merged.getId());source.setBalanceAmount(BigDecimal.ZERO);invoiceRepository.save(source);}
+        merged.setStockDeducted(true);
         finalizeInvoice(merged,false);
         invoiceRepository.flush();
         auditLogService.log("HELD_BILLS_MERGED","Invoice",merged.getInvoiceNumber(),merged.getNotes());
@@ -833,8 +853,9 @@ public class InvoiceService {
         }
         for(var line:stockQuantities(invoice).entrySet()) {
             if(consumeQuota && invoice.getSalesman()!=null) productStaffQuotaService.consumeStaffQuota(line.getKey().product(),invoice.getSalesman().getId(),line.getKey().warehouse(),line.getValue());
-            stockService.decreaseStock(line.getKey().warehouse(),line.getKey().product(),line.getValue(),"SALE",invoice.getDocumentNumber(),"Invoice completion");
+            if(!Boolean.TRUE.equals(invoice.getStockDeducted()))stockService.decreaseStock(line.getKey().warehouse(),line.getKey().product(),line.getValue(),"SALE",invoice.getDocumentNumber(),"Invoice completion");
         }
+        invoice.setStockDeducted(true);
         InvoiceBalances.recalculate(invoice);
         invoiceRepository.save(invoice);
         customerBalances.reconcile(customer.getId());

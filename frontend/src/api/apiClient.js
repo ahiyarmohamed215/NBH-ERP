@@ -639,6 +639,7 @@ export const productApi = {
 };
 
 export const customerApi = {
+  getPosCustomers: (config={}) => api.get('/customers/pos',{...config,skipCache:true,skipDedupe:true}),
   getAll: (config = {}) => api.get('/customers', config),
   getActive: (config = {}) => api.get('/customers/active', config),
   search: (query) => api.get('/customers/search', { params: { query } }),

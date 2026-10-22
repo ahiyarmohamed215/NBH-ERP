@@ -235,7 +235,7 @@ export default function PosView({ onExitPos }) {
     try {
       const [whRes, custRes, balancesRes, catRes, brandRes, prodRes] = await Promise.all([
         warehouseApi.getActive().catch(() => ({ data: [] })),
-        customerApi.getActive().catch(() => ({ data: [] })),
+        customerApi.getPosCustomers().catch(() => ({ data: [] })),
         inventoryApi.getBalances({ size: 1000 }).catch(() => ({ data: [] })),
         categoryApi.getActive().catch(() => ({ data: [] })),
         brandApi.getActive().catch(() => ({ data: [] })),
@@ -296,7 +296,7 @@ export default function PosView({ onExitPos }) {
   useDataSync(() => Promise.allSettled([refreshStock(),loadHeldInvoices(),loadStaffPerformance()]),
     ['erp:inventory_updated','erp:sales_updated'], [], ['inventory','sales','grn','gtn','prn']);
   useDataSync(() => loadInitialData(), ['erp:customers_updated'], [], ['customers','inventory']);
-  useDataSync(() => refreshCustomerCredit(), ['erp:payments_updated','erp:sales_updated'], [], ['payments','sales']);
+  useDataSync(() => refreshCustomerCredit(), ['erp:payments_updated','erp:sales_updated','erp:customers_updated','erp:customer_groups_updated'], [], ['payments','sales','customers','customer-groups']);
   useDataSync(() => setProgressVersion(value=>value+1), ['erp:targets_updated','erp:sales_updated'], [], ['targets','sales','customers']);
   // POS has no recoverable drafts: clear only this staff member's old,
   // unpublished bills through the service so their reservations are released.
@@ -414,7 +414,7 @@ export default function PosView({ onExitPos }) {
   const custCreditLimit = Number(selectedCustomer?.creditLimit || 0);
   const creditBlock = customerCreditBlock(selectedCustomer, netTotal);
   const refreshCustomerCredit = async () => {
-    try {const response=await customerApi.getActive({skipCache:true});const list=response.data?.data || response.data; if(Array.isArray(list))setCustomers(list);}
+    try {const response=await customerApi.getPosCustomers({skipCache:true});const list=response.data?.data || response.data; if(Array.isArray(list)){setCustomers(list);setSelectedCustomerId(current=>list.some(c=>String(c.id)===String(current))?current:null);}}
     catch {addToast('Could not refresh customer balances. Please try again.','error');}
   };
   const custAvailableCredit = Math.max(0, custCreditLimit - custOutstanding);

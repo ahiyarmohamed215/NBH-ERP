@@ -15,7 +15,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   customerApi,
   salesmanApi,
-  userApi,
   salesApi,
   customerGroupApi,
   routeApi,
@@ -236,10 +235,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [cRes, sRes, uRes, rRes] = await Promise.allSettled([
+      const [cRes, sRes, rRes] = await Promise.allSettled([
         customerApi.getAll({params: {includeInactive: true}}),
-        salesmanApi.getAll(),
-        userApi.getStaffLookup(),
+        salesmanApi.getPosStaff(),
         customerGroupApi.getAll(true),
       ]);
 
@@ -254,38 +252,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       }
 
       const rawSalesmen = sRes.status === 'fulfilled' ? (sRes.value.data || sRes.value || []) : [];
-      const rawUsers = uRes.status === 'fulfilled' ? (uRes.value.data?.content || uRes.value.data || uRes.value || []) : [];
-
-      // Combine all employees and staff members so ANY responsible staff (sales reps, delivery officers, drivers, managers, etc.) can be assigned
+      // Only the POS-authorized staff lookup supplies group assignment options.
       const combinedStaff = [];
       const seen = new Set();
 
-      rawUsers.forEach((u) => {
-        const name = u.fullName || u.username;
-        if (name && !seen.has(String(u.id))) {
-          seen.add(String(u.id));
-          const roles = Array.isArray(u.roles)
-            ? u.roles.map((r) => (typeof r === 'string' ? r.replace('ROLE_', '') : r?.name?.replace('ROLE_', ''))).join(', ')
-            : '';
-          combinedStaff.push({
-            id: String(u.id),
-            name: name,
-            salesmanCode: u.employeeCode || u.username || 'EMP',
-            role: roles || 'Staff Member',
-            phone: u.phone || '',
-          });
-        }
-      });
-
       rawSalesmen.forEach((s) => {
-        const name = s.name || s.fullName;
+        const name = s.fullName || s.name || s.username;
         if (name && !seen.has(String(s.id))) {
           seen.add(String(s.id));
           combinedStaff.push({
             id: String(s.id),
             name: name,
-            salesmanCode: s.salesmanCode || s.code || 'REP',
-            role: 'Sales Representative',
+            salesmanCode: s.employeeCode || s.salesmanCode || s.code || 'EMP',
+            role: 'POS staff',
             phone: s.phone || '',
           });
         }

@@ -6,9 +6,6 @@ import com.nbh.erp.sales.dto.InvoiceDto;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.security.SecurityUtils;
 import com.nbh.erp.inventory.service.StockService;
-import com.nbh.erp.stockadjustment.entity.*;
-import com.nbh.erp.stockadjustment.repository.StockAdjustmentRepository;
-import com.nbh.erp.sequence.service.DocumentSequenceService;
 import com.nbh.erp.audit.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,16 +14,15 @@ import java.util.*;
 import java.math.*;
 import java.time.*;
 
-/** A single transaction owns the review, physical count records and reservation changes. */
+/** Warehouse review issues the approved sale quantities; merging must not issue them again. */
 @Service @RequiredArgsConstructor
 public class HeldWarehouseWorkflow {
     private final InvoiceRepository invoices;
     private final StockService stock;
-    private final StockAdjustmentRepository adjustments;
-    private final DocumentSequenceService numbers;
     private final AuditLogService audit;
     private final Clock clock;
     private final HeldOriginalsService originals;
+    private final com.nbh.erp.customer.service.PosCustomerAccess posCustomers;
     private final PosAllocationService allocations;
     private final org.springframework.context.ApplicationEventPublisher events;
 
@@ -51,6 +47,7 @@ public class HeldWarehouseWorkflow {
     public InvoiceDto send(Long id,SendRequest request){
         Invoice bill=lock(id,request.expectedVersion());
         if(!"HELD".equals(bill.getStatus()))throw new BusinessException("Only held bills can be sent to the warehouse");
+        posCustomers.requireAssigned(bill.getCustomer().getId());
         bill.setAssignedStaff(null);
         originals.capture(bill);
         if(!Boolean.FALSE.equals(request.printNow())){
@@ -107,37 +104,19 @@ public class HeldWarehouseWorkflow {
         for(var line:request.items()){
             if(line.itemId()==null || input.put(line.itemId(),line)!=null)throw new BusinessException("Duplicate or missing bill line");
             if(line.approvedQuantity()==null || line.approvedQuantity().signum()<0 || line.approvedQuantity().stripTrailingZeros().scale()>2)throw new BusinessException("Enter approved quantities with up to two decimals");
-            if(line.physicalStock()!=null && (line.physicalStock().signum()<0 || line.physicalStock().stripTrailingZeros().scale()>2))throw new BusinessException("Enter a valid total physical stock count");
+            if(line.physicalStock()!=null)throw new BusinessException("Physical stock cannot be changed in Warehouse Review. Use Inventory Stock Adjustments.");
         }
-        if(request.items().stream().anyMatch(i->i.physicalStock()!=null))SecurityUtils.requirePermission("INVENTORY_ADJUST");
         if(request.remarks()==null || request.remarks().isBlank() || request.remarks().length()>1000)throw new BusinessException("Enter warehouse review remarks, up to 1000 characters");
         allocations.lockStaff(bill);
         var ordered=bill.getItems().stream().sorted(Comparator.comparing((InvoiceItem i)->i.fulfillmentWarehouse().getId()).thenComparing(i->i.getProduct().getId())).toList();
         boolean reserved=Boolean.TRUE.equals(bill.getStockReserved());
         if(reserved)for(var item:ordered)stock.changeReservation(item.fulfillmentWarehouse().getId(),item.getProduct().getId(),item.getQuantity().negate());
-        Map<String,StockAdjustment> documents=new TreeMap<>();Set<String> counts=new HashSet<>();
+        List<String> changes=new ArrayList<>();
         for(var item:ordered){
             var line=input.get(item.getId());if(line==null)throw new BusinessException("Bill line does not match this review");
             if(!Boolean.TRUE.equals(item.fulfillmentWarehouse().getIsActive()) || !Boolean.TRUE.equals(item.getProduct().getIsActive()))throw new BusinessException("A bill product or warehouse is inactive");
-            if(item.getQuantity().compareTo(line.approvedQuantity())!=0){
-                var review=documents.computeIfAbsent("REVIEW:"+item.fulfillmentWarehouse().getId(),k->StockAdjustment.builder().adjustmentNumber(numbers.generateAdjustmentNumber())
-                    .warehouse(item.fulfillmentWarehouse()).sourceHeldBillId(id).sourceHeldBillNumber(bill.getHeldNumber()).adjustmentDate(LocalDate.now(clock))
-                    .adjustmentType("ORDER_REVIEW").reason("Onhold Bill "+bill.getHeldNumber()+": bill quantities revised from returned warehouse sheets. "+request.remarks())
-                    .status("PROCESSED").approvedBy(name).approvedAt(LocalDateTime.now(clock)).build());
-                review.getItems().add(StockAdjustmentItem.builder().stockAdjustment(review).product(item.getProduct()).systemQuantity(item.getQuantity()).physicalQuantity(line.approvedQuantity())
-                    .differenceQuantity(line.approvedQuantity().subtract(item.getQuantity())).unitCost(item.getCostPrice()).reason("Bill quantity change; physical stock unchanged").build());
-            }
-            if(line.physicalStock()!=null){
-                String key=item.fulfillmentWarehouse().getId()+":"+item.getProduct().getId();
-                if(!counts.add(key))throw new BusinessException("Enter the total physical count only once per product and warehouse");
-                Long wh=item.fulfillmentWarehouse().getId();stock.getAvailableStockForUpdate(wh,item.getProduct().getId());
-                BigDecimal before=stock.getStockBalance(wh,item.getProduct().getId()).getQuantity();
-                if(before.compareTo(line.physicalStock())!=0){
-                    var doc=documents.computeIfAbsent("COUNT:"+wh+":"+line.physicalStock().compareTo(before),k->StockAdjustment.builder().adjustmentNumber(numbers.generateAdjustmentNumber()).warehouse(item.fulfillmentWarehouse()).sourceHeldBillId(id).sourceHeldBillNumber(bill.getHeldNumber()).adjustmentDate(LocalDate.now(clock)).reason("Onhold Bill "+bill.getHeldNumber()+": "+request.remarks()).status("PROCESSED").approvedBy(name).approvedAt(LocalDateTime.now(clock)).build());
-                    stock.adjustStock(wh,item.getProduct().getId(),line.physicalStock(),doc.getAdjustmentNumber(),doc.getReason());
-                    doc.getItems().add(StockAdjustmentItem.builder().stockAdjustment(doc).product(item.getProduct()).systemQuantity(before).physicalQuantity(line.physicalStock()).differenceQuantity(line.physicalStock().subtract(before)).unitCost(item.getCostPrice()).reason("On-hold bill "+bill.getHeldNumber()).build());
-                }
-            }
+            if(item.getQuantity().compareTo(line.approvedQuantity())!=0)
+                changes.add(item.getProduct().getSku()+" / "+item.fulfillmentWarehouse().getCode()+": "+item.getQuantity().toPlainString()+" -> "+line.approvedQuantity().toPlainString());
             BigDecimal approved=line.approvedQuantity();
             BigDecimal discount=item.getQuantity().signum()==0?BigDecimal.ZERO:item.getDiscountAmount().multiply(approved).divide(item.getQuantity(),2,RoundingMode.HALF_UP);
             item.setQuantity(approved);item.setDiscountAmount(discount);item.setTotalPrice(approved.multiply(item.getUnitPrice()).subtract(discount));
@@ -153,14 +132,16 @@ public class HeldWarehouseWorkflow {
             if(approvedTotal.compareTo(stock.getAvailableStockForUpdate(item.fulfillmentWarehouse().getId(),item.getProduct().getId()))>0)
                 throw new BusinessException("Approved quantity exceeds available warehouse stock for "+item.getProduct().getName());
         }
-        adjustments.saveAll(documents.values());
         bill.setSubtotal(bill.getItems().stream().map(InvoiceItem::getTotalPrice).reduce(BigDecimal.ZERO,BigDecimal::add));
         if(bill.getDiscountAmount().compareTo(bill.getSubtotal())>0)throw new BusinessException("Bill discount exceeds the approved subtotal. Revise the bill before sending.");
         bill.setTaxAmount(bill.getSubtotal().subtract(bill.getDiscountAmount()).multiply(bill.getTaxRate()).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP));
         bill.setNetTotal(bill.getSubtotal().subtract(bill.getDiscountAmount()).add(bill.getTaxAmount()));bill.setBalanceAmount(bill.getNetTotal());
-        if(reserved)for(var item:ordered)if(item.getQuantity().signum()>0)stock.changeReservation(item.fulfillmentWarehouse().getId(),item.getProduct().getId(),item.getQuantity());
+        for(var item:ordered)if(item.getQuantity().signum()>0)
+            stock.decreaseStock(item.fulfillmentWarehouse().getId(),item.getProduct().getId(),item.getQuantity(),item.getCostPrice(),"SALE",bill.getHeldNumber(),"Sale confirmed by warehouse review");
+        bill.setStockReserved(false);
+        bill.setStockDeducted(true);
         bill.setStatus("STOCK_ADJUSTED");bill.setReviewedBy(name);bill.setReviewedAt(LocalDateTime.now(clock));
         bill.setNotes((bill.getNotes()==null?"":bill.getNotes()+"\n")+"Warehouse review: "+request.remarks());
-        invoices.saveAndFlush(bill);audit.log("HELD_STOCK_REVIEW","Invoice",bill.getHeldNumber(),request.remarks());return InvoiceDto.from(bill);
+        invoices.saveAndFlush(bill);audit.log("HELD_WAREHOUSE_REVIEW","Invoice",bill.getHeldNumber(),request.remarks()+"\n"+(changes.isEmpty()?"No quantity changes.":String.join("\n",changes)));return InvoiceDto.from(bill);
     }
 }

@@ -22,12 +22,19 @@ import java.util.List;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final com.nbh.erp.customer.service.PosCustomerAccess posCustomers;
 
     @GetMapping
     @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('CUSTOMER')")
     @Operation(summary = "List all customers")
     public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers(@RequestParam(defaultValue = "false") boolean includeInactive) {
         return ResponseEntity.ok(ApiResponse.ok(includeInactive ? customerService.getDirectoryCustomers() : customerService.getAllCustomers()));
+    }
+
+    @GetMapping("/pos")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_CREATE')")
+    public ResponseEntity<ApiResponse<List<CustomerDto>>> getPosCustomers(){
+        return ResponseEntity.ok(ApiResponse.ok(posCustomers.customers()));
     }
 
     @GetMapping("/active")

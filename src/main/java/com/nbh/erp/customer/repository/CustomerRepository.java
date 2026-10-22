@@ -39,6 +39,12 @@ public interface CustomerRepository extends com.nbh.erp.common.repository.Recycl
         }
     }
 
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId))")
+    List<Customer> findAssignedPosCustomers(@Param("staffId") Long staffId);
+
+    @Query("SELECT CASE WHEN COUNT(DISTINCT c.id) > 0 THEN true ELSE false END FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.id = :customerId AND c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId))")
+    boolean isAssignedPosCustomer(@Param("customerId") Long customerId,@Param("staffId") Long staffId);
+
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
     List<Customer> findByIsActiveTrue();

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest
 class HeldBillWorkflowIntegrationTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.nbh.erp.customer.service.PosCustomerAccess posCustomerAccess;
  @Autowired InvoiceService invoices;
  @Autowired com.nbh.erp.sales.service.HeldWarehouseWorkflow workflow;
 
@@ -199,7 +200,10 @@ class HeldBillWorkflowIntegrationTest {
   var line=sent.getItems().getFirst();
   assertThrows(BusinessException.class,()->workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Too many",List.of(new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(line.getId(),BigDecimal.valueOf(5),null)))));
   assertEquals(0,BigDecimal.valueOf(7).compareTo(stock.getAvailableStock(f.warehouse,f.product)),"Rejected review must restore original reservations");
+  long adjustmentCount=adjustmentRecords.count();
   var adjusted=workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Warehouse has four approved",List.of(new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(line.getId(),BigDecimal.valueOf(4),null))));
+  assertEquals(adjustmentCount,adjustmentRecords.count());
+  assertEquals(0,BigDecimal.valueOf(6).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
   assertEquals(0,BigDecimal.valueOf(4).compareTo(adjusted.getItems().getFirst().getQuantity()));
   assertEquals(0,BigDecimal.valueOf(2).compareTo(originals.read(records.findById(sent.getId()).orElseThrow()).getItems().getFirst().getQuantity()));
   var free=fixture();var noQuota=invoices.createInvoice(held(free,2));var freeSent=printed(workflow.send(noQuota.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(noQuota.getRecordVersion(),null,false)));
@@ -382,7 +386,7 @@ class HeldBillWorkflowIntegrationTest {
   assertTrue(next.bills().stream().anyMatch(b->b.getId().equals(own.getId())),"Month reset must not delete open held bills");
   when(businessClock.instant()).thenReturn(Instant.parse("2028-02-15T00:00:00Z"));assertEquals(LocalDate.of(2028,2,29),invoices.heldWorkspace("mine","",null).periodEnd());
  }
- @Test void multiWarehouseReviewCreatesCountRecordsAndDeductsEachWarehouseExactlyOnce(){
+ @Test void multiWarehouseReviewIssuesStockAndMergeDoesNotDeductAgain(){
   var first=fixture();var second=fixture();var request=held(first,2);
   request.setItems(List.of(
     CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(first.product).warehouseId(first.warehouse).quantity(BigDecimal.valueOf(2)).unitPrice(BigDecimal.TEN).build(),
@@ -396,24 +400,28 @@ class HeldBillWorkflowIntegrationTest {
 
 
   var delivered=printed(sent);
-  var lines=delivered.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getWarehouseId().equals(first.warehouse)?BigDecimal.ONE:BigDecimal.valueOf(2),i.getWarehouseId().equals(first.warehouse)?BigDecimal.valueOf(8):null)).toList();
-  var review=new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(delivered.getRecordVersion(),"Warehouse signed sheets; shortage counted",lines);
+  var lines=delivered.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getWarehouseId().equals(first.warehouse)?BigDecimal.ONE:BigDecimal.valueOf(2),null)).toList();
+  var review=new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(delivered.getRecordVersion(),"Warehouse signed sheets checked",lines);
   var reviewed=workflow.review(bill.getId(),review);assertEquals("STOCK_ADJUSTED",reviewed.getStatus());
+  assertEquals(0,BigDecimal.valueOf(9).compareTo(stock.getStockBalance(first.warehouse,first.product).getQuantity()));
+  assertEquals(0,BigDecimal.valueOf(8).compareTo(stock.getStockBalance(second.warehouse,second.product).getQuantity()));
+  assertEquals(0,stock.getStockBalance(first.warehouse,first.product).getReservedQuantity().signum());
+  assertEquals(0,stock.getStockBalance(second.warehouse,second.product).getReservedQuantity().signum());
   var bypass=new com.nbh.erp.sales.dto.UpdateInvoiceRequest();bypass.setDiscountAmount(BigDecimal.ONE);
   assertThrows(BusinessException.class,()->invoices.updateInvoice(bill.getId(),bypass));
-  assertEquals(0,BigDecimal.valueOf(7).compareTo(stock.getAvailableStock(first.warehouse,first.product)));
+  assertEquals(0,BigDecimal.valueOf(9).compareTo(stock.getAvailableStock(first.warehouse,first.product)));
   assertThrows(BusinessException.class,()->workflow.review(bill.getId(),review));
-  assertEquals(3,adjustmentRecords.findAll().stream().filter(a->bill.getId().equals(a.getSourceHeldBillId())).count());
+  assertEquals(0,adjustmentRecords.findAll().stream().filter(a->bill.getId().equals(a.getSourceHeldBillId())).count());
   var invoice=invoices.completeHeldInvoices(List.of(bill.getId())).getFirst();assertEquals(2,invoice.getItems().size());
-  assertEquals(0,BigDecimal.valueOf(7).compareTo(stock.getAvailableStock(first.warehouse,first.product)));
+  assertEquals(0,BigDecimal.valueOf(9).compareTo(stock.getAvailableStock(first.warehouse,first.product)));
   assertEquals(0,BigDecimal.valueOf(8).compareTo(stock.getAvailableStock(second.warehouse,second.product)));
   assertTrue(invoices.heldWorkspace("mine","",null,true).bills().stream().anyMatch(b->b.getId().equals(bill.getId())));
   assertEquals(List.of(bill.getHeldNumber()),invoices.getInvoiceById(invoice.getId()).getSourceHeldNumbers());
   invoices.voidInvoice(invoice.getId(),"Test multiwarehouse restoration");
-  assertEquals(0,BigDecimal.valueOf(8).compareTo(stock.getAvailableStock(first.warehouse,first.product)));
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(first.warehouse,first.product)));
   assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(second.warehouse,second.product)));
  }
- @Test void failedReviewRollsBackCountsAndAnySalesEditorCanReviewAndMergeAnotherCashiersBill(){
+ @Test void physicalCountIsRejectedAndSalesEditorsCanReviewAnotherCashiersBill(){
   var f=fixture();var bill=invoices.createInvoice(held(f,2));ready(invoices.createInvoice(held(fixture(),1)));
   String assignee="review-"+UUID.randomUUID().toString().substring(0,8);
   users.save(com.nbh.erp.user.entity.User.builder().username(assignee).password("test").email(assignee+"@test.example").fullName(assignee).build());
@@ -478,7 +486,7 @@ class HeldBillWorkflowIntegrationTest {
   assertEquals("SENT_TO_WAREHOUSE",invoices.getInvoiceById(bill.getId()).getStatus());
   verify(transport).submit(eq("Office Wi-Fi A4"),anyString(),anyString());*/
  }
- @Test void removingAProductCreatesOnholdAdjustmentEvidenceWithoutChangingPhysicalStock(){
+ @Test void removingAProductReleasesItsStockAndIssuesOnlyApprovedProducts(){
   var first=fixture();var second=fixture();ready(invoices.createInvoice(held(fixture(),1)));
   var req=held(first,2);req.setItems(List.of(
    CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(first.product).warehouseId(first.warehouse).quantity(BigDecimal.valueOf(2)).unitPrice(BigDecimal.TEN).build(),
@@ -487,7 +495,51 @@ class HeldBillWorkflowIntegrationTest {
   var result=workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Remove unavailable product",sent.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getProductId().equals(first.product)?BigDecimal.ZERO:BigDecimal.ONE,null)).toList()));
   assertEquals("STOCK_ADJUSTED",result.getStatus());assertEquals(1,result.getItems().size());
   assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(first.warehouse,first.product).getQuantity()));
-  assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(second.warehouse,second.product).getQuantity()));
-  var evidence=adjustmentRecords.findAll().stream().filter(a->original.getId().equals(a.getSourceHeldBillId())).toList();assertEquals(2,evidence.size());assertTrue(evidence.stream().allMatch(a->a.getAdjustmentType().equals("ORDER_REVIEW")));
+  assertEquals(0,BigDecimal.valueOf(9).compareTo(stock.getStockBalance(second.warehouse,second.product).getQuantity()));
+  var evidence=adjustmentRecords.findAll().stream().filter(a->original.getId().equals(a.getSourceHeldBillId())).toList();assertTrue(evidence.isEmpty());
+ }
+
+ @Test void reviewedSaleCancellationRestoresStockOnceBeforeMerge(){
+  var f=fixture();var reviewed=ready(invoices.createInvoice(held(f,3)));
+  assertEquals(0,BigDecimal.valueOf(7).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertTrue(records.findById(reviewed.getId()).orElseThrow().getStockDeducted());
+  invoices.cancelHeldInvoice(reviewed.getId(),"Cancelled reviewed sale",reviewed.getRecordVersion());
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertEquals(0,stock.getStockBalance(f.warehouse,f.product).getReservedQuantity().signum());
+  assertFalse(records.findById(reviewed.getId()).orElseThrow().getStockDeducted());
+  assertThrows(BusinessException.class,()->invoices.cancelHeldInvoice(reviewed.getId(),"Again",reviewed.getRecordVersion()));
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(f.warehouse,f.product)));
+ }
+ @Test void voidingReviewedSaleRestoresStockBeforeMerge(){
+  var f=fixture();var reviewed=ready(invoices.createInvoice(held(f,3)));
+  invoices.voidInvoice(reviewed.getId(),"Void reviewed sale");
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertEquals(0,stock.getStockBalance(f.warehouse,f.product).getReservedQuantity().signum());
+ }
+ @Test void mergeCombinesLegacyReservedAndAlreadyIssuedReviewedBills(){
+  var f=fixture();var legacy=invoices.createInvoice(held(f,2));
+  transactions.executeWithoutResult(status->{var record=records.findById(legacy.getId()).orElseThrow();record.setStatus("STOCK_ADJUSTED");records.saveAndFlush(record);});
+  var reviewed=ready(invoices.createInvoice(held(f,3)));
+  assertEquals(0,BigDecimal.valueOf(7).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getAvailableStock(f.warehouse,f.product)));
+  var merged=invoices.mergeHeldBills(List.of(legacy.getId(),reviewed.getId()));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertEquals(0,stock.getStockBalance(f.warehouse,f.product).getReservedQuantity().signum());
+  invoices.voidInvoice(merged.getId(),"Void combined invoice");
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getAvailableStock(f.warehouse,f.product)));
+ }
+ @Test void otherStaffCanBillReleasedStockAfterReviewReducesQuantity(){
+  var f=fixture();var bill=invoices.createInvoice(held(f,8));
+  var sent=workflow.send(bill.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(bill.getRecordVersion(),null));
+  var reviewed=workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Approve five",List.of(new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(sent.getItems().getFirst().getId(),BigDecimal.valueOf(5),null))));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  principal("another-staff",true);
+  var other=invoices.createInvoice(held(f,5));
+  assertEquals(0,stock.getAvailableStock(f.warehouse,f.product).signum());
+  principal("held-admin",true);
+  invoices.mergeHeldBills(List.of(reviewed.getId()));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  assertEquals(0,stock.getAvailableStock(f.warehouse,f.product).signum());
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(invoices.getInvoiceById(other.getId()).getItems().getFirst().getQuantity()));
  }
 }

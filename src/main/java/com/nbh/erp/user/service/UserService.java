@@ -330,9 +330,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public java.util.List<UserDto> getPosStaff() {
         return userRepository.findAll().stream()
-                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) && "APPROVED".equalsIgnoreCase(u.getApprovalStatus()))
-                .filter(u -> com.nbh.erp.security.UserPrincipal.create(u).getAuthorities().stream().anyMatch(authority ->
-                        Set.of("ROLE_ADMIN", "ROLE_SUPER_ADMIN", "SALES_CREATE").contains(authority.getAuthority())))
+                .filter(com.nbh.erp.customer.service.PosCustomerAccess::canUsePos)
                 .map(UserDto::from)
                 .toList();
     }

@@ -29,6 +29,13 @@ public class CustomerGroupService {
     private final CustomerRepository customerRepository;
     private final AuditLogService auditLogService;
 
+    private User assignedPosStaff(Long staffId){
+        if(staffId==null)return null;
+        var staff=userRepository.findById(staffId).orElseThrow(()->new ResourceNotFoundException("User","id",staffId));
+        if(!com.nbh.erp.customer.service.PosCustomerAccess.canUsePos(staff))throw new com.nbh.erp.common.exception.BusinessException("Assign an active, approved staff member with POS access");
+        return staff;
+    }
+
     @Transactional(readOnly = true)
     public List<CustomerGroupDto> getAllGroups() {
         return getAllGroups(true);
@@ -84,7 +91,7 @@ public class CustomerGroupService {
         User assignedStaff = null;
         Long staffId = request.getEffectiveStaffId();
         if (staffId != null) {
-            assignedStaff = userRepository.findById(staffId).orElse(null);
+            assignedStaff = assignedPosStaff(staffId);
         }
 
         String name = request.getEffectiveName();
@@ -149,7 +156,7 @@ public class CustomerGroupService {
 
         Long staffId = request.getEffectiveStaffId();
         if (staffId != null) {
-            User assignedStaff = userRepository.findById(staffId).orElse(null);
+            User assignedStaff = assignedPosStaff(staffId);
             group.setAssignedStaff(assignedStaff);
         } else {
             group.setAssignedStaff(null);

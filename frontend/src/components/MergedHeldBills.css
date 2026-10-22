@@ -1,5 +1,48 @@
-.merged-held-bills{margin-bottom:16px;min-width:0;}
-.merged-held-bills h4{margin:0 0 8px;font-size:var(--erp-text-nav);}
-.merged-held-bill-link{appearance:none;border:0;background:transparent;padding:4px 0;font:inherit;font-weight:600;color:var(--erp-accent);cursor:pointer;text-align:left;}
-.merged-held-bill-link:hover{text-decoration:underline;}
-.merged-held-bill-link:focus-visible{outline:2px solid var(--erp-accent);outline-offset:3px;border-radius:2px;}
+.merged-held-bills {
+  margin-bottom: 16px;
+  min-width: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.merged-held-bills-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.merged-held-icon {
+  color: #0284c7;
+}
+
+.merged-held-bills h4 {
+  margin: 0;
+  font-size: var(--erp-text-nav);
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.merged-held-bill-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--erp-accent, #0284c7);
+  cursor: pointer;
+  text-align: left;
+}
+
+.merged-held-bill-link:hover {
+  text-decoration: underline;
+}
+
+.merged-held-bill-link:focus-visible {
+  outline: 2px solid var(--erp-accent, #0284c7);
+  outline-offset: 3px;
+  border-radius: 2px;
+}

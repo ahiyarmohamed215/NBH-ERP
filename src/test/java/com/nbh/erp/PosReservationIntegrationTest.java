@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class PosReservationIntegrationTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.nbh.erp.customer.service.PosCustomerAccess posCustomerAccess;
  @Autowired InvoiceService invoices;
  @Autowired StockService stock;
  @Autowired CustomerRepository customers;

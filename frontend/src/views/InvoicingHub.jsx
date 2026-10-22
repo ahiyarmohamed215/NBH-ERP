@@ -108,6 +108,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   const [endDate, setEndDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [editingInvoice, setEditingInvoice] = useState(null);
+  const [savingEditedInvoice, setSavingEditedInvoice] = useState(false);
 
   // Memoized line items for selected invoice preview (ensures items are always shown)
   const selectedInvoiceItems = useMemo(() => {
@@ -162,6 +163,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         sourceHeldNumbers: inv.sourceHeldNumbers || [],
         sourceHeldBills: inv.sourceHeldBills || [],
         packing: inv.packing,
+        notes: inv.notes || '',
       }));
       setInvoices(formattedLive);
     } catch (err) {
@@ -307,27 +309,62 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     }
   };
 
+  const handleOpenEditInvoice = async (inv) => {
+    setEditingInvoice({
+      ...inv,
+      notes: inv.notes || '',
+      items: inv.items || [],
+      packing: inv.packing || null,
+      sourceHeldNumbers: inv.sourceHeldNumbers || [],
+      sourceHeldBills: inv.sourceHeldBills || [],
+    });
+    if (inv.id && !String(inv.id).startsWith('inv-')) {
+      try {
+        const res = await salesApi.getById(inv.id);
+        const fresh = res.data?.data || res.data;
+        if (fresh) {
+          setEditingInvoice((prev) =>
+            prev && String(prev.id) === String(inv.id)
+              ? {
+                  ...prev,
+                  notes: fresh.notes ?? prev.notes ?? '',
+                  items: (Array.isArray(fresh.items) && fresh.items.length > 0 ? fresh.items : prev.items) || [],
+                  packing: fresh.packing || prev.packing,
+                  sourceHeldBills: fresh.sourceHeldBills || prev.sourceHeldBills,
+                  sourceHeldNumbers: fresh.sourceHeldNumbers || prev.sourceHeldNumbers,
+                }
+              : prev
+          );
+        }
+      } catch (err) {
+        console.warn('Unable to load full invoice details for edit:', err);
+      }
+    }
+  };
+
   const handleSaveEditedInvoice = async () => {
     if (!editingInvoice) return;
     if (!canEditSales) {
       addToast('Permission denied: Only permissible staff can edit invoices', 'error');
       return;
     }
+    setSavingEditedInvoice(true);
     try {
       if (editingInvoice.id && !String(editingInvoice.id).startsWith('inv-')) {
         await salesApi.update(editingInvoice.id, { notes: editingInvoice.notes });
       }
       addToast(`Invoice ${editingInvoice.invoiceNumber} updated successfully!`, 'success');
       await loadBackendInvoices();
+      if (selectedInvoice && (selectedInvoice.id === editingInvoice.id || selectedInvoice.invoiceNumber === editingInvoice.invoiceNumber)) {
+        setSelectedInvoice({ ...selectedInvoice, ...editingInvoice });
+      }
+      setEditingInvoice(null);
     } catch (err) {
       console.error('Failed to update invoice:', err);
       addToast(err.message || 'Failed to update invoice', 'error');
-      return;
+    } finally {
+      setSavingEditedInvoice(false);
     }
-    if (selectedInvoice && (selectedInvoice.id === editingInvoice.id || selectedInvoice.invoiceNumber === editingInvoice.invoiceNumber)) {
-      setSelectedInvoice({ ...selectedInvoice, ...editingInvoice });
-    }
-    setEditingInvoice(null);
   };
 
   const generateInvoicePrintHtml = (inv) => {
@@ -1491,7 +1528,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingInvoice({ ...inv });
+                                  handleOpenEditInvoice(inv);
                                 }}
                                 style={{
                                   width: '30px',
@@ -1916,7 +1953,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
             className="glass-modal"
             style={{
               width: '100%',
-              maxWidth: '780px',
+              maxWidth: 'min(calc(780px + 3in), 96vw)',
               maxHeight: '90vh',
               overflowY: 'auto',
               padding: '28px',
@@ -2069,7 +2106,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
                   onClick={() => {
                     const invToEdit = { ...selectedInvoice };
                     setSelectedInvoice(null);
-                    setEditingInvoice(invToEdit);
+                    handleOpenEditInvoice(invToEdit);
                   }}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0284c7' }}
                   title="Edit invoice details"
@@ -2117,204 +2154,397 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {editingInvoice && (
         <div
           className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1200, overflowY: 'auto' }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            zIndex: 1200,
+            overflowY: 'auto',
+          }}
+          onClick={() => setEditingInvoice(null)}
         >
           <div
-            className="glass-modal"
+            className="glass-modal erp-edit-invoice-modal purchasing-no-shadows"
             style={{
               width: '100%',
-              maxWidth: '520px',
-              padding: '24px',
-              borderRadius: '14px',
+              maxWidth: 'min(calc(780px + 3in), 96vw)',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
               backgroundColor: '#ffffff',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              border: '1px solid #cbd5e1',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
-                  <Edit3 size={18} />
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '18px 24px',
+                backgroundColor: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#0284c7',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Edit3 size={20} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>
-                    Edit Invoice: {editingInvoice.invoiceNumber}
-                  </h3>
-                  <span style={{ fontSize: 'var(--erp-text-small)', color: '#64748b' }}>Update invoice metadata & financial records</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
+                      Edit Invoice: <span className="erp-table-code" style={{ fontSize: '0.95rem' }}>{editingInvoice.invoiceNumber}</span>
+                    </h3>
+                    <StatusBadge status={editingInvoice.status || 'PENDING'} />
+                    {editingInvoice.deliveryStatus && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '9999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          backgroundColor: editingInvoice.deliveryStatus === 'DELIVERED' ? '#dcfce7' : '#e0f2fe',
+                          color: editingInvoice.deliveryStatus === 'DELIVERED' ? '#166534' : '#0369a1',
+                          border: `1px solid ${editingInvoice.deliveryStatus === 'DELIVERED' ? '#86efac' : '#bae6fd'}`,
+                        }}
+                      >
+                        <Truck size={12} /> {editingInvoice.deliveryStatus.replaceAll('_', ' ')}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                    Issued on {editingInvoice.displayDate || editingInvoice.invoiceDate || 'Today'} · Sales Rep: {editingInvoice.salesman || 'Sales Staff'}
+                  </span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingInvoice(null)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                aria-label="Close edit invoice"
               >
                 <X size={20} />
               </button>
             </div>
 
+            {/* Modal Body & Form */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSaveEditedInvoice();
               }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
             >
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                  CUSTOMER NAME
-                </label>
-                <input disabled
-                  type="text"
-                  className="input-glass erp-field"
-                  style={{ width: '100%', height: '36px' }}
-                  value={editingInvoice.customerName || ''}
-                  onChange={(e) => setEditingInvoice({ ...editingInvoice, customerName: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    PAYMENT TYPE
-                  </label>
-                  <select disabled
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '36px' }}
-                    value={editingInvoice.paymentType || 'Full Payment'}
-                    onChange={(e) => setEditingInvoice({ ...editingInvoice, paymentType: e.target.value })}
-                  >
-                    <option value="Full Payment">Full Payment</option>
-                    <option value="Installment">Installment</option>
-                    <option value="Credit">Credit</option>
-                  </select>
+              <div
+                style={{
+                  padding: '20px 24px',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  flex: 1,
+                }}
+              >
+                {/* Audit & Compliance Notice */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '10px',
+                    color: '#1e40af',
+                    fontSize: '0.82rem',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#0284c7' }} />
+                  <span>
+                    Financial entries, tax calculations, and item lines are locked for regulatory and accounting audit integrity. You can update invoice notes, delivery remarks, and instructions below.
+                  </span>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    PAYMENT METHOD
-                  </label>
-                  <select disabled
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '36px' }}
-                    value={editingInvoice.paymentMethod || 'Cash'}
-                    onChange={(e) => setEditingInvoice({ ...editingInvoice, paymentMethod: e.target.value })}
-                  >
-                    <option value="Cash">Cash</option>
-                    <option value="Credit Card">Credit Card</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="Cheque">Cheque</option>
-                  </select>
-                </div>
-              </div>
+                {/* 3-Column Info Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+                  {/* Card 1: Customer */}
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', fontWeight: 700 }}>
+                      Billed Customer
+                    </span>
+                    <strong style={{ fontSize: '0.92rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {editingInvoice.customerName || 'Walk-in Customer'}
+                    </strong>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                      Terms: <strong style={{ color: '#334155' }}>{editingInvoice.paymentType || 'Full Payment'}</strong>
+                    </span>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    TOTAL AMOUNT (LKR)
-                  </label>
-                  <input disabled
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
-                    value={editingInvoice.totalAmount || ''}
-                    onChange={(e) => {
-                      const total = parseFloat(e.target.value) || 0;
-                      const paid = parseFloat(editingInvoice.paidAmount) || 0;
-                      setEditingInvoice({
-                        ...editingInvoice,
-                        totalAmount: total,
-                        balanceAmount: Math.max(0, total - paid),
-                        status: paid >= total ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING',
-                      });
-                    }}
-                    required
-                  />
-                </div>
+                  {/* Card 2: Payment & Sales */}
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', fontWeight: 700 }}>
+                      Payment Details
+                    </span>
+                    <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>
+                      {editingInvoice.paymentMethod || 'Cash'}
+                    </strong>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                      Salesman: <strong style={{ color: '#334155' }}>{editingInvoice.salesman || 'Sales Staff'}</strong>
+                    </span>
+                  </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    PAID AMOUNT (LKR)
-                  </label>
-                  <input disabled
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
-                    value={editingInvoice.paidAmount !== undefined ? editingInvoice.paidAmount : ''}
-                    onChange={(e) => {
-                      const paid = parseFloat(e.target.value) || 0;
-                      const total = parseFloat(editingInvoice.totalAmount) || 0;
-                      setEditingInvoice({
-                        ...editingInvoice,
-                        paidAmount: paid,
-                        balanceAmount: Math.max(0, total - paid),
-                        status: paid >= total ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING',
-                      });
-                    }}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    BALANCE (CALCULATED)
-                  </label>
-                  <div
-                    style={{
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0 12px',
-                      borderRadius: '6px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      fontSize: 'var(--erp-text-field)',
-                      fontWeight: 700,
-                      color: Number(editingInvoice.balanceAmount || 0) > 0 ? '#dc2626' : '#16a34a',
-                      fontFamily: 'monospace',
-                    }}
-                  >
-                    LKR {Number(editingInvoice.balanceAmount || 0).toFixed(2)}
+                  {/* Card 3: Financial Summary */}
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#64748b', fontWeight: 700 }}>
+                      Financial Summary
+                    </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Total:</span>
+                      <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                        LKR {Number(editingInvoice.totalAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Balance:</span>
+                      <strong
+                        style={{
+                          fontSize: '0.88rem',
+                          fontVariantNumeric: 'tabular-nums',
+                          color: Number(editingInvoice.balanceAmount || 0) > 0 ? '#dc2626' : '#16a34a',
+                        }}
+                      >
+                        LKR {Number(editingInvoice.balanceAmount || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    STATUS
-                  </label>
-                  <select disabled
-                    className="input-glass erp-field"
-                    style={{ width: '100%', height: '36px', fontWeight: 700 }}
-                    value={editingInvoice.status || 'PENDING'}
-                    onChange={(e) => setEditingInvoice({ ...editingInvoice, status: e.target.value })}
+                {/* Source Onhold Bills & Packing (if present) */}
+                {(editingInvoice.sourceHeldNumbers?.length > 0 || editingInvoice.sourceHeldBills?.length > 0 || editingInvoice.packing) && (
+                  <div
+                    style={{
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '10px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
                   >
-                    <option value="PAID">PAID</option>
-                    <option value="PARTIAL">PARTIAL</option>
-                    <option value="PENDING">PENDING</option>
-                  </select>
+                    {(editingInvoice.sourceHeldNumbers?.length > 0 || editingInvoice.sourceHeldBills?.length > 0) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Layers size={13} /> Merged Onhold Bills:
+                        </span>
+                        {(editingInvoice.sourceHeldBills?.length > 0
+                          ? editingInvoice.sourceHeldBills.map((b) => b.number || b.heldNumber)
+                          : editingInvoice.sourceHeldNumbers || []
+                        ).map((num) => (
+                          <span
+                            key={num}
+                            style={{
+                              padding: '2px 8px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #86efac',
+                              borderRadius: '6px',
+                              fontFamily: 'monospace',
+                              fontSize: '0.76rem',
+                              fontWeight: 700,
+                              color: '#15803d',
+                            }}
+                          >
+                            {num}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {editingInvoice.packing && (
+                      <div style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>
+                        Packing: Box {editingInvoice.packing.boxes || 0} · Bag {editingInvoice.packing.bags || 0} · P. Bag {editingInvoice.packing.pBags || 0} · Others {editingInvoice.packing.others || 0}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Line Items Preview */}
+                {Array.isArray(editingInvoice.items) && editingInvoice.items.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                      Invoiced Line Items ({editingInvoice.items.length})
+                    </span>
+                    <div
+                      className="erp-table-frame erp-table-scroll"
+                      style={{
+                        maxHeight: '170px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f8fafc', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
+                            <th className="erp-table-heading" style={{ width: '36px', textAlign: 'center' }}>#</th>
+                            <th className="erp-table-heading" style={{ width: '120px' }}>SKU</th>
+                            <th className="erp-table-heading">Product Name</th>
+                            <th className="erp-table-heading" style={{ width: '70px', textAlign: 'right' }}>Qty</th>
+                            <th className="erp-table-heading" style={{ width: '105px', textAlign: 'right' }}>Unit Price</th>
+                            <th className="erp-table-heading" style={{ width: '110px', textAlign: 'right' }}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editingInvoice.items.map((it, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td className="erp-table-cell" style={{ textAlign: 'center', color: '#94a3b8' }}>{idx + 1}</td>
+                              <td className="erp-table-cell erp-table-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0284c7' }}>
+                                {it.code || it.productSku || it.sku || '-'}
+                              </td>
+                              <td className="erp-table-cell" style={{ fontWeight: 600, color: '#1e293b' }}>
+                                {it.name || it.productName || 'Product item'}
+                              </td>
+                              <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                                {it.quantity || 1}
+                              </td>
+                              <td className="erp-table-cell" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
+                                Rs. {(Number(it.unitPrice) || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#0f172a' }}>
+                                Rs. {(Number(it.totalPrice || (it.quantity * it.unitPrice)) || 0).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Editable Notes Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label
+                      htmlFor="edit-invoice-notes"
+                      style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        color: '#1e293b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.4px',
+                      }}
+                    >
+                      Invoice Notes, Delivery Instructions & Remarks
+                    </label>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      {(editingInvoice.notes || '').length} / 500 characters
+                    </span>
+                  </div>
+                  <textarea
+                    id="edit-invoice-notes"
+                    rows={4}
+                    className="erp-field"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#f8fbff',
+                      color: '#0f172a',
+                      fontSize: '0.88rem',
+                      fontFamily: 'inherit',
+                      lineHeight: 1.5,
+                      resize: 'vertical',
+                    }}
+                    placeholder="Add delivery instructions, special handling, customer purchase order notes, or remarks..."
+                    value={editingInvoice.notes || ''}
+                    maxLength={500}
+                    disabled={savingEditedInvoice}
+                    onChange={(e) => setEditingInvoice({ ...editingInvoice, notes: e.target.value })}
+                  />
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    These remarks will appear on printed invoices, delivery dispatch notes, and customer statements.
+                  </span>
                 </div>
               </div>
 
-              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {/* Modal Footer */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '14px 24px',
+                  backgroundColor: '#f8fafc',
+                  borderTop: '1px solid #e2e8f0',
+                }}
+              >
                 <button
                   type="button"
-                  className="btn btn-glass erp-button"
+                  className="erp-button btn-glass"
+                  disabled={savingEditedInvoice}
                   onClick={() => setEditingInvoice(null)}
+                  style={{ padding: '8px 16px', fontWeight: 600 }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-primary erp-button erp-button-primary"
-                  style={{ borderColor: '#0284c7' }}
+                  className="erp-button erp-button-primary"
+                  disabled={savingEditedInvoice}
+                  style={{
+                    padding: '8px 20px',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                  }}
                 >
-                  <Check size={16} /> Save Changes
+                  {savingEditedInvoice ? (
+                    'Saving…'
+                  ) : (
+                    <>
+                      <Check size={16} /> Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </form>

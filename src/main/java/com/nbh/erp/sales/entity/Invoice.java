@@ -28,6 +28,11 @@ public class Invoice extends BaseEntity {
     @Builder.Default
     private Boolean stockReserved=false;
 
+    // Tracks stock issued at warehouse review or invoice completion, independently of reservations.
+    @Column(name="stock_deducted",nullable=false)
+    @Builder.Default
+    private Boolean stockDeducted=false;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
