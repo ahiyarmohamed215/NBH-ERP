@@ -25,9 +25,12 @@ The navigation shows implemented pages only. Unfinished attendance, payroll, com
 
 ## Local setup
 
+For production on AWS EC2 with RDS, use [the AWS deployment guide](deploy/aws/README.md),
+the `prod` Spring profile, and the templates under `deploy/aws/`.
+
 1. Install Java 21, Node.js 22 and MySQL 8. Create a dedicated database and database user.
 2. Set the process environment variables shown in `.env.example`. Spring does not load that file automatically. `DB_PASSWORD` and `JWT_SECRET` are required. The JWT secret must decode from Base64 to at least 32 random bytes. A secure PowerShell generator is `[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`.
-3. For an empty database only, enable `INITIAL_ADMIN_ENABLED=true` and set a unique `INITIAL_ADMIN_PASSWORD` of at least 12 characters. After the first successful start, disable bootstrap and remove the password from the environment. Existing administrator passwords are not reset by startup.
+3. Only when the users table has never been populated, enable `INITIAL_ADMIN_ENABLED=true` and set a unique `INITIAL_ADMIN_PASSWORD` of at least 12 characters that also meets the registration password policy (upper/lowercase, digit, special character, no username/email inclusion or common password). After the first successful start, disable bootstrap and remove the password from the environment. Existing accounts, including inactive or soft-deleted accounts, prevent bootstrap; startup never reactivates or promotes them. Existing role permission assignments are retained.
 4. Run `.\mvnw.cmd spring-boot:run` (Linux/macOS: `bash mvnw spring-boot:run`). Flyway creates the schema; Hibernate validates it.
 5. In `frontend`, run `npm ci` then `npm run dev`. Open `http://localhost:5173`. Vite proxies `/api` to port 8080. For separately hosted frontends set `VITE_API_URL` to the backend origin and set `CORS_ALLOWED_ORIGINS` to exact frontend origins.
 

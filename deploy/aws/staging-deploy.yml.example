@@ -1,0 +1,28 @@
+# PROPOSAL ONLY: not installed under .github/workflows and cannot deploy.
+# Before activation, create the staging GitHub Environment with required reviewers,
+# prevent self-review, restrict deployment branches, and verify plan support.
+name: Staging (manual approval only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+  staging:
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-${{ github.sha }}'
+          path: release-artifacts
+      - name: Deployment deliberately disabled pending approval of transport and rollback
+        run: |
+          echo 'No AWS deployment is configured. Approve a reviewed deployment script first.'
+          exit 1

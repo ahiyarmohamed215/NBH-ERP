@@ -1,0 +1,29 @@
+[Unit]
+Description=NBH ERP backend (AWS EC2 and RDS)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=erp
+Group=erp
+WorkingDirectory=/opt/erp
+EnvironmentFile=/etc/nbh-erp/erp.env
+# A conservative starting heap; tune against the actual EC2 memory budget.
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -Djava.awt.headless=true -Dfile.encoding=UTF-8 -jar /opt/erp/nbh-erp.jar
+Restart=on-failure
+RestartSec=10s
+# Longer than Spring's 30-second graceful shutdown window.
+TimeoutStopSec=45s
+SuccessExitStatus=143
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nbh-erp
+
+[Install]
+WantedBy=multi-user.target

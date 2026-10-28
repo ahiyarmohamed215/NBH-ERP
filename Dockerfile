@@ -25,9 +25,9 @@ USER appuser
 # Copy jar from build stage
 COPY --from=build /workspace/target/*.jar app.jar
 
-# Render assigns port dynamically via $PORT
+# Optional container port; EC2 systemd deployment uses deploy/aws/nbh-erp.service.
 ENV PORT=8080
 EXPOSE 8080
 
-# -XX:+UseContainerSupport and -XX:MaxRAMPercentage=75.0 ensure the JVM respects Render memory limits (e.g. 512MB RAM)
+# Size the JVM heap relative to the container memory limit.
 ENTRYPOINT ["sh", "-c", "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=${PORT} -jar app.jar"]
