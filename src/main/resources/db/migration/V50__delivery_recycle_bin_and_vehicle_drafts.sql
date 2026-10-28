@@ -1,0 +1,10 @@
+ALTER TABLE vehicles ADD COLUMN deleted_at DATETIME NULL;
+ALTER TABLE vehicles ADD COLUMN purged_at DATETIME NULL;
+ALTER TABLE vehicles ADD COLUMN status_before_delete VARCHAR(20) NULL;
+ALTER TABLE vehicles ADD COLUMN active_before_delete BOOLEAN NULL;
+ALTER TABLE vehicles MODIFY COLUMN vehicle_number VARCHAR(50) NULL;
+ALTER TABLE vehicles MODIFY COLUMN model VARCHAR(100) NULL;
+ALTER TABLE delivery_routes ADD COLUMN deleted_at DATETIME NULL;
+ALTER TABLE delivery_routes ADD COLUMN purged_at DATETIME NULL;
+ALTER TABLE delivery_routes ADD COLUMN status_before_delete VARCHAR(20) NULL;
+ALTER TABLE delivery_routes ADD COLUMN active_before_delete BOOLEAN NULL;
