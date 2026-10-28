@@ -14,11 +14,13 @@ class PurchasingInventoryInputValidationTest {
   var r=new com.nbh.erp.product.dto.CreateProductRequest();r.setMinStockLevel(-1);invalid(r,"minStockLevel");r.setMinStockLevel(0);valid(r,"minStockLevel");
   r.setSku("x".repeat(51));invalid(r,"sku");r.setCategoryId(-1L);invalid(r,"categoryId");
   r.setDescription("x".repeat(5001));invalid(r,"description");r.setSellingPrice(new BigDecimal("1.234"));invalid(r,"sellingPrice");
+  r.setMarkupPercent(new BigDecimal("12.34567"));invalid(r,"markupPercent");
+  r.setMarkupPercent(new BigDecimal("12.3456"));valid(r,"markupPercent");
+  r.setMarkupPercent(new BigDecimal("-1"));invalid(r,"markupPercent");
  }
- @Test void brandMarkupHasFourDecimalPlacesAndTextLimit(){
-  var r=new com.nbh.erp.brand.dto.CreateBrandRequest();r.setMarkupPercent(new BigDecimal("12.34567"));invalid(r,"markupPercent");
-  r.setMarkupPercent(new BigDecimal("12.3456"));valid(r,"markupPercent");r.setDescription("x".repeat(5001));invalid(r,"description");
-  var edit=new com.nbh.erp.brand.dto.UpdateBrandRequest();edit.setMarkupPercent(new BigDecimal("-1"));invalid(edit,"markupPercent");
+ @Test void brandAndCategoryTextLimit(){
+  var r=new com.nbh.erp.brand.dto.CreateBrandRequest();r.setDescription("x".repeat(5001));invalid(r,"description");
+  var edit=new com.nbh.erp.brand.dto.UpdateBrandRequest();edit.setDescription("x".repeat(5001));invalid(edit,"description");
   var category=new com.nbh.erp.category.dto.CreateCategoryRequest();category.setDescription("x".repeat(5001));invalid(category,"description");
  }
  @Test void warehousePhoneAndTextAreValidated(){

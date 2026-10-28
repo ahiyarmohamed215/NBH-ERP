@@ -22,16 +22,16 @@ class CustomerRangeDashboardTest {
  @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
  @Test void dashboardPersistsMonthlySummariesAndSynchronizationRecalculatesExistingTotals(){
   var month=YearMonth.parse(service.getCurrentYearMonth());
-  var customer=Customer.builder().customerCode("RANGE-LOAD-TEST").name("Range dashboard customer").build();em.persist(customer);
+  var customer=Customer.builder().customerCode("RANGE-LOAD-TEST").name("Range dashboard customer").isActive(true).build();em.persist(customer);
   var warehouse=Warehouse.builder().code("RANGE-TEST-WH").name("Warehouse").build();em.persist(warehouse);
-  var invoice=Invoice.builder().invoiceNumber("RANGE-COMPLETED").customer(customer).warehouse(warehouse).invoiceDate(month.atDay(1)).netTotal(new BigDecimal("100000")).status("COMPLETED").build();em.persist(invoice);
+  var invoice=Invoice.builder().invoiceNumber("RANGE-COMPLETED").customer(customer).warehouse(warehouse).invoiceDate(month.atDay(1)).netTotal(new BigDecimal("100000")).originalHeldTotal(new BigDecimal("100000")).originalHeldSentAt(month.atDay(1).atStartOfDay()).status("COMPLETED").build();em.persist(invoice);
   em.persist(Invoice.builder().invoiceNumber("RANGE-HELD").customer(customer).warehouse(warehouse).invoiceDate(month.atDay(1)).netTotal(new BigDecimal("200000")).status("HELD").build());em.flush();
   var dashboard=service.getManagerDashboard(month.toString(),null,null,"RANGE-LOAD-TEST",PageRequest.of(0,25));em.flush();
   assertEquals(1,dashboard.getCustomers().size());
   var progress=dashboard.getCustomers().getFirst();assertEquals(customer.getId(),progress.getCustomerId());
   assertEquals(0,new BigDecimal("100000").compareTo(progress.getMonthlyPurchases()));assertEquals("RANGE_1",progress.getCurrentRangeCode());
   assertEquals(0,new BigDecimal("50000").compareTo(progress.getRemainingAmount()));
-  invoice.setNetTotal(new BigDecimal("120000"));em.flush();service.synchronizeMonth(month.toString());em.flush();
+  invoice.setNetTotal(new BigDecimal("120000"));invoice.setOriginalHeldTotal(new BigDecimal("120000"));em.flush();service.synchronizeMonth(month.toString());em.flush();
   var refreshed=service.getManagerDashboard(month.toString(),null,null,"RANGE-LOAD-TEST",PageRequest.of(0,25)).getCustomers().getFirst();
   assertEquals(0,new BigDecimal("120000").compareTo(refreshed.getMonthlyPurchases()));assertEquals(0,new BigDecimal("30000").compareTo(refreshed.getRemainingAmount()));
   invoice.setStatus("CANCELLED");em.flush();service.synchronizeMonth(month.toString());em.flush();

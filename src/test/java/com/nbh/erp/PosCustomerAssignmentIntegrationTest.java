@@ -36,6 +36,7 @@ class PosCustomerAssignmentIntegrationTest {
  @Autowired CustomerRepository customers;
  @Autowired CustomerGroupRepository groups;
  @Autowired CustomerGroupService groupService;
+ @Autowired com.nbh.erp.customer.service.CustomerService customerService;
  @Autowired UserRepository users;
  @Autowired UserService userService;
  @Autowired RoleRepository roles;
@@ -47,7 +48,14 @@ class PosCustomerAssignmentIntegrationTest {
  @Autowired com.nbh.erp.warehouse.repository.WarehouseRepository warehouses;
  @Autowired com.nbh.erp.product.repository.ProductRepository products;
  @Autowired com.nbh.erp.category.repository.CategoryRepository categories;
+ @Autowired com.nbh.erp.delivery.repository.DeliveryRouteRepository deliveryRoutes;
  String key(){return UUID.randomUUID().toString().substring(0,8);}
+ com.nbh.erp.delivery.entity.DeliveryRoute route(){
+  String key=key();return deliveryRoutes.saveAndFlush(com.nbh.erp.delivery.entity.DeliveryRoute.builder().routeCode("DR-"+key).routeName("Route "+key).isActive(true).build());
+ }
+ Customer customerWithRoute(com.nbh.erp.delivery.entity.DeliveryRoute route,CustomerGroup primary,CustomerGroup... assigned){
+  String key=key();return customers.saveAndFlush(Customer.builder().customerCode(key).name("Customer "+key).creditLimit(BigDecimal.ZERO).currentBalance(BigDecimal.ZERO).isActive(true).deliveryRoute(route).customerGroup(primary).customerGroups(new HashSet<>(Arrays.asList(assigned))).build());
+ }
  User staff(boolean pos){
   String key=key();var permission=permissions.findByName(pos?"SALES_CREATE":"CUSTOMER_VIEW").orElseGet(()->permissions.save(Permission.builder().name(pos?"SALES_CREATE":"CUSTOMER_VIEW").module(pos?"SALES":"CUSTOMER").build()));
   var role=roles.save(Role.builder().name("ROLE_ASSIGN_"+key).permissions(new HashSet<>(Set.of(permission))).build());
@@ -62,7 +70,8 @@ class PosCustomerAssignmentIntegrationTest {
  @Test void customerLookupIncludesOnlyActiveAssignmentsAcrossAllGroupsAndLegacyPrimary(){
   var a=staff(true);var b=staff(true);var ga=group(a,true);var ga2=group(a,true);var gb=group(b,true);var inactive=group(a,false);
   var own=customer(null,ga,ga2);var shared=customer(null,ga,gb);var legacy=customer(ga);var other=customer(null,gb);var unassigned=customer(null);var dormant=customer(null,inactive);var disabled=customer(null,ga);disabled.setIsActive(false);customers.saveAndFlush(disabled);
-  login(a);var ids=access.customers().stream().map(c->c.getId()).toList();assertEquals(Set.of(own.getId(),shared.getId(),legacy.getId()),new HashSet<>(ids));assertEquals(3,ids.size());
+  login(a);var ids=access.customers().stream().map(c->c.getId()).toList();assertEquals(Set.of(own.getId(),legacy.getId()),new HashSet<>(ids));assertEquals(2,ids.size());
+  assertThrows(BusinessException.class,()->access.requireAssigned(shared.getId()));login(b);assertThrows(BusinessException.class,()->access.requireAssigned(shared.getId()));login(a);
   assertThrows(BusinessException.class,()->access.requireAssigned(other.getId()));assertThrows(BusinessException.class,()->access.requireAssigned(unassigned.getId()));assertThrows(BusinessException.class,()->access.requireAssigned(dormant.getId()));assertThrows(BusinessException.class,()->access.requireAssigned(disabled.getId()));
   ga.setAssignedStaff(b);ga2.setAssignedStaff(b);groups.saveAndFlush(ga);groups.saveAndFlush(ga2);assertTrue(access.customers().isEmpty());assertThrows(BusinessException.class,()->access.requireAssigned(own.getId()));
  }
@@ -88,5 +97,79 @@ class PosCustomerAssignmentIntegrationTest {
  @Test void administratorStillNeedsAnAssignedCustomerGroupForPos(){
   var admin=staff(true);admin.setRoles(new HashSet<>(Set.of(roles.findByName("ROLE_ADMIN").orElseThrow())));users.saveAndFlush(admin);login(admin);var customer=customer(null);
   assertTrue(access.customers().isEmpty());assertThrows(BusinessException.class,()->access.requireAssigned(customer.getId()));
+ }
+
+ void admin(){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("group-admin",null,List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))));}
+ CreateCustomerGroupRequest assignment(User staff,Long... ids){return CreateCustomerGroupRequest.builder().groupCode(key()).groupName("Assignment").assignedStaffId(staff==null?null:staff.getId()).customerIds(Arrays.asList(ids)).build();}
+ @Test void oneStaffCanOwnManyCustomersButAnotherStaffCannotShareThem(){
+  admin();var a=staff(true);var b=staff(true);var first=customer(null);var second=customer(null);
+  var ga=groupService.createGroup(assignment(a,first.getId(),second.getId()));
+  assertEquals(Set.of(first.getId(),second.getId()),new HashSet<>(ga.getCustomerIds()));
+  assertTrue(assertThrows(BusinessException.class,()->groupService.createGroup(assignment(b,first.getId()))).getMessage().contains("another staff"));
+  // Several groups are allowed when their owner is the same staff member.
+  var same=groupService.createGroup(assignment(a,first.getId()));assertEquals(List.of(first.getId()),same.getCustomerIds());
+  login(a);assertEquals(2,access.customers().size());login(b);assertTrue(access.customers().isEmpty());
+ }
+ @Test void groupUpdatesCannotIntroduceConflictsAndRemovingPrimaryAllowsReassignment(){
+  admin();var a=staff(true);var b=staff(true);var c=customer(null);
+  var original=groupService.createGroup(assignment(a,c.getId()));var target=groupService.createGroup(assignment(b));
+  assertThrows(BusinessException.class,()->groupService.updateGroup(target.getId(),assignment(b,c.getId())));
+  var unowned=groupService.createGroup(assignment(null,c.getId()));
+  var ownerOnly=assignment(b);ownerOnly.setCustomerIds(null);
+  assertThrows(BusinessException.class,()->groupService.updateGroup(unowned.getId(),ownerOnly));
+  groupService.updateGroup(original.getId(),assignment(a));
+  var remainingPrimary=customers.findById(c.getId()).orElseThrow().getCustomerGroup();
+  assertTrue(remainingPrimary==null || !remainingPrimary.getId().equals(original.getId()));
+  var moved=groupService.updateGroup(target.getId(),assignment(b,c.getId()));assertEquals(List.of(c.getId()),moved.getCustomerIds());
+  login(a);assertTrue(access.customers().isEmpty());login(b);access.requireAssigned(c.getId());
+ }
+ @Test void inactiveGroupOwnershipAndLegacyPrimaryCannotBeBypassed(){
+  admin();var a=staff(true);var b=staff(true);var old=group(a,false);var c=customer(old);
+  assertThrows(BusinessException.class,()->groupService.createGroup(assignment(b,c.getId())));
+  var fresh=groupService.createGroup(assignment(a,c.getId()));assertEquals(List.of(c.getId()),fresh.getCustomerIds());
+  c.setIsActive(false);customers.saveAndFlush(c);
+  var transfer=assignment(b);transfer.setCustomerIds(null);
+  assertThrows(BusinessException.class,()->groupService.updateGroup(fresh.getId(),transfer));
+ }
+ @Test void creatingCustomerCannotCombineGroupsOwnedByDifferentStaff(){
+  admin();var a=staff(true);var b=staff(true);var ga=group(a,true);var gb=group(b,true);var ga2=group(a,false);
+  var request=new com.nbh.erp.customer.dto.CreateCustomerRequest();request.setCustomerCode(key());request.setName("New customer");request.setCustomerGroupIds(List.of(ga.getId(),gb.getId()));
+  assertThrows(BusinessException.class,()->customerService.createCustomer(request));
+  request.setCustomerGroupIds(List.of(ga.getId(),ga2.getId()));var saved=customerService.createCustomer(request);assertEquals(2,customers.findById(saved.getId()).orElseThrow().getCustomerGroups().size());
+ }
+ @Test @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+ void concurrentGroupAssignmentsCannotGiveOneCustomerToTwoStaff() throws Exception {
+  admin();var a=staff(true);var b=staff(true);var c=customer(null);var start=new java.util.concurrent.CountDownLatch(1);
+  try(var workers=java.util.concurrent.Executors.newFixedThreadPool(2)){
+   var first=workers.submit(()->{admin();try{start.await();groupService.createGroup(assignment(a,c.getId()));return true;}catch(BusinessException expected){return false;}finally{clear();}});
+   var second=workers.submit(()->{admin();try{start.await();groupService.createGroup(assignment(b,c.getId()));return true;}catch(BusinessException expected){return false;}finally{clear();}});
+   start.countDown();assertNotEquals(first.get(30,java.util.concurrent.TimeUnit.SECONDS),second.get(30,java.util.concurrent.TimeUnit.SECONDS));
+  }
+  assertEquals(1,customers.findMappedStaffIds(c.getId(),null).size());
+ }
+ @Test void customerLookupByRouteFiltersAssignedCustomersStrictlyByRoute(){
+  var staff=staff(true);var otherStaff=staff(true);login(staff);
+  var group=group(staff,true);var otherGroup=group(otherStaff,true);
+  var r1=route();var r2=route();
+  var c1=customerWithRoute(r1,null,group);
+  var c2=customerWithRoute(r2,null,group);
+  var c3=customerWithRoute(r1,null,otherGroup);
+  var c4=customerWithRoute(r1,null);
+  var allIds=access.customers().stream().map(c->c.getId()).toList();
+  assertTrue(allIds.contains(c1.getId()));
+  assertTrue(allIds.contains(c2.getId()));
+  assertFalse(allIds.contains(c3.getId()));
+  assertFalse(allIds.contains(c4.getId()));
+
+  var r1Ids=access.customers(r1.getId()).stream().map(c->c.getId()).toList();
+  assertEquals(List.of(c1.getId()),r1Ids);
+
+  var r2Ids=access.customers(r2.getId()).stream().map(c->c.getId()).toList();
+  assertEquals(List.of(c2.getId()),r2Ids);
+
+  assertDoesNotThrow(()->access.requireAssigned(c1.getId(),r1.getId()));
+  assertThrows(BusinessException.class,()->access.requireAssigned(c1.getId(),r2.getId()));
+  assertThrows(BusinessException.class,()->access.requireAssigned(c3.getId(),r1.getId()));
+  assertThrows(BusinessException.class,()->access.requireAssigned(c4.getId(),r1.getId()));
  }
 }

@@ -64,7 +64,7 @@ class SignupValidationTest {
                 passwordEncoder,
                 refreshSessions,
                 sessionActivity,
-                permissionRepository
+                permissionRepository, new com.nbh.erp.auth.service.LoginProtection()
         );
     }
 

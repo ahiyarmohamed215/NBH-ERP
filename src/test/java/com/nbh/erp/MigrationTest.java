@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MigrationTest {
     @Test void freshDatabaseMigratesAndCanRestart() throws Exception {
         String url="jdbc:h2:mem:migration-fresh;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1";
-        var flyway=Flyway.configure().dataSource(url,"sa","").load();
+        var flyway=Flyway.configure().dataSource(url,"sa","").target("4").load();
         assertEquals(4,flyway.migrate().migrationsExecuted);
         assertEquals(0,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
@@ -37,7 +37,7 @@ class MigrationTest {
             }
             s.execute("insert into brands (is_active,created_at,code,name) values (true,current_timestamp,'LEGACY','Preserved brand')");
         }
-        var flyway=Flyway.configure().dataSource(url,"sa","").baselineOnMigrate(true).baselineVersion("1").load();
+        var flyway=Flyway.configure().dataSource(url,"sa","").baselineOnMigrate(true).baselineVersion("1").target("4").load();
         assertEquals(3,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {
             try(var rows=s.executeQuery("select name,record_version from brands where code='LEGACY'")) { assertTrue(rows.next());assertEquals("Preserved brand",rows.getString(1));assertEquals(0,rows.getLong(2)); }
@@ -55,7 +55,7 @@ class MigrationTest {
             s.execute("insert into role_permissions (role_id,permission_id) values (700,700)");
             s.execute("insert into account (code,name,type,active,created_at,record_version) values ('HISTORY','Historical account','ASSET',true,current_timestamp,0)");
         }
-        var flyway=Flyway.configure().dataSource(url,"sa","").load();
+        var flyway=Flyway.configure().dataSource(url,"sa","").target("4").load();
         assertEquals(1,flyway.migrate().migrationsExecuted);
         assertEquals(0,flyway.migrate().migrationsExecuted);
         try(var c=DriverManager.getConnection(url,"sa","");var s=c.createStatement()) {

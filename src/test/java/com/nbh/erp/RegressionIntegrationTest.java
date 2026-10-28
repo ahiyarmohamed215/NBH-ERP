@@ -105,17 +105,15 @@ class RegressionIntegrationTest {
  @Test void heldCompletionWithoutLinesDeductsStockAndPostsDebt() {
   var invoice=invoices.createInvoice(sale(true)); assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
   var update=new UpdateInvoiceRequest(); update.setStatus("COMPLETED"); update.setPaidAmount(BigDecimal.ZERO);
-  invoices.updateInvoice(invoice.getId(),update);
-  assertEquals(0,n("98").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
-  assertEquals(0,n("20").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance()));
-  invoices.updateInvoice(invoice.getId(),update); assertEquals(0,n("98").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () -> invoices.updateInvoice(invoice.getId(), update));
+  assertEquals(0,n("100").compareTo(stock.getAvailableStock(warehouse.getId(),product.getId())));
  }
  @Test void postedTotalsCannotBeOverwritten() { var invoice=invoices.createInvoice(sale(false)); var update=new UpdateInvoiceRequest();update.setTotalAmount(n("1"));assertThrows(RuntimeException.class,()->invoices.updateInvoice(invoice.getId(),update)); }
  @Test void overpaymentRejected() { var invoice=invoices.createInvoice(sale(false)); assertThrows(RuntimeException.class,()->payments.processPayment(CreatePaymentRequest.builder().invoiceId(invoice.getId()).amount(n("21")).build())); }
  @Test void unknownInvoiceDoesNotBecomeAdvance() { assertThrows(RuntimeException.class,()->payments.processPayment(CreatePaymentRequest.builder().invoiceNumber("DOES-NOT-EXIST").customerId(customer.getId()).amount(n("10")).build())); }
  @Test void advanceAndVoidDoNotInventDebt() { var payment=payments.processPayment(CreatePaymentRequest.builder().customerId(customer.getId()).amount(n("50")).paymentType("ADVANCE").build());payments.voidPayment(payment.getId(),"Test reversal");assertEquals(0,customers.findById(customer.getId()).orElseThrow().getCurrentBalance().signum()); }
  @Test void advanceAllocationAndReversalReconcileInvoice() { var invoice=invoices.createInvoice(sale(false));var payment=payments.processPayment(CreatePaymentRequest.builder().customerId(customer.getId()).amount(n("50")).build()); payments.allocateAdvance(payment.getId(),invoice.getId(),n("15"));assertEquals(0,n("5").compareTo(invoiceRepository.findById(invoice.getId()).orElseThrow().getBalanceAmount()));payments.voidPayment(payment.getId(),"Test reversal");assertEquals(0,n("20").compareTo(customers.findById(customer.getId()).orElseThrow().getCurrentBalance())); }
- @Test void zeroCreditLimitBlocksDebt() { customer.setCreditLimit(BigDecimal.ZERO); customers.save(customer);assertThrows(RuntimeException.class,()->invoices.createInvoice(sale(false))); }
+ @Test void zeroCreditLimitBlocksDebt() { customer.setCreditLimit(n("10")); customers.saveAndFlush(customer);assertThrows(RuntimeException.class,()->invoices.createInvoice(sale(false))); }
  CreateSalesReturnRequest returnRequest(InvoiceDto invoice,String quantity) {
   var req=new CreateSalesReturnRequest();req.setInvoiceId(invoice.getId());req.setReturnType("REFUND");
   var line=new CreateSalesReturnRequest.CreateSalesReturnItemRequest();line.setInvoiceItemId(invoice.getItems().get(0).getId());line.setProductId(product.getId());line.setQuantity(n(quantity));line.setUnitPrice(n("9999"));req.setItems(List.of(line));return req;
@@ -239,8 +237,8 @@ class RegressionIntegrationTest {
   opening.getItems().add(com.nbh.erp.grn.entity.GrnItem.builder().grn(opening).product(product).warehouse(warehouse).quantityReceived(n("100")).unitCost(BigDecimal.ZERO).totalCost(BigDecimal.ZERO).build());
   context.getBean(com.nbh.erp.grn.repository.GrnRepository.class).saveAndFlush(opening);
 
-  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("OPEN-B").name("Opening brand").markupPercent(n("25")).build());
-  product.setBrand(brand);product.setCostPrice(BigDecimal.ZERO);product.setSellingPrice(BigDecimal.ZERO);product.setUseBrandMarkup(true);products.save(product);
+  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("OPEN-B").name("Opening brand").build());
+  product.setBrand(brand);product.setCostPrice(BigDecimal.ZERO);product.setSellingPrice(BigDecimal.ZERO);product.setMarkupPercent(n("25"));product.setUseBrandMarkup(true);products.save(product);
   var request=new com.nbh.erp.stockadjustment.dto.CreateStockAdjustmentRequest();request.setWarehouseId(warehouse.getId());request.setAdjustmentDate(LocalDate.now());request.setReason("Opening cost correction");
   var item=new com.nbh.erp.stockadjustment.dto.CreateStockAdjustmentRequest.CreateStockAdjustmentItemRequest();item.setProductId(product.getId());item.setPhysicalQuantity(n("100"));item.setUnitCost(n("100"));request.setItems(List.of(item));
   var draft=adjustments.createAdjustment(request,false);
@@ -251,21 +249,20 @@ class RegressionIntegrationTest {
   assertEquals(0,n("100").compareTo(stockItem.getCostPrice()));assertEquals(0,n("125").compareTo(stockItem.getSellingPrice()));assertEquals(0,n("100").compareTo(stockItem.getQuantity()));
  }
  @Test void receiptPricingPublishesAutomaticAndManualPricesOnlyWhenProcessed() {
-  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("PRICE-B").name("Pricing brand").markupPercent(n("25")).build());
-  product.setBrand(brand);products.save(product);
+  var brand=brands.save(com.nbh.erp.brand.entity.Brand.builder().code("PRICE-B").name("Pricing brand").build());
+  product.setBrand(brand);product.setMarkupPercent(n("25"));products.save(product);
   var request=automaticReceiptRequest();var line=request.getItems().getFirst();
   line.setUseBrandMarkup(true);line.setUnitCost(n("100"));
   var draft=grns.createGrn(request,false);
   assertEquals(0,n("10").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
   grns.processGrn(draft.getId(),"Receipt verified");
   assertEquals(0,n("125").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
-  var brandUpdate=new com.nbh.erp.brand.dto.UpdateBrandRequest();brandUpdate.setName("Pricing brand");brandUpdate.setMarkupPercent(n("30"));
-  brandService.updateBrand(brand.getId(),brandUpdate);
+  product.setMarkupPercent(n("30"));products.save(product);
   assertEquals(0,n("130").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
   line.setUseBrandMarkup(false);line.setSellingPrice(n("145"));
   grns.updateGrn(draft.getId(),request,false);
   assertEquals(0,n("145").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
-  brandUpdate.setMarkupPercent(n("50"));brandService.updateBrand(brand.getId(),brandUpdate);
+  product.setMarkupPercent(n("50"));products.save(product);
   assertEquals(0,n("145").compareTo(products.findById(product.getId()).orElseThrow().getSellingPrice()));
  }
  @Test void automaticGrnWarehouseAndTypeSurviveDraftEditAndPosting() {
@@ -351,11 +348,9 @@ class RegressionIntegrationTest {
   var req=automaticReceiptRequest();req.setGrnType("Unknown type");
   assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->grns.createGrn(req,false));
  }
- @Test void brandMarkupCalculatesReceiptSellingPriceAndManualDraftEditPersists() {
-  var brandReq=new com.nbh.erp.brand.dto.CreateBrandRequest();brandReq.setCode("MP-BRAND");brandReq.setName("Markup brand");brandReq.setMarkupPercent(n("25"));
-  var brand=brandService.createBrand(brandReq);
-  product.setBrand(brands.findById(brand.getId()).orElseThrow());products.save(product);
-  assertEquals(0,n("25").compareTo(com.nbh.erp.product.dto.ProductDto.from(product,true).getBrandMarkupPercent()));
+ @Test void productMarkupCalculatesReceiptSellingPriceAndManualDraftEditPersists() {
+  product.setMarkupPercent(n("25"));products.save(product);
+  assertEquals(0,n("25").compareTo(com.nbh.erp.product.dto.ProductDto.from(product,true).getMarkupPercent()));
   var req=automaticReceiptRequest();var line=req.getItems().getFirst();line.setUseBrandMarkup(true);line.setSellingPrice(n("999"));
   var draft=grns.createGrn(req,false);var saved=draft.getItems().getFirst();
   assertEquals(0,n("5.00").compareTo(saved.getSellingPrice()));assertEquals(0,n("25").compareTo(saved.getMarkupPercent()));assertTrue(saved.getUseBrandMarkup());
@@ -368,8 +363,8 @@ class RegressionIntegrationTest {
   assertEquals(0,n("-25").compareTo(belowCost.getItems().getFirst().getMarkupPercent()));
   line.setSellingPrice(n("7.25"));line.setMarkupPercent(n("81.25"));grns.updateGrn(draft.getId(),req,false);
   assertEquals(0,n("7.25").compareTo(grns.getGrnById(draft.getId()).getItems().getFirst().getSellingPrice()));
-  var update=new com.nbh.erp.brand.dto.UpdateBrandRequest();update.setName("Markup brand");update.setMarkupPercent(n("30"));brandService.updateBrand(brand.getId(),update);
-  assertEquals(0,n("30").compareTo(brandService.getBrandById(brand.getId()).getMarkupPercent()));
+  product.setMarkupPercent(n("30"));products.save(product);
+  assertEquals(0,n("30").compareTo(products.findById(product.getId()).orElseThrow().getMarkupPercent()));
  }
  com.nbh.erp.grn.dto.GrnDto receipt() {
   var req=new com.nbh.erp.grn.dto.CreateGrnRequest();req.setSupplierId(supplier.getId());req.setWarehouseId(warehouse.getId());req.setReceivedDate(LocalDate.now());

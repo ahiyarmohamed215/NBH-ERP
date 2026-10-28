@@ -180,9 +180,9 @@ public class ProductInventoryPerformanceTest {
 
         // Brands
         Brand brand1 = brandRepository.findByCode("BRD-A")
-                .orElseGet(() -> brandRepository.save(Brand.builder().code("BRD-A").name("Brand Alpha").markupPercent(new BigDecimal("15.00")).isActive(true).build()));
+                .orElseGet(() -> brandRepository.save(Brand.builder().code("BRD-A").name("Brand Alpha").isActive(true).build()));
         Brand brand2 = brandRepository.findByCode("BRD-B")
-                .orElseGet(() -> brandRepository.save(Brand.builder().code("BRD-B").name("Brand Beta").markupPercent(new BigDecimal("20.00")).isActive(true).build()));
+                .orElseGet(() -> brandRepository.save(Brand.builder().code("BRD-B").name("Brand Beta").isActive(true).build()));
 
         // Suppliers
         Supplier sup1 = supplierRepository.findBySupplierCode("SUP-P1")
@@ -239,7 +239,7 @@ public class ProductInventoryPerformanceTest {
         stats.clear();
 
         long startTime = System.currentTimeMillis();
-        PagedResponse<ProductDto> result = productService.getProductsPaginated("", null, PageRequest.of(0, 20));
+        PagedResponse<ProductDto> result = productService.getProductsPaginated("SKU-PERF", null, PageRequest.of(0, 20));
         long latencyMs = System.currentTimeMillis() - startTime;
 
         long queryCount = stats.getPrepareStatementCount();
@@ -274,7 +274,7 @@ public class ProductInventoryPerformanceTest {
         stats.clear();
 
         long startTime = System.currentTimeMillis();
-        Page<StockDto> result = stockService.searchBalances(null, "", PageRequest.of(0, 20));
+        Page<StockDto> result = stockService.searchBalances(null, "SKU-PERF", PageRequest.of(0, 20));
         long latencyMs = System.currentTimeMillis() - startTime;
 
         long queryCount = stats.getPrepareStatementCount();
@@ -306,7 +306,7 @@ public class ProductInventoryPerformanceTest {
     @DisplayName("Verify StockDto cost price security masking")
     @org.springframework.transaction.annotation.Transactional
     public void testStockDtoSecurityMasking() {
-        StockBalance sb = stockBalanceRepository.findAllWithProductAndWarehouse(null).get(0);
+        StockBalance sb = stockBalanceRepository.findAllWithProductAndWarehouse(null).stream().filter(b -> b.getProduct() != null && b.getProduct().getBrand() != null).findFirst().orElseThrow();
 
         // Allowed
         StockDto allowed = StockDto.from(sb, true);

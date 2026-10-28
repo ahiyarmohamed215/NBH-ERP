@@ -12,12 +12,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ProductPricingTest {
     private BigDecimal n(String value) {return new BigDecimal(value);}
-    @Test void automaticPriceTracksCostAndCurrentBrandMarkup() {
-        var brand=Brand.builder().markupPercent(n("25")).build();
-        var product=Product.builder().costPrice(n("100")).brand(brand).build();
+    @Test void automaticPriceTracksCostAndCurrentProductMarkup() {
+        var product=Product.builder().costPrice(n("100")).markupPercent(n("25")).build();
         assertEquals(n("125.00"),product.getSellingPrice());
         product.setUseBrandMarkup(true);product.setSellingPrice(n("120"));
-        brand.setMarkupPercent(n("30"));assertEquals(n("130.00"),product.getSellingPrice());
+        product.setMarkupPercent(n("30"));assertEquals(n("130.00"),product.getSellingPrice());
         product.setCostPrice(n("200"));assertEquals(n("260.00"),product.getSellingPrice());
     }
     @Test void manualPricesIncludingZeroStayManual() {
@@ -28,14 +27,14 @@ class ProductPricingTest {
         assertEquals(n("95"),legacy.getSellingPrice());
     }
     @Test void catalogAndInventoryExposeTheSamePriceWithoutExposingHiddenCost() {
-        var product=Product.builder().id(1L).costPrice(n("12.3456")).brand(Brand.builder().markupPercent(n("12.5")).build()).build();
+        var product=Product.builder().id(1L).costPrice(n("12.3456")).markupPercent(n("12.5")).build();
         var stock=StockBalance.builder().product(product).warehouse(Warehouse.builder().id(1L).build()).quantity(n("2")).reservedQuantity(BigDecimal.ZERO).build();
         assertEquals(n("13.89"),ProductDto.from(product,false).getSellingPrice());
         assertEquals(n("13.89"),StockDto.from(stock,false).getSellingPrice());
         assertNull(ProductDto.from(product,false).getCostPrice());assertNull(StockDto.from(stock,false).getCostPrice());
     }
     @Test void purchasingDocumentsExposeSellingPriceSeparatelyFromPurchaseCost() {
-        var product=Product.builder().id(1L).costPrice(n("100")).brand(Brand.builder().markupPercent(n("25")).build()).build();
+        var product=Product.builder().id(1L).costPrice(n("100")).markupPercent(n("25")).build();
         var warehouse=Warehouse.builder().id(1L).build();
         var supplier=com.nbh.erp.supplier.entity.Supplier.builder().id(1L).name("Supplier").build();
         var returned=org.mockito.Mockito.mock(com.nbh.erp.purchasereturn.entity.PurchaseReturnItem.class);

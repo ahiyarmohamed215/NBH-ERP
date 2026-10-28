@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.cors.allowed-origins=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://erp.example.test")
 class SecurityHardeningTask2Test {
 
     @Autowired
@@ -69,21 +69,21 @@ class SecurityHardeningTask2Test {
         }
 
         @Test
-        @DisplayName("Approved production origin (https://nbh-erp.vercel.app) is accepted")
+        @DisplayName("Explicitly configured production origin is accepted")
         void approvedProdOriginAccepted() throws Exception {
             mvc.perform(options("/api/v1/health/live")
-                            .header(HttpHeaders.ORIGIN, "https://nbh-erp.vercel.app")
+                            .header(HttpHeaders.ORIGIN, "https://erp.example.test")
                             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
                     .andExpect(status().isOk())
-                    .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://nbh-erp.vercel.app"))
+                    .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://erp.example.test"))
                     .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
         }
 
         @Test
-        @DisplayName("Unapproved arbitrary Vercel subdomain is strictly rejected")
-        void unapprovedVercelSubdomainRejected() throws Exception {
+        @DisplayName("Unapproved arbitrary hosted origin is strictly rejected")
+        void unapprovedHostedOriginRejected() throws Exception {
             mvc.perform(options("/api/v1/health/live")
-                            .header(HttpHeaders.ORIGIN, "https://malicious-tenant.vercel.app")
+                            .header(HttpHeaders.ORIGIN, "https://malicious-tenant.example.test")
                             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
                     .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
         }

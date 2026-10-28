@@ -91,7 +91,7 @@ class RoleAccessIntegrationTest {
  }
  @Test void workflowStaffLookupDoesNotGrantEmployeeManagementOrExposeContactDetails() throws Exception {
   String bearer=token(staff("DELIVERY_MANAGE"));
-  mvc.perform(get("/api/v1/users/lookup").header("Authorization","Bearer "+bearer)).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].email").doesNotExist()).andExpect(jsonPath("$.data[0].permissions").doesNotExist());
+  mvc.perform(get("/api/v1/users/lookup").header("Authorization","Bearer "+bearer)).andExpect(status().isOk()).andExpect(jsonPath("$.data[0].roles").isArray()).andExpect(jsonPath("$.data[0].email").doesNotExist()).andExpect(jsonPath("$.data[0].permissions").doesNotExist());
   mvc.perform(get("/api/v1/users").header("Authorization","Bearer "+bearer)).andExpect(status().isForbidden());
  }
  @Test void posStaffMustHaveBillingPermissionInsteadOfOnlyAStaffRoleName(){

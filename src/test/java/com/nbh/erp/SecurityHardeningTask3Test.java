@@ -36,7 +36,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.cors.allowed-origins=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://erp.example.test")
 class SecurityHardeningTask3Test {
 
     @Autowired
@@ -326,10 +326,10 @@ class SecurityHardeningTask3Test {
         }
 
         @Test
-        @DisplayName("Approved production origin (https://nbh-erp.vercel.app) is accepted")
+        @DisplayName("Explicitly configured production origin is accepted")
         void approvedProductionOriginAccepted() throws Exception {
             mvc.perform(post("/api/v1/auth/refresh")
-                            .header(HttpHeaders.ORIGIN, "https://nbh-erp.vercel.app")
+                            .header(HttpHeaders.ORIGIN, "https://erp.example.test")
                             .header("X-Requested-With", "XMLHttpRequest")
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isUnauthorized());

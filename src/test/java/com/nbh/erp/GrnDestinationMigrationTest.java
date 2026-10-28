@@ -14,7 +14,7 @@ class GrnDestinationMigrationTest {
             statement.execute("INSERT INTO brands VALUES (1)");
             statement.execute("INSERT INTO grn_items VALUES (1)");
         }
-        var flyway = Flyway.configure().dataSource(url, "sa", "").baselineOnMigrate(true).baselineVersion("9").load();
+        var flyway = Flyway.configure().dataSource(url, "sa", "").baselineOnMigrate(true).baselineVersion("9").target("10").load();
         assertEquals(1, flyway.migrate().migrationsExecuted);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         try (var connection = DriverManager.getConnection(url, "sa", ""); var statement = connection.createStatement()) {

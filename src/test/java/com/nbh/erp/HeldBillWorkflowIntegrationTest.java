@@ -69,6 +69,139 @@ class HeldBillWorkflowIntegrationTest {
   return new Fixture(customer.getId(),warehouse.getId(),product.getId());
  }
  CreateInvoiceRequest held(Fixture f,int qty){return CreateInvoiceRequest.builder().customerId(f.customer).warehouseId(f.warehouse).invoiceDate(LocalDate.now(businessClock)).hold(true).reserveStock(true).items(List.of(CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(f.product).quantity(BigDecimal.valueOf(qty)).unitPrice(BigDecimal.TEN).build())).build();}
+ @Autowired com.nbh.erp.sales.service.HeldBillBatchService splitBills;
+ private java.util.List<CreateInvoiceRequest.CreateInvoiceItemRequest> splitLines(Fixture f,int count){
+  return java.util.stream.IntStream.range(0,count).mapToObj(i->CreateInvoiceRequest.CreateInvoiceItemRequest.builder()
+   .productId(f.product).warehouseId(f.warehouse).quantity(BigDecimal.ONE).unitPrice(BigDecimal.TEN).build()).toList();
+ }
+ @Test void splitWarehouseBillsReceiveIndependentNumbersAndOriginals(){
+  var a=fixture();var b=fixture();var c=fixture();
+  var request=held(a,1);var lines=new java.util.ArrayList<CreateInvoiceRequest.CreateInvoiceItemRequest>();
+  lines.addAll(splitLines(a,10));lines.addAll(splitLines(b,10));lines.addAll(splitLines(c,5));request.setItems(lines);request.setNotes("Deliver together");
+  var saved=splitBills.save(new com.nbh.erp.sales.service.HeldBillBatchService.SaveRequest(null,request));
+  assertEquals(java.util.List.of(10,10,5),saved.stream().map(bill->bill.getItems().size()).toList());
+  assertEquals(3,saved.stream().map(bill->bill.getHeldNumber()).distinct().count());
+  for(var bill:saved){
+   assertEquals("SENT_TO_WAREHOUSE",bill.getStatus());assertEquals("Deliver together",bill.getNotes());
+   assertTrue(bill.getItems().stream().allMatch(item->item.getWarehouseId().equals(bill.getWarehouseId())));
+   var stored=records.findById(bill.getId()).orElseThrow();assertNotNull(stored.getOriginalHeldSnapshot());
+   assertEquals(bill.getItems().size(),originals.read(stored).getItems().size());
+   assertNotNull(bill.getHeldSavedAt());
+   assertEquals(stored.getOriginalHeldCapturedAt(),bill.getHeldSavedAt());
+   assertEquals(bill.getHeldSavedAt(),originals.read(stored).getHeldSavedAt());
+  }
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(a.warehouse,a.product).getReservedQuantity()));
+  assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(b.warehouse,b.product).getReservedQuantity()));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getStockBalance(c.warehouse,c.product).getReservedQuantity()));
+ }
+  @Test void simultaneousPercentageAndCashDiscountSubtractTogether(){
+  var f=fixture();
+  var req=held(f,2);
+  req.getItems().getFirst().setDiscountRate(new BigDecimal("5.00"));
+  req.getItems().getFirst().setDiscountAmount(new BigDecimal("2.00"));
+  var created=invoices.createInvoice(req);
+  assertEquals(0,new BigDecimal("17.00").compareTo(created.getSubtotal()));
+  assertEquals(0,new BigDecimal("17.00").compareTo(created.getNetTotal()));
+  var item=created.getItems().getFirst();
+  assertEquals(0,new BigDecimal("5.00").compareTo(item.getDiscountRate()));
+  assertEquals(0,new BigDecimal("2.00").compareTo(item.getDiscountAmount()));
+  assertEquals(0,new BigDecimal("17.00").compareTo(item.getTotalPrice()));
+
+  var sent=workflow.send(created.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(created.getRecordVersion(),"held-admin"));
+  var reviewed=workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(
+    sent.getRecordVersion(),"Partial review",List.of(new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(item.getId(),BigDecimal.ONE,null))
+  ));
+  assertEquals(0,new BigDecimal("8.50").compareTo(reviewed.getSubtotal()));
+  assertEquals(0,new BigDecimal("8.50").compareTo(reviewed.getNetTotal()));
+  var reviewedItem=reviewed.getItems().getFirst();
+  assertEquals(0,new BigDecimal("5.00").compareTo(reviewedItem.getDiscountRate()));
+  assertEquals(0,new BigDecimal("1.00").compareTo(reviewedItem.getDiscountAmount()));
+  assertEquals(0,new BigDecimal("8.50").compareTo(reviewedItem.getTotalPrice()));
+ }
+ @Test void discountCannotExceedTwentyPercentLimit() {
+  var f = fixture();
+  var reqRate = held(f, 2);
+  reqRate.getItems().getFirst().setDiscountRate(new BigDecimal("21.00"));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () -> invoices.createInvoice(reqRate));
+
+  var reqValid = held(f, 2);
+  reqValid.getItems().getFirst().setDiscountRate(new BigDecimal("15.00"));
+  reqValid.getItems().getFirst().setDiscountAmount(new BigDecimal("1.00"));
+  var created = invoices.createInvoice(reqValid);
+  assertEquals(0, new BigDecimal("16.00").compareTo(created.getNetTotal()));
+
+  var reqExceed = held(f, 2);
+  reqExceed.getItems().getFirst().setDiscountRate(new BigDecimal("15.00"));
+  reqExceed.getItems().getFirst().setDiscountAmount(new BigDecimal("1.50"));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () -> invoices.createInvoice(reqExceed));
+
+  var reqCashExceed = held(f, 2);
+  reqCashExceed.getItems().getFirst().setDiscountAmount(new BigDecimal("5.00"));
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () -> invoices.createInvoice(reqCashExceed));
+ }
+@Test void splitEighteenProductLimitPreservesMoneyReservationsAndRetry(){
+  var a=fixture();var b=fixture();
+  stock.increaseStock(a.warehouse,a.product,BigDecimal.valueOf(100),BigDecimal.ONE,"GRN","SPLIT","Split test");
+  var request=held(a,1);var lines=new java.util.ArrayList<CreateInvoiceRequest.CreateInvoiceItemRequest>();
+  lines.addAll(splitLines(a,25));lines.addAll(splitLines(b,5));request.setItems(lines);
+  request.setDiscountAmount(new BigDecimal("7.01"));request.setTaxRate(new BigDecimal("7.5"));
+  var servlet=new org.springframework.mock.web.MockHttpServletRequest();servlet.addHeader("Idempotency-Key",java.util.UUID.randomUUID().toString());
+  org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(servlet));
+  java.util.List<com.nbh.erp.sales.dto.InvoiceDto> saved;
+  try{
+   var input=new com.nbh.erp.sales.service.HeldBillBatchService.SaveRequest(null,request);
+   saved=splitBills.save(input);var retry=splitBills.save(input);
+   assertEquals(saved.stream().map(bill->bill.getId()).toList(),retry.stream().map(bill->bill.getId()).toList());
+  }finally{org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();}
+  assertEquals(java.util.List.of(18,7,5),saved.stream().map(bill->bill.getItems().size()).toList());
+  assertEquals(3,saved.stream().map(bill->bill.getHeldNumber()).distinct().count());
+  assertEquals(0,new BigDecimal("7.01").compareTo(saved.stream().map(bill->bill.getDiscountAmount()).reduce(BigDecimal.ZERO,BigDecimal::add)));
+  assertEquals(0,new BigDecimal("314.96").compareTo(saved.stream().map(bill->bill.getNetTotal()).reduce(BigDecimal.ZERO,BigDecimal::add)));
+  assertEquals(0,BigDecimal.valueOf(25).compareTo(stock.getStockBalance(a.warehouse,a.product).getReservedQuantity()));
+  for(var bill:saved)workflow.review(bill.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(bill.getRecordVersion(),"Checked separately",bill.getItems().stream().map(item->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(item.getId(),item.getQuantity(),null)).toList()));
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getStockBalance(a.warehouse,a.product).getReservedQuantity()));
+  assertEquals(0,BigDecimal.valueOf(85).compareTo(stock.getStockBalance(a.warehouse,a.product).getQuantity()));
+  assertEquals(0,BigDecimal.valueOf(5).compareTo(stock.getStockBalance(b.warehouse,b.product).getQuantity()));
+ }
+ @Test void splitSaveRollsBackEveryBillWhenAnyWarehouseIsInvalid(){
+  var a=fixture();var b=fixture();var inactive=warehouses.findById(b.warehouse).orElseThrow();inactive.setIsActive(false);warehouses.saveAndFlush(inactive);
+  var request=held(a,1);request.setItems(java.util.List.of(splitLines(a,1).getFirst(),splitLines(b,1).getFirst()));
+  long before=records.count();
+  assertThrows(com.nbh.erp.common.exception.BusinessException.class,()->splitBills.save(new com.nbh.erp.sales.service.HeldBillBatchService.SaveRequest(null,request)));
+  assertEquals(before,records.count());
+  assertEquals(0,BigDecimal.ZERO.compareTo(stock.getStockBalance(a.warehouse,a.product).getReservedQuantity()));
+ }
+ @Test void warehousePackingPersistsAndSumsAcrossWarehousesAndBillsAndCancellation(){
+  var f=fixture();var second=fixture();var request=held(f,2);
+  request.setItems(List.of(request.getItems().getFirst(),CreateInvoiceRequest.CreateInvoiceItemRequest.builder().productId(second.product).warehouseId(second.warehouse).quantity(BigDecimal.ONE).unitPrice(BigDecimal.TEN).build()));
+  var draft=invoices.createInvoice(request);
+  var sent=workflow.send(draft.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(draft.getRecordVersion(),null));
+  var counts=Map.of(f.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(2,3,1,0),second.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(1,0,2,1));
+  var a=workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Packing checked",sent.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getQuantity(),null)).toList(),counts));
+  assertEquals(new com.nbh.erp.sales.dto.InvoicePacking(3,3,3,1),a.getPacking());
+  var saved=invoices.getInvoiceById(a.getId());assertEquals(counts,saved.getWarehousePacking());assertEquals(a.getPacking(),saved.getPacking());
+  var next=invoices.createInvoice(held(f,1));var nextSent=workflow.send(next.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(next.getRecordVersion(),null));
+  var b=workflow.review(nextSent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(nextSent.getRecordVersion(),"Packing checked",nextSent.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getQuantity(),null)).toList(),Map.of(f.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(4,1,0,2))));
+  var ids=List.of(a.getId(),b.getId());var preview=invoices.previewHeldMerge(ids);
+  assertEquals(new com.nbh.erp.sales.dto.InvoicePacking(7,4,3,3),preview.packing());
+  var merged=invoices.completeHeldInvoices(ids,preview.expectedVersions(),new com.nbh.erp.sales.dto.InvoicePacking(999,999,999,999)).getFirst();
+  assertEquals(preview.packing(),merged.getPacking(),"Merge must use persisted review counts rather than client totals");
+  assertEquals(preview.packing(),invoices.getInvoiceById(merged.getId()).getPacking());
+  invoices.cancelHeldInvoice(a.getId(),"Customer removed first order",records.findById(a.getId()).orElseThrow().getRecordVersion());
+  assertEquals(b.getPacking(),invoices.getInvoiceById(merged.getId()).getPacking());
+  invoices.cancelHeldInvoice(b.getId(),"Customer removed final order",records.findById(b.getId()).orElseThrow().getRecordVersion());
+  assertEquals(new com.nbh.erp.sales.dto.InvoicePacking(0,0,0,0),invoices.getInvoiceById(merged.getId()).getPacking());
+ }
+ @Test void warehouseReviewRejectsInvalidOrMissingWarehouseCountsBeforeChangingStock(){
+  var f=fixture();var draft=invoices.createInvoice(held(f,2));
+  var sent=workflow.send(draft.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.SendRequest(draft.getRecordVersion(),null));
+  var lines=sent.getItems().stream().map(i->new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewLine(i.getId(),i.getQuantity(),null)).toList();
+  for(var counts:List.of(Map.<Long,com.nbh.erp.sales.dto.InvoicePacking>of(),Map.of(f.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(-1,0,0,0)),Map.of(f.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(1000001,0,0,0)),Map.of(f.warehouse,new com.nbh.erp.sales.dto.InvoicePacking(null,0,0,0)))){
+   assertThrows(BusinessException.class,()->workflow.review(sent.getId(),new com.nbh.erp.sales.service.HeldWarehouseWorkflow.ReviewRequest(sent.getRecordVersion(),"Packing checked",lines,counts)));
+   assertEquals("SENT_TO_WAREHOUSE",invoices.getInvoiceById(sent.getId()).getStatus());
+   assertEquals(0,BigDecimal.TEN.compareTo(stock.getStockBalance(f.warehouse,f.product).getQuantity()));
+  }
+ }
  @Test @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
  void submittedAndCancelledBillsRefreshRangeSummaryAfterCommit(){
   String owner="print-events-"+UUID.randomUUID().toString().substring(0,8);principal(owner,true);
