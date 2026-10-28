@@ -23,6 +23,8 @@ import { useDataSync } from '../hooks/useDataSync';
 import '../components/PurchasingAppearance.css';
 
 const labels = {
+  VEHICLE: 'Vehicle',
+  DELIVERY_ROUTE: 'Delivery route',
   PRODUCT: 'Product',
   SUPPLIER: 'Supplier',
   BRAND: 'Brand',
@@ -34,6 +36,8 @@ const labels = {
 };
 
 const entityIcons = {
+  VEHICLE: Truck,
+  DELIVERY_ROUTE: Truck,
   PRODUCT: Package,
   SUPPLIER: Truck,
   BRAND: Tag,

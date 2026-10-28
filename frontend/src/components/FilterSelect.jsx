@@ -45,7 +45,7 @@ export default function FilterSelect({value,onChange,children,selectedLabel,styl
       onClick={toggle} onFocus={onFocus} onBlur={onBlur} onKeyDown={event=>{if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();if(!open)toggle();}}}>
       <span className="modern-filter-value">{selectedLabel ?? (selected?.label || (variant==='field' ? 'Select an option' : 'Select filter'))}</span><ChevronDown size={14}/>
     </button>
-    {variant==='field' && <select className="modern-select-native erp-field" aria-hidden="true" tabIndex={-1} value={value} onChange={onChange} required={required} disabled={disabled} name={fieldName} onInvalid={event=>{event.preventDefault();trigger.current?.focus();if(!open)toggle();}}>{children}</select>}
+    {variant==='field' && <select className="modern-select-native erp-field" aria-label={ariaLabel || name} aria-hidden="true" tabIndex={-1} value={value} onChange={onChange} required={required} disabled={disabled} name={fieldName} onInvalid={event=>{event.preventDefault();trigger.current?.focus();if(!open)toggle();}}>{children}</select>}
     {open && createPortal(<div ref={popup} className="modern-filter-popup purchasing-no-shadows" style={position} onKeyDown={keydown}>
       {searchable && options.length>=8 && <div className="modern-filter-search"><Search size={14}/><input className="erp-field" ref={search} type="text" aria-label={`Search ${name} options`} placeholder="Search options..." value={query} onChange={event=>{setQuery(event.target.value);setActive(0);}}/></div>}
       <div ref={list} id={id} role="listbox" tabIndex={-1} aria-label={`${name} options`} aria-activedescendant={matches[active] ? `${id}-${active}` : undefined} className="modern-filter-options">

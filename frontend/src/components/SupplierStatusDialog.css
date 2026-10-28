@@ -1,5 +1,9 @@
 .supplier-status-dialog{--status-tone:#e11d48;--status-pale:#fff1f2;--status-border:#fecdd3;--status-text:#be123c;width:min(560px,calc(100vw - 24px));max-width:560px;max-height:calc(100dvh - 24px);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;padding:0;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
-.supplier-status-activate{--status-tone:#16a34a;--status-pale:#f0fdf4;--status-border:#bbf7d0;--status-text:#15803d}
+.supplier-status-activate,.supplier-status-available{--status-tone:#16a34a;--status-pale:#f0fdf4;--status-border:#bbf7d0;--status-text:#15803d}
+.supplier-status-service{--status-tone:#2563eb;--status-pale:#eff6ff;--status-border:#bfdbfe;--status-text:#1d4ed8}
+.supplier-status-garage{--status-tone:#e11d48;--status-pale:#fff1f2;--status-border:#fecdd3;--status-text:#be123c}
+.supplier-status-draft{--status-tone:#64748b;--status-pale:#f8fafc;--status-border:#cbd5e1;--status-text:#475569}
+.supplier-status-reschedule{--status-tone:#d97706;--status-pale:#fef3c7;--status-border:#fde68a;--status-text:#92400e}
 .purchasing-status-neutral{--status-tone:var(--erp-accent);--status-pale:#eff6ff;--status-border:#bfdbfe;--status-text:var(--erp-accent-hover)}
 .supplier-status-dialog header{display:grid;grid-template-columns:34px minmax(0,1fr) 28px;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0}
 .purchasing-status-symbol{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:7px;background:var(--status-pale);color:var(--status-tone)}

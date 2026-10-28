@@ -1,3 +1,21 @@
+.pos-bill-remarks-backdrop{padding:12px;z-index:1400;}
+.pos-bill-remarks{width:min(560px,100%);max-height:calc(100dvh - 24px);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;padding:0;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:var(--erp-text);}
+.pos-bill-remarks header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0;}
+.pos-bill-remarks header>div{min-width:0;overflow-wrap:anywhere;}
+.pos-bill-remarks h2{margin:0 0 6px;}
+.pos-bill-remarks header p{margin:0;color:#475569;font-size:var(--erp-text-small);}
+.pos-bill-remarks header>button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;flex-shrink:0;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#64748b;cursor:pointer;}
+.pos-bill-remarks header>button:hover:not(:disabled){background:#f8fafc;color:#334155;}
+.pos-bill-remarks-body{padding:18px 20px;overflow:auto;min-height:0;font-size:var(--erp-text-body);}
+.pos-bill-remarks-body>p:first-child{margin:0 0 16px;line-height:1.5;color:#475569;}
 .pos-bill-remarks label{display:block;margin-bottom:6px;font-size:var(--erp-text-field);font-weight:600;color:var(--erp-text);}
-.pos-bill-remarks textarea.erp-field{width:100%;height:auto;min-height:110px;resize:vertical;padding:10px 12px;box-sizing:border-box;font:inherit;color:var(--erp-text);}
+.pos-bill-remarks textarea.erp-field{width:100%;height:auto;min-height:110px;resize:vertical;padding:10px 12px;box-sizing:border-box;font:inherit;color:var(--erp-text);border:1px solid #cbd5e1;border-radius:6px;background:#fff;line-height:1.5;}
+.pos-bill-remarks textarea.erp-field:focus{border-color:#93c5fd;background:#f8fbff;outline:2px solid #93c5fd;outline-offset:2px;}
 .pos-bill-remarks-count{display:block;margin-top:6px;text-align:right;color:var(--erp-muted);font-size:var(--erp-text-small);}
+.pos-bill-remarks footer{padding:13px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;flex-shrink:0;background:#fafcff;}
+.pos-bill-remarks footer .btn-glass{background:#fff;border:1px solid #cbd5e1;color:#475569;}
+.pos-bill-remarks footer .btn-glass:hover:not(:disabled){background:#f8fafc;border-color:#94a3b8;color:#334155;}
+.pos-bill-remarks button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
+.pos-bill-remarks button:disabled{opacity:.55;cursor:not-allowed;}
+.pos-bill-remarks-error{color:#b91c1c;font-size:var(--erp-text-small);}
+@media(max-width:400px){.pos-bill-remarks header,.pos-bill-remarks-body{padding:14px;}.pos-bill-remarks footer{padding:12px 14px;}.pos-bill-remarks footer button{flex:1;}}

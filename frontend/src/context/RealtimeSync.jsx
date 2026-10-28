@@ -22,7 +22,7 @@ export function invalidateRealtime(topics, eventData = {}) {
   if (!accepted) {
     clearApiCache();
   } else {
-    if (accepted.includes('inventory')) {
+    if (accepted.includes('inventory') || accepted.includes('sales')) {
       clearApiCache('/inventory');
       clearApiCache('/products');
     }

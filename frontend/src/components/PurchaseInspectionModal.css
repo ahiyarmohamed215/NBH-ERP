@@ -360,8 +360,8 @@
 .purchase-inspection .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
 .purchase-inspection .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:1 / -1}
 .purchase-inspection .purchase-inspection-details-card dt svg{color:#0284c7}
-.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success):not(.purchase-inspection-warning){color:var(--erp-accent);border-color:#bfdbfe;background:#fff}
-.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success):not(.purchase-inspection-warning):hover{background:#eff6ff;border-color:#93c5fd}
+.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success):not(.purchase-inspection-warning):not(.purchase-inspection-service){color:var(--erp-accent);border-color:#bfdbfe;background:#fff}
+.purchase-inspection .purchase-inspection-detail-actions .btn:not(.purchase-inspection-danger):not(.purchase-inspection-success):not(.purchase-inspection-warning):not(.purchase-inspection-service):hover{background:#eff6ff;border-color:#93c5fd}
 .purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-danger:hover{color:#e11d48;background:#ffe4e6;border-color:#fda4af}
 
 .purchase-inspection-split.purchase-inspection-bottom-actions .purchase-inspection-body{grid-template-columns:minmax(230px,1fr) minmax(0,3fr);grid-template-rows:minmax(0,1fr) auto}
@@ -409,20 +409,22 @@
 
 .purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-success{color:#15803d;border-color:#86efac;background:#dcfce7}
 .purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-success:hover{color:#166534;border-color:#4ade80;background:#bbf7d0}
+.purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-service{color:#1d4ed8;border-color:#bfdbfe;background:#eff6ff}
+.purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-service:hover{color:#1e40af;border-color:#93c5fd;background:#dbeafe}
 
-.grn-inspection .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
-.grn-inspection .purchase-inspection-detail-actions .btn{flex-shrink:0}
-@media(max-width:600px){.grn-inspection .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}}
+:is(.grn-inspection,.route-inspection) .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
+:is(.grn-inspection,.route-inspection) .purchase-inspection-detail-actions .btn{flex-shrink:0}
+@media(max-width:600px){:is(.grn-inspection,.route-inspection) .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}}
 
-:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-details-card{height:128px;padding:14px 18px;gap:16px}
-:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(var(--purchase-detail-columns,3),minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px 16px;max-height:100px;overflow:auto}
-:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:auto}
-:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
-:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-detail-actions .btn{flex-shrink:0}
+:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-details-card{min-height:96px;height:auto;max-height:140px;padding:14px 18px;gap:16px}
+:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{grid-template-columns:repeat(var(--purchase-detail-columns,3),minmax(0,1fr));gap:10px 16px;max-height:100px;overflow:auto}
+:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-details-card .purchase-inspection-detail-wide{grid-column:auto}
+:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-detail-actions{max-width:none;flex-wrap:nowrap;white-space:nowrap}
+:is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-detail-actions .btn{flex-shrink:0}
 @media(max-width:1000px){
- :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-details-card{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:128px;padding:12px 14px;gap:10px}
- :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{max-height:62px;gap:8px 14px}
- :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection) .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}
+ :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-details-card{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:auto;min-height:96px;padding:12px 14px;gap:10px}
+ :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-header-details .purchase-inspection-details-card .purchase-inspection-details{max-height:none;gap:8px 14px}
+ :is(.gtn-inspection,.prn-inspection,.po-inspection,.allocation-inspection,.adjustment-inspection,.route-inspection) .purchase-inspection-detail-actions{max-width:100%;min-width:0;overflow-x:auto;justify-content:flex-start}
 }
 
 .purchase-inspection .purchase-inspection-detail-actions .purchase-inspection-warning{color:#92400e;border-color:#fcd34d;background:#fffbeb}

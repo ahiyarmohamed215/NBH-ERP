@@ -43,7 +43,7 @@ export function importGrnRows(rows,products,suppliers) {
       const quantityError=numberError(qty,'Received quantity',{positive:true});if(quantityError)throw new Error(quantityError);
       const unitCost=cost===''?Number(product.costPrice || 0):Number(cost);
       const costError=numberError(cost===''?unitCost:cost,'Unit cost');if(costError)throw new Error(costError);
-      let markupPercent=mp===''?Number(product.brandMarkupPercent || 0):Number(mp);
+      let markupPercent=mp===''?Number(product.markupPercent ?? product.brandMarkupPercent ?? 0):Number(mp);
       if(!Number.isFinite(markupPercent) || markupPercent < -100 || markupPercent > 99999 || (mp && !/^-?\d+(\.\d{1,2})?$/.test(mp)))throw new Error('Enter a valid MP% with up to 2 decimal places, between -100 and 99999.');
       const salePrice=selling===''?Number((unitCost*(1+markupPercent/100)).toFixed(2)):Number(selling);
       const saleError=numberError(selling===''?salePrice:selling,'Selling price');if(saleError)throw new Error(saleError);
@@ -73,7 +73,7 @@ export async function createGrnTemplate(products,{supplier='',remarks=''}={}) {
   sheet.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};sheet.getRow(1).height=24;
   sheet.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF2563EB'}};
   [30,32,22,18,18,12,18,42].forEach((width,index)=>sheet.getColumn(index+1).width=width);
-  for(const product of products)sheet.addRow([supplier,product.name,product.sku,null,Number(product.costPrice || 0),Number(product.brandMarkupPercent || 0),null,remarks]);
+  for(const product of products)sheet.addRow([supplier,product.name,product.sku,null,Number(product.costPrice || 0),Number(product.markupPercent ?? product.brandMarkupPercent ?? 0),null,remarks]);
   sheet.autoFilter='A1:H1';sheet.getColumn(3).numFmt='@';
   for(const column of [4,5,6,7])sheet.getColumn(column).numFmt='0.00';
   return book.xlsx.writeBuffer();

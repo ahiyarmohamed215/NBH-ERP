@@ -4,9 +4,13 @@
 .erp-status-pending { background:#fef3c7; color:#a16207; }
 .erp-status-inactive { background:#fff1f2; color:#be123c; }
 .erp-status-neutral { background:#f1f5f9; color:#64748b; }
+.erp-status-service { background:#dbeafe; color:#1d4ed8; }
 button.erp-status-badge { cursor:pointer; }
 button.erp-status-badge:hover { filter:brightness(.97); }
 button.erp-status-badge:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
 button.erp-status-badge:disabled { cursor:default; opacity:.6; }
 
-.erp-status-badge[data-status="PENDING"] { background:#dbeafe; color:#1d4ed8; }
+.erp-status-badge[data-status="PENDING"],
+.erp-status-badge[data-status="IN_SERVICE"] { background:#dbeafe; color:#1d4ed8; }
+.erp-status-badge[data-status="IN_GARAGE"],
+.erp-status-garage { background:#fff1f2; color:#e11d48; }

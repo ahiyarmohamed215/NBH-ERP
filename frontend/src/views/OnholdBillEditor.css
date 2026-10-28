@@ -20,4 +20,16 @@
 .onhold-editor-actions{display:flex;align-items:center;gap:10px;margin-left:auto;}
 .onhold-editor-filters .onhold-editor-reset{height:38px;padding:0 12px;border:1px solid var(--erp-border);background:#f1f5f9;color:var(--erp-muted);gap:4px;}
 .onhold-editor .held-error{margin:0;font-size:var(--erp-text-body);color:#b91c1c;}
+.onhold-review-packing{flex-shrink:0;padding:16px;border:1px solid var(--erp-border);border-radius:8px;background:#fff;}
+.onhold-review-packing h2{margin:0 0 6px;font-size:var(--erp-text-section);color:var(--erp-text);}
+.onhold-review-packing>p{margin:0 0 14px;font-size:var(--erp-text-small);line-height:1.5;color:#475569;}
+.onhold-review-packing fieldset{margin:0;padding:12px 0;border:0;border-bottom:1px solid var(--erp-border);min-width:0;}
+.onhold-review-packing legend{padding:0;font-size:var(--erp-text-body);font-weight:600;color:var(--erp-text);}
+.onhold-review-packing-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.onhold-review-packing-fields label{display:flex;flex-direction:column;gap:6px;font-size:var(--erp-text-small);color:#475569;}
+.onhold-review-packing-fields input{width:100%;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;background:#fff;color:var(--erp-text);font-variant-numeric:tabular-nums;}
+.onhold-review-packing-fields input:focus{outline:2px solid #93c5fd;outline-offset:2px;border-color:#93c5fd;}
+.onhold-review-packing-fields input[aria-invalid=true]{border-color:#b91c1c;}
+.onhold-review-packing .onhold-review-packing-total{margin:14px 0 0;font-weight:600;}
+@media(max-width:500px){.onhold-review-packing-fields{grid-template-columns:repeat(2,minmax(0,1fr));}.onhold-review-packing{padding:12px;}}
 @media(max-width:700px){.onhold-editor .erp-page-header{align-items:flex-start;}.onhold-editor-toolbar>.erp-search-group{min-width:0 !important;flex-basis:100%;}.onhold-editor .onhold-editor-footer{position:sticky;bottom:0;background:var(--erp-canvas);padding:12px 0;}.onhold-editor-actions{flex-wrap:wrap;}.onhold-editor .erp-table-frame.onhold-editor-lines{flex-basis:300px;}}

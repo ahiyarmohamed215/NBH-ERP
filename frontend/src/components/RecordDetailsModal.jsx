@@ -24,7 +24,7 @@ export default function RecordDetailsModal({label,title,subtitle,status,badge,de
    <header className="purchase-inspection-header"><div className="purchase-inspection-title"><div className="master-details-heading"><h2 className="erp-dialog-title">{title}</h2>{badge || (status && <StatusBadge status={status}/>)}</div><div className="master-details-meta"><span>{subtitle}</span></div></div><button data-close type="button" className="master-details-close" aria-label={`Close ${label.toLowerCase()}`} onClick={onClose}><X size={18}/></button></header>
    <div className="master-details-body"><dl className="purchase-inspection-details master-details-grid">{details.map(([name,value,wide])=><div key={name} className={wide?'master-details-wide':undefined}><dt>{name}</dt><dd>{value==null || value===''?'—':value}</dd></div>)}</dl>{children}</div>
    {actions}
-   <footer className="master-details-footer">{onPrint && (allowDraftPrint || status!=='DRAFT') && <button type="button" className="btn btn-glass erp-button" title={printTitle} onClick={onPrint}><Printer size={14}/> Print</button>}<button type="button" className="btn btn-glass erp-button" onClick={onClose}>Close</button></footer>
+   <footer className="master-details-footer">{onPrint && (allowDraftPrint || status!=='DRAFT') && <button type="button" className="btn btn-primary erp-button erp-button-primary master-details-print-btn" title={printTitle} onClick={onPrint}><Printer size={14}/> Print</button>}<button type="button" className="btn btn-glass erp-button" onClick={onClose}>Close</button></footer>
   </section>
  </div>;
 }

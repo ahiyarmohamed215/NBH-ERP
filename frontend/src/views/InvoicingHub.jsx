@@ -1,3 +1,4 @@
+import { executeA4Print } from '../utils/customerPrintTemplates.js';
 import {canWriteTab,hasPermission} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
@@ -19,12 +20,12 @@ import PosView from './PosView';
 import OnholdBillEditor from './OnholdBillEditor';
 import HeldBillDetails from '../components/HeldBillDetails';
 import OnholdBillsTable from '../components/OnholdBillsTable';
-import HeldBillPrintDialog from '../components/HeldBillPrintDialog';
 import HeldInvoiceDialog from '../components/HeldInvoiceDialog';
 import MergedHeldBills from '../components/MergedHeldBills';
 import {usePurchasingStatusChange} from '../hooks/usePurchasingStatusChange';
 import {printHeldWarehouseSheets} from '../utils/heldWarehousePrint';
 import SalesReturnsView from './SalesReturnsView';
+import QuotationView from './QuotationView';
 import { canEditModule } from '../utils/permissionUtils';
 import {
   FileText,
@@ -179,9 +180,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
   useDataSync(loadBackendInvoices, ['erp:data_changed', 'erp:sales_updated']);
 
-  // Quotations filtering & export
-  const [quotationSearchQuery, setQuotationSearchQuery] = useState('');
-  const [quotationStatusFilter, setQuotationStatusFilter] = useState('ALL');
+  const quotationRef = useRef(null);
 
   // Payments filtering & export
   const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
@@ -387,10 +386,14 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       )
       .join('');
 
+    const isHeld = !inv.invoiceNumber || inv.status === 'YET_TO_PRINT' || inv.status === 'SENT_TO_WAREHOUSE' || inv.status === 'HELD';
+    const displayStatus = inv.status === 'YET_TO_PRINT' ? 'SENT TO WAREHOUSE' : (inv.status || (isHeld ? 'SENT TO WAREHOUSE' : 'PAID')).replace(/_/g, ' ');
+    const isWarehouseStatus = displayStatus === 'SENT TO WAREHOUSE';
+
     const statusColor =
-      inv.status === 'PAID' ? '#16a34a' : inv.status === 'PARTIAL' ? '#d97706' : '#dc2626';
+      inv.status === 'PAID' ? '#16a34a' : isWarehouseStatus ? '#0369a1' : inv.status === 'PARTIAL' ? '#d97706' : '#dc2626';
     const statusBg =
-      inv.status === 'PAID' ? '#dcfce7' : inv.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2';
+      inv.status === 'PAID' ? '#dcfce7' : isWarehouseStatus ? '#e0f2fe' : inv.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2';
 
     return `
       <!DOCTYPE html>
@@ -549,32 +552,39 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
           <div class="invoice-box">
             <div class="header">
               <div>
-                <div class="company-name">NBH AUTOMOTIVE & HARDWARE (PVT) LTD</div>
+                <div class="company-name">NBH ENTERPRISE</div>
+                ${isHeld ? `<div class="company-sub">WAREHOUSE OPERATIONS · DISPATCH VERIFICATION</div>` : `
                 <div class="company-sub">No. 45/A, Negombo Road, Colombo, Sri Lanka</div>
                 <div class="company-sub">Tel: +94 11 234 5678 | Email: sales@nbhhardware.lk</div>
-                <div class="company-sub">VAT Reg No: 10482910-7000</div>
+                <div class="company-sub">VAT Reg No: 10482910-7000</div>`}
               </div>
               <div style="text-align: right;">
-                <div class="invoice-title">COMMERCIAL INVOICE</div>
-                <div><span class="status-badge">${inv.status || 'PAID'}</span></div>
+                <div class="invoice-title">${isHeld ? 'ONHOLD BILL' : 'COMMERCIAL INVOICE'}</div>
+                <div><span class="status-badge">${displayStatus}</span></div>
               </div>
             </div>
 
             <div class="meta-grid">
               <div class="meta-col">
-                <div class="meta-label">Billed To:</div>
+                <div class="meta-label">${isHeld ? 'Customer:' : 'Billed To:'}</div>
                 <div class="customer-title">${inv.customerName || 'Walk-in Customer'}</div>
                 <div style="color: #475569;">Payment Type: <strong>${inv.paymentType || 'Full Payment'}</strong></div>
                 <div style="color: #475569; margin-top: 2px;">Payment Method: <strong>${inv.paymentMethod || 'Cash'}</strong></div>
               </div>
               <div class="meta-col" style="text-align: right;">
-                <div class="meta-label">Invoice Details:</div>
-                <div style="font-weight: 800; font-size: 16px; color: #0284c7; font-family: monospace; margin: 3px 0 6px 0;">${inv.invoiceNumber}</div>
+                <div class="meta-label">${isHeld ? 'Bill Reference:' : 'Invoice Details:'}</div>
+                <div style="font-weight: 800; font-size: 16px; color: #0284c7; font-family: monospace; margin: 3px 0 6px 0;">${inv.invoiceNumber || inv.heldNumber || inv.id}</div>
                 <div style="color: #475569;">Date: <strong>${inv.displayDate || inv.invoiceDate || new Date().toLocaleDateString()}</strong></div>
                 <div style="color: #475569; margin-top: 2px;">Salesman: <strong>${inv.salesman || 'Sales Executive'}</strong></div>
                 ${inv.odnNumber ? `<div style="color: #475569; margin-top: 2px;">ODN Ref: <strong>${inv.odnNumber}</strong></div>` : ''}
               </div>
             </div>
+
+            ${(isHeld || inv.notes) ? `
+            <div style="background:#f0f9ff;border:1px solid #0284c7;border-radius:6px;padding:9px 14px;margin-bottom:18px;font-size:12px;">
+              <strong style="color:#0369a1;text-transform:uppercase;letter-spacing:0.5px;">Common Remarks:</strong>
+              <span style="color:#0f172a;margin-left:6px;">${inv.notes || 'Standard warehouse dispatch & inventory verification'}</span>
+            </div>` : ''}
 
             <table class="items-table">
               <thead>
@@ -592,6 +602,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               </tbody>
             </table>
 
+            ${inv.packing ? `<p style="padding:12px 0;border-top:1px solid #cbd5e1;font-size:12px;"><strong>Packing:</strong> Box ${Number(inv.packing.boxes) || 0} · Bag ${Number(inv.packing.bags) || 0} · P. Bag ${Number(inv.packing.pBags) || 0} · Others ${Number(inv.packing.others) || 0}</p>` : ''}
             <div class="totals-container">
               <div class="notes-box">
                 <strong style="color: #0f172a;">Customer Terms & Conditions:</strong><br>
@@ -628,11 +639,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
               <div class="sig-block">Customer Acceptance</div>
             </div>
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+
         </body>
       </html>
     `;
@@ -642,13 +649,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     if (inv?.id && !inv.id.startsWith('inv-')) {
       pdfApi.printInvoice(inv.id);
     } else {
-      const printableWindow = window.open('', '_blank');
-      if (printableWindow) {
-        printableWindow.document.write(generateInvoicePrintHtml(inv));
-        printableWindow.document.close();
-      } else {
-        window.print();
-      }
+      executeA4Print(generateInvoicePrintHtml(inv), inv.invoiceNumber || 'Invoice');
     }
   };
 
@@ -657,13 +658,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       pdfApi.downloadInvoice(inv.id, inv.invoiceNumber);
       addToast(`Downloading PDF for Invoice ${inv.invoiceNumber}...`, 'success');
     } else {
-      const printableWindow = window.open('', '_blank');
-      if (printableWindow) {
-        printableWindow.document.write(generateInvoicePrintHtml(inv));
-        printableWindow.document.close();
-      } else {
-        window.print();
-      }
+      executeA4Print(generateInvoicePrintHtml(inv), inv.invoiceNumber || 'Invoice');
       addToast(`Printable document opened for ${inv.invoiceNumber}`, 'success');
     }
   };
@@ -692,15 +687,6 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   const [dispatchNoteData, setDispatchNoteData] = useState(null);
   const [heldMergeError,setHeldMergeError]=useState('');
 
-  // Modal states for creating / recording items
-  const [showCreateQuotationModal, setShowCreateQuotationModal] = useState(false);
-  const [quotationForm, setQuotationForm] = useState({
-    customerName: '',
-    quotationDate: formatBusinessDate(),
-    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    totalAmount: '',
-    notes: '',
-  });
 
   const loadHeldBills = async () => {
     const request=++heldRequest.current,scope=heldScope.current;
@@ -728,11 +714,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
     ['erp:sales_updated'], [], ['sales']);
 
 
-  useEffect(()=>{
-    if(!['hold-bills','held-history'].includes(currentTab) || !heldBills.some(b=>b.status==='YET_TO_PRINT'))return;
-    const timer=setInterval(loadHeldBills,5000);return()=>clearInterval(timer);
-  },[currentTab,heldBills,heldOwnerScope,heldSearchQuery]);
-
+  
   // Workflow Action 1: Send bill to warehouse
   const handleSendToWarehouse = async (heldBill) => {
     try { await salesApi.sendHeld(heldBill.id, { expectedVersion:heldBill.recordVersion }); await loadHeldBills();
@@ -749,7 +731,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   };
   const handlePrintOnhold = async bill => {
     if(printingOnholdId)return;
-    if(bill.status==='YET_TO_PRINT'){setPendingHeldPrint(bill);return;}setPrintingOnholdId(bill.id);
+    setPrintingOnholdId(bill.id);
     try{
       printHeldWarehouseSheets(bill);
       try{await salesApi.printHeld(bill.id);}catch(_){}
@@ -800,7 +782,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         const num = (b.heldNumber || '').toLowerCase();
         const cust = (b.customerName || '').toLowerCase();
         const salesman = (b.salesman || b.salesmanName || b.createdBy || '').toLowerCase();
-        const wh = (b.warehouseCode || '').toLowerCase();
+        const wh = (b.warehouseName || b.warehouseCode || '').toLowerCase();
         if (!num.includes(q) && !cust.includes(q) && !salesman.includes(q) && !wh.includes(q)) {
           return false;
         }
@@ -819,7 +801,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       `"${b.heldNumber || ''}"`,
       `"${b.customerName || 'Walk-in'}"`,
       `"${b.invoiceDate ? new Date(b.invoiceDate).toLocaleString() : ''}"`,
-      `"${b.warehouseCode || ''}"`,
+      `"${b.warehouseName || b.warehouseCode || ''}"`,
       b.items?.length || 1,
       `"${b.createdBy || ''}"`,
       `"${b.status || 'HELD'}"`,
@@ -838,141 +820,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
   // -------------------------------------------------------------
   // OTHER TABS DATA (Quotations, Payments, Advances, Outstanding)
   // -------------------------------------------------------------
-  // -------------------------------------------------------------
-  // OTHER TABS DATA (Quotations)
-  // -------------------------------------------------------------
-  const [quotations, setQuotations] = useState([]);
-  const [loadingQuotations, setLoadingQuotations] = useState(false);
 
-  const loadBackendQuotations = async () => {
-    try {
-      setLoadingQuotations(true);
-      const res = await quotationApi.search({ size: 100 });
-      const liveList = res.data?.content || res.data || [];
-      const formatted = liveList.map((q) => ({
-        id: q.id,
-        quotationNo: q.quotationNumber || q.quotationNo,
-        quotationNumber: q.quotationNumber,
-        customerName: q.customerName || 'Customer',
-        customerId: q.customerId,
-        date: q.quotationDate || q.date,
-        validUntil: q.validUntil,
-        totalAmount: Number(q.totalAmount || 0),
-        status: q.status || 'PENDING',
-        notes: q.notes,
-        items: q.items || [],
-      }));
-      setQuotations(formatted);
-    } catch (err) {
-      console.error('Failed to load quotations:', err);
-    } finally {
-      setLoadingQuotations(false);
-    }
-  };
-
-  useEffect(() => {
-    if (currentTab === 'quotations') loadBackendQuotations();
-  }, [currentTab]);
-  useDataSync(() => currentTab === 'quotations' ? loadBackendQuotations() : undefined,
-    ['erp:sales_updated'], [], ['quotations']);
-
-  const resolveCustomerId = async (name) => {
-    const res = await customerApi.search(name);
-    const matches = (res.data || []).filter(c => c.name.toLowerCase() === name.trim().toLowerCase());
-    if(matches.length !== 1) throw new Error('Enter one exact, unique customer name');
-    return matches[0].id;
-  };
-
-  const handleSaveQuotation = async (e) => {
-    e.preventDefault();
-    if (!quotationForm.customerName || !quotationForm.totalAmount) {
-      addToast('Please provide customer name and quotation amount', 'error');
-      return;
-    }
-    const amt = parseFloat(quotationForm.totalAmount) || 0;
-    try {
-      const payload = {
-        customerName: quotationForm.customerName,
-        quotationDate: quotationForm.quotationDate || formatBusinessDate(),
-        validUntil: quotationForm.validUntil || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        totalAmount: amt,
-        notes: quotationForm.notes || '',
-      };
-      const res = await quotationApi.create(payload);
-      const created = res.data?.data || res.data;
-      addToast(`Quotation ${created?.quotationNumber || created?.quotationNo || 'created'} successfully!`, 'success');
-      setShowCreateQuotationModal(false);
-      setQuotationForm({
-        customerName: '',
-        quotationDate: formatBusinessDate(),
-        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        totalAmount: '',
-        notes: '',
-      });
-      await loadBackendQuotations();
-    } catch (err) {
-      console.error('Failed to create quotation:', err);
-      addToast(err.response?.data?.message || 'Failed to create quotation', 'error');
-    }
-  };
-
-  const handleConvertQuotationToInvoice = async (qt) => {
-    try {
-      const res = await quotationApi.convertToInvoice(qt.id);
-      const inv = res.data?.data || res.data;
-      addToast(`Quotation ${qt.quotationNo || qt.quotationNumber} converted to Commercial Invoice ${inv?.invoiceNumber}!`, 'success');
-      await Promise.all([loadBackendQuotations(), loadBackendInvoices()]);
-    } catch (err) {
-      console.error('Failed to convert quotation to invoice:', err);
-      addToast(err.response?.data?.message || 'Failed to convert quotation', 'error');
-    }
-  };
-
-  const handleDeleteQuotation = async (qt) => {
-    if (!window.confirm(`Are you sure you want to delete quotation ${qt.quotationNo || qt.quotationNumber}?`)) return;
-    try {
-      await quotationApi.delete(qt.id);
-      addToast(`Quotation ${qt.quotationNo || qt.quotationNumber} deleted successfully`, 'success');
-      await loadBackendQuotations();
-    } catch (err) {
-      console.error('Failed to delete quotation:', err);
-      addToast(err.response?.data?.message || 'Failed to delete quotation', 'error');
-    }
-  };
-
-  const filteredQuotations = useMemo(() => {
-    return quotations.filter((q) => {
-      if (quotationStatusFilter !== 'ALL' && q.status !== quotationStatusFilter) return false;
-      if (quotationSearchQuery.trim()) {
-        const query = quotationSearchQuery.toLowerCase();
-        return (
-          (q.quotationNo || '').toLowerCase().includes(query) ||
-          (q.customerName || '').toLowerCase().includes(query)
-        );
-      }
-      return true;
-    });
-  }, [quotations, quotationSearchQuery, quotationStatusFilter]);
-
-  const handleExportQuotationsCSV = () => {
-    const headers = ['Quotation #', 'Customer', 'Date', 'Valid Until', 'Total Amount', 'Status'];
-    const rows = filteredQuotations.map((q) => [
-      `"${q.quotationNo || ''}"`,
-      `"${q.customerName || ''}"`,
-      `"${q.date || ''}"`,
-      `"${q.validUntil || ''}"`,
-      q.totalAmount,
-      `"${q.status || ''}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const link = document.createElement('a');
-    link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', `Quotations_Export_${formatBusinessDate()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Quotations exported to CSV', 'success');
-  };
 
 
 
@@ -1033,7 +881,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
         {currentTab === 'quotations' ? (
           <button disabled={!canWriteTab(user,'invoicing',currentTab)} className="erp-button erp-button-primary"
             type="button"
-            onClick={() => setShowCreateQuotationModal(true)}
+            onClick={() => quotationRef.current?.openCreate?.()}
             style={{
               padding: '9px 18px',
               display: 'inline-flex',
@@ -1615,255 +1463,12 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* TAB 7: QUOTATIONS (Draft Quotations & Proposals) */}
       {/* ------------------------------------------------------------- */}
       {currentTab === 'quotations' && (
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-          {/* Toolbar Card */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0',
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              flexWrap: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {/* Left Control: Search Input */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
-              <Search
-                size={17}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '11px',
-                  color: '#94a3b8',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input className="erp-field"
-                type="text"
-                placeholder="Search quotations by quotation # or customer name..."
-                value={quotationSearchQuery}
-                onChange={(e) => setQuotationSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  height: '38px',
-                  padding: '0 32px 0 38px',
-                  border: '1px solid #cbd5e1',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
-                }}
-              />
-              {quotationSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setQuotationSearchQuery('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    padding: '2px',
-                  }}
-                  title="Clear search text"
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </div>
-
-            {/* Right Controls: Status filter, Reset, Export CSV */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'nowrap' }}>
-              <select className="erp-field"
-                value={quotationStatusFilter}
-                onChange={(e) => setQuotationStatusFilter(e.target.value)}
-                style={{
-                  height: '38px',
-                  padding: '0 26px 0 10px',
-                  border: '1px solid #cbd5e1',
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="ACCEPTED">Accepted</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
-
-              {(quotationSearchQuery || quotationStatusFilter !== 'ALL') && (
-                <button className="erp-button"
-                  type="button"
-                  onClick={() => {
-                    setQuotationSearchQuery('');
-                    setQuotationStatusFilter('ALL');
-                  }}
-                  style={{
-                    height: '38px',
-                    padding: '0 12px',
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#f1f5f9',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                  title="Reset filters"
-                >
-                  <X size={13} /> Reset
-                </button>
-              )}
-
-              {/* Export CSV */}
-              <button
-                type="button"
-                onClick={handleExportQuotationsCSV}
-                style={{
-                  height: '38px',
-                  width: '38px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: 0,
-                  color: '#64748b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                }}
-                title="Export quotations to CSV"
-              >
-                <Download size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Table Container */}
-          <div className="erp-table-frame"
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              width: '100%',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-              flex: 1,
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <div className="erp-table-scroll" style={{ width: '100%', maxWidth: '100%', overflowY: 'auto', overflowX: 'auto', flex: 1, minHeight: 0 }}>
-              <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--erp-text-field)' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fafbfc' }}>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION #</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>CUSTOMER</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>QUOTATION DATE</th>
-                    <th className="erp-table-heading" style={{ position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>VALID UNTIL</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'right', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>TOTAL</th>
-                    <th className="erp-table-heading" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
-                    <th className="erp-table-heading erp-table-actions" style={{ textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, borderBottom: '1px solid #e2e8f0' }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredQuotations.map((qt) => (
-                    <tr
-                      key={qt.id}
-                      style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    >
-                      <td className="erp-table-cell erp-table-code" style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
-                        {qt.quotationNo}
-                      </td>
-                      <td className="erp-table-cell" style={{ fontWeight: 600, color: '#0f172a' }}>{qt.customerName}</td>
-                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                        {qt.date ? new Date(qt.date).toLocaleDateString() : 'â€”'}
-                      </td>
-                      <td className="erp-table-cell" style={{ color: '#64748b' }}>
-                        {qt.validUntil ? new Date(qt.validUntil).toLocaleDateString() : 'â€”'}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>
-                        LKR {Number(qt.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="erp-table-cell" style={{ textAlign: 'center' }}>
-                        <StatusBadge status={qt.status} />
-                      </td>
-                      <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          {qt.status !== 'ACCEPTED' && (
-                            <button aria-label="Convert to commercial invoice" className="erp-button erp-table-icon-action"
-                              type="button"
-                              onClick={() => handleConvertQuotationToInvoice(qt)}
-                              style={{
-                                padding: '4px 8px',
-                                backgroundColor: '#16a34a',
-                                color: '#ffffff',
-                                border: 'none',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                cursor: 'pointer',
-                              }}
-                              title="Convert to commercial invoice"
-                            ><CheckCircle size={12} /></button>
-                          )}
-                          <button aria-label="Print quotation"
-                            type="button"
-                            className="btn btn-glass btn-sm erp-button erp-table-icon-action"
-                            onClick={() => {
-                              addToast(`Quotation ${qt.quotationNo} printed`, 'info');
-                              window.print();
-                            }}
-                            style={{ padding: '4px 7px' }}
-                            title="Print quotation"
-                          >
-                            <Printer size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredQuotations.length === 0 && (
-                    <tr>
-                      <td className="erp-table-cell" colSpan={7} style={{ textAlign: 'center', color: '#64748b' }}>
-                        No quotations found matching your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <QuotationView
+          ref={quotationRef}
+          onConvertToInvoice={() => {
+            loadBackendInvoices();
+          }}
+        />
       )}
 
       {/* ------------------------------------------------------------- */}
@@ -2556,8 +2161,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
       {/* MODAL: Held Bill Inspection */}
       {/* ------------------------------------------------------------- */}
       {statusChangeDialog}
-      {pendingHeldPrint && <HeldBillPrintDialog bill={pendingHeldPrint} onClose={()=>setPendingHeldPrint(null)} onPrinted={async()=>{setPendingHeldPrint(null);await loadHeldBills();addToast('All warehouse sheets printed. Bill sent to warehouse.','success');}}/>}
-      {selectedHeldDetail && <HeldBillDetails key={selectedHeldDetail.id} bill={selectedHeldDetail} user={user} onClose={()=>setSelectedHeldDetail(null)} onChanged={loadHeldBills} onEdit={handleOpenStockAdjustment} onCancel={handleCancelOnhold}/>}
+            {selectedHeldDetail && <HeldBillDetails key={selectedHeldDetail.id} bill={selectedHeldDetail} user={user} onClose={()=>setSelectedHeldDetail(null)} onChanged={loadHeldBills} onEdit={handleOpenStockAdjustment} onCancel={handleCancelOnhold}/>}
 
 
       {/* ------------------------------------------------------------- */}
@@ -2568,125 +2172,7 @@ export default function InvoicingHub({ activeSubTab = 'sales', onSubTabChange })
 
 
 
-      {/* ------------------------------------------------------------- */}
-      {/* MODAL: Create Quotation */}
-      {/* ------------------------------------------------------------- */}
-      {showCreateQuotationModal && (
-        <div
-          className="modal-backdrop"
-          style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
-        >
-          <div
-            className="glass-modal"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              padding: '24px',
-              borderRadius: '12px',
-              backgroundColor: '#ffffff',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', color: '#0f172a', fontWeight: 800 }}>Create New Quotation</h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateQuotationModal(false)}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            <form onSubmit={handleSaveQuotation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Quotation #</label>
-                  <input className="erp-field"
-                    type="text"
-                    readOnly
-                    value="[Auto-generated by backend]"
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Date</label>
-                  <input className="erp-field"
-                    type="date"
-                    value={quotationForm.quotationDate}
-                    onChange={(e) => setQuotationForm({ ...quotationForm, quotationDate: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Customer Name *</label>
-                <input className="erp-field"
-                  type="text"
-                  required
-                  placeholder="e.g. AutoCare Services"
-                  value={quotationForm.customerName}
-                  onChange={(e) => setQuotationForm({ ...quotationForm, customerName: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Total Amount (LKR) *</label>
-                  <input className="erp-field"
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                    value={quotationForm.totalAmount}
-                    onChange={(e) => setQuotationForm({ ...quotationForm, totalAmount: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', fontWeight: 700, boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Valid Until</label>
-                  <input className="erp-field"
-                    type="date"
-                    value={quotationForm.validUntil}
-                    onChange={(e) => setQuotationForm({ ...quotationForm, validUntil: e.target.value })}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--erp-text-small)', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Notes</label>
-                <textarea className="erp-field"
-                  rows={2}
-                  placeholder="Payment terms, delivery conditions..."
-                  value={quotationForm.notes}
-                  onChange={(e) => setQuotationForm({ ...quotationForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-glass erp-button"
-                  onClick={() => setShowCreateQuotationModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary erp-button erp-button-primary"
-                  style={{ borderColor: '#0284c7' }}
-                >
-                  Create Quotation
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

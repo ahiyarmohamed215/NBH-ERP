@@ -22,6 +22,8 @@ import './PurchaseInspectionModal.css';
 import './MasterDetailsModal.css';
 
 const entityIcons = {
+  VEHICLE: Truck,
+  DELIVERY_ROUTE: Truck,
   PRODUCT: Package,
   SUPPLIER: Truck,
   BRAND: Tag,

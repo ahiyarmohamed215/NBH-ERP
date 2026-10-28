@@ -79,7 +79,7 @@ export default function PosLineEditor({
                 disabled={busy}
                 type="number"
                 min="0"
-                max="100"
+                max="20"
                 step="0.01"
                 className="input-glass erp-field"
                 value={item.editDiscRate ?? ''}
@@ -92,7 +92,7 @@ export default function PosLineEditor({
                 disabled={busy}
                 type="number"
                 min="0"
-                max={item.editQty * item.unitPrice}
+                max={Math.max(0, Number(((Number(item.editQty || 0) * Number(item.unitPrice || 0) * 0.20) - ((Number(item.editQty || 0) * Number(item.unitPrice || 0)) * (Math.min(20, parseFloat(item.editDiscRate) || 0) / 100))).toFixed(2)))}
                 step="0.01"
                 className="input-glass erp-field"
                 value={item.editDiscAmt ?? ''}
@@ -102,7 +102,7 @@ export default function PosLineEditor({
           </div>
           <dl className="pos-line-summary">
             <div><dt>Total before discount</dt><dd>{posMoney(Number(item.editQty || 0) * Number(item.unitPrice || 0))}</dd></div>
-            <div><dt>Discount</dt><dd>{posMoney(item.editDiscAmt)}</dd></div>
+            <div><dt>Total discount</dt><dd>{posMoney(Math.max(0, (Number(item.editQty || 0) * Number(item.unitPrice || 0)) - Number(item.editTotal || 0)))}</dd></div>
             <div><dt>Line total</dt><dd>{posMoney(item.editTotal)}</dd></div>
           </dl>
         </div>

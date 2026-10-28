@@ -639,7 +639,7 @@ export const productApi = {
 };
 
 export const customerApi = {
-  getPosCustomers: (config={}) => api.get('/customers/pos',{...config,skipCache:true,skipDedupe:true}),
+  getPosCustomers: (paramsOrConfig={}, extraConfig={}) => { if (typeof paramsOrConfig === 'number' || typeof paramsOrConfig === 'string') { return api.get('/customers/pos', { params: { deliveryRouteId: paramsOrConfig }, ...extraConfig, skipCache: true, skipDedupe: true }); } const { params, ...rest } = paramsOrConfig; return api.get('/customers/pos', { params, ...rest, ...extraConfig, skipCache: true, skipDedupe: true }); },
   getAll: (config = {}) => api.get('/customers', config),
   getActive: (config = {}) => api.get('/customers/active', config),
   search: (query) => api.get('/customers/search', { params: { query } }),
@@ -662,7 +662,7 @@ export const customerTargetApi = {
 
 export const recycleBinApi = {
   getAll: () => api.get('/recycle-bin'),
-  delete: (type,id) => api.delete(`/recycle-bin/${type}/${id}`),
+  delete: (type,id,reason) => api.delete(`/recycle-bin/${type}/${id}`, { params: reason ? { reason } : {} }),
   restore: (type,id) => api.post(`/recycle-bin/${type}/${id}/restore`),
   permanentlyDelete: (type,id) => api.delete(`/recycle-bin/${type}/${id}/permanent`),
 };
@@ -758,9 +758,11 @@ export const salesApi = {
 
 
   getPosStaffPerformance: (params={}) => api.get('/invoices/held/performance',{params,skipCache:true,skipDedupe:true}),
+  getPosStaffRankings: (params={}) => api.get('/invoices/held/rankings',{params,skipCache:true,skipDedupe:true}),
   getHeldReviewLimits: id => api.get(`/invoices/held/${id}/review-limits`,{skipCache:true,skipDedupe:true}),
   getPosStockLimits: params => api.get('/invoices/pos/stock-limits',{params,skipCache:true,skipDedupe:true}),
   getHeldOriginals: params => api.get('/invoices/held/originals',{params,skipCache:true,skipDedupe:true}),
+  saveSplitHeld: (data,key) => api.post('/invoices/held/save-split',data,{headers:{'Idempotency-Key':key}}),
   sendHeld: (id,data) => api.post(`/invoices/held/${id}/send`,data),
   reviewHeld: (id,data) => api.post(`/invoices/held/${id}/review`,data),
 
@@ -814,6 +816,7 @@ export const quotationApi = {
   create: (data) => api.post('/quotations', data),
   update: (id, data) => api.put(`/quotations/${id}`, data),
   delete: (id) => api.delete(`/quotations/${id}`),
+  cancel: (id, data) => api.post(`/quotations/${id}/cancel`, data),
   convertToInvoice: (id, warehouseId) =>
     api.post(`/quotations/${id}/convert-to-invoice`, null, { params: warehouseId ? { warehouseId } : {} }),
 };
@@ -860,6 +863,8 @@ export const printPdfDocument = async (pdfUrl) => {
     if (win) {
       win.onload = () => {
         try {
+          // Attach to the loaded PDF, not the popup's initial about:blank navigation.
+          win.addEventListener('pagehide', () => window.URL.revokeObjectURL(blobUrl), { once: true });
           win.focus();
           win.print();
         } catch (_) {}
@@ -879,7 +884,6 @@ export const printPdfDocument = async (pdfUrl) => {
       }
       if (iframe.dataset.blobUrl) URL.revokeObjectURL(iframe.dataset.blobUrl);
       iframe.dataset.blobUrl = blobUrl;
-      iframe.src = blobUrl;
       iframe.onload = () => {
         setTimeout(() => {
           try {
@@ -888,6 +892,7 @@ export const printPdfDocument = async (pdfUrl) => {
           } catch (_) {}
         }, 350);
       };
+      iframe.src = blobUrl;
     }
   } catch (err) {
     window.dispatchEvent(new CustomEvent('erp:api_error', { detail: err.message }));
@@ -962,12 +967,15 @@ export const vehicleApi = {
   create: (data) => api.post('/vehicles', data),
   update: (id, data) => api.put(`/vehicles/${id}`, data),
   delete: (id) => api.delete(`/vehicles/${id}`),
+  changeStatus: (id, status, reason) => api.patch(`/vehicles/${id}/status`, { status, reason }),
 };
 
 export const deliveryRouteApi = {
   getAll: () => api.get('/delivery-routes'),
   getActive: () => api.get('/delivery-routes/active'),
   getById: (id) => api.get(`/delivery-routes/${id}`),
+  changeStatus: (id, status, reason) => api.patch(`/delivery-routes/${id}/status`, {status, reason}),
+  toggleActive: (id) => api.patch(`/delivery-routes/${id}/toggle-active`),
   create: (data) => api.post('/delivery-routes', data),
   update: (id, data) => api.put(`/delivery-routes/${id}`, data),
   delete: (id) => api.delete(`/delivery-routes/${id}`),
@@ -982,6 +990,7 @@ export const deliveryApi = {
   dispatch: (id, data) => api.post(`/deliveries/${id}/dispatch`, data || {}),
   complete: (id, data) => api.post(`/deliveries/${id}/complete`, data || {}),
   cancel: (id, data) => api.post(`/deliveries/${id}/cancel`, data || {}),
+  reschedule: (id, data) => api.post(`/deliveries/${id}/reschedule`, data || {}),
 };
 
 export const customerMonthlyRangeApi = {

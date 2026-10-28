@@ -5,7 +5,6 @@ import {hasPermission} from '../utils/moduleAccess';
 import {warehouseGroups,printHeldWarehouseSheets} from '../utils/heldWarehousePrint';
 import PurchaseInspectionModal from './PurchaseInspectionModal';
 import SearchBar from './SearchBar';
-import HeldBillPrintDialog from './HeldBillPrintDialog';
 import FilterSelect from './FilterSelect';
 import {posRemarks,isCancelledBill} from '../utils/billRemarks';
 import {printHeldBill} from '../utils/heldBillPrint';
@@ -37,9 +36,9 @@ export default function HeldBillDetails({bill:initialBill,user,onClose,onChanged
     refresh();const timer=setInterval(refresh,5000);return()=>{alive=false;clearInterval(timer);};
   },[initialBill.id,original,canOperate]);
   const run=async action=>{if(busy)return;setBusy(true);setError('');setNotice('');try{await action();}catch(e){setError(e.response?.data?.message || e.message || 'Unable to complete this action.');}finally{setBusy(false);}};
-  const print=()=>{if(original){printHeldBill(bill);return;}if(bill.status==='YET_TO_PRINT'){setShowPrint(true);return;}return run(async()=>{
+  const print=()=>{if(original){printHeldBill(bill);return;}return run(async()=>{
     printHeldWarehouseSheets(bill,warehouse || undefined);
-    try{await salesApi.printHeld(bill.id,warehouse || undefined);}catch(_){}
+    try{const res=await salesApi.printHeld(bill.id,warehouse || undefined);const latest=res.data?.data || res.data;if(latest?.status)setBill(previous=>({...previous,...latest}));}catch(_){}
     setNotice('Warehouse sheets opened for printing.');
     await load();
     onChanged();
@@ -55,11 +54,11 @@ export default function HeldBillDetails({bill:initialBill,user,onClose,onChanged
       {label:'Created by',value:[bill.createdByName || bill.createdBy,bill.createdByEmployeeCode].filter(Boolean).join(' · ')},
       {label:original?'Original bill total':'Bill total',value:`LKR ${Number(bill.netTotal || 0).toFixed(2)}`},
       {label:'Remarks',value:posRemarks(bill) || '—',wide:true},
+      ...(!original && bill.packing?[{label:'Packing',value:`Box ${bill.packing.boxes || 0} · Bag ${bill.packing.bags || 0} · P. Bag ${bill.packing.pBags || 0} · Others ${bill.packing.others || 0}`,wide:true}]:[]),
       ...(isCancelledBill(bill)?[{label:'Cancellation reason',value:bill.cancellationReason || '—',wide:true}]:[]),
     ]}
     content={<div className="onhold-inspection-content">
-      {showPrint && <HeldBillPrintDialog bill={bill} onClose={()=>setShowPrint(false)} onPrinted={async()=>{setShowPrint(false);setBill(previous=>({...previous,status:'SENT_TO_WAREHOUSE'}));await load();onChanged();}}/>}
-      <div className="purchase-inspection-table-toolbar">
+            <div className="purchase-inspection-table-toolbar">
         <SearchBar value={query} onChange={e=>setQuery(e.target.value)} onClear={()=>setQuery('')} placeholder="Search product code or name..." ariaLabel="Search onhold products"/>
         <FilterSelect value={warehouse} onChange={e=>setWarehouse(e.target.value)} aria-label="Warehouse filter" style={{width:190}}><option value="">All Warehouses</option>{groups.map(group=><option key={group.id} value={group.id}>{group.name}</option>)}</FilterSelect>
         <button type="button" className="purchase-inspection-table-print" disabled={busy || !canPrint} aria-label={original?'Print held bill':'Print warehouse sheets'} onClick={print}><Printer size={15}/>Print</button>

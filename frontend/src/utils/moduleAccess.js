@@ -1,7 +1,7 @@
 const names=values=>(values || []).map(value=>String(typeof value==='string'?value:value?.name || '').trim().toUpperCase()).filter(Boolean);
 export const permissionNames=user=>names(user?.permissions);
 export const roleNames=user=>names(user?.roles);
-export const isAdministrator=user=>Boolean(user && (String(user.username).toLowerCase()==='admin' || roleNames(user).some(role=>['ROLE_ADMIN','ROLE_SUPER_ADMIN','SUPER_ADMIN'].includes(role))));
+export const isAdministrator=user=>Boolean(user && roleNames(user).some(role=>['ROLE_ADMIN','ROLE_SUPER_ADMIN','SUPER_ADMIN'].includes(role)));
 
 // A module's write permission includes reading its own records, never unrelated modules.
 const readAliases={

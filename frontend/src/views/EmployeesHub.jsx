@@ -29,7 +29,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
 
   const isSuperAdminUser = (emp) => {
     if (!emp) return false;
-    if (emp.username === 'admin') return true;
     const rList = emp.roles || [];
     return rList.some((r) => {
       const name = typeof r === 'string' ? r : r?.name;
@@ -680,7 +679,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           phone: formData.phone,
           password: formData.password || undefined,
           roles: rolesToSave,
-          isActive: isSuperAdminUser(selectedEmployee) ? true : undefined,
         });
         const resetNoted = selectedEmployee.passwordResetRequested && formData.password;
         addToast(
@@ -749,7 +747,6 @@ export default function EmployeesHub({ activeSubTab, onSubTabChange }) {
           phone: formData.phone,
           password: formData.password || undefined,
           roles: rolesToSave,
-          isActive: isSuperAdminUser(selectedEmployee) ? true : undefined,
         });
         addToast(`Employee "${formData.fullName || selectedEmployee.username}" updated`, 'success');
         setModalMode(null);

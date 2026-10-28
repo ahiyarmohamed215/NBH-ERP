@@ -13,7 +13,6 @@ import StatusBadge from './StatusBadge';
 import {hasPermission} from '../utils/moduleAccess';
 
 import {printA4Report} from '../utils/printReport';
-import {posRemarks} from '../utils/billRemarks';
 import {printHeldBill} from '../utils/heldBillPrint';
 
 import './OnholdBillsTable.css';
@@ -28,10 +27,16 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
   const copyStatus=b=>['CANCELLED','INVOICE_CANCELLED','VOIDED'].includes(b.status)?'CANCELLED':'BILLED';
 
-  const displayStatus=b=>archive?copyStatus(b):b.status==='MERGED'?'INVOICE_CREATED':b.status;
+  const displayStatus=b=>archive?copyStatus(b):b.status==='MERGED'?'INVOICE_CREATED':b.status==='YET_TO_PRINT'?'SENT_TO_WAREHOUSE':b.status;
 
   const visible=bills.filter(b=>Boolean(b.originalCopy)===archive && b.status!=='HELD' && (status==='ALL' || displayStatus(b)===status) && matchesDateRange(b.createdAt || b.invoiceDate,from,to));
 
+  const billWarehouse=b=>{
+    if(b.warehouseName) return b.warehouseName;
+    const names=[...new Set((b.items||[]).map(i=>i.warehouseName).filter(Boolean))];
+    if(names.length) return names.join(', ');
+    return b.warehouseCode || '—';
+  };
 
   const printDirectory=()=>{
 
@@ -45,13 +50,13 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
         {label:'Status',value:status==='ALL'?'All':escape(statusLabel(status))},{label:'Date range',value:escape(from || 'Any date')+' to '+escape(to || 'Any date')}],
 
-      columns:[{header:'Onhold bill number',accessor:'number'},{header:'Customer',accessor:'customer'},{header:'Bill date',accessor:'date'},
+      columns:[{header:'Onhold bill number',accessor:'number'},{header:'Customer',accessor:'customer'},{header:'Warehouse',accessor:'warehouse'},{header:'Bill date',accessor:'date'},
 
-        {header:'Staff',accessor:'staff'},{header:'Total products',accessor:'products',align:'right'},{header:'Total (LKR)',accessor:'total',align:'right'},{header:'Status',accessor:'status'},...(showRemarks?[{header:'Remarks',accessor:'remarks'}]:[])],
+        {header:'Staff',accessor:'staff'},{header:'Total products',accessor:'products',align:'right'},{header:'Total (LKR)',accessor:'total',align:'right'},{header:'Status',accessor:'status'}],
 
-      data:visible.map(b=>({number:escape(b.heldNumber),customer:escape(b.customerName),date:escape((b.createdAt || b.invoiceDate)?.slice(0,10)),staff:escape([b.createdByName || b.createdBy,b.createdByEmployeeCode].filter(Boolean).join(' · ')),
+      data:visible.map(b=>({number:escape(b.heldNumber),customer:escape(b.customerName),warehouse:escape(billWarehouse(b)),date:escape((b.createdAt || b.invoiceDate)?.slice(0,10)),staff:escape([b.createdByName || b.createdBy,b.createdByEmployeeCode].filter(Boolean).join(' · ')),
 
-        products:b.items?.length || 0,total:Number(b.netTotal || 0).toFixed(2),status:escape(statusLabel(displayStatus(b))),remarks:escape(posRemarks(b) || '—')})),
+        products:b.items?.length || 0,total:Number(b.netTotal || 0).toFixed(2),status:escape(statusLabel(displayStatus(b)))})),
 
       summaryItems:[{label:'Total bills',value:String(visible.length)},{label:'Total (LKR)',value:visible.reduce((sum,b)=>sum+Number(b.netTotal || 0),0).toFixed(2)}],
 
@@ -61,9 +66,6 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
   const editable=b=>!archive && !history && (b.canResume!==false || hasPermission(user,'SALES_EDIT'));
 
-
-
-  const showRemarks=!archive;
   const showSelection=!archive && !history && !posOnly && status==='STOCK_ADJUSTED';
   const changeStatus=value=>{onSelect?.([]);onStatusChange(value);};
 
@@ -76,7 +78,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
     <div className="onhold-directory-toolbar">
 
-      <SearchBar value={query} onChange={e=>onQueryChange(e.target.value)} onClear={()=>onQueryChange('')} placeholder="Search bill number, customer or staff..." ariaLabel="Search onhold bills"/>
+      <SearchBar value={query} onChange={e=>onQueryChange(e.target.value)} onClear={()=>onQueryChange('')} placeholder="Search bill number, customer, warehouse or staff..." ariaLabel="Search onhold bills"/>
 
       <div className="purchase-date-controls onhold-directory-controls">
 
@@ -91,8 +93,6 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
           <option value="ALL">All Statuses</option>
 
           {archive?<option value="BILLED">Billed</option>:<>
-
-          <option value="YET_TO_PRINT">Yet to Print</option>
 
           <option value="SENT_TO_WAREHOUSE">Sent to Warehouse</option>
 
@@ -126,7 +126,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
       {showSelection && <th className="erp-table-heading">Select</th>}
 
-      {['Onhold bill number','Customer','Bill date','Staff','Total products','Total','Status',...(showRemarks?['Remarks']:[]),'Actions'].map(label=><th key={label} className={`erp-table-heading ${label==='Actions'?'erp-table-actions':['Total products','Total'].includes(label)?'onhold-money':''}`}>{label}</th>)}
+      {['Onhold bill number','Customer','Warehouse','Bill date','Staff','Total products','Total','Status','Actions'].map(label=><th key={label} className={`erp-table-heading ${label==='Actions'?'erp-table-actions':['Total products','Total'].includes(label)?'onhold-money':''}`}>{label}</th>)}
 
     </tr></thead><tbody>
 
@@ -134,7 +134,9 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
         {showSelection && <td className="erp-table-cell" onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={`Select ${b.heldNumber}`} disabled={!editable(b) || b.status!=='STOCK_ADJUSTED'} checked={selected.includes(b.id)} onChange={e=>onSelect(e.target.checked?[...selected,b.id]:selected.filter(id=>id!==b.id))}/></td>}
 
-        <td className="erp-table-cell erp-table-code">{b.heldNumber}</td><td className="erp-table-cell onhold-customer-name">{b.customerName}</td><td className="erp-table-cell erp-table-date">{(b.createdAt || b.invoiceDate)?.slice(0,10)}</td>
+        <td className="erp-table-cell erp-table-code">{b.heldNumber}</td><td className="erp-table-cell onhold-customer-name">{b.customerName}</td>
+        <td className="erp-table-cell onhold-warehouse" title={billWarehouse(b)}>{billWarehouse(b)}</td>
+        <td className="erp-table-cell erp-table-date">{(b.createdAt || b.invoiceDate)?.slice(0,10)}</td>
 
         <td className="erp-table-cell onhold-staff"><span>{b.createdByName || b.createdBy}</span>{b.createdByEmployeeCode && <small>{b.createdByEmployeeCode}</small>}</td><td className="erp-table-cell onhold-money">{b.items?.length || 0}</td>
 
@@ -142,14 +144,11 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
         <td className="erp-table-cell"><StatusBadge status={displayStatus(b)} label={!archive && displayStatus(b)==='CANCELLED'?'ONHOLD BILL CANCELLED':undefined}/></td>
 
-        {showRemarks && <td className="erp-table-cell onhold-remarks" title={posRemarks(b)}>{posRemarks(b) || '—'}</td>}
-
-
         <td className="erp-table-cell erp-table-actions" onClick={e=>e.stopPropagation()}><div>
 
           {(archive || b.status!=='CANCELLED') && <button type="button" className="erp-table-icon-action" aria-label={`Print ${b.heldNumber}`} title={archive?'Print held bill':'Print warehouse sheets'} disabled={!archive && b.canResume===false} onClick={()=>archive?printHeldBill(b):onPrint(b)}><Printer size={13}/></button>}
 
-          {editable(b) && !posOnly && b.status==='SENT_TO_WAREHOUSE' && hasPermission(user,'SALES_EDIT') && <button type="button" className="erp-table-icon-action" aria-label={`Adjust ${b.heldNumber}`} title="Warehouse Review" onClick={()=>onEdit(b)}><Edit2 size={13}/></button>}
+          {editable(b) && !posOnly && (b.status==='SENT_TO_WAREHOUSE' || b.status==='YET_TO_PRINT') && hasPermission(user,'SALES_EDIT') && <button type="button" className="erp-table-icon-action" aria-label={`Adjust ${b.heldNumber}`} title="Warehouse Review" onClick={()=>onEdit(b)}><Edit2 size={13}/></button>}
 
 
 
@@ -157,7 +156,7 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
 
       </tr>)}
 
-      {!visible.length && <tr><td className="erp-table-cell" colSpan={8+(showRemarks?1:0)+(showSelection?1:0)}>{loading?'Loading onhold bills…':'No onhold bills match these filters.'}</td></tr>}
+      {!visible.length && <tr><td className="erp-table-cell" colSpan={9+(showSelection?1:0)}>{loading?'Loading onhold bills…':'No onhold bills match these filters.'}</td></tr>}
 
     </tbody></table></div>
 
@@ -166,4 +165,3 @@ export default function OnholdBillsTable({bills=[],loading,user,scope,onScopeCha
   </div>;
 
 }
-

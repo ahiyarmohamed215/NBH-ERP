@@ -1,9 +1,13 @@
+import useRecordDeletion from '../hooks/useRecordDeletion';
+import CustomersHub from './CustomersHub';
 import {canWriteTab,hasPermission} from '../utils/moduleAccess';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import { Trash2 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import DeliveryVehicleWorkspace from '../components/DeliveryVehicleWorkspace';
+import VehicleDetailsModal from '../components/VehicleDetailsModal';
+import PurchasingStatusDialog from '../components/PurchasingStatusDialog';
 import DeliveryWorkspace from '../components/DeliveryWorkspace';
 import DeliveryDirectory from '../components/DeliveryDirectory';
 import DeliveryActionDialog from '../components/DeliveryActionDialog';
@@ -17,7 +21,7 @@ import './DeliveryTheme.css';
 import '../components/PurchasingAppearance.css';
 import { formatBusinessDate } from '../utils/invoiceMapping';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Truck, Users, CheckCircle2, AlertCircle, Plus, Search, Navigation, Printer, RefreshCw, X, Edit2, UserCheck, Gauge, Check, Download } from 'lucide-react';
+import { Truck, Users, CheckCircle2, AlertCircle, Plus, Search, Navigation, Printer, RefreshCw, X, Edit2, UserCheck, Gauge, Check, Download, CalendarClock } from 'lucide-react';
 import { deliveryApi, deliveryRouteApi, vehicleApi } from '../api/apiClient';
 import api from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +31,7 @@ import { canEditModule } from '../utils/permissionUtils';
 export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const { user } = useAuth();
   const canEditDelivery = canEditModule(user, 'DELIVERY');
+  const vehicleDeletion=useRecordDeletion('VEHICLE','Vehicle',async()=>{setViewingVehicle(null);await fetchData();});
   // Primary Tabs: 'deliveries' | 'routes' | 'vehicles'
   const [currentTab, setCurrentTab] = useModuleTab('delivery',activeSubTab,'deliveries',user);
 
@@ -44,6 +49,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const [routes, setRoutes] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [staffLoading,setStaffLoading]=useState(false);
+  const [staffError,setStaffError]=useState('');
   const [warehouses, setWarehouses] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -53,6 +60,10 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const [tripBusy,setTripBusy]=useState(false);
   const [vehicleBusy,setVehicleBusy]=useState(false);
   const [vehicleSearch,setVehicleSearch]=useState('');
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState('ALL');
+  const [vehicleStatusTransition, setVehicleStatusTransition] = useState(null);
+  const [vehicleStatusReason, setVehicleStatusReason] = useState('');
+  const [vehicleStatusBusy, setVehicleStatusBusy] = useState(false);
   const [viewingVehicle,setViewingVehicle]=useState(null);
   const [viewingRoute,setViewingRoute]=useState(null);
   const [deliveryFrom,setDeliveryFrom]=useState(''),[deliveryTo,setDeliveryTo]=useState('');
@@ -67,6 +78,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showManifestModal, setShowManifestModal] = useState(false);
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
@@ -84,6 +96,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     scheduledDate: formatBusinessDate(),
     departureTime: '',
     selectedInvoiceIds: [],
+    specialInvoiceIds: [],
     startOdometer: '',
     notes: '',
   });
@@ -103,6 +116,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
   const [cancelForm, setCancelForm] = useState({
     cancellationReason: '',
+  });
+
+  const [rescheduleForm, setRescheduleForm] = useState({
+    newScheduledDate: '',
+    reason: '',
+    notes: '',
   });
 
   // Route Form State (matching CustomersHub Customer Groups system)
@@ -141,22 +160,33 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     id: null,
     vehicleNumber: '',
     model: '',
-    vehicleType: 'TRUCK',
+    vehicleType: '',
     capacityKg: '',
-    status: 'AVAILABLE',
+    assignedStaffId: '',
     notes: '',
   });
+
+  const loadStaff=useCallback(async()=>{
+    setStaffLoading(true);setStaffError('');
+    try{
+      const response=await api.get('/users/lookup');
+      const raw=response.data?.data?.content || response.data?.data || response.data?.content || response.data || [];
+      if(!Array.isArray(raw))throw new Error('Invalid staff response');
+      setEmployees(raw.filter(staff=>staff.isActive!==false));
+    }catch{setStaffError('Unable to load staff. Please retry.');}
+    finally{setStaffLoading(false);}
+  },[]);
 
   // Load all foundational data
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const staffRequest=loadStaff();
     try {
       const [
         delivRes,
         routesRes,
         vehRes,
         sumRes,
-        usersRes,
         whRes,
         custRes
       ] = await Promise.all([
@@ -164,12 +194,20 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         deliveryRouteApi.getAll(),
         vehicleApi.getAll(),
         deliveryApi.getSummary(),
-        api.get('/users/lookup').catch(() => ({ data: { data: [] } })),
         api.get('/warehouses').catch(() => ({ data: { data: [] } })),
         api.get('/customers').catch(() => ({ data: { data: [] } }))
       ]);
 
-      setDeliveries(delivRes.data?.data?.content || delivRes.data?.data || delivRes.data?.content || delivRes.data || []);
+      const fetchedDeliveries = delivRes.data?.data?.content || delivRes.data?.data || delivRes.data?.content || delivRes.data || [];
+      const sortedDeliveries = [...(Array.isArray(fetchedDeliveries) ? fetchedDeliveries : [])].sort((a, b) => {
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+        if (timeB && !timeA) return 1;
+        if (!timeB && timeA) return -1;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+      setDeliveries(sortedDeliveries);
 
       const rawRoutes = routesRes.data?.data || routesRes.data || [];
       const normalizedRoutes = (Array.isArray(rawRoutes) ? rawRoutes : []).map((r) => ({
@@ -190,15 +228,28 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         customerIds: (r.customerIds || []).map(String),
         createdAt: r.createdAt || '',
         isActive:r.isActive ?? true,
-      }));
+        status: r.status || (r.isActive ?? true ? 'ACTIVE' : 'INACTIVE'),
+      })).sort((a, b) => {
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+        if (timeB && !timeA) return 1;
+        if (!timeB && timeA) return -1;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
       setRoutes(normalizedRoutes);
 
-      setVehicles(vehRes.data?.data || vehRes.data || []);
+      const fetchedVehicles = vehRes.data?.data || vehRes.data || [];
+      const sortedVehicles = [...fetchedVehicles].sort((a, b) => {
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+        if (timeB && !timeA) return 1;
+        if (!timeB && timeA) return -1;
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+      setVehicles(sortedVehicles);
       setSummary(sumRes.data?.data || null);
-
-      const rawUsers = usersRes.data?.data?.content || usersRes.data?.data || usersRes.data?.content || usersRes.data || [];
-      const userList = Array.isArray(rawUsers) ? rawUsers : [];
-      setEmployees(userList.filter((u) => u.isActive !== false));
 
       const wList = whRes.data?.data || whRes.data || [];
       setWarehouses(Array.isArray(wList) ? wList : []);
@@ -209,9 +260,9 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       console.error('Error fetching delivery data:', err);
       showToast('Failed to load delivery data', 'error');
     } finally {
-      setLoading(false);
+      await staffRequest;setLoading(false);
     }
-  }, []);
+  }, [loadStaff]);
 
   useEffect(() => {
     fetchData();
@@ -241,6 +292,7 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       scheduledDate: formatBusinessDate(),
       departureTime: '',
       selectedInvoiceIds: [],
+      specialInvoiceIds: [],
       startOdometer: '',
       notes: '',
     });
@@ -248,19 +300,40 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
   };
 
   // Submit Create Delivery Trip
-  const handleCreateDeliveryTrip = async (e) => {
-    e.preventDefault();
-    if (!newTripForm.driverId || !newTripForm.assistantStaffId) {
-      showToast('Please assign two staff members (Driver and Assistant)', 'error');
-      return;
-    }
-    if (String(newTripForm.driverId) === String(newTripForm.assistantStaffId)) {
-      showToast('Primary driver and assistant must be two different staff members', 'error');
-      return;
-    }
-    if (!newTripForm.selectedInvoiceIds || newTripForm.selectedInvoiceIds.length === 0) {
-      showToast('Please select at least one sales invoice to load for delivery', 'error');
-      return;
+  const handleCreateDeliveryTrip = async (e, options = {}) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const isDraft = Boolean(options?.isDraft);
+
+    if (isDraft) {
+      const hasAny = Boolean(
+        newTripForm.warehouseId ||
+        newTripForm.routeId ||
+        newTripForm.vehicleId ||
+        newTripForm.driverId ||
+        newTripForm.assistantStaffId ||
+        newTripForm.scheduledDate ||
+        (newTripForm.notes && newTripForm.notes.trim()) ||
+        newTripForm.startOdometer ||
+        newTripForm.departureTime ||
+        (newTripForm.selectedInvoiceIds && newTripForm.selectedInvoiceIds.length > 0)
+      );
+      if (!hasAny) {
+        showToast('Please fill at least one field to save a delivery draft', 'warning');
+        return;
+      }
+    } else {
+      if (!newTripForm.driverId || !newTripForm.assistantStaffId) {
+        showToast('Please assign two staff members (Driver and Assistant)', 'error');
+        return;
+      }
+      if (String(newTripForm.driverId) === String(newTripForm.assistantStaffId)) {
+        showToast('Primary driver and assistant must be two different staff members', 'error');
+        return;
+      }
+      if (!newTripForm.selectedInvoiceIds || newTripForm.selectedInvoiceIds.length === 0) {
+        showToast('Please select at least one sales invoice to load for delivery', 'error');
+        return;
+      }
     }
 
     if(tripBusy)return;
@@ -270,17 +343,23 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         warehouseId: newTripForm.warehouseId ? Number(newTripForm.warehouseId) : null,
         routeId: newTripForm.routeId ? Number(newTripForm.routeId) : null,
         vehicleId: newTripForm.vehicleId ? Number(newTripForm.vehicleId) : null,
-        driverId: Number(newTripForm.driverId),
-        assistantStaffId: Number(newTripForm.assistantStaffId),
-        scheduledDate: newTripForm.scheduledDate,
+        driverId: newTripForm.driverId ? Number(newTripForm.driverId) : null,
+        assistantStaffId: newTripForm.assistantStaffId ? Number(newTripForm.assistantStaffId) : null,
+        scheduledDate: newTripForm.scheduledDate || null,
         departureTime: newTripForm.departureTime || null,
-        invoiceIds: newTripForm.selectedInvoiceIds.map(Number),
+        invoiceIds: (newTripForm.selectedInvoiceIds || []).map(Number),
+        specialInvoiceIds: (options?.specialInvoiceIds || newTripForm.specialInvoiceIds || []).map(Number),
         startOdometer: newTripForm.startOdometer ? Number(newTripForm.startOdometer) : null,
         notes: newTripForm.notes,
+        isDraft,
       };
 
-      await deliveryApi.create(payload);
-      showToast('Delivery trip created & invoices loaded successfully!', 'success');
+      const res = await deliveryApi.create(payload);
+      const createdTrip = res.data?.data || res.data;
+      if (createdTrip && createdTrip.id) {
+        setDeliveries((prev) => [createdTrip, ...prev.filter((d) => d.id !== createdTrip.id)]);
+      }
+      showToast(isDraft ? 'Delivery draft saved successfully!' : 'Delivery trip created & invoices loaded successfully!', 'success');
       setShowCreateTripModal(false);
       fetchData();
     } catch (err) {
@@ -295,7 +374,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     setSelectedTrip(trip);
     setDispatchForm({
       departureTime: new Date().toISOString().slice(0, 16),
-      startOdometer: trip.startOdometer || '',
       notes: trip.notes || '',
     });
     setShowDispatchModal(true);
@@ -303,21 +381,81 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
 
   const handleConfirmDispatch = async () => {
     if (!selectedTrip) return;
-    if(tripBusy)return;
+    if (!dispatchForm.departureTime) {
+      showToast('Please enter the departure time', 'error');
+      return;
+    }
+    if (tripBusy) return;
     setTripBusy(true);
     try {
       await deliveryApi.dispatch(selectedTrip.id, {
         departureTime: dispatchForm.departureTime ? `${dispatchForm.departureTime}:00` : null,
-        startOdometer: dispatchForm.startOdometer ? Number(dispatchForm.startOdometer) : null,
-        notes: dispatchForm.notes,
+        notes: dispatchForm.notes || null,
       });
       showToast(`Trip ${selectedTrip.deliveryNumber} dispatched on route!`, 'success');
-      setSelectedTrip(previous=>({...previous,status:'IN_TRANSIT',departureTime:dispatchForm.departureTime,startOdometer:dispatchForm.startOdometer!==''?Number(dispatchForm.startOdometer):previous.startOdometer,invoices:(previous.invoices || []).map(invoice=>({...invoice,deliveryStatus:'OUT_FOR_DELIVERY'}))}));
+      setSelectedTrip(previous => ({
+        ...previous,
+        status: 'IN_TRANSIT',
+        departureTime: dispatchForm.departureTime,
+        notes: dispatchForm.notes || previous.notes,
+        invoices: (previous.invoices || []).map(invoice => ({ ...invoice, deliveryStatus: 'OUT_FOR_DELIVERY' })),
+      }));
       setShowDispatchModal(false);
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Dispatch failed', 'error');
-    } finally {setTripBusy(false);}
+    } finally {
+      setTripBusy(false);
+    }
+  };
+
+  // Reschedule Action ("If they didn't go, ask reason and reschedule")
+  const handleOpenReschedule = (trip) => {
+    setSelectedTrip(trip);
+    setRescheduleForm({
+      newScheduledDate: trip.scheduledDate || formatBusinessDate(),
+      reason: '',
+      notes: '',
+    });
+    setShowRescheduleModal(true);
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!selectedTrip) return;
+    if (!rescheduleForm.newScheduledDate) {
+      showToast('Please select a new scheduled date', 'error');
+      return;
+    }
+    if (!rescheduleForm.reason?.trim()) {
+      showToast('Please enter a reason for rescheduling', 'error');
+      return;
+    }
+    if (tripBusy) return;
+    setTripBusy(true);
+    try {
+      const response = await deliveryApi.reschedule(selectedTrip.id, {
+        newScheduledDate: rescheduleForm.newScheduledDate,
+        reason: rescheduleForm.reason.trim(),
+        notes: rescheduleForm.notes?.trim() || null,
+      });
+      const updated = response.data?.data || response.data;
+      showToast(`Trip ${selectedTrip.deliveryNumber} rescheduled to ${rescheduleForm.newScheduledDate}`, 'info');
+      setSelectedTrip(previous => ({
+        ...previous,
+        ...(updated || {}),
+        status: 'RESCHEDULED',
+        scheduledDate: rescheduleForm.newScheduledDate,
+        rescheduledDate: rescheduleForm.newScheduledDate,
+        rescheduleReason: rescheduleForm.reason.trim(),
+        notes: rescheduleForm.notes?.trim() || previous.notes,
+      }));
+      setShowRescheduleModal(false);
+      fetchData();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Rescheduling failed', 'error');
+    } finally {
+      setTripBusy(false);
+    }
   };
 
   // Complete Action ("When it returns & deliver")
@@ -479,15 +617,31 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     setAssignCustomerSearch('');
   };
 
-  const handleSaveRouteView = async (e) => {
-    if (e) e.preventDefault();
+  const handleSaveRouteView = async (e, options = {}) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!isCreatingRoute && !canEditDelivery) {
       showToast('Permission denied: Only authorized staff can edit existing delivery routes.', 'error');
       return;
     }
-    if (!routeEditForm.name.trim()) {
-      showToast('Delivery route name is required', 'error');
-      return;
+    const isDraft = Boolean(options?.isDraft);
+    if (isDraft) {
+      const hasAny = Boolean(
+        routeEditForm.name.trim() ||
+        (routeEditForm.routeCode && routeEditForm.routeCode.trim()) ||
+        (routeEditForm.description && routeEditForm.description.trim()) ||
+        (routeEditForm.area && routeEditForm.area.trim()) ||
+        routeEditForm.assignedStaffId ||
+        (routeEditForm.selectedCustomerIds && routeEditForm.selectedCustomerIds.length > 0)
+      );
+      if (!hasAny) {
+        showToast('Please fill at least one field to save a route draft', 'warning');
+        return;
+      }
+    } else {
+      if (!routeEditForm.name.trim()) {
+        showToast('Delivery route name is required', 'error');
+        return;
+      }
     }
 
     const assignedStaff = employees.find((em) => String(em.id) === String(routeEditForm.assignedStaffId));
@@ -495,15 +649,20 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     const staffIdNum = routeEditForm.assignedStaffId ? Number(routeEditForm.assignedStaffId) : null;
     const customerIdsNum = (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean);
 
+    const routeNameVal = routeEditForm.name.trim() || (isDraft ? (routeEditForm.routeCode?.trim() ? `Draft Route ${routeEditForm.routeCode.trim()}` : 'Draft Route') : '');
+
     const payload = {
-      routeName: routeEditForm.name.trim(),
-      name: routeEditForm.name.trim(),
+      routeName: routeNameVal,
+      name: routeNameVal,
       routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
       area: routeEditForm.area ? routeEditForm.area.trim() : '',
-      deliveryDays: routeEditForm.deliveryDays ? routeEditForm.deliveryDays.trim() : '',
+      deliveryDays: routeEditForm.deliveryDays ? routeEditForm.deliveryDays.trim() : (selectedRoute?.deliveryDays || ''),
       assignedStaffId: staffIdNum,
       customerIds: customerIdsNum,
+      isDraft,
+      status: isDraft ? 'DRAFT' : (selectedRoute?.status || 'ACTIVE'),
+      isActive: !isDraft,
     };
 
     try {
@@ -522,12 +681,15 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           assignedStaffName: created.assignedStaffName || staffName,
           salesmanId: created.assignedStaffId ? String(created.assignedStaffId) : (staffIdNum ? String(staffIdNum) : ''),
           salesmanName: created.assignedStaffName || staffName,
+          status: created.status || (isDraft ? 'DRAFT' : 'ACTIVE'),
+          isActive: created.isActive ?? !isDraft,
           customerCount: created.customerCount != null ? created.customerCount : customerIdsNum.length,
           customerIds: (created.customerIds || customerIdsNum).map(String),
           createdAt: created.createdAt || new Date().toISOString(),
         };
         setRoutes((prev) => [...prev, normalized]);
-        showToast(`Delivery route "${normalized.name}" created successfully!`, 'success');
+        showToast(isDraft ? `Delivery route draft "${normalized.name}" saved successfully!` : `Delivery route "${normalized.name}" created successfully!`, 'success');
+        handleCloseRouteView();
       } else if (selectedRoute) {
         const res = await deliveryRouteApi.update(selectedRoute.id, payload);
         const updated = res.data?.data || res.data || res;
@@ -600,43 +762,91 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       id: null,
       vehicleNumber: '',
       model: '',
-      vehicleType: 'TRUCK',
+      vehicleType: '',
       capacityKg: '',
-      status: 'AVAILABLE',
+      assignedStaffId: '',
       notes: '',
     });
     setShowVehicleModal(true);
   };
 
-  const handleSaveVehicle = async (e) => {
+  const handleSaveVehicle = async (e, draft = vehicleForm.status === 'DRAFT') => {
     e.preventDefault();
-    if (!vehicleForm.vehicleNumber.trim() || !vehicleForm.model.trim()) {
+    if (!draft && (!String(vehicleForm.vehicleNumber || '').trim() || !String(vehicleForm.model || '').trim())) {
       showToast('Vehicle plate number and model are required', 'error');
       return;
     }
+    if(!draft && !vehicleForm.vehicleType){showToast('Select a vehicle type.','error');return;}
+    if(!draft && !vehicleForm.assignedStaffId){showToast('Select the staff member responsible for this vehicle.','error');return;}
     if(vehicleBusy)return;
     setVehicleBusy(true);
     try {
       const payload = {
-        vehicleNumber: vehicleForm.vehicleNumber.trim().toUpperCase(),
-        model: vehicleForm.model.trim(),
+        vehicleNumber: String(vehicleForm.vehicleNumber || '').trim().toUpperCase(),
+        model: String(vehicleForm.model || '').trim(),
         vehicleType: vehicleForm.vehicleType,
         capacityKg: vehicleForm.capacityKg ? Number(vehicleForm.capacityKg) : null,
-        status: vehicleForm.status,
+        assignedStaffId: vehicleForm.assignedStaffId ? Number(vehicleForm.assignedStaffId) : null,
+        draft,
         notes: vehicleForm.notes,
       };
+      let saved = null;
       if (vehicleForm.id) {
-        await vehicleApi.update(vehicleForm.id, payload);
+        const response = await vehicleApi.update(vehicleForm.id, payload);
+        saved = response.data?.data || response.data;
         showToast('Vehicle updated successfully', 'success');
       } else {
-        await vehicleApi.create(payload);
-        showToast('Vehicle added to delivery fleet', 'success');
+        const response = await vehicleApi.create(payload);
+        saved = response.data?.data || response.data;
+        showToast('Vehicle added successfully', 'success');
       }
       setShowVehicleModal(false);
+      if (saved && saved.id) {
+        setVehicles(prev => [saved, ...prev.filter(v => v.id !== saved.id)]);
+      }
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to save vehicle', 'error');
     } finally {setVehicleBusy(false);}
+  };
+
+  const handleOpenVehicleStatusChange = (vehicle) => {
+    const current = vehicle.status || 'AVAILABLE';
+    const validTargets = ['AVAILABLE', 'IN_SERVICE', 'IN_GARAGE'].filter(s => s !== current);
+    const defaultTarget = current === 'AVAILABLE' ? 'IN_SERVICE' : validTargets[0] || 'AVAILABLE';
+    setVehicleStatusTransition({
+      type: 'Vehicle',
+      number: vehicle.vehicleNumber || `Vehicle draft #${vehicle.id}`,
+      current,
+      target: defaultTarget,
+      vehicle,
+    });
+    setVehicleStatusReason('');
+  };
+
+  const handleConfirmVehicleStatusChange = async () => {
+    if (!vehicleStatusTransition || vehicleStatusBusy || !vehicleStatusReason.trim()) return;
+    setVehicleStatusBusy(true);
+    try {
+      const vehicleId = vehicleStatusTransition.vehicle.id;
+      const newStatus = vehicleStatusTransition.target;
+      const response = await vehicleApi.changeStatus(vehicleId, newStatus, vehicleStatusReason.trim());
+      const updated = response.data?.data || response.data;
+      setVehicles(prev => {
+        const existing = prev.find(v => v.id === vehicleId) || {};
+        const merged = { ...existing, ...updated, status: newStatus };
+        return [merged, ...prev.filter(v => v.id !== vehicleId)];
+      });
+      if (viewingVehicle && viewingVehicle.id === vehicleId) {
+        setViewingVehicle(prev => ({ ...prev, ...updated, status: newStatus }));
+      }
+      showToast('Vehicle status updated successfully', 'success');
+      setVehicleStatusTransition(null);
+    } catch (err) {
+      showToast(err.response?.data?.message || err.message || 'Failed to update vehicle status', 'error');
+    } finally {
+      setVehicleStatusBusy(false);
+    }
   };
 
   // Filtered deliveries list
@@ -654,6 +864,13 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
       const matchRoute = routeFilter === 'ALL' || String(d.routeId) === String(routeFilter);
 
       return matchSearch && matchStatus && matchRoute && matchesDateRange(d.scheduledDate || d.createdAt,deliveryFrom,deliveryTo);
+    }).sort((a, b) => {
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+      if (timeB && !timeA) return 1;
+      if (!timeB && timeA) return -1;
+      return Number(b.id || 0) - Number(a.id || 0);
     });
   }, [deliveries, searchTerm, statusFilter, routeFilter,deliveryFrom,deliveryTo]);
 
@@ -676,14 +893,55 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
     }
   };
 
-  const invoiceColumns=[{label:'Invoice number',value:row=>row.invoiceNumber},{label:'Customer',value:row=>row.customerName},{label:'Address',value:row=>row.address || row.customerAddress || '—'},{label:'Amount (LKR)',value:row=>Number(row.netTotal || 0).toLocaleString(undefined,{minimumFractionDigits:2})},{label:'Status',value:row=>row.deliveryStatus || selectedTrip?.status || '—'}];
-  const printTrip=trip=>{const escape=value=>String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));printA4Report({title:'Delivery Manifest',metaItems:[['Delivery number',trip.deliveryNumber],['Route',trip.routeName],['Vehicle',trip.vehicleNumber],['Driver',trip.driverName],['Assistant',trip.assistantStaffName],['Scheduled date',trip.scheduledDate],['Remarks',trip.notes]].map(([label,value])=>({label,value:escape(value)})),columns:invoiceColumns.map(column=>({header:column.label,accessor:row=>escape(column.value(row))})),data:trip.invoices || [],summaryItems:[{label:'Total (LKR)',value:Number(trip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})}]});};
+  const invoiceColumns = [
+    {
+      label: 'Invoice number',
+      value: row => {
+        const isSpecial = (selectedTrip?.specialInvoiceIds || []).map(String).includes(String(row.id));
+        return isSpecial ? `${row.invoiceNumber} (Special)` : row.invoiceNumber;
+      },
+      render: row => {
+        const isSpecial = (selectedTrip?.specialInvoiceIds || []).map(String).includes(String(row.id));
+        return (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>
+              {row.invoiceNumber}
+            </span>
+            {isSpecial && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
+                  borderRadius: '9999px',
+                  padding: '1px 6px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  lineHeight: '14px',
+                }}
+              >
+                ⚡ Special Invoice
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    { label: 'Customer', value: row => row.customerName },
+    { label: 'Address', value: row => row.address || row.customerAddress || '—' },
+    { label: 'Amount (LKR)', value: row => Number(row.netTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+    { label: 'Status', value: row => row.deliveryStatus || selectedTrip?.status || '—' }
+  ];
+  const printTrip=trip=>{const escape=value=>String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));const driverDisplay=[trip.driverName,trip.driverPhone?`📞 ${trip.driverPhone}`:null].filter(Boolean).join(' · ');const assistantDisplay=[trip.assistantStaffName,trip.assistantStaffPhone?`📞 ${trip.assistantStaffPhone}`:null].filter(Boolean).join(' · ');const meta=[['Delivery number',trip.deliveryNumber],['Route',trip.routeName],['Vehicle',trip.vehicleNumber],['Driver',driverDisplay],['Assistant',assistantDisplay],['Scheduled date',trip.scheduledDate],...(trip.status==='RESCHEDULED'||trip.rescheduleReason?[['Rescheduled date',trip.rescheduledDate||trip.scheduledDate],['Reschedule reason',trip.rescheduleReason]]:[]),...(trip.status==='CANCELLED'||trip.cancellationReason?[['Cancellation reason',trip.cancellationReason]]:[]),['Remarks',trip.notes]];printA4Report({title:'Delivery Manifest',metaItems:meta.map(([label,value])=>({label,value:escape(value)})),columns:invoiceColumns.map(column=>({header:column.label,accessor:row=>escape(column.value(row))})),data:trip.invoices || [],summaryItems:[{label:'Total (LKR)',value:Number(trip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})}]});};
   const loadTrip=async(row,print=false)=>{try{const response=await deliveryApi.getById(row.id);const trip=response.data?.data || response.data || row;if(print)printTrip(trip);else {setSelectedTrip(trip);setShowManifestModal(true);}}catch(error){showToast(error.message || 'Could not load delivery','error');}};
-  if(showVehicleModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryVehicleWorkspace form={vehicleForm} setForm={setVehicleForm} busy={vehicleBusy} onClose={()=>setShowVehicleModal(false)} onSave={handleSaveVehicle}/></div>;
-  if(showCreateTripModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryWorkspace form={newTripForm} setForm={setNewTripForm} warehouses={warehouses} routes={routes} vehicles={vehicles} employees={employees} invoices={pendingInvoices} busy={tripBusy} onClose={()=>setShowCreateTripModal(false)} onSave={handleCreateDeliveryTrip}/></div>;
+  if(showVehicleModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryVehicleWorkspace employees={employees} staffLoading={staffLoading} staffError={staffError} onRetryStaff={loadStaff} form={vehicleForm} setForm={setVehicleForm} busy={vehicleBusy} onClose={()=>setShowVehicleModal(false)} onSave={handleSaveVehicle}/></div>;
+  if(showCreateTripModal)return <div className="delivery-theme purchasing-no-shadows" style={{display:'flex',flex:1,minHeight:0}}><DeliveryWorkspace form={newTripForm} setForm={setNewTripForm} warehouses={warehouses} routes={routes} vehicles={vehicles} employees={employees} customers={customers} invoices={pendingInvoices} busy={tripBusy} onClose={()=>setShowCreateTripModal(false)} onSave={handleCreateDeliveryTrip}/></div>;
 
   return (
-    <div className="delivery-theme inventory-theme purchasing-no-shadows erp-page"
+    <div className={`delivery-theme ${currentTab==='routes'?'':'inventory-theme '}purchasing-no-shadows erp-page`}
       style={{
         padding: '24px 32px',
         flex: 1,
@@ -720,8 +978,8 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {currentTab === 'deliveries' && (
-            <button disabled={!canWriteTab(user,'delivery',currentTab)} className="erp-button erp-button-primary"
+          {currentTab !== 'vehicles' && (
+            <button disabled={!canWriteTab(user,'delivery','deliveries')} className="erp-button erp-button-primary"
               type="button"
               onClick={handleOpenCreateTrip}
               style={{
@@ -733,22 +991,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               }}
             >
               <Plus size={17} /> New Delivery
-            </button>
-          )}
-
-          {currentTab === 'routes' && (
-            <button disabled={!canWriteTab(user,'delivery',currentTab)} className="erp-button erp-button-primary"
-              type="button"
-              onClick={handleOpenCreateRouteView}
-              style={{
-                padding: '9px 18px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              <Plus size={17} /> New Delivery Route
             </button>
           )}
 
@@ -800,24 +1042,44 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
           onClick={() => setCurrentTab('vehicles')}
 
         >
-          <Gauge size={16} /> Fleet Vehicles
+          <Gauge size={16} /> Vehicles
         </ErpTab>
 
       </ErpTabs>
 
-      {currentTab==='deliveries' && <DeliveryDirectory title="Delivery Trips" rows={filteredDeliveries} query={searchTerm} onQuery={setSearchTerm} loading={loading} onRefresh={fetchData} onView={row=>loadTrip(row)} onPrint={row=>loadTrip(row,true)} columns={[{label:'Delivery number',code:true,value:row=>row.deliveryNumber},{label:'Route',value:row=>row.routeName},{label:'Vehicle',value:row=>row.vehicleNumber},{label:'Driver / assistant',value:row=>[row.driverName,row.assistantStaffName].filter(Boolean).join(' / ')},{label:'Invoices',value:row=>row.totalInvoicesCount ?? 0},{label:'Date',value:row=>row.scheduledDate},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} filters={<><FilterSelect aria-label="Delivery status" title="Filter deliveries by status" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="ALL">All Statuses</option>{['SCHEDULED','IN_TRANSIT','DELIVERED','CANCELLED'].map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</FilterSelect><FilterSelect className="inventory-full-label-filter" aria-label="Delivery route filter" title="Filter deliveries by route" value={routeFilter} style={{width:'auto'}} onChange={event=>setRouteFilter(event.target.value)}><option value="ALL">All Routes</option>{routes.map(route=><option key={route.id} value={route.id}>{route.routeName}</option>)}</FilterSelect><DateRangePicker documentType="Delivery" from={deliveryFrom} to={deliveryTo} onChange={(from,to)=>{setDeliveryFrom(from);setDeliveryTo(to);}}/></>}/> }
+      {currentTab==='deliveries' && <DeliveryDirectory title="Delivery Trips" rows={filteredDeliveries} query={searchTerm} onQuery={setSearchTerm} loading={loading} onRefresh={fetchData} onView={row=>loadTrip(row)} onPrint={row=>loadTrip(row,true)} columns={[{label:'Delivery number',code:true,value:row=>row.deliveryNumber},{label:'Route',value:row=>row.routeName},{label:'Vehicle',value:row=>row.vehicleNumber},{label:'Driver / assistant',value:row=>[row.driverName,row.assistantStaffName].filter(Boolean).join(' / ')},{label:'Invoices',value:row=>row.totalInvoicesCount ?? 0},{label:'Date',value:row=>row.scheduledDate},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} filters={<><FilterSelect aria-label="Delivery status" title="Filter deliveries by status" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="ALL">All Statuses</option>{['DRAFT','SCHEDULED','RESCHEDULED','IN_TRANSIT','DELIVERED','CANCELLED'].map(status=><option key={status} value={status}>{status.replaceAll('_',' ')}</option>)}</FilterSelect><FilterSelect className="inventory-full-label-filter" aria-label="Delivery route filter" title="Filter deliveries by route" value={routeFilter} style={{width:'auto'}} onChange={event=>setRouteFilter(event.target.value)}><option value="ALL">All Routes</option>{routes.map(route=><option key={route.id} value={route.id}>{route.routeName}</option>)}</FilterSelect><DateRangePicker documentType="Delivery" from={deliveryFrom} to={deliveryTo} onChange={(from,to)=>{setDeliveryFrom(from);setDeliveryTo(to);}}/></>}/> }
 
-      {currentTab==='routes' && <DeliveryDirectory title="Delivery Routes" rows={filteredRoutes} query={routeSearchTerm} onQuery={setRouteSearchTerm} loading={loading} onRefresh={fetchData} columns={[{label:'Route code',code:true,value:row=>row.routeCode},{label:'Route',value:row=>row.routeName},{label:'Area',value:row=>row.area},{label:'Delivery days',value:row=>row.deliveryDays},{label:'Assigned staff',value:row=>row.assignedStaffName},{label:'Customers',value:row=>row.customerCount},{label:'Remarks',value:row=>row.description}]} canEdit={canEditDelivery} onView={setViewingRoute} onEdit={handleOpenRouteView}/>}
-      {currentTab==='vehicles' && <DeliveryDirectory title="Fleet Vehicles" rows={vehicles.filter(row=>[row.vehicleNumber,row.model,row.vehicleType,row.notes].some(value=>String(value || '').toLowerCase().includes(vehicleSearch.toLowerCase())))} query={vehicleSearch} onQuery={setVehicleSearch} loading={loading} onRefresh={fetchData} columns={[{label:'Plate number',code:true,value:row=>row.vehicleNumber},{label:'Model & make',value:row=>row.model},{label:'Type',value:row=>row.vehicleType},{label:'Capacity (kg)',value:row=>row.capacityKg},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} canEdit={canEditDelivery} onView={setViewingVehicle} onEdit={row=>{setVehicleForm({...row,capacityKg:row.capacityKg ?? '',notes:row.notes || ''});setShowVehicleModal(true);}}/>}
+      {currentTab==='routes' && <CustomersHub activeSubTab="groups" deliveryMode/>}
+      {currentTab==='vehicles' && <DeliveryDirectory title="Vehicles" rows={vehicles.filter(row=>{
+        const matchesSearch = [row.vehicleNumber,row.model,row.vehicleType,row.assignedStaffName,row.assignedStaffEmployeeCode,row.notes].some(value=>String(value || '').toLowerCase().includes(vehicleSearch.toLowerCase()));
+        const matchesStatus = vehicleStatusFilter === 'ALL' || row.status === vehicleStatusFilter;
+        return matchesSearch && matchesStatus;
+      })} query={vehicleSearch} onQuery={setVehicleSearch} loading={loading} onRefresh={fetchData} filters={<FilterSelect aria-label="Vehicle status" title="Filter vehicles by status" value={vehicleStatusFilter} onChange={event=>setVehicleStatusFilter(event.target.value)}><option value="ALL">All Statuses</option><option value="AVAILABLE">Available</option><option value="IN_GARAGE">In Garage</option><option value="IN_SERVICE">In Service</option><option value="DRAFT">Draft</option></FilterSelect>} columns={[{label:'Plate number',code:true,value:row=>row.vehicleNumber || `Vehicle draft #${row.id}`},{label:'Vehicle model',value:row=>row.model},{label:'Type',value:row=>row.vehicleType},{label:'Responsible staff',value:row=>[row.assignedStaffName,row.assignedStaffEmployeeCode].filter(Boolean).join(' / ') || 'Unassigned'},{label:'Capacity (kg)',value:row=>row.capacityKg},{label:'Status',status:true,value:row=>row.status},{label:'Remarks',value:row=>row.notes}]} canEdit={canEditDelivery} onDelete={row=>vehicleDeletion.requestDeletion({...row,name:row.vehicleNumber || `Vehicle draft #${row.id}`})} onView={setViewingVehicle} onEdit={row=>{setVehicleForm({...row,capacityKg:row.capacityKg ?? '',notes:row.notes || ''});setShowVehicleModal(true);}}/>}
 
       {showDispatchModal && selectedTrip && <DeliveryActionDialog mode="dispatch" trip={selectedTrip} form={dispatchForm} setForm={setDispatchForm} busy={tripBusy} onClose={()=>setShowDispatchModal(false)} onConfirm={handleConfirmDispatch}/>}
+      {showRescheduleModal && selectedTrip && <DeliveryActionDialog mode="reschedule" trip={selectedTrip} form={rescheduleForm} setForm={setRescheduleForm} busy={tripBusy} onClose={()=>setShowRescheduleModal(false)} onConfirm={handleConfirmReschedule}/>}
       {showCompleteModal && selectedTrip && <DeliveryActionDialog mode="complete" trip={selectedTrip} form={completeForm} setForm={setCompleteForm} busy={tripBusy} onClose={()=>setShowCompleteModal(false)} onConfirm={handleConfirmComplete}/>}
       {showCancelModal && selectedTrip && <DeliveryActionDialog mode="cancel" trip={selectedTrip} form={cancelForm} setForm={setCancelForm} busy={tripBusy} onClose={()=>setShowCancelModal(false)} onConfirm={handleConfirmCancel}/>}
 
-      {showManifestModal && selectedTrip && <PurchaseInspectionModal type="Delivery" number={selectedTrip.deliveryNumber} status={selectedTrip.status} rows={selectedTrip.invoices || []} columns={invoiceColumns} tableToolbar tableSearchPlaceholder="Search invoice or customer..." tableSearchLabel="Search delivery invoices" emptyMessage="No matching invoices found." onPrint={()=>printTrip(selectedTrip)} onClose={()=>setShowManifestModal(false)} details={[{label:'Route',value:selectedTrip.routeName},{label:'Warehouse',value:selectedTrip.warehouseName},{label:'Vehicle',value:selectedTrip.vehicleNumber},{label:'Driver',value:selectedTrip.driverName},{label:'Assistant',value:selectedTrip.assistantStaffName},{label:'Scheduled date',value:selectedTrip.scheduledDate},{label:'Total (LKR)',value:Number(selectedTrip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})},{label:'Departure',value:formatTimeStr(selectedTrip.departureTime)},{label:'Return',value:formatTimeStr(selectedTrip.returnTime)},{label:'Remarks',value:selectedTrip.notes}]} detailActions={canEditDelivery ? [...(selectedTrip.status==='SCHEDULED'?[{label:'Dispatch Delivery',icon:Navigation,tone:'success',onClick:()=>handleOpenDispatch(selectedTrip)}]:[]),...(selectedTrip.status==='IN_TRANSIT'?[{label:'Complete Delivery',icon:CheckCircle2,tone:'success',onClick:()=>handleOpenComplete(selectedTrip)}]:[]),...(['SCHEDULED','IN_TRANSIT'].includes(selectedTrip.status)?[{label:'Cancel Delivery',icon:X,tone:'danger',onClick:()=>handleOpenCancel(selectedTrip)}]:[])] : []}/>}
-      {viewingVehicle && <PurchaseInspectionModal type="Fleet" number={viewingVehicle.vehicleNumber} status={viewingVehicle.status} rows={[viewingVehicle]} columns={[{label:'Model',value:row=>row.model},{label:'Type',value:row=>row.vehicleType},{label:'Capacity (kg)',value:row=>row.capacityKg ?? '—'},{label:'Notes',value:row=>row.notes || '—'}]} headerPrint onClose={()=>setViewingVehicle(null)} details={[{label:'Model',value:viewingVehicle.model},{label:'Type',value:viewingVehicle.vehicleType},{label:'Capacity',value:viewingVehicle.capacityKg?`${viewingVehicle.capacityKg} kg`:'—'},{label:'Remarks',value:viewingVehicle.notes}]} detailActions={canEditDelivery?[{label:'Edit Vehicle',icon:Edit2,onClick:()=>{setVehicleForm({...viewingVehicle,capacityKg:viewingVehicle.capacityKg ?? '',notes:viewingVehicle.notes || ''});setViewingVehicle(null);setShowVehicleModal(true);}}]:[]}/>}
+      {showManifestModal && selectedTrip && <PurchaseInspectionModal type="Delivery" number={selectedTrip.deliveryNumber} status={selectedTrip.status} rows={selectedTrip.invoices || []} columns={invoiceColumns} tableToolbar tableSearchPlaceholder="Search invoice or customer..." tableSearchLabel="Search delivery invoices" emptyMessage="No matching invoices found." onPrint={()=>printTrip(selectedTrip)} onClose={()=>setShowManifestModal(false)} details={[{label:'Route',value:selectedTrip.routeName},{label:'Warehouse',value:selectedTrip.warehouseName},{label:'Vehicle',value:selectedTrip.vehicleNumber},{label:'Driver',value:selectedTrip.driverName?[selectedTrip.driverName,selectedTrip.driverPhone?`📞 ${selectedTrip.driverPhone}`:null].filter(Boolean).join(' · '):'—'},{label:'Assistant',value:selectedTrip.assistantStaffName?[selectedTrip.assistantStaffName,selectedTrip.assistantStaffPhone?`📞 ${selectedTrip.assistantStaffPhone}`:null].filter(Boolean).join(' · '):'—'},{label:'Scheduled date',value:selectedTrip.scheduledDate},...(selectedTrip.status==='RESCHEDULED'||selectedTrip.rescheduleReason?[{label:'Rescheduled date',value:selectedTrip.rescheduledDate||selectedTrip.scheduledDate},{label:'Reschedule reason',value:selectedTrip.rescheduleReason,wide:true}]:[]),...(selectedTrip.status==='CANCELLED'||selectedTrip.cancellationReason?[{label:'Cancellation reason',value:selectedTrip.cancellationReason,wide:true}]:[]),{label:'Total (LKR)',value:Number(selectedTrip.totalAmount || 0).toLocaleString(undefined,{minimumFractionDigits:2})},...(selectedTrip.departureTime?[{label:'Departure',value:formatTimeStr(selectedTrip.departureTime)}]:[]),...(selectedTrip.returnTime?[{label:'Return',value:formatTimeStr(selectedTrip.returnTime)}]:[]),{label:'Remarks',value:selectedTrip.notes}]} detailActions={canEditDelivery ? [...(['SCHEDULED','RESCHEDULED'].includes(selectedTrip.status)?[{label:'Dispatch Delivery',icon:Navigation,tone:'success',onClick:()=>handleOpenDispatch(selectedTrip)},{label:'Reschedule Delivery',icon:CalendarClock,tone:'warning',onClick:()=>handleOpenReschedule(selectedTrip)}]:[]),...(selectedTrip.status==='IN_TRANSIT'?[{label:'Complete Delivery',icon:CheckCircle2,tone:'success',onClick:()=>handleOpenComplete(selectedTrip)}]:[]),...(['SCHEDULED','RESCHEDULED','IN_TRANSIT'].includes(selectedTrip.status)?[{label:'Cancel Delivery',icon:X,tone:'danger',onClick:()=>handleOpenCancel(selectedTrip)}]:[])] : []}/>}
+      {vehicleDeletion.deletionDialog}
+      {viewingVehicle && <VehicleDetailsModal onDelete={()=>vehicleDeletion.requestDeletion({...viewingVehicle,name:viewingVehicle.vehicleNumber || `Vehicle draft #${viewingVehicle.id}`})} vehicle={viewingVehicle} canManage={canEditDelivery} onClose={()=>setViewingVehicle(null)} onEdit={()=>{setVehicleForm({...viewingVehicle,capacityKg:viewingVehicle.capacityKg ?? '',notes:viewingVehicle.notes || ''});setViewingVehicle(null);setShowVehicleModal(true);}} onChangeStatus={()=>handleOpenVehicleStatusChange(viewingVehicle)}/>}
+      {vehicleStatusTransition && <PurchasingStatusDialog
+        title="Change Vehicle Status"
+        confirmLabel="Save changes"
+        closeLabel="Cancel"
+        pending={vehicleStatusTransition}
+        targetOptions={['AVAILABLE','IN_SERVICE','IN_GARAGE'].filter(s => s !== (vehicleStatusTransition.current || vehicleStatusTransition.vehicle?.status))}
+        onTargetChange={newTarget=>setVehicleStatusTransition(prev=>({...prev,target:newTarget}))}
+        reason={vehicleStatusReason}
+        onReasonChange={setVehicleStatusReason}
+        reasonPlaceholder="Explain why this vehicle status needs to change..."
+        busy={vehicleStatusBusy}
+        onClose={()=>!vehicleStatusBusy && setVehicleStatusTransition(null)}
+        onConfirm={handleConfirmVehicleStatusChange}
+      />}
 
-      {viewingRoute && <PurchaseInspectionModal type="Route" number={viewingRoute.routeCode || viewingRoute.routeName} status={viewingRoute.isActive?'ACTIVE':'INACTIVE'} tableToolbar tableSearchPlaceholder="Search customer code or name..." tableSearchLabel="Search route customers" emptyMessage="No matching customers found." rows={customers.filter(customer=>(viewingRoute.customerIds || []).map(String).includes(String(customer.id)) || String(customer.routeId)===String(viewingRoute.id))} columns={[{label:'Customer code',value:row=>row.customerCode || row.code},{label:'Customer',value:row=>row.name || row.customerName},{label:'Phone',value:row=>row.phone},{label:'Address',value:row=>row.address}]} onClose={()=>setViewingRoute(null)} details={[{label:'Route',value:viewingRoute.routeName},{label:'Area',value:viewingRoute.area},{label:'Delivery days',value:viewingRoute.deliveryDays},{label:'Assigned staff',value:viewingRoute.assignedStaffName},{label:'Remarks',value:viewingRoute.description}]} detailActions={canEditDelivery?[{label:'Edit Route',icon:Edit2,onClick:()=>{handleOpenRouteView(viewingRoute);setViewingRoute(null);}}]:[]}/>}
+      {viewingRoute && <PurchaseInspectionModal type="Route" number={viewingRoute.routeCode || viewingRoute.routeName} status={viewingRoute.status || (viewingRoute.isActive?'ACTIVE':'INACTIVE')} tableToolbar tableSearchPlaceholder="Search customer code or name..." tableSearchLabel="Search route customers" emptyMessage="No matching customers found." rows={customers.filter(customer=>(viewingRoute.customerIds || []).map(String).includes(String(customer.id)) || String(customer.routeId)===String(viewingRoute.id))} columns={[{label:'Customer code',value:row=>row.customerCode || row.code},{label:'Customer',value:row=>row.name || row.customerName},{label:'Phone',value:row=>row.phone},{label:'Address',value:row=>row.address}]} onClose={()=>setViewingRoute(null)} details={[{label:'Route',value:viewingRoute.routeName},{label:'Area',value:viewingRoute.area},{label:'Assigned staff',value:viewingRoute.assignedStaffName},{label:'Remarks',value:viewingRoute.description}]} detailActions={canEditDelivery?[{label:'Edit Route',icon:Edit2,onClick:()=>{handleOpenRouteView(viewingRoute);setViewingRoute(null);}}]:[]}/>}
       {/* MODAL 6: DELIVERY ROUTE VIEW POPUP (SPLIT 2 COLUMNS)          */}
       {/* ------------------------------------------------------------- */}
       {(selectedRoute || isCreatingRoute) && (
@@ -1011,26 +1273,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                     />
                   </div>
 
-                  {/* Delivery Days */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                      Delivery Days
-                    </label>
-                    <input className="erp-field"
-                      type="text"
-                      placeholder="e.g. Monday, Wednesday, Friday"
-                      value={routeEditForm.deliveryDays}
-                      onChange={(e) => setRouteEditForm({ ...routeEditForm, deliveryDays: e.target.value })}
-                      style={{
-                        width: '100%',
-                        height: '38px',
-                        padding: '0 12px',
-                        border: '1px solid #cbd5e1',
-                        backgroundColor: '#ffffff',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
 
                   {/* Description Input */}
                   <div>
@@ -1293,6 +1535,30 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
               >
                 Cancel
               </button>
+              {isCreatingRoute && (
+                <button
+                  type="button"
+                  onClick={(e) => handleSaveRouteView(e, { isDraft: true })}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    color: '#334155',
+                    fontSize: 'var(--erp-text-field)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                >
+                  Save as Draft
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleSaveRouteView}
@@ -1451,6 +1717,19 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                   return (
                     <div
                       key={c.id}
+                      onClick={() => {
+                        if (isAssigned) {
+                          setRouteEditForm({
+                            ...routeEditForm,
+                            selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
+                          });
+                        } else {
+                          setRouteEditForm({
+                            ...routeEditForm,
+                            selectedCustomerIds: [...routeEditForm.selectedCustomerIds, String(c.id)],
+                          });
+                        }
+                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1458,9 +1737,12 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         padding: '8px 10px',
                         borderRadius: '6px',
                         borderBottom: '1px solid #f1f5f9',
+                        cursor: 'pointer',
+                        backgroundColor: isAssigned ? '#f0fdf4' : 'transparent',
+                        transition: 'background-color 0.15s ease',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isAssigned ? '#dcfce7' : '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isAssigned ? '#f0fdf4' : 'transparent')}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                         <div
@@ -1487,7 +1769,6 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                           </div>
                           <div style={{ fontSize: 'var(--erp-text-caption)', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{c.code || c.customerCode}</span>
-                            {c.phone && <span>• {c.phone}</span>}
                             {otherRoutes.length > 0 && (
                               <span style={{ color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '1px 6px', borderRadius: '4px', fontSize: 'var(--erp-text-caption)', fontWeight: 500 }}>
                                 Also in: {otherRoutes.map((r) => r.routeName || r.name).join(', ')}
@@ -1497,48 +1778,26 @@ export default function DeliveryHub({ activeSubTab = 'deliveries' }) {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isAssigned) {
-                            setRouteEditForm({
-                              ...routeEditForm,
-                              selectedCustomerIds: routeEditForm.selectedCustomerIds.filter((id) => id !== String(c.id)),
-                            });
-                          } else {
-                            setRouteEditForm({
-                              ...routeEditForm,
-                              selectedCustomerIds: [...routeEditForm.selectedCustomerIds, String(c.id)],
-                            });
-                          }
-                        }}
-                        style={{
-                          marginLeft: '10px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '4px 10px',
-                          borderRadius: '5px',
-                          fontSize: 'var(--erp-text-caption)',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          border: isAssigned ? '1px solid #bbf7d0' : 'none',
-                          backgroundColor: isAssigned ? '#f0fdf4' : '#0284c7',
-                          color: isAssigned ? '#15803d' : '#ffffff',
-                          flexShrink: 0,
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {isAssigned ? (
-                          <>
-                            <Check size={12} /> Assigned
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={12} /> Add
-                          </>
-                        )}
-                      </button>
+                      {isAssigned && (
+                        <span
+                          style={{
+                            marginLeft: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 10px',
+                            borderRadius: '5px',
+                            fontSize: 'var(--erp-text-caption)',
+                            fontWeight: 600,
+                            border: '1px solid #bbf7d0',
+                            backgroundColor: '#f0fdf4',
+                            color: '#15803d',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Check size={12} /> Assigned
+                        </span>
+                      )}
                     </div>
                   );
                 })

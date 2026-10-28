@@ -96,17 +96,12 @@ export default function LoginView({ onSwitchToSignup }) {
       await login(username.trim(), password);
       addToast('Welcome back! Successfully logged in.', 'success');
     } catch (err) {
-      const rawMessage = err.response?.data?.message || err.friendlyMessage || err.message || '';
-      const msg = rawMessage.toLowerCase();
-
-      if (msg.includes('username') && (msg.includes('incorrect') || msg.includes('not found') || msg.includes('invalid'))) {
-        setUsernameError('Username is incorrect.');
-      } else if (msg.includes('password') && (msg.includes('incorrect') || msg.includes('invalid') || msg.includes('not match'))) {
-        setPasswordError('Password is incorrect.');
-      } else if (msg.includes('bad credentials')) {
-        setPasswordError('Password is incorrect.');
+      if (err.response?.status === 429) {
+        addToast('Too many sign-in attempts. Please wait a minute and try again.', 'error');
+      } else if (err.response?.status === 401) {
+        setPasswordError('Invalid username or password. Please try again or contact your administrator.');
       } else {
-        addToast(rawMessage || 'Login failed. Please check your credentials.', 'error');
+        addToast('Unable to sign in right now. Please try again later.', 'error');
       }
     } finally {
       setLoading(false);

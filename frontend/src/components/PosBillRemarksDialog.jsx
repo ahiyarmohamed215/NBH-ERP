@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {X} from 'lucide-react';
 import {posMoney} from './PosRangeProgress';
-import './HeldBillPrintDialog.css';
+import './PurchasingAppearance.css';
 import './PosBillRemarksDialog.css';
 
 export default function PosBillRemarksDialog({customerName,total,busy,onClose,onConfirm}) {
@@ -30,12 +30,12 @@ export default function PosBillRemarksDialog({customerName,total,busy,onClose,on
     try{if(await onConfirm(remarks.trim())===false)setError('The bill was not saved. Your products and remarks are kept. Try again.');}
     finally{submitting.current=false;}
   };
-  return createPortal(<div className="modal-backdrop held-print-backdrop"><form ref={panel} className="glass-modal held-print-dialog pos-bill-remarks" role="dialog" aria-modal="true" aria-labelledby="pos-bill-remarks-title" aria-describedby="pos-bill-remarks-help" onSubmit={submit}>
+  return createPortal(<div className="modal-backdrop purchasing-no-shadows pos-bill-remarks-backdrop"><form ref={panel} className="glass-modal pos-bill-remarks" role="dialog" aria-modal="true" aria-labelledby="pos-bill-remarks-title" aria-describedby="pos-bill-remarks-help" onSubmit={submit}>
     <header><div><h2 id="pos-bill-remarks-title" className="erp-dialog-title">Bill remarks</h2><p>{customerName} · {posMoney(total)}</p></div><button type="button" aria-label="Close bill remarks" disabled={busy} onClick={onClose}><X size={18}/></button></header>
-    <div className="held-print-body"><p id="pos-bill-remarks-help">Add delivery instructions or other details for this bill. You can leave this blank.</p>
+    <div className="pos-bill-remarks-body"><p id="pos-bill-remarks-help">Add delivery instructions or other details for this bill. You can leave this blank.</p>
       <label htmlFor="pos-bill-remarks">Remarks (optional)</label><textarea ref={input} id="pos-bill-remarks" className="erp-field" rows={4} maxLength={1000} value={remarks} disabled={busy} onChange={event=>setRemarks(event.target.value)} placeholder="For example: Deliver after 3 pm"/>
-      <span className="pos-bill-remarks-count">{remarks.length}/1000</span>{error && <p className="held-print-error" role="alert">{error}</p>}
+      <span className="pos-bill-remarks-count">{remarks.length}/1000</span>{error && <p className="pos-bill-remarks-error" role="alert">{error}</p>}
     </div>
-    <footer><button type="button" className="erp-button" disabled={busy} onClick={onClose}>Back to bill</button><button type="submit" className="erp-button held-print-primary" disabled={busy}>{busy?'Saving…':'Save Onhold Bill'}</button></footer>
+    <footer><button type="button" className="btn btn-glass erp-button" disabled={busy} onClick={onClose}>Back to bill</button><button type="submit" className="btn btn-primary erp-button erp-button-primary" disabled={busy}>{busy?'Saving…':'Save Onhold Bill'}</button></footer>
   </form></div>,document.body);
 }

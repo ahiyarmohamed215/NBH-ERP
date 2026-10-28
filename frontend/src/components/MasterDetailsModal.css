@@ -51,3 +51,20 @@
 .master-details-modal.master-details-uniform{height:min(410px,calc(100dvh - 24px));}
 .master-details-uniform .master-details-body{flex:1;}
 @media(max-width:600px){.master-details-modal.master-details-uniform{height:min(620px,calc(100dvh - 24px));}}
+
+.master-details-print-btn {
+  background: var(--erp-accent, #0284c7) !important;
+  color: #fff !important;
+  border: 1px solid var(--erp-accent, #0284c7) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.master-details-print-btn:hover:not(:disabled) {
+  background: var(--erp-accent-hover, #0369a1) !important;
+  border-color: var(--erp-accent-hover, #0369a1) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+}

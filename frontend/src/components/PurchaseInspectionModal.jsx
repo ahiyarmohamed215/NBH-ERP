@@ -1,10 +1,10 @@
 import React,{useState} from 'react';
-import { Search, Printer, X, FileCheck, ArrowLeftRight, RotateCcw, ClipboardList, UserRound, Calendar, MessageSquare, Warehouse, Boxes, Truck, Navigation, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Search, Printer, X, FileCheck, ArrowLeftRight, RotateCcw, ClipboardList, UserRound, Calendar, MessageSquare, Warehouse, Boxes, Truck, Navigation, ShieldCheck, SlidersHorizontal, FileText } from 'lucide-react';
 import { printA4Report } from '../utils/printReport';
 import './PurchaseInspectionModal.css';
 import StatusBadge from './StatusBadge';
 
-export default function PurchaseInspectionModal({ type, number, status, rows = [], columns, actions = [], headerActions = [], detailActions = [], onPrint, onClose, actionsPosition = 'bottom', details = [], detailsPosition = 'header', showHeaderClose = true, closeLabel = 'Close', tableToolbar = false, tableSearchPlaceholder,tableSearchLabel,emptyMessage, content, headerPrint = false, footer, ariaLabel, closeAriaLabel, tablePrint = true, className = '' }) {
+export default function PurchaseInspectionModal({ type, number, status, rows = [], columns, actions = [], headerActions = [], detailActions = [], onPrint, onClose, actionsPosition = 'bottom', details = [], detailsPosition = 'header', showHeaderClose = true, closeLabel = 'Close', tableToolbar = false, tableSearchPlaceholder,tableSearchLabel,emptyMessage, content, headerPrint = false, footer, ariaLabel, closeAriaLabel, tablePrint = true, className = '', style, tablePrintAriaLabel }) {
   const [tableQuery,setTableQuery]=useState('');
   const query=tableQuery.trim().toLowerCase();
   const visibleRows=tableToolbar && query ? rows.filter(row=>columns.some(column=>String(column.value(row) ?? '').toLowerCase().includes(query))) : rows;
@@ -12,8 +12,8 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
   const cardActions=unifiedDetails ? [...detailActions,...headerActions,...actions] : detailActions;
   const managementActions=unifiedDetails ? [] : headerActions;
   const footerActions=unifiedDetails ? [] : actions;
-  const DocumentIcon = { GRN: FileCheck, GTN: ArrowLeftRight, PRN: RotateCcw, PO: ClipboardList, Inventory: Boxes, Allocation: ShieldCheck, Adjustment: SlidersHorizontal, Delivery: Truck, Fleet: Truck, Route: Navigation }[type] || FileCheck;
-  const documentTitle = { GRN: 'Goods received note', GTN: 'Goods transfer note', PRN: 'Purchase return note', PO: 'Purchase order', Inventory: 'Inventory stock', Allocation: 'Inventory allocation', Adjustment: 'Stock adjustment', Delivery: 'Delivery trip', Fleet: 'Fleet vehicle', Route: 'Delivery route' }[type] || type;
+  const DocumentIcon = { GRN: FileCheck, GTN: ArrowLeftRight, PRN: RotateCcw, PO: ClipboardList, Inventory: Boxes, Allocation: ShieldCheck, Adjustment: SlidersHorizontal, Delivery: Truck, Fleet: Truck, Route: Navigation, QUOTATION: FileText, Quotation: FileText }[type] || FileCheck;
+  const documentTitle = { GRN: 'Goods received note', GTN: 'Goods transfer note', PRN: 'Purchase return note', PO: 'Purchase order', Inventory: 'Inventory stock', Allocation: 'Inventory allocation', Adjustment: 'Stock adjustment', Delivery: 'Delivery trip', Fleet: 'Fleet vehicle', Route: 'Delivery route', QUOTATION: 'Customer quotation', Quotation: 'Customer quotation' }[type] || type;
   const printDocument = () => {
     if (onPrint) { onPrint(); return; }
     const escapeText = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -35,15 +35,15 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
   const detailsSection = unifiedDetails || cardActions.length > 0 ? <div className="purchase-inspection-details-card">
     {detailsList}
     {cardActions.length > 0 && <div className="purchase-inspection-detail-actions" aria-label={`${type} details actions`}>
-      {cardActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={label} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
+      {cardActions.map(({label,ariaLabel,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={ariaLabel || label} data-tone={tone} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
     </div>}
   </div> : detailsList;
   const managementSection = managementActions.length > 0 && <div className="purchase-inspection-header-actions" aria-label={`${type} management actions`}>
-{managementActions.map(({label,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={label} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
+{managementActions.map(({label,ariaLabel,icon:Icon,onClick,disabled,tone})=><button key={label} type="button" aria-label={ariaLabel || label} data-tone={tone} className={`btn btn-glass${tone === 'danger' ? ' purchase-inspection-danger' : tone === 'success' ? ' purchase-inspection-success' : tone === 'warning' ? ' purchase-inspection-warning' : ''}`} onClick={onClick} disabled={disabled}>{Icon && <Icon size={15}/>} {label}</button>)}
           </div>;
   return (
     <div className="modal-backdrop" style={{ padding: '12px', zIndex: 1100 }}>
-      <div className={`glass-modal purchase-inspection ${type.toLowerCase()}-inspection${tableToolbar ? ' purchase-inspection-toolbar-layout' : ''}${detailsPosition === 'sidebar' ? ' purchase-inspection-split' : ''}${actionsPosition === 'bottom' ? ' purchase-inspection-bottom-actions' : ''}${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-label={ariaLabel || `${type} ${number}`}>
+      <div style={style} className={`glass-modal purchase-inspection ${type.toLowerCase()}-inspection${tableToolbar ? ' purchase-inspection-toolbar-layout' : ''}${detailsPosition === 'sidebar' ? ' purchase-inspection-split' : ''}${actionsPosition === 'bottom' ? ' purchase-inspection-bottom-actions' : ''}${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-label={ariaLabel || `${type} ${number}`}>
         <header className={`purchase-inspection-header${unifiedDetails ? ' purchase-inspection-header-details' : ''}`}>
           <div className="purchase-inspection-header-main">
             <div className="purchase-inspection-title"><div className="grn-inspection-symbol"><DocumentIcon size={22} strokeWidth={1.7} /></div><div><span className="purchase-inspection-caption">{documentTitle}</span><div className="purchase-inspection-number-row"><h2 className="erp-dialog-title">{number}</h2>{unifiedDetails && <StatusBadge status={status}/>}</div></div></div>
@@ -61,12 +61,12 @@ export default function PurchaseInspectionModal({ type, number, status, rows = [
           <section className="purchase-inspection-items" aria-label={`${type} products`}>
             {tableToolbar && !content && <div className="purchase-inspection-table-toolbar" aria-label={`${type} table controls`}>
               <div className="purchase-inspection-table-search"><Search size={16}/><input className="erp-field" type="search" aria-label={tableSearchLabel || `Search ${type} products`} placeholder={tableSearchPlaceholder || "Search product code or name..."} value={tableQuery} onChange={event=>setTableQuery(event.target.value)}/>{tableQuery && <button type="button" aria-label="Clear table search" onClick={()=>setTableQuery('')}><X size={14}/></button>}</div>
-              {tablePrint !== false && <button type="button" className="purchase-inspection-table-print" title={`Print ${type}`} aria-label={`Print ${type}`} onClick={printDocument}><Printer size={15}/> Print</button>}
+              {tablePrint !== false && <button type="button" className="purchase-inspection-table-print" title={tablePrintAriaLabel || `Print ${type}`} aria-label={tablePrintAriaLabel || (type === 'Route' ? 'Print Delivery Route' : `Print ${type}`)} onClick={printDocument}><Printer size={15}/> Print</button>}
             </div>}
 
             {content || <div className="purchase-inspection-table erp-table-scroll erp-table-frame"><table className="glass-table erp-table">
               <thead><tr>{columns.map((column) => <th key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-heading'}>{column.label}</th>)}</tr></thead>
-              <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-cell'}>{column.value(row) ?? '—'}</td>)}</tr>)}
+              <tbody>{visibleRows.map((row, index) => <tr key={row.id ?? index}>{columns.map((column) => <td key={column.label} className={(column.numeric ? 'purchase-inspection-number' : '') + ' erp-table-cell'}>{column.render ? column.render(row) : (column.value(row) ?? '—')}</td>)}</tr>)}
                 {!visibleRows.length && <tr><td colSpan={columns.length} className="purchase-inspection-empty erp-table-cell">{emptyMessage || (query ? 'No matching products found.' : 'No products found.')}</td></tr>}
               </tbody>
             </table></div>}

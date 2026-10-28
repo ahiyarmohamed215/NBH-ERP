@@ -10,7 +10,7 @@ export function inventorySellingPrice(balance,product={},canSeeCost=false) {
   if(canSeeCost) {
     const catalogCost=numeric(product.costPrice),stockCost=numeric(balance.costPrice);
     const cost=catalogCost>0 ? catalogCost : stockCost>0 ? stockCost : catalogCost ?? stockCost;
-    const markup=numeric(product.brandMarkupPercent ?? balance.brandMarkupPercent) ?? 0;
+    const markup=numeric(product.markupPercent ?? balance.markupPercent ?? product.brandMarkupPercent ?? balance.brandMarkupPercent) ?? 0;
     if(cost!=null && cost>=0 && markup>=-100)return Number((cost*(1+markup/100)).toFixed(2));
   }
   return catalog ?? stock ?? 0;

@@ -1,6 +1,8 @@
 import CustomerOutstandingTable from '../components/CustomerOutstandingTable';
+import {usePurchasingStatusChange} from '../hooks/usePurchasingStatusChange';
 import {customerOutstandingInvoices,outstandingPaymentStatus} from '../utils/customerOutstanding';
 import {hasPermission} from '../utils/moduleAccess';
+import {conflictingCustomerGroup} from '../utils/customerGroupAssignment';
 import useModuleTab from '../hooks/useModuleTab';
 import ErpTabs, {ErpTab} from '../components/ErpTabs';
 import { Trash2 } from 'lucide-react';
@@ -10,6 +12,9 @@ import CustomerEditorModal from '../components/CustomerEditorModal';
 import FilterSelect from '../components/FilterSelect';
 import SearchBar from '../components/SearchBar';
 import './CustomersHub.css';
+import '../components/PurchaseProductSearch.css';
+import '../components/PurchaseInspectionModal.css';
+import PurchaseInspectionModal from '../components/PurchaseInspectionModal';
 import useRecordDeletion from '../hooks/useRecordDeletion';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
@@ -17,6 +22,7 @@ import {
   salesmanApi,
   salesApi,
   customerGroupApi,
+  deliveryRouteApi,
   routeApi,
   pdfApi,
   paymentApi,
@@ -41,7 +47,9 @@ import {
   RefreshCw,
   X,
   CheckCircle,
+  Ban,
   MapPin,
+  MessageSquare,
   FileText,
   DollarSign,
   Phone,
@@ -72,13 +80,19 @@ import {
 import CustomerMonthlyRangeHub from './CustomerMonthlyRangeHub';
 import { historyDocumentReference, historyDetailRows } from '../utils/customerHistoryDetails';
 
-export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) {
+export default function CustomersHub({ activeSubTab = 'list', onSubTabChange, deliveryMode = false }) {
   const { user } = useAuth();
-  const canEditCustomer = canEditModule(user, 'CUSTOMER');
+  const canEditCustomer = canEditModule(user, deliveryMode ? 'DELIVERY' : 'CUSTOMER');
   const customerDeletion=useRecordDeletion('CUSTOMER','Customer',()=>loadInitialData());
+  const routeDeletion=useRecordDeletion('DELIVERY_ROUTE','Delivery route',async()=>{handleCloseRouteView();await loadInitialData();});
+  const {requestStatusChange:requestRouteStatusChange,statusChangeDialog:routeStatusDialog}=usePurchasingStatusChange();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useModuleTab('customers',activeSubTab === 'routes' ? 'groups' : activeSubTab === 'ranges' ? 'targets' : activeSubTab,'list',user);
+  const [moduleTab, setModuleTab] = useModuleTab(deliveryMode ? 'delivery' : 'customers',deliveryMode ? 'routes' : activeSubTab === 'routes' ? 'groups' : activeSubTab === 'ranges' ? 'targets' : activeSubTab,deliveryMode ? 'routes' : 'list',user);
+  const activeTab = deliveryMode ? 'groups' : moduleTab;
+  const setActiveTab = tab => setModuleTab(deliveryMode ? 'routes' : tab);
+  const groupText = text => deliveryMode ? text.replaceAll('Customer Groups', 'Delivery Routes').replaceAll('Customer Group', 'Delivery Route').replaceAll('Customer group', 'Delivery route').replaceAll('customer groups', 'delivery routes').replaceAll('customer group', 'delivery route').replaceAll('Groups', 'Routes').replaceAll('Group', 'Route').replaceAll('group', 'route') : text;
+  const groupApi = deliveryMode ? deliveryRouteApi : customerGroupApi;
 
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -237,8 +251,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     try {
       const [cRes, sRes, rRes] = await Promise.allSettled([
         customerApi.getAll({params: {includeInactive: true}}),
-        salesmanApi.getPosStaff(),
-        customerGroupApi.getAll(true),
+        deliveryMode ? Promise.resolve({data: []}) : salesmanApi.getPosStaff(),
+        groupApi.getAll(true),
       ]);
 
       let loadedCustomers = [];
@@ -278,6 +292,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           ? rRes.value.data
           : (Array.isArray(rRes.value) ? rRes.value : []);
         const loadedGroups = rawGroups.map((r) => ({
+          ...r,
           id: r.id,
           name: r.groupName || r.routeName || r.name,
           groupName: r.groupName || r.routeName || r.name,
@@ -292,8 +307,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           assignedStaffName: r.assignedStaffName || r.salesRepName || '',
           customerIds: (r.customerIds || []).map(String),
           createdAt: r.createdAt || new Date().toISOString(),
+          status: r.status || (r.isActive !== false ? 'ACTIVE' : 'INACTIVE'),
         }));
-        setRoutes(loadedGroups);
+        const sortedGroups = [...loadedGroups].sort((a, b) => {
+          const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+          if (timeB && !timeA) return 1;
+          if (!timeB && timeA) return -1;
+          return Number(b.id || 0) - Number(a.id || 0);
+        });
+        setRoutes(sortedGroups);
       }
     } catch (err) {
       addToast('Error loading data: ' + err.message, 'error');
@@ -324,6 +348,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Helper to find all customer groups a customer belongs to (Active only)
   const getCustomerRoutes = (customerId) => {
     const cid = String(customerId);
+    if (deliveryMode) return routes.filter(route => (route.customerIds || []).some(id => String(id) === cid));
     const cObj = customers.find((c) => String(c.id) === cid);
     const activeRoutes = routes.filter((r) => r.isActive !== false);
     const routesByArray = activeRoutes.filter((r) =>
@@ -737,19 +762,30 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const filteredRoutes = useMemo(() => {
     let list = routes;
     if (groupStatusFilter === 'active') {
-      list = list.filter((r) => r.isActive !== false);
+      list = list.filter((r) => r.status !== 'DRAFT' && !r.isDraft && r.isActive !== false);
     } else if (groupStatusFilter === 'inactive') {
-      list = list.filter((r) => r.isActive === false);
+      list = list.filter((r) => (r.status === 'INACTIVE' || r.isActive === false) && r.status !== 'DRAFT' && !r.isDraft);
+    } else if (groupStatusFilter === 'draft') {
+      list = list.filter((r) => r.status === 'DRAFT' || r.isDraft);
     }
     const q = routeSearchTerm.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((r) => {
-      const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId || r.assignedStaffId));
-      const repName = (r.assignedStaffName || r.salesmanName || assignedSalesman?.name || '').toLowerCase();
-      const name = (r.name || '').toLowerCase();
-      const code = (r.groupCode || r.routeCode || '').toLowerCase();
-      const desc = (r.description || '').toLowerCase();
-      return name.includes(q) || code.includes(q) || repName.includes(q) || desc.includes(q);
+    if (q) {
+      list = list.filter((r) => {
+        const assignedSalesman = salesmen.find((s) => String(s.id) === String(r.salesmanId || r.assignedStaffId));
+        const repName = (r.assignedStaffName || r.salesmanName || assignedSalesman?.name || '').toLowerCase();
+        const name = (r.name || '').toLowerCase();
+        const code = (r.groupCode || r.routeCode || '').toLowerCase();
+        const desc = (r.description || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || repName.includes(q) || desc.includes(q);
+      });
+    }
+    return [...list].sort((a, b) => {
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      if (timeB && timeA && timeB !== timeA) return timeB - timeA;
+      if (timeB && !timeA) return 1;
+      if (!timeB && timeA) return -1;
+      return Number(b.id || 0) - Number(a.id || 0);
     });
   }, [routes, routeSearchTerm, groupStatusFilter, salesmen]);
 
@@ -856,7 +892,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       name: route.name || route.routeName || '',
       routeCode: route.routeCode || route.groupCode || '',
       description: route.description || '',
-      salesmanId: staffId,
+      salesmanId: deliveryMode ? '' : staffId,
+      area: route.area || '',
+      deliveryDays: route.deliveryDays || '',
       isActive: route.isActive !== false,
       selectedCustomerIds: route.customerIds ? [...route.customerIds] : [],
     });
@@ -875,6 +913,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       name: '',
       routeCode: '',
       description: '',
+      area: '',
+      deliveryDays: '',
       salesmanId: '',
       isActive: true,
       selectedCustomerIds: [],
@@ -900,12 +940,22 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   const handleToggleRouteActive = async (route, e) => {
     if (e) e.stopPropagation();
     if (!canEditCustomer) {
-      addToast('Permission denied: Only authorized staff can edit customer groups.', 'error');
+      addToast(groupText('Permission denied: Only authorized staff can edit customer groups.'), 'error');
       return;
     }
+    if(deliveryMode){
+      requestRouteStatusChange({type:'Delivery Route',number:route.routeCode || route.name,current:route.isActive===false?'INACTIVE':'ACTIVE',target:route.isActive===false?'ACTIVE':'INACTIVE',onConfirm:async reason=>{
+        const response=await deliveryRouteApi.changeStatus(route.id,route.isActive===false?'ACTIVE':'INACTIVE',reason);
+        const dto=response.data?.data || response.data;
+        const isActive=dto.isActive;
+        setRoutes(previous=>previous.map(row=>row.id===route.id?{...row,isActive}:row));
+        setSelectedRoute(previous=>previous?.id===route.id?{...previous,isActive}:previous);
+        setRouteEditForm(previous=>({...previous,isActive}));
+      }});return;
+    }
     try {
-      const res = await customerGroupApi.toggleActive(route.id);
-      const updatedDto = res.data?.data;
+      const res = await groupApi.toggleActive(route.id);
+      const updatedDto = res.data?.data || res.data;
       const nextActive = (updatedDto && updatedDto.isActive !== undefined)
         ? Boolean(updatedDto.isActive)
         : !Boolean(route.isActive !== false);
@@ -918,7 +968,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         setRouteEditForm((prev) => ({ ...prev, isActive: nextActive }));
       }
       addToast(
-        `Customer group "${route.name}" is now ${nextActive ? 'Active' : 'Inactive'}.`,
+        groupText(`Customer group "${route.name}" is now ${nextActive ? 'Active' : 'Inactive'}.`),
         'success'
       );
     } catch (err) {
@@ -926,38 +976,78 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     }
   };
 
-  const handleSaveRouteView = async (e) => {
-    if (e) e.preventDefault();
-    if (!isCreatingRoute && !canEditCustomer) {
-      addToast('Permission denied: Only authorized staff can edit customer groups.', 'error');
+  const handleSaveRouteView = async (e, options = {}) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!canEditCustomer) {
+      addToast(groupText('Permission denied: Only authorized staff can edit customer groups.'), 'error');
       return;
     }
-    if (!routeEditForm.name.trim()) {
-      addToast('Customer group name is required', 'error');
-      return;
+    const isDraft = Boolean(options?.isDraft);
+    if (isDraft) {
+      const hasAny = Boolean(
+        routeEditForm.name.trim() ||
+        (routeEditForm.routeCode && routeEditForm.routeCode.trim()) ||
+        (routeEditForm.description && routeEditForm.description.trim()) ||
+        (routeEditForm.area && routeEditForm.area.trim()) ||
+        routeEditForm.salesmanId ||
+        (routeEditForm.selectedCustomerIds && routeEditForm.selectedCustomerIds.length > 0)
+      );
+      if (!hasAny) {
+        addToast(groupText('Please fill at least one field to save a draft.'), 'warning');
+        return;
+      }
+    } else {
+      if (!routeEditForm.name.trim()) {
+        addToast(groupText('Customer group name is required'), 'error');
+        return;
+      }
     }
 
     const assignedSalesman = salesmen.find((s) => String(s.id) === String(routeEditForm.salesmanId));
     const salesmanName = assignedSalesman?.name || '';
     const staffIdNum = routeEditForm.salesmanId ? Number(routeEditForm.salesmanId) : null;
-    const payload = {
-      groupName: routeEditForm.name.trim(),
-      routeName: routeEditForm.name.trim(),
+    const conflictId = !deliveryMode && routeEditForm.selectedCustomerIds.find((id) => conflictingCustomerGroup(id, staffIdNum, routes, selectedRoute?.id));
+    if (conflictId) {
+      const customer = customers.find((c) => String(c.id) === String(conflictId));
+      addToast(`${customer?.name || 'This customer'} already belongs to another staff member. Remove the existing staff assignment before reassigning.`, 'error');
+      return;
+    }
+
+    const effectiveName = routeEditForm.name.trim() || (isDraft ? (routeEditForm.routeCode?.trim() ? `Draft ${routeEditForm.routeCode.trim()}` : groupText('Draft Route')) : '');
+
+    const payload = deliveryMode ? {
+      ...selectedRoute,
+      routeName: effectiveName,
+      routeCode: routeEditForm.routeCode.trim() || undefined,
+      description: routeEditForm.description.trim(),
+      area: routeEditForm.area || '',
+      deliveryDays: routeEditForm.deliveryDays || selectedRoute?.deliveryDays || '',
+      assignedStaffId: null,
+      isDraft,
+      status: isDraft ? 'DRAFT' : (selectedRoute?.status || 'ACTIVE'),
+      isActive: !isDraft && routeEditForm.isActive !== false,
+      customerIds: routeEditForm.selectedCustomerIds.map(Number).filter(Boolean),
+    } : {
+      groupName: effectiveName,
+      routeName: effectiveName,
       groupCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       routeCode: routeEditForm.routeCode ? routeEditForm.routeCode.trim() : undefined,
       description: routeEditForm.description ? routeEditForm.description.trim() : '',
       assignedStaffId: staffIdNum,
       salesRepId: staffIdNum,
-      isActive: routeEditForm.isActive !== false,
+      isDraft,
+      status: isDraft ? 'DRAFT' : (selectedRoute?.status || 'ACTIVE'),
+      isActive: !isDraft && routeEditForm.isActive !== false,
       customerIds: (routeEditForm.selectedCustomerIds || []).map((id) => Number(id)).filter(Boolean),
     };
 
     try {
       if (isCreatingRoute) {
-        const res = await customerGroupApi.create(payload);
+        const res = await groupApi.create(payload);
         const created = res.data?.data || res.data || res;
         const assignedId = created.assignedStaffId || created.salesRepId;
         const normalized = {
+          ...created,
           id: created.id,
           name: created.groupName || created.routeName || created.name,
           groupName: created.groupName || created.routeName || created.name,
@@ -965,7 +1055,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           groupCode: created.groupCode || created.routeCode || '',
           routeCode: created.groupCode || created.routeCode || '',
           description: created.description || '',
-          isActive: created.isActive !== undefined ? created.isActive : true,
+          status: created.status || (isDraft ? 'DRAFT' : 'ACTIVE'),
+          isActive: created.isActive !== undefined ? created.isActive : !isDraft,
           salesmanId: assignedId ? String(assignedId) : '',
           salesmanName: created.assignedStaffName || created.salesRepName || salesmanName,
           assignedStaffId: assignedId ? String(assignedId) : '',
@@ -973,16 +1064,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           customerIds: (created.customerIds || []).map(String),
           createdAt: created.createdAt || new Date().toISOString(),
         };
-        setRoutes((prev) => [...prev, normalized]);
+        setRoutes((prev) => [normalized, ...prev.filter((r) => r.id !== normalized.id)]);
         setSelectedRoute(normalized);
         setIsCreatingRoute(false);
         setRouteModalMode('view');
-        addToast(`Customer group "${normalized.name}" created successfully!`, 'success');
+        addToast(groupText(isDraft ? `Delivery route draft "${normalized.name}" saved successfully!` : `Customer group "${normalized.name}" created successfully!`), 'success');
       } else if (selectedRoute) {
-        const res = await customerGroupApi.update(selectedRoute.id, payload);
+        const res = await groupApi.update(selectedRoute.id, payload);
         const updated = res.data?.data || res.data || res;
         const assignedId = updated.assignedStaffId || updated.salesRepId;
         const normalized = {
+          ...updated,
           id: updated.id,
           name: updated.groupName || updated.routeName || updated.name,
           groupName: updated.groupName || updated.routeName || updated.name,
@@ -998,16 +1090,14 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           customerIds: (updated.customerIds || []).map(String),
           createdAt: selectedRoute.createdAt || new Date().toISOString(),
         };
-        setRoutes((prev) =>
-          prev.map((r) => (r.id === selectedRoute.id ? normalized : r))
-        );
+        setRoutes((prev) => [normalized, ...prev.filter((r) => r.id !== selectedRoute.id)]);
         setSelectedRoute(normalized);
         setRouteModalMode('view');
-        addToast(`Customer group "${normalized.name}" updated successfully!`, 'success');
+        addToast(groupText(`Customer group "${normalized.name}" updated successfully!`), 'success');
       }
       loadInitialData();
     } catch (err) {
-      addToast('Error saving customer group: ' + (err.response?.data?.message || err.message), 'error');
+      addToast(groupText('Error saving customer group: ') + (err.response?.data?.message || err.message), 'error');
     }
   };
 
@@ -1051,7 +1141,8 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   // Available customers for inline customer search & assignment (ACTIVE only)
   const inlineCustomerSearchResults = useMemo(() => {
-    const activeCustomers = customers.filter((c) => isCustomerActive(c));
+    const activeCustomers = customers.filter((c) => isCustomerActive(c)
+      && (deliveryMode || !conflictingCustomerGroup(c.id, routeEditForm.salesmanId, routes, selectedRoute?.id)));
     const q = inlineCustomerSearch.trim().toLowerCase();
     if (!q) {
       const assignedSet = new Set((routeEditForm.selectedCustomerIds || []).map(String));
@@ -1066,7 +1157,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         (c.address && c.address.toLowerCase().includes(q)) ||
         (c.contactPerson && c.contactPerson.toLowerCase().includes(q))
     ).slice(0, 30);
-  }, [customers, inlineCustomerSearch, routeEditForm.selectedCustomerIds]);
+  }, [customers, inlineCustomerSearch, routeEditForm.selectedCustomerIds, routeEditForm.salesmanId, routes, selectedRoute?.id, deliveryMode]);
 
   // Export CSV matching EmployeesHub style
   const handleExportCSV = () => {
@@ -1074,7 +1165,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       addToast('No customers to export', 'error');
       return;
     }
-    const headers = ['Code', 'Name', 'Customer Group', 'Contact Person', 'Phone', 'Email', 'Address', 'Credit Limit', 'Current Balance', 'Status'];
+    const headers = ['Code', 'Name', groupText('Customer Group'), 'Contact Person', 'Phone', 'Email', 'Address', 'Credit Limit', 'Current Balance', 'Status'];
     const rows = filteredCustomers.map((c) => {
       const assignedRoutes = getCustomerRoutes(c.id);
       const routeNames = assignedRoutes.map((r) => r.name).join('; ') || 'Unassigned';
@@ -1106,7 +1197,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   // Export Customer Groups to CSV
   const handleExportRoutesCSV = () => {
     if (routes.length === 0) {
-      addToast('No customer groups to export', 'error');
+      addToast(groupText('No customer groups to export'), 'error');
       return;
     }
     const headers = ['Group Name', 'Group Code', 'Assigned Staff', 'Total Customers', 'Description', 'Created Date'];
@@ -1133,7 +1224,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    addToast('Customer groups exported to CSV', 'success');
+    addToast(groupText('Customer groups exported to CSV'), 'success');
   };
 
   const handlePrintSingleCustomer = (c) => {
@@ -1150,6 +1241,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
   const handlePrintCustomerGroup = (routeObj) => {
     if (!routeObj) return;
+    if (deliveryMode) {
+      printA4Report({title: 'Delivery Route', subtitle: `${routeObj.routeCode} · ${routeObj.name}`,
+        metaItems: [{label:'Area',value:routeObj.area || '—'},{label:'Description',value:routeObj.description || '—'}],
+        columns: [{header:'Customer code',accessor:c=>c.customerCode || c.code},{header:'Customer',accessor:'name'},{header:'Phone',accessor:'phone'},{header:'Address',accessor:'address'}],
+        data: customers.filter(c => routeObj.customerIds.map(String).includes(String(c.id)))});
+      return;
+    }
     const assigned = customers.filter((c) => {
       const cRoutes = getCustomerRoutes(c.id);
       return cRoutes.some((r) => String(r.id) === String(routeObj.id));
@@ -1186,9 +1284,9 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   };
 
   const handlePrintCustomerGroupsReport = () => {
-    const list = filteredRoutes.length > 0 ? filteredRoutes : routes;
+    const list = filteredRoutes;
     if (list.length === 0) {
-      addToast('No customer groups to print', 'error');
+      addToast(groupText('No customer groups to print'), 'error');
       return;
     }
     if (list.length === 1) {
@@ -1196,19 +1294,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       return;
     }
     printA4Report({
-      title: 'Customer Groups Master Directory',
-      subtitle: `Total Groups: ${list.length}`,
+      title: groupText('Customer Groups Master Directory'),
+      subtitle: groupText(`Total Groups: ${list.length}`),
       metaItems: [
         { label: 'Date', value: new Date().toLocaleDateString() },
         { label: 'Filter', value: groupStatusFilter.toUpperCase() },
       ],
       columns: [
-        { header: 'Group Name', accessor: 'name' },
-        { header: 'Group Code', accessor: (r) => r.groupCode || r.routeCode || '—' },
-        { header: 'Assigned Staff / Rep', accessor: (r) => {
+        { header: groupText('Group Name'), accessor: 'name' },
+        { header: groupText('Group Code'), accessor: (r) => r.groupCode || r.routeCode || '—' },
+        ...(!deliveryMode ? [{ header: 'Assigned Staff / Rep', accessor: (r) => {
           const assignedStaff = salesmen.find((s) => String(s.id) === String(r.assignedStaffId || r.salesmanId));
           return r.assignedStaffName || r.salesmanName || assignedStaff?.name || 'Unassigned';
-        }},
+        }}] : []),
         { header: 'Total Customers', accessor: (r) => {
           const assigned = customers.filter((c) => {
             const cRoutes = getCustomerRoutes(c.id);
@@ -1232,9 +1330,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
   return (
     <div className={`erp-page customers-page purchasing-no-shadows${showCustomerModal ? ' inventory-allocation-focus' : ''}`}
       style={{
-        padding: showCustomerModal ? '12px' : '24px 32px',
+        '--erp-page-padding': deliveryMode ? '0px' : undefined,
+        padding: deliveryMode ? 0 : showCustomerModal ? '12px' : '24px 32px',
         flex: 1,
-        height: '100%',
+        height: deliveryMode ? 'auto' : '100%',
         maxHeight: '100%',
         minHeight: 0,
         width: '100%',
@@ -1260,7 +1359,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       ) : (
         <>
           {/* Page Header (Fixed / Sticky to Desktop Screen) */}
-      <div className="erp-page-header"
+      {!deliveryMode && <div className="erp-page-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -1293,10 +1392,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
             <Plus size={17} /> New Customer
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Subtabs Bar (Underline Style matching EmployeesHub - Fixed / Sticky) */}
-      <ErpTabs module="customers"
+      {!deliveryMode && <ErpTabs module="customers"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1335,7 +1434,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
         >
           <Target size={16} /> Range & Targets
         </ErpTab>
-      </ErpTabs>
+      </ErpTabs>}
 
       {/* ------------------------------------------------------------- */}
       {/* TAB 1: Customer List View                                    */}
@@ -1645,14 +1744,15 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
           >
             <div>
               <h2 className="erp-dialog-title" style={{ color: '#0f172a', margin: '0 0 4px 0' }}>
-                Customer Groups
+                {groupText('Customer Groups')}
               </h2>
               <p style={{ color: '#64748b', fontSize: 'var(--erp-text-field)', margin: 0 }}>
-                Organize customers into groups and assign a dedicated staff member to manage each customer group.
+                {deliveryMode ? 'Organize customers into delivery routes.' : 'Organize customers into groups and assign a dedicated staff member to manage each customer group.'}
               </p>
             </div>
 
             <button className="erp-button erp-button-primary"
+              disabled={!canEditCustomer}
               type="button"
               onClick={handleOpenCreateRouteView}
               style={{
@@ -1666,7 +1766,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
             >
-              <Plus size={16} /> Create Customer Group
+              <Plus size={16} /> {groupText('Create Customer Group')}
             </button>
           </div>
 
@@ -1703,7 +1803,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
               />
               <input className="erp-field"
                 type="text"
-                placeholder="Search customer groups by name, assigned staff, description..."
+                placeholder={deliveryMode ? "Search delivery routes by name, code, description..." : "Search customer groups by name, assigned staff, description..."}
                 value={routeSearchTerm}
                 onChange={(e) => setRouteSearchTerm(e.target.value)}
                 style={{
@@ -1750,64 +1850,42 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
 
             {/* Right Controls: Group Status Filter & Icon Buttons (Export CSV, Print, Download PDF, Refresh) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-              <select className="erp-field"
+              <FilterSelect
                 value={groupStatusFilter}
                 onChange={(e) => setGroupStatusFilter(e.target.value)}
-                style={{
-                  height: '34px',
-                  padding: '0 30px 0 12px',
-                  width: '135px',
-                  minWidth: '115px',
-                  border: '1px solid #e2e8f0',
-                  fontWeight: 500,
-                  color: '#334155',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 10px center',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#0284c7';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.15)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-                }}
+                aria-label={deliveryMode ? 'Route status filter' : 'Group status filter'}
+                style={{ width: 140 }}
               >
-                <option value="all">All Groups</option>
-                <option value="active">Active Groups</option>
-                <option value="inactive">Inactive Groups</option>
-              </select>
+                <option value="all">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </FilterSelect>
 
               {/* Print Groups Directory A4 (Icon Only) */}
               <button
                 type="button"
                 onClick={handlePrintCustomerGroupsReport}
                 style={{
-                  height: '34px',
-                  width: '36px',
-                  minWidth: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   padding: 0,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
                   color: '#334155',
+                  fontSize: 'var(--erp-text-body)',
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -1820,9 +1898,10 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Print Customer Groups Directory (A4)"
+                title={deliveryMode ? 'Print Delivery Routes Directory (A4)' : groupText('Print Customer Groups Directory (A4)')}
+                aria-label={deliveryMode ? 'Print Delivery Routes Directory (A4)' : groupText('Print Customer Groups Directory (A4)')}
               >
-                <Printer size={14} />
+                <Printer size={15} />
               </button>
 
               {/* Refresh Groups (Icon Only) */}
@@ -1830,20 +1909,25 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 type="button"
                 onClick={loadInitialData}
                 style={{
-                  height: '34px',
-                  width: '36px',
-                  minWidth: '36px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
+                  height: '38px',
+                  width: '38px',
+                  minWidth: '38px',
                   padding: 0,
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
                   color: '#334155',
+                  fontSize: 'var(--erp-text-body)',
+                  fontWeight: 600,
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  gap: '6px',
                   cursor: 'pointer',
                   boxSizing: 'border-box',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -1856,9 +1940,11 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   e.currentTarget.style.borderColor = '#cbd5e1';
                   e.currentTarget.style.color = '#334155';
                 }}
-                title="Refresh customer groups"
+                title={deliveryMode ? 'Refresh delivery routes' : groupText('Refresh customer groups')}
+                aria-label={deliveryMode ? 'Refresh delivery routes' : groupText('Refresh customer groups')}
+                disabled={loading}
               >
-                <RefreshCw size={14} />
+                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -1893,7 +1979,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     fontSize: 'var(--erp-text-description)',
                   }}
                 >
-                  No customer groups found matching current search.
+                  {groupText('No customer groups found matching current search.')}
                 </div>
               ) : (
                 filteredRoutes.map((route) => {
@@ -1951,46 +2037,104 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                            {/* Clickable Status Badge to toggle Active / Inactive */}
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleRouteActive(route, e)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '3px 10px',
-                                borderRadius: '9999px',
-                                fontSize: 'var(--erp-text-caption)',
-                                fontWeight: 700,
-                                backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
-                                color: isGroupActive ? '#15803d' : '#b91c1c',
-                                border: `1px solid ${isGroupActive ? '#86efac' : '#fca5a5'}`,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = isGroupActive ? '#bbf7d0' : '#fecaca';
-                                e.currentTarget.style.transform = 'scale(1.03)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = isGroupActive ? '#dcfce7' : '#fee2e2';
-                                e.currentTarget.style.transform = 'scale(1)';
-                              }}
-                              title={`Status: ${isGroupActive ? 'Active' : 'Inactive'} (Click to set as ${isGroupActive ? 'Inactive' : 'Active'})`}
-                            >
+                            {/* Status Badge */}
+                            {(route.status === 'DRAFT' || route.isDraft) ? (
                               <span
                                 style={{
-                                  width: '6px',
-                                  height: '6px',
-                                  borderRadius: '50%',
-                                  backgroundColor: isGroupActive ? '#16a34a' : '#dc2626',
-                                  display: 'inline-block',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #cbd5e1',
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                                 }}
-                              />
-                              {isGroupActive ? 'Active' : 'Inactive'}
-                            </button>
+                                title="Status: Draft"
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#64748b',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                Draft
+                              </span>
+                            ) : deliveryMode ? (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
+                                  color: isGroupActive ? '#15803d' : '#b91c1c',
+                                  border: `1px solid ${isGroupActive ? '#86efac' : '#fca5a5'}`,
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                                }}
+                                title={`Status: ${isGroupActive ? 'Active' : 'Inactive'}`}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: isGroupActive ? '#16a34a' : '#dc2626',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                {isGroupActive ? 'Active' : 'Inactive'}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleRouteActive(route, e)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  backgroundColor: isGroupActive ? '#dcfce7' : '#fee2e2',
+                                  color: isGroupActive ? '#15803d' : '#b91c1c',
+                                  border: `1px solid ${isGroupActive ? '#86efac' : '#fca5a5'}`,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = isGroupActive ? '#bbf7d0' : '#fecaca';
+                                  e.currentTarget.style.transform = 'scale(1.03)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = isGroupActive ? '#dcfce7' : '#fee2e2';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                                title={`Status: ${isGroupActive ? 'Active' : 'Inactive'} (Click to set as ${isGroupActive ? 'Inactive' : 'Active'})`}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: isGroupActive ? '#16a34a' : '#dc2626',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                {isGroupActive ? 'Active' : 'Inactive'}
+                              </button>
+                            )}
 
                             {/* Customer Count */}
                             <div
@@ -2019,7 +2163,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         </p>
 
                         {/* Responsible Staff */}
-                        <p
+                        {!deliveryMode && <p
                           style={{
                             color: repName ? '#0369a1' : '#64748b',
                             fontSize: 'var(--erp-text-small)',
@@ -2032,7 +2176,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         >
                           <UserCheck size={13} color={repName ? '#0284c7' : '#94a3b8'} />
                           {repName ? `Assigned Staff: ${repName}` : 'No staff member assigned'}
-                        </p>
+                        </p>}
                       </div>
 
                       {/* Card Footer: View link & Print/Download icons */}
@@ -2046,11 +2190,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                         }}
                       >
                         <span style={{ fontSize: 'var(--erp-text-body)', color: '#0284c7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Eye size={13} /> View Group Details →
+                          <Eye size={13} /> {groupText('View Group Details →')}
                         </span>
 
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <div className={deliveryMode ? 'erp-row-actions grn-style-actions' : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {deliveryMode && canEditCustomer && <button className="erp-table-icon-action" data-tone="danger" type="button" aria-label={`Delete route ${route.name}`} title="Delete delivery route" onClick={event=>{event.stopPropagation();routeDeletion.requestDeletion(route);}}><Trash2 size={13}/></button>}
                           <button
+                            className={deliveryMode ? 'erp-table-icon-action' : undefined}
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2082,7 +2228,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               e.currentTarget.style.borderColor = '#e2e8f0';
                               e.currentTarget.style.color = '#334155';
                             }}
-                            title="Print Customer Group (A4)"
+                            title={groupText('Print Customer Group (A4)')}
                           >
                             <Printer size={13} />
                           </button>
@@ -2099,13 +2245,105 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
       {/* ------------------------------------------------------------- */}
       {/* MODAL: Customer Group & Route View Popup (Split 2 Columns)   */}
       {/* ------------------------------------------------------------- */}
-      {(selectedRoute || isCreatingRoute) && (
+      {routeDeletion.deletionDialog}
+      {routeStatusDialog}
+      {deliveryMode && routeModalMode === 'view' && selectedRoute && !isCreatingRoute ? (
+        <PurchaseInspectionModal
+          type="Route"
+          number={selectedRoute.routeName || selectedRoute.name || selectedRoute.routeCode}
+          status={selectedRoute.isDraft ? 'DRAFT' : (selectedRoute.isActive !== false ? 'ACTIVE' : 'INACTIVE')}
+          rows={assignedCustomerList}
+          columns={[
+            { label: 'Customer code', value: row => row.customerCode || row.code || '—' },
+            { label: 'Customer', value: row => row.name || row.customerName || '—' },
+            { label: 'Phone', value: row => row.phone || row.mobile || row.contactPerson || '—' },
+            { label: 'Address', value: row => row.address || row.deliveryAddress || '—' },
+            {
+              label: 'Status',
+              value: row => isCustomerActive(row) ? 'Active' : 'Inactive',
+              render: row => <StatusBadge status={isCustomerActive(row) ? 'ACTIVE' : 'INACTIVE'} />,
+            },
+          ]}
+          tableToolbar
+          tableSearchPlaceholder="Search customer code or name..."
+          tableSearchLabel="Search route customers"
+          tablePrintAriaLabel="Print Delivery Route"
+          emptyMessage="No matching customers found."
+          onPrint={() => handlePrintCustomerGroup(selectedRoute)}
+          onClose={handleCloseRouteView}
+          ariaLabel="Delivery Route Details"
+          className="customer-group-dialog"
+          style={{ maxWidth: '1040px' }}
+          detailsPosition="header"
+          details={[
+            { label: 'Area', value: selectedRoute.area || '—', icon: MapPin },
+            { label: 'Delivery days', value: selectedRoute.deliveryDays || '—', icon: Calendar },
+            { label: 'Assigned customers', value: `${assignedCustomerList.length} Customer${assignedCustomerList.length === 1 ? '' : 's'}`, icon: Users },
+            { label: 'Remarks', value: selectedRoute.description || 'No route remarks specified.', wide: true, icon: MessageSquare },
+          ]}
+          detailActions={[
+            ...(canEditCustomer ? [
+              {
+                label: 'Edit Delivery Route',
+                icon: Edit2,
+                onClick: () => {
+                  const staffId = routeEditForm.salesmanId || selectedRoute?.assignedStaffId || selectedRoute?.salesmanId || '';
+                  const st = salesmen.find((s) => String(s.id) === String(staffId));
+                  setStaffSearchQuery(st ? st.name : '');
+                  setIsStaffSearchOpen(false);
+                  setInlineCustomerSearch('');
+                  setIsInlineCustomerSearchOpen(false);
+                  setRouteModalMode('edit');
+                },
+              },
+              {
+                label: selectedRoute.isActive !== false ? 'Deactivate Route' : 'Reactivate Route',
+                ariaLabel: selectedRoute.isActive !== false ? 'Deactivate Delivery Route' : 'Reactivate Delivery Route',
+                icon: selectedRoute.isActive !== false ? Ban : CheckCircle,
+                tone: selectedRoute.isActive !== false ? 'warning' : 'success',
+                onClick: () => handleToggleRouteActive(selectedRoute),
+              },
+              {
+                label: 'Delete Route',
+                ariaLabel: 'Delete Delivery Route',
+                icon: Trash2,
+                tone: 'danger',
+                onClick: () => routeDeletion.requestDeletion(selectedRoute),
+              },
+            ] : []),
+          ]}
+          footer={
+            <div className="purchase-inspection-footer-bar" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 24px', borderTop: '1px solid #edf0f4', background: '#fff' }}>
+              <button
+                type="button"
+                className="btn btn-glass erp-button"
+                onClick={handleCloseRouteView}
+                style={{
+                  padding: '8px 18px',
+                  border: '1px solid #e2e8f0',
+                  background: '#fff',
+                  color: '#475569',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  fontSize: 'var(--erp-text-body, 13px)',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          }
+        />
+      ) : (selectedRoute || isCreatingRoute) && (
         <div
           className="modal-backdrop"
           style={{ padding: '12px', zIndex: 1100, overflowY: 'auto' }}
         >
           <div
-            className="glass-modal"
+            className="glass-modal customer-group-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={groupText(isCreatingRoute ? 'Create Customer Group' : 'Customer Group Details')}
             style={{
               width: '100%',
               maxWidth: '1040px',
@@ -2157,46 +2395,104 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </span>
                     )}
 
-                    {/* Clickable Status Badge in View Popup Header */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
-                      style={{
-                        fontSize: 'var(--erp-text-caption)',
-                        fontWeight: 700,
-                        padding: '3px 11px',
-                        borderRadius: '9999px',
-                        backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
-                        color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
-                        border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca';
-                        e.currentTarget.style.transform = 'scale(1.03)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2';
-                        e.currentTarget.style.transform = 'scale(1)';
-                      }}
-                      title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to set as ${selectedRoute?.isActive !== false ? 'Inactive' : 'Active'})`}
-                    >
+                    {/* Status Badge in View Popup Header */}
+                    {selectedRoute?.isDraft ? (
                       <span
                         style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
-                          display: 'inline-block',
+                          fontSize: 'var(--erp-text-caption)',
+                          fontWeight: 700,
+                          padding: '3px 11px',
+                          borderRadius: '9999px',
+                          backgroundColor: '#f1f5f9',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                         }}
-                      />
-                      {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
-                    </button>
+                        title="Status: Draft"
+                      >
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: '#64748b',
+                            display: 'inline-block',
+                          }}
+                        />
+                        Draft
+                      </span>
+                    ) : deliveryMode ? (
+                      <span
+                        style={{
+                          fontSize: 'var(--erp-text-caption)',
+                          fontWeight: 700,
+                          padding: '3px 11px',
+                          borderRadius: '9999px',
+                          backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                          color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                          border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        }}
+                        title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}`}
+                      >
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                            display: 'inline-block',
+                          }}
+                        />
+                        {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
+                        style={{
+                          fontSize: 'var(--erp-text-caption)',
+                          fontWeight: 700,
+                          padding: '3px 11px',
+                          borderRadius: '9999px',
+                          backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                          color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                          border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#bbf7d0' : '#fecaca';
+                          e.currentTarget.style.transform = 'scale(1.03)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                        title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to set as ${selectedRoute?.isActive !== false ? 'Inactive' : 'Active'})`}
+                      >
+                        <span
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                            display: 'inline-block',
+                          }}
+                        />
+                        {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
+                      </button>
+                    )}
 
                     {/* Count */}
                     <span
@@ -2215,7 +2511,32 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
+                    {deliveryMode && (
+                      <button
+                        type="button"
+                        className="purchase-inspection-table-print"
+                        aria-label="Print Delivery Route"
+                        title="Print delivery route"
+                        onClick={() => handlePrintCustomerGroup(selectedRoute)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          height: '32px',
+                          padding: '0 12px',
+                          border: '1px solid var(--erp-accent, #0284c7)',
+                          borderRadius: '6px',
+                          background: 'var(--erp-accent, #0284c7)',
+                          color: '#ffffff',
+                          fontWeight: 500,
+                          fontSize: 'var(--erp-text-caption, 12px)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Printer size={15} /> Print
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -2238,7 +2559,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
 
                 {/* View Mode Body */}
-                <div
+                <div className="customer-group-dialog-body"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'minmax(280px, 340px) 1fr',
@@ -2258,83 +2579,233 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       overflowY: 'auto',
                     }}
                   >
-                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                      <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', marginBottom: '14px' }}>
-                        Customer Group Details
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px' }}>
+                      <div style={{
+                        fontWeight: 700,
+                        fontSize: 'var(--erp-text-subtitle, 15px)',
+                        color: '#0f172a',
+                        paddingBottom: '12px',
+                        marginBottom: '14px',
+                        borderBottom: '1px solid #e2e8f0',
+                      }}>
+                        {groupText('Customer Group Details')}
                       </div>
 
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Group Name
+                      {/* Route / Group Name */}
+                      <div style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {groupText('Group Name')}
                         </div>
-                        <div style={{ fontSize: 'var(--erp-text-nav)', fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>
-                          {selectedRoute?.name}
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Group Code
-                        </div>
-                        <div style={{ fontSize: 'var(--erp-text-field)', color: '#334155', fontFamily: 'monospace', marginTop: '2px' }}>
-                          {selectedRoute?.groupCode || selectedRoute?.routeCode || 'Auto-generated'}
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Status
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
-                            style={{
-                              fontSize: 'var(--erp-text-caption)',
-                              fontWeight: 700,
-                              padding: '3px 10px',
-                              borderRadius: '9999px',
-                              backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
-                              color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
-                              border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                            }}
-                            title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to toggle)`}
-                          >
-                            <span
-                              style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
-                                display: 'inline-block',
-                              }}
-                            />
-                            {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
-                          </button>
+                        <div style={{ fontSize: 'var(--erp-text-subtitle, 15px)', fontWeight: 700, color: '#0f172a', marginTop: '3px', wordBreak: 'break-word' }}>
+                          {selectedRoute?.name || '—'}
                         </div>
                       </div>
 
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Assigned Staff Member
+                      {/* Code & Status Row */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                        gap: '12px',
+                        marginBottom: '14px',
+                        paddingBottom: '12px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {groupText('Group Code')}
+                          </div>
+                          <div style={{
+                            fontSize: 'var(--erp-text-field)',
+                            color: '#334155',
+                            fontFamily: 'monospace',
+                            fontWeight: 600,
+                            marginTop: '4px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
+                            padding: '2px 8px',
+                            display: 'inline-block',
+                          }}>
+                            {selectedRoute?.groupCode || selectedRoute?.routeCode || 'Auto-generated'}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 'var(--erp-text-field)', color: '#0369a1', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <UserCheck size={13} />
-                          {selectedRoute?.assignedStaffName || selectedRoute?.salesmanName || 'No staff assigned'}
+
+                        <div>
+                          <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Status
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
+                            {(selectedRoute?.status === 'DRAFT' || selectedRoute?.isDraft) ? (
+                              <span
+                                style={{
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  backgroundColor: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #cbd5e1',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                }}
+                                title="Status: Draft"
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#64748b',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                Draft
+                              </span>
+                            ) : deliveryMode ? (
+                              <span
+                                style={{
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                                  color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                                  border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                }}
+                                title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}`}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleRouteActive(selectedRoute, e)}
+                                style={{
+                                  fontSize: 'var(--erp-text-caption)',
+                                  fontWeight: 700,
+                                  padding: '3px 10px',
+                                  borderRadius: '9999px',
+                                  backgroundColor: selectedRoute?.isActive !== false ? '#dcfce7' : '#fee2e2',
+                                  color: selectedRoute?.isActive !== false ? '#15803d' : '#b91c1c',
+                                  border: `1px solid ${selectedRoute?.isActive !== false ? '#86efac' : '#fca5a5'}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                title={`Status: ${selectedRoute?.isActive !== false ? 'Active' : 'Inactive'} (Click to toggle)`}
+                              >
+                                <span
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: selectedRoute?.isActive !== false ? '#16a34a' : '#dc2626',
+                                    display: 'inline-block',
+                                  }}
+                                />
+                                {selectedRoute?.isActive !== false ? 'Active' : 'Inactive'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
+                      {/* Staff Member (Customer Group mode only) */}
+                      {!deliveryMode && (
+                        <div style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+                          <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Assigned Staff Member
+                          </div>
+                          <div style={{ fontSize: 'var(--erp-text-field)', color: '#0369a1', fontWeight: 600, marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <UserCheck size={14} />
+                            {selectedRoute?.assignedStaffName || selectedRoute?.salesmanName || 'No staff assigned'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Area / Region (Delivery Route mode) - Highlighted and easy to read */}
+                      {deliveryMode && (
+                        <div style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+                          <div style={{
+                            fontSize: 'var(--erp-text-caption)',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            marginBottom: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}>
+                            <MapPin size={12} color="#0284c7" />
+                            <span>Area / Region</span>
+                          </div>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: 'var(--erp-text-field)',
+                            fontWeight: 600,
+                            color: '#0369a1',
+                            backgroundColor: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            marginTop: '2px',
+                          }}>
+                            <span>{selectedRoute?.area || '—'}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Remarks & Notes - Dedicated legible card */}
                       <div>
-                        <div style={{ fontSize: 'var(--erp-text-caption)', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Description / Notes
+                        <div style={{
+                          fontSize: 'var(--erp-text-caption)',
+                          fontWeight: 600,
+                          color: '#64748b',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          marginBottom: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}>
+                          <FileText size={12} color="#64748b" />
+                          <span>{deliveryMode ? 'Route Remarks & Notes' : 'Description / Notes'}</span>
                         </div>
-                        <div style={{ fontSize: 'var(--erp-text-body)', color: '#475569', marginTop: '3px', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
-                          {selectedRoute?.description || 'No description added.'}
+                        <div
+                          style={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '12px 14px',
+                            color: selectedRoute?.description ? '#0f172a' : '#94a3b8',
+                            fontSize: 'var(--erp-text-body, 13px)',
+                            lineHeight: 1.55,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            fontStyle: selectedRoute?.description ? 'normal' : 'italic',
+                            minHeight: '64px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                          }}
+                        >
+                          {selectedRoute?.description || (deliveryMode ? 'No remarks or notes recorded for this route.' : 'No description added.')}
                         </div>
                       </div>
                     </div>
@@ -2371,6 +2842,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       <input className="erp-field"
                         type="text"
                         placeholder="Search assigned customers..."
+                        aria-label={deliveryMode ? 'Search route customers' : 'Search assigned customers'}
                         value={customerSearchInRoute}
                         onChange={(e) => setCustomerSearchInRoute(e.target.value)}
                         style={{
@@ -2436,7 +2908,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     <div style={{ fontSize: 'var(--erp-text-small)', color: '#94a3b8' }}>
                                       {customerSearchInRoute
                                         ? 'Try adjusting your search query.'
-                                        : 'Click the "Update Group" button below to add customers to this group.'}
+                                        : groupText('Click the "Update Group" button below to add customers to this group.')}
                                     </div>
                                   </div>
                                 </td>
@@ -2506,34 +2978,107 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     flexShrink: 0,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button className="erp-button"
-                      type="button"
-                      onClick={() => handlePrintCustomerGroup(selectedRoute)}
-                      style={{
-                        padding: '8px 18px',
-                        border: '1px solid #bae6fd',
-                        backgroundColor: '#ffffff',
-                        color: '#0284c7',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f0f9ff';
-                        e.currentTarget.style.borderColor = '#0284c7';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff';
-                        e.currentTarget.style.borderColor = '#bae6fd';
-                      }}
-                      title="Print Customer Group (A4)"
-                    >
-                      <Printer size={14} /> Print
-                    </button>
+                  <div className={deliveryMode ? 'grn-style-actions erp-row-actions' : undefined} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {!deliveryMode && (
+                      <button className="erp-button"
+                        type="button"
+                        onClick={() => handlePrintCustomerGroup(selectedRoute)}
+                        style={{
+                          padding: '8px 18px',
+                          border: '1px solid #bae6fd',
+                          backgroundColor: '#ffffff',
+                          color: '#0284c7',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f0f9ff';
+                          e.currentTarget.style.borderColor = '#0284c7';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                          e.currentTarget.style.borderColor = '#bae6fd';
+                        }}
+                        title={groupText('Print Customer Group (A4)')}
+                      >
+                        <Printer size={14} /> Print
+                      </button>
+                    )}
 
+                    {deliveryMode && canEditCustomer && <>
+                      <button
+                        type="button"
+                        className="btn btn-glass erp-button purchase-inspection-danger"
+                        data-tone="danger"
+                        aria-label="Delete Delivery Route"
+                        title="Delete delivery route"
+                        onClick={() => routeDeletion.requestDeletion(selectedRoute)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#e11d48',
+                          backgroundColor: '#fff1f2',
+                          borderColor: '#fecdd3',
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Trash2 size={14} /> Delete Route
+                      </button>
+                      {selectedRoute.isActive === false ? (
+                        <button
+                          type="button"
+                          className="btn btn-glass erp-button purchase-inspection-success"
+                          data-tone="success"
+                          aria-label="Activate Delivery Route"
+                          title="Reactivate delivery route"
+                          onClick={() => handleToggleRouteActive(selectedRoute)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#15803d',
+                            backgroundColor: '#dcfce7',
+                            borderColor: '#86efac',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <CheckCircle size={14} /> Reactivate Route
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-glass erp-button purchase-inspection-danger"
+                          data-tone="danger"
+                          aria-label="Deactivate Delivery Route"
+                          title="Deactivate delivery route"
+                          onClick={() => handleToggleRouteActive(selectedRoute)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#b91c1c',
+                            backgroundColor: '#fee2e2',
+                            borderColor: '#fca5a5',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Ban size={14} /> Deactivate Route
+                        </button>
+                      )}
+                    </>}
                     <button className="erp-button"
                       type="button"
                       onClick={handleCloseRouteView}
@@ -2551,6 +3096,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   {canEditCustomer && (
                     <button className="erp-button erp-button-primary"
                       type="button"
+                      aria-label={deliveryMode ? 'Edit Delivery Route' : undefined}
                       onClick={() => {
                         const staffId = routeEditForm.salesmanId || selectedRoute?.assignedStaffId || selectedRoute?.salesmanId || '';
                         const st = salesmen.find((s) => String(s.id) === String(staffId));
@@ -2571,7 +3117,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                     >
-                      <Edit2 size={14} /> Update Customer Group
+                      <Edit2 size={14} /> {deliveryMode ? 'Edit Delivery Route' : 'Update Customer Group'}
                     </button>
                   )}
                   </div>
@@ -2596,7 +3142,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <h3 style={{ margin: 0, fontSize: 'var(--erp-text-section)', fontWeight: 700, color: '#0f172a' }}>
-                      {isCreatingRoute ? 'Create Customer Group' : `Update Customer Group: ${routeEditForm.name || selectedRoute?.name}`}
+                      {groupText(isCreatingRoute ? 'Create Customer Group' : `Update Customer Group: ${routeEditForm.name || selectedRoute?.name}`)}
                     </h3>
                     <span
                       style={{
@@ -2653,7 +3199,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                 </div>
 
                 {/* Edit Mode Body */}
-                <div
+                <div className="customer-group-dialog-body"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: 'minmax(280px, 340px) 1fr',
@@ -2675,17 +3221,17 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   >
                     <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
                       <div style={{ fontWeight: 700, fontSize: 'var(--erp-text-button)', color: '#0f172a', marginBottom: '14px' }}>
-                        Customer Group Details
+                        {groupText('Customer Group Details')}
                       </div>
 
                       {/* Route Name Input */}
                       <div style={{ marginBottom: '14px' }}>
                         <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                          Customer Group Name *
+                          {groupText('Customer Group Name *')}
                         </label>
                         <input className="erp-field"
                           type="text"
-                          placeholder="e.g. Wholesale Tier A, Corporate Accounts"
+                          placeholder={deliveryMode ? "e.g. Colombo Western Corridor" : "e.g. Wholesale Tier A, Corporate Accounts"}
                           value={routeEditForm.name}
                           onChange={(e) => setRouteEditForm({ ...routeEditForm, name: e.target.value })}
                           style={{
@@ -2700,7 +3246,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </div>
 
                       {/* Responsible Staff Search Box with Autocomplete Dropdown */}
-                      <div ref={staffSearchRef} style={{ marginBottom: '14px', position: 'relative' }}>
+                      {!deliveryMode && <div ref={staffSearchRef} style={{ marginBottom: '14px', position: 'relative' }}>
                         <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
                           Assigned Staff Member
                         </label>
@@ -2867,16 +3413,19 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                             )}
                           </div>
                         )}
-                      </div>
+                      </div>}
 
+                      {deliveryMode && <>
+                        <label className="erp-form-field">Area<input className="erp-field" aria-label="Route area" value={routeEditForm.area || ''} onChange={e=>setRouteEditForm({...routeEditForm,area:e.target.value})}/></label>
+                      </>}
                       {/* Description Input */}
                       <div>
                         <label style={{ display: 'block', fontSize: 'var(--erp-text-body)', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
-                          Group Description / Notes
+                          {groupText('Group Description / Notes')}
                         </label>
                         <textarea className="erp-field"
                           rows="3"
-                          placeholder="e.g. Group of wholesale and corporate client accounts"
+                          placeholder={deliveryMode ? 'e.g. Customers along the western delivery route' : 'e.g. Group of wholesale and corporate client accounts'}
                           value={routeEditForm.description}
                           onChange={(e) => setRouteEditForm({ ...routeEditForm, description: e.target.value })}
                           style={{
@@ -2923,83 +3472,61 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                       </div>
                     </div>
 
-                    {/* Inline Customer Search & Add Box with Dropdown */}
-                    <div ref={inlineCustomerSearchRef} style={{ position: 'relative', width: '100%' }}>
-                      <Search
-                        size={14}
-                        style={{
-                          position: 'absolute',
-                          left: '10px',
-                          top: '10px',
-                          color: '#0284c7',
-                          pointerEvents: 'none',
-                        }}
-                      />
-                      <input className="erp-field"
-                        type="text"
-                        placeholder="Search customer by name, code, phone to add to group..."
-                        value={inlineCustomerSearch}
-                        onChange={(e) => {
-                          setInlineCustomerSearch(e.target.value);
-                          setIsInlineCustomerSearchOpen(true);
-                        }}
-                        onFocus={() => setIsInlineCustomerSearchOpen(true)}
-                        style={{
-                          width: '100%',
-                          height: '34px',
-                          padding: '0 30px 0 32px',
-                          border: isInlineCustomerSearchOpen ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          boxSizing: 'border-box',
-                          outline: 'none',
-                          boxShadow: isInlineCustomerSearchOpen ? '0 0 0 2px rgba(2, 132, 199, 0.15)' : 'none',
-                          transition: 'all 0.15s ease',
-                        }}
-                      />
-                      {inlineCustomerSearch && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInlineCustomerSearch('');
-                            setIsInlineCustomerSearchOpen(false);
+                    {/* Customer Assign Search matching StaffSearch dropdown way */}
+                    <div
+                      ref={inlineCustomerSearchRef}
+                      className="purchase-product-search"
+                      style={{ position: 'relative', width: '100%', marginBottom: '10px' }}
+                    >
+                      <div className="purchase-search-input">
+                        <Search size={16} />
+                        <input
+                          className="erp-field"
+                          type="text"
+                          aria-label={deliveryMode ? 'Search customers to add to route' : 'Search customers to add to group'}
+                          placeholder={groupText('Search customer by name, code, phone to add to group...')}
+                          value={inlineCustomerSearch}
+                          onChange={(e) => {
+                            setInlineCustomerSearch(e.target.value);
+                            setIsInlineCustomerSearchOpen(true);
                           }}
-                          style={{
-                            position: 'absolute',
-                            right: '8px',
-                            top: '8px',
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: '#94a3b8',
-                            padding: 0,
-                          }}
-                          title="Clear search"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
+                          onFocus={() => setIsInlineCustomerSearchOpen(true)}
+                        />
+                        {inlineCustomerSearch && (
+                          <button
+                            type="button"
+                            aria-label="Clear customer search"
+                            onClick={() => {
+                              setInlineCustomerSearch('');
+                              setIsInlineCustomerSearchOpen(false);
+                            }}
+                          >
+                            <X size={15} />
+                          </button>
+                        )}
+                      </div>
 
-                      {/* Dropdown with matching customers to add */}
+                      {/* Dropdown with matching customers to add - styled matching StaffSearch */}
                       {isInlineCustomerSearchOpen && (
                         <div
+                          className="purchase-product-results"
+                          role="listbox"
+                          aria-label="Customer search results"
                           style={{
                             position: 'absolute',
-                            top: 'calc(100% + 4px)',
+                            top: '100%',
                             left: 0,
                             right: 0,
+                            marginTop: '4px',
                             maxHeight: '260px',
                             overflowY: 'auto',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 8px -2px rgba(15, 23, 42, 0.08)',
                             zIndex: 100,
                           }}
                         >
                           {inlineCustomerSearchResults.length === 0 ? (
-                            <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: 'var(--erp-text-body)' }}>
+                            <p style={{ padding: '14px 12px', margin: 0, textAlign: 'center', color: '#64748b' }}>
                               {inlineCustomerSearch ? `No active customers found matching "${inlineCustomerSearch}"` : 'Type customer name, code, phone or address to search'}
-                            </div>
+                            </p>
                           ) : (
                             inlineCustomerSearchResults.map((c) => {
                               const isAlreadyAssigned = (routeEditForm.selectedCustomerIds || []).some(
@@ -3007,71 +3534,80 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                               );
                               return (
                                 <div
+                                  role="option"
                                   key={c.id}
+                                  tabIndex={isAlreadyAssigned ? -1 : 0}
                                   onClick={() => {
                                     if (isAlreadyAssigned) return;
                                     setRouteEditForm((prev) => ({
                                       ...prev,
                                       selectedCustomerIds: [...prev.selectedCustomerIds, String(c.id)],
                                     }));
-                                    addToast(`Added "${c.name}" to group`, 'success');
+                                    addToast(groupText(`Added "${c.name}" to ${deliveryMode ? 'route' : 'group'}`), 'success');
                                     setInlineCustomerSearch('');
                                     setIsInlineCustomerSearchOpen(false);
                                   }}
                                   style={{
-                                    padding: '8px 12px',
+                                    cursor: isAlreadyAssigned ? 'default' : 'pointer',
+                                    backgroundColor: isAlreadyAssigned ? '#f8fafc' : undefined,
+                                    opacity: isAlreadyAssigned ? 0.75 : 1,
+                                    width: '100%',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    gap: '10px',
-                                    cursor: isAlreadyAssigned ? 'default' : 'pointer',
-                                    backgroundColor: isAlreadyAssigned ? '#f8fafc' : '#ffffff',
+                                    gap: '12px',
+                                    padding: '9px 12px',
+                                    textAlign: 'left',
+                                    border: 'none',
                                     borderBottom: '1px solid #f1f5f9',
-                                    transition: 'background-color 0.1s ease',
-                                    opacity: isAlreadyAssigned ? 0.7 : 1,
+                                    boxSizing: 'border-box',
                                   }}
                                   onMouseEnter={(e) => {
-                                    if (!isAlreadyAssigned) e.currentTarget.style.backgroundColor = '#f0f9ff';
+                                    if (!isAlreadyAssigned) e.currentTarget.style.backgroundColor = '#eff6ff';
                                   }}
                                   onMouseLeave={(e) => {
                                     if (!isAlreadyAssigned) e.currentTarget.style.backgroundColor = isAlreadyAssigned ? '#f8fafc' : '#ffffff';
                                   }}
                                 >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                    <div
-                                      style={{
-                                        width: '26px',
-                                        height: '26px',
-                                        borderRadius: '50%',
-                                        backgroundColor: '#e0f2fe',
-                                        color: '#0284c7',
-                                        border: '1px solid #bae6fd',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontWeight: 600,
-                                        fontSize: 'var(--erp-text-caption)',
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {(c.name || 'C').slice(0, 1).toUpperCase()}
-                                    </div>
-                                    <div style={{ minWidth: 0, flex: 1 }}>
-                                      <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 'var(--erp-text-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span className="purchase-result-product" style={{ minWidth: 0, flex: 1 }}>
+                                    <span className="purchase-result-title" style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                                      {(c.code || c.customerCode) && (
+                                        <span className="purchase-result-code" style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--erp-accent)' }}>
+                                          {c.code || c.customerCode}
+                                        </span>
+                                      )}
+                                      <div className="purchase-result-name" style={{ fontWeight: 600, color: '#0f172a', display: 'inline' }}>
                                         {c.name}
                                       </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--erp-text-caption)', color: '#64748b' }}>
-                                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#334155' }}>
-                                          {c.code || c.customerCode || 'NO CODE'}
-                                        </span>
-                                        {c.phone && <span>📞 {c.phone}</span>}
-                                        {c.address && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>📍 {c.address}</span>}
-                                      </div>
-                                    </div>
-                                  </div>
+                                    </span>
+                                  </span>
 
-                                  <div style={{ flexShrink: 0 }}>
-                                    {isAlreadyAssigned ? (
+                                  {/* Right side: Address & assigned badge without icons */}
+                                  <span
+                                    className="purchase-result-stock"
+                                    style={{
+                                      color: '#64748b',
+                                      fontWeight: 500,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      maxWidth: '220px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0,
+                                      marginLeft: 'auto',
+                                      textAlign: 'right',
+                                    }}
+                                  >
+                                    {c.address ? (
+                                      <span title={c.address} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {c.address}
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: '#94a3b8' }}>—</span>
+                                    )}
+                                    {isAlreadyAssigned && (
                                       <span
                                         style={{
                                           fontSize: 'var(--erp-text-badge)',
@@ -3081,29 +3617,13 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                           padding: '2px 8px',
                                           borderRadius: '9999px',
                                           border: '1px solid #bbf7d0',
+                                          flexShrink: 0,
                                         }}
                                       >
-                                        ✓ Assigned
-                                      </span>
-                                    ) : (
-                                      <span
-                                        style={{
-                                          fontSize: 'var(--erp-text-caption)',
-                                          fontWeight: 600,
-                                          color: '#0284c7',
-                                          backgroundColor: '#e0f2fe',
-                                          padding: '3px 10px',
-                                          borderRadius: '6px',
-                                          border: '1px solid #bae6fd',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                        }}
-                                      >
-                                        <Plus size={12} /> Add
+                                        Assigned
                                       </span>
                                     )}
-                                  </div>
+                                  </span>
                                 </div>
                               );
                             })
@@ -3241,7 +3761,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                     <StatusBadge status={isCustomerActive(c) ? 'Active' : 'Inactive'} />
                                   </td>
                                   <td className="erp-table-cell erp-table-actions" style={{ textAlign: 'right' }}>
-                                    <button data-tone="danger" aria-label="Remove customer from group" className="erp-button erp-table-icon-action"
+                                    <button data-tone="danger" aria-label={groupText('Remove customer from group')} className="erp-button erp-table-icon-action"
                                       type="button"
                                       onClick={() => {
                                         setRouteEditForm({
@@ -3256,7 +3776,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                                         cursor: 'pointer',
                                         padding: '3px 6px',
                                       }}
-                                      title="Remove customer from group"
+                                      title={groupText('Remove customer from group')}
                                     ><Trash2 size={13}/></button>
                                   </td>
                                 </tr>
@@ -3300,6 +3820,30 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                   >
                     Cancel
                   </button>
+                  {isCreatingRoute && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleSaveRouteView(e, { isDraft: true })}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 18px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#f8fafc',
+                        color: '#334155',
+                        fontSize: 'var(--erp-text-field)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    >
+                      Save as Draft
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSaveRouteView}
@@ -3321,7 +3865,7 @@ export default function CustomersHub({ activeSubTab = 'list', onSubTabChange }) 
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0284c7')}
                   >
-                    <Check size={16} /> {isCreatingRoute ? 'Save New Customer Group' : 'Save Changes'}
+                    <Check size={16} /> {groupText(isCreatingRoute ? 'Save New Customer Group' : 'Save Changes')}
                   </button>
                 </div>
               </>

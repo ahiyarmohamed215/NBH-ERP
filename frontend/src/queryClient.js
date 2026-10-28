@@ -227,6 +227,11 @@ if (typeof window !== 'undefined') {
     queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
   });
 
+  window.addEventListener('erp:sales_updated', (event) => {
+    if (event.detail?.remote) return;
+    queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all });
+  });
+
   window.addEventListener('erp:purchasing_updated', (event) => {
     if (event.detail?.remote) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.products.all });

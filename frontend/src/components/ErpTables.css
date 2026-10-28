@@ -67,7 +67,7 @@
 .erp-table.erp-table .erp-table-actions > div { justify-content:flex-end !important; gap:6px !important; }
 
 /* Only icon actions get a fixed square size. Text actions keep their labels. */
-.erp-table.erp-table .erp-table-icon-action {
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action {
   display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
   width:var(--erp-table-action-size) !important; min-width:var(--erp-table-action-size) !important;
   height:var(--erp-table-action-size) !important; min-height:var(--erp-table-action-size) !important;
@@ -75,12 +75,12 @@
   border-radius:var(--erp-control-radius) !important; background:#fff !important;
   color:var(--erp-accent) !important; cursor:pointer;
 }
-.erp-table.erp-table .erp-table-icon-action:hover:not(:disabled) { background:var(--erp-accent-soft) !important; }
-.erp-table.erp-table .erp-table-icon-action svg { width:13px !important; height:13px !important; color:inherit; stroke:currentColor; }
-.erp-table.erp-table .erp-table-icon-action[data-tone="danger"] { color:var(--danger) !important; border-color:var(--erp-table-action-danger-border) !important; }
-.erp-table.erp-table .erp-table-icon-action[data-tone="danger"]:hover:not(:disabled) { background:var(--danger-bg) !important; }
-.erp-table.erp-table .erp-table-icon-action:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
-.erp-table.erp-table .erp-table-icon-action:disabled { opacity:.55; cursor:not-allowed; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action:hover:not(:disabled) { background:var(--erp-accent-soft) !important; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action svg { width:13px !important; height:13px !important; color:inherit; stroke:currentColor; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action[data-tone="danger"] { color:var(--danger) !important; border-color:var(--erp-table-action-danger-border) !important; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action[data-tone="danger"]:hover:not(:disabled) { background:var(--danger-bg) !important; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+:is(.erp-table.erp-table,.grn-style-actions) .erp-table-icon-action:disabled { opacity:.55; cursor:not-allowed; }
 .erp-row-actions { display:inline-flex; align-items:center; gap:6px; }
 .erp-table.erp-table .erp-status-badge { text-transform:uppercase; }
 

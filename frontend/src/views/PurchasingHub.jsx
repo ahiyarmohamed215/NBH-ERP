@@ -23,7 +23,6 @@ import {
 export default function PurchasingHub({ activeSubTab, onSubTabChange, createRequest, onCreateRequestHandled }) {
   const { user } = useAuth();
   const isSuperAdmin = Boolean(
-    user?.username === 'admin' ||
     user?.roles?.includes('ROLE_SUPER_ADMIN') ||
     user?.roles?.includes('SUPER_ADMIN') ||
     user?.roles?.includes('ROLE_ADMIN')

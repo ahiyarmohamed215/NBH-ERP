@@ -1,0 +1,178 @@
+import React, { useId, useState } from 'react';
+import { Search, X, Phone, UserRound } from 'lucide-react';
+import './PurchaseProductSearch.css';
+import './FilterSelect.css';
+
+export default function CustomerSearch({
+  customers = [],
+  value,
+  onChange,
+  onSelectCustomer,
+  disabled = false,
+  label = 'Customer *',
+  ariaLabel = 'Customer',
+  placeholder = 'Search customer by name, phone...',
+  className = '',
+  required = false,
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const resultsId = useId();
+
+  const selected = customers.find((c) => String(c.id) === String(value));
+  const results = customers.filter((c) => {
+    const searchStr = `${c.name || ''} ${c.code || c.customerCode || ''} ${c.phone || ''} ${c.email || ''}`.toLowerCase();
+    const q = (selected && !query ? '' : query).trim().toLowerCase();
+    return !q || searchStr.includes(q);
+  });
+
+  const select = (customer) => {
+    onChange(customer.id);
+    if (onSelectCustomer) onSelectCustomer(customer);
+    setQuery('');
+    setOpen(false);
+    setActive(0);
+  };
+
+  const handleClear = () => {
+    onChange('');
+    if (onSelectCustomer) onSelectCustomer(null);
+    setQuery('');
+    setOpen(false);
+    setActive(0);
+  };
+
+  const displayValue = selected ? (query ? query : selected.name) : query;
+
+  return (
+    <div
+      className={`purchase-product-search supplier-search-container ${className}`.trim()}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      {label && <label>{label}</label>}
+      <div className="purchase-search-input">
+        <Search size={16} />
+        <input
+          className="erp-field"
+          aria-label={ariaLabel}
+          role="searchbox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={resultsId}
+          aria-activedescendant={open && results[active] ? `${resultsId}-${active}` : undefined}
+          placeholder={placeholder}
+          disabled={disabled}
+          value={displayValue}
+          onFocus={() => {
+            setOpen(true);
+            setActive(0);
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (value) onChange('');
+            setOpen(true);
+            setActive(0);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setOpen(false);
+              return;
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              setOpen(true);
+              setActive((index) =>
+                Math.max(0, Math.min(results.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))
+              );
+            } else if (event.key === 'Enter' && open) {
+              event.preventDefault();
+              if (results[active]) select(results[active]);
+            }
+          }}
+        />
+        {(value || query) && !disabled && (
+          <button
+            type="button"
+            aria-label="Clear customer search"
+            onClick={handleClear}
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="modern-filter-trigger"
+        aria-hidden="true"
+        tabIndex={-1}
+        style={{ display: 'none' }}
+        onClick={() => {
+          setOpen(true);
+          setActive(0);
+        }}
+      />
+      <select
+        className="modern-select-native erp-field"
+        aria-hidden="true"
+        tabIndex={-1}
+        value={value || ''}
+        onChange={(event) => {
+          const cust = customers.find((c) => String(c.id) === String(event.target.value));
+          onChange(event.target.value);
+          if (onSelectCustomer) onSelectCustomer(cust || null);
+        }}
+        required={required}
+        disabled={disabled}
+      >
+        <option value="">Select customer</option>
+        {customers.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      {open && (
+        <div className="purchase-product-results" role="listbox" id={resultsId} aria-label="Customer search results">
+          {results.slice(0, 30).map((customer, index) => (
+            <button
+              type="button"
+              role="option"
+              key={customer.id}
+              id={`${resultsId}-${index}`}
+              data-value={customer.id}
+              aria-selected={index === active}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActive(index)}
+              onClick={() => select(customer)}
+            >
+              <span className="purchase-result-product">
+                <span className="purchase-result-name" style={{ fontWeight: 600 }}>{customer.name}</span>
+                {(customer.phone || customer.email) && (
+                  <small style={{ display: 'flex', gap: '8px', color: '#64748b', fontSize: 'var(--erp-text-caption)' }}>
+                    {customer.phone && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Phone size={11} /> {customer.phone}
+                      </span>
+                    )}
+                    {customer.email && <span>{customer.email}</span>}
+                  </small>
+                )}
+              </span>
+              {(customer.code || customer.customerCode) && (
+                <span className="purchase-result-stock" style={{ color: 'var(--erp-accent)', fontWeight: 600 }}>
+                  {customer.code || customer.customerCode}
+                </span>
+              )}
+            </button>
+          ))}
+          {!results.length && <p style={{ padding: '8px 12px', margin: 0, color: '#64748b' }}>No matching customers found.</p>}
+        </div>
+      )}
+    </div>
+  );
+}

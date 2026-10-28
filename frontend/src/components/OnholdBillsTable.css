@@ -20,6 +20,7 @@
 .onhold-directory-controls .onhold-reset{height:38px;padding:0 12px;border:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;box-sizing:border-box;}
 
 .onhold-directory-table .onhold-remarks{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--erp-text);}
+.onhold-directory-table .onhold-warehouse{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--erp-text);}
 .onhold-directory-table .erp-table-code,.onhold-directory-table .erp-table-date{white-space:nowrap;}
 
 .onhold-staff>span{display:block;color:var(--erp-text);}

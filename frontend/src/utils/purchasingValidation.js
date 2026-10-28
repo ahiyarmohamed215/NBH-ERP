@@ -85,7 +85,7 @@ export function masterErrors(type,form,{draft=false}={}) {
  if(product){
   for(const key of ['brandId','categoryId','warehouseId'])if(!draft && !form[key])errors[key]='Select an option.';
   if(!draft || String(form.minStockLevel ?? '').trim()){const error=numberError(form.minStockLevel,'Minimum stock level',{decimals:0,max:2147483647});if(error)errors.minStockLevel=error;}
+  if(!draft || String(form.markupPercent ?? '').trim()){const error=numberError(form.markupPercent,'MP%',{decimals:4,max:99999});if(error)errors.markupPercent=error;}
  }
- if(brand && (!draft || String(form.markupPercent ?? '').trim())){const error=numberError(form.markupPercent,'MP%',{decimals:4,max:99999});if(error)errors.markupPercent=error;}
  return errors;
 }

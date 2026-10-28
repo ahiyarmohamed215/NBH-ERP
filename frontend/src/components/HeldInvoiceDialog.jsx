@@ -17,13 +17,15 @@ export default function HeldInvoiceDialog({
   onClose,
   onConfirm
 }) {
-  const [packing, setPacking] = useState({ boxes: '', bags: '', pBags: '', others: '' });
+  const [enteredPacking, setPacking] = useState({ boxes: '', bags: '', pBags: '', others: '' });
+  const automaticPacking=preview?.packing;
+  const packing=automaticPacking || enteredPacking;
   const dialog = useRef(null);
   const first = useRef(null);
 
   // Validation strictly aligns with testing: each field must be non-negative integer <= 1,000,000
   const valid = fields.every(
-    ([key]) => /^\d+$/.test(packing[key]) && Number(packing[key]) <= 1000000
+    ([key]) => /^\d+$/.test(String(packing[key])) && Number(packing[key]) <= (automaticPacking?100000000:1000000)
   );
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function HeldInvoiceDialog({
                   </span>
                 )}
               </div>
-              <p>Review consolidated items and specify packing dispatch quantities.</p>
+              <p>Review consolidated items and packing dispatch quantities.</p>
             </div>
           </div>
           <button
@@ -214,7 +216,7 @@ export default function HeldInvoiceDialog({
                 <Package size={16} className="held-packing-icon" />
                 <h3 id="held-packing-title">Packing Quantities</h3>
               </div>
-              <button
+              {!automaticPacking && <button
                 type="button"
                 className="held-quick-zero-btn"
                 onClick={handleFillAllZero}
@@ -222,10 +224,10 @@ export default function HeldInvoiceDialog({
                 disabled={busy}
               >
                 <Sparkles size={13} /> Set All to 0
-              </button>
+              </button>}
             </div>
             <p className="held-packing-instruction">
-              Enter quantity for each packaging unit. Enter <strong>0</strong> for any unused type.
+              {automaticPacking?'Combined counts from the selected warehouse-reviewed bills.':<>Enter quantity for each packaging unit. Enter <strong>0</strong> for any unused type.</>}
             </p>
 
             <div className="held-invoice-packing-fields">
@@ -241,11 +243,12 @@ export default function HeldInvoiceDialog({
                       className="erp-field held-packing-input"
                       type="number"
                       min="0"
-                      max="1000000"
+                      max={automaticPacking?100000000:1000000}
                       step="1"
                       inputMode="numeric"
                       required
                       disabled={busy}
+                      readOnly={Boolean(automaticPacking)}
                       value={packing[key]}
                       placeholder="0"
                       onChange={(event) =>

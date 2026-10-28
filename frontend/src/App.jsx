@@ -147,7 +147,6 @@ export default function App() {
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const isSuperAdmin = Boolean(
-    user?.username === 'admin' ||
     user?.roles?.includes('ROLE_SUPER_ADMIN') ||
     user?.roles?.includes('SUPER_ADMIN') ||
     user?.roles?.includes('ROLE_ADMIN') ||
@@ -239,7 +238,7 @@ export default function App() {
         subItems: [
           { id: 'deliveries', label: 'Delivery Trips', permission: 'DELIVERY_VIEW' },
           { id: 'routes', label: 'Delivery Routes', permission: 'DELIVERY_VIEW' },
-          { id: 'vehicles', label: 'Fleet Vehicles', permission: 'DELIVERY_VIEW' },
+          { id: 'vehicles', label: 'Vehicles', permission: 'DELIVERY_VIEW' },
         ],
       },
       {
@@ -674,7 +673,7 @@ export default function App() {
 
                         {/* Shared selection line for every compact sidebar module. */}
                         {isCurrentModule && (
-                          <span className="erp-sidebar-selection-line" aria-hidden="true" />
+                          <span className="erp-sidebar-selection-line" aria-hidden="true" style={{ position: 'absolute', bottom: '0px', left: '0px', right: '0px', height: '2px' }} />
                         )}
                       </>
                     ) : (

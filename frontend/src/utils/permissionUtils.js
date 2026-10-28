@@ -6,11 +6,10 @@
  * 2. Administrators can edit records; other staff need the module's write permission.
  */
 
-import {roleNames,permissionNames} from './moduleAccess';
+import {roleNames,permissionNames} from './moduleAccess.js';
 
 export function isSuperAdmin(user) {
   if (!user) return false;
-  if (String(user.username).toLowerCase() === 'admin') return true;
   const roles = user.roles || [];
   return roles.some((r) => {
     const s = String(typeof r === 'string' ? r : r?.name || '').toUpperCase();

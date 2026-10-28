@@ -1,3 +1,4 @@
+import { executeA4Print } from './customerPrintTemplates.js';
 /**
  * Reusable A4 Enterprise Report Printing & PDF Utility
  * Standard structure for all ERP pages (Customers, Sales, Inventory, Purchasing, etc.)
@@ -12,12 +13,6 @@ export function printA4Report({
   summaryItems = [], // Array of { label: string, value: string }
   footerNote = 'NBH Enterprise Resource Planning • Confidential Business Record',
 }) {
-  const printWindow = window.open('', '_blank', 'width=900,height=700');
-  if (!printWindow) {
-    alert('Please allow popups to print / export this document.');
-    return;
-  }
-
   const currentDate = new Date().toLocaleString();
 
   const metaHtml = metaItems.length > 0
@@ -240,21 +235,12 @@ export function printA4Report({
         <span>A4 Format • Page 1 of 1</span>
       </div>
 
-      <script>
-        window.onload = function() {
-          setTimeout(function() {
-            window.focus();
-            window.print();
-          }, 250);
-        };
-      </script>
+
     </body>
     </html>
   `;
 
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+  return executeA4Print(html, title);
 }
 
 export {
@@ -263,6 +249,6 @@ export {
   printCustomerDirectoryA4,
   printCustomerLedgerA4,
   executeA4Print,
-} from './customerPrintTemplates';
+} from './customerPrintTemplates.js';
 
 export default printA4Report;

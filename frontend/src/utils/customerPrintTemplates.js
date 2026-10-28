@@ -8,6 +8,14 @@
  * Triggers printing using a new window or a hidden fallback iframe.
  */
 export function executeA4Print(htmlContent, documentTitle = 'Document') {
+  const bindControls = (target) => {
+    target.document.querySelectorAll('[data-print-action]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.dataset.printAction === 'print') target.print();
+        else target.close();
+      });
+    });
+  };
   // Try popup window first
   const printWindow = window.open('', '_blank', 'width=950,height=850,menubar=no,toolbar=no,location=no,status=no');
 
@@ -16,6 +24,7 @@ export function executeA4Print(htmlContent, documentTitle = 'Document') {
       printWindow.document.open();
       printWindow.document.write(htmlContent);
       printWindow.document.close();
+      bindControls(printWindow);
 
       const triggerPrint = () => {
         try {
@@ -56,6 +65,7 @@ export function executeA4Print(htmlContent, documentTitle = 'Document') {
     doc.open();
     doc.write(htmlContent);
     doc.close();
+    bindControls(iframe.contentWindow);
 
     setTimeout(() => {
       try {
@@ -593,11 +603,11 @@ export function printCustomerStatementA4(customer = {}, options = {}) {
     </head>
     <body>
       <div class="floating-print-bar no-print">
-        <button class="print-btn" onclick="window.print()">
+        <button class="print-btn" data-print-action="print">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           Print A4 Document
         </button>
-        <button class="close-btn" onclick="window.close()">Close Window</button>
+        <button class="close-btn" data-print-action="close">Close Window</button>
       </div>
 
       <div class="page-container">
@@ -921,11 +931,11 @@ export function printCustomerGroupRosterA4(group = {}, assignedCustomers = [], o
     </head>
     <body>
       <div class="floating-print-bar no-print">
-        <button class="print-btn" onclick="window.print()">
+        <button class="print-btn" data-print-action="print">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           Print A4 Document
         </button>
-        <button class="close-btn" onclick="window.close()">Close Window</button>
+        <button class="close-btn" data-print-action="close">Close Window</button>
       </div>
 
       <div class="page-container">
@@ -1143,11 +1153,11 @@ export function printCustomerDirectoryA4(customers = [], options = {}) {
     </head>
     <body>
       <div class="floating-print-bar no-print">
-        <button class="print-btn" onclick="window.print()">
+        <button class="print-btn" data-print-action="print">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           Print A4 Document
         </button>
-        <button class="close-btn" onclick="window.close()">Close Window</button>
+        <button class="close-btn" data-print-action="close">Close Window</button>
       </div>
 
       <div class="page-container">

@@ -274,15 +274,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     try {
       const response = await productApi.getById(product.id);
       if (response.data?.id) current = { ...product, ...response.data };
-    } catch { /* Retain product details while resolving its brand below. */ }
-    if (current.brandId) {
-      try {
-        const response = await brandApi.getById(current.brandId);
-        if (response.data?.markupPercent != null) current = { ...current, brandMarkupPercent: Number(response.data.markupPercent) };
-      } catch {
-        addToast('Unable to refresh the brand MP%. Please check the connection and select the product again.', 'warning');
-      }
-    }
+    } catch { /* Retain product details */ }
     setProducts(previous=>previous.map(item=>String(item.id)===String(current.id) ? current : item));
     return current;
   };
@@ -297,7 +289,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     }
     const currentStock = null;
     const cost = Number(prod.costPrice) || 0;
-    const markupPercent = Number(prod.brandMarkupPercent) || 0;
+    const markupPercent = Number(prod.markupPercent ?? prod.brandMarkupPercent) || 0;
     const sale = Number((cost * (1 + markupPercent / 100)).toFixed(2));
     const wholesale = Number(prod.wholesalePrice) || (sale ? sale * 0.9 : cost * 1.15);
     const credit = Number(prod.creditPrice) || (sale ? sale * 1.05 : cost * 1.25);
@@ -429,8 +421,8 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
     setStagingItem(calculateGrnStaging({
       ...INITIAL_STAGING_ITEM, ...item,
       quantity: item.quantityReceived, costPrice: item.unitCost,
-      markupPercent: item.markupPercent ?? Number(product?.brandMarkupPercent || 0),
-      brandMarkupPercent: Number(product?.brandMarkupPercent ?? item.brandMarkupPercent ?? item.markupPercent ?? 0),
+      markupPercent: item.markupPercent ?? Number(product?.markupPercent ?? product?.brandMarkupPercent ?? 0),
+      brandMarkupPercent: Number(product?.markupPercent ?? product?.brandMarkupPercent ?? item.brandMarkupPercent ?? item.markupPercent ?? 0),
       useBrandMarkup: item.useBrandMarkup ?? false,
       lastCostPrice: product?.costPrice ?? null, currentSellingPrice: product?.sellingPrice ?? null,
       stockLoading: true,
@@ -647,9 +639,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
   };
 
   const spreadsheetProducts = async () => {
-    const response=await brandApi.getAll();
-    const brands=response.data?.content || response.data || [];
-    return products.map(product=>({...product,brandMarkupPercent:brands.find(brand=>String(brand.id)===String(product.brandId))?.markupPercent ?? product.brandMarkupPercent ?? 0}));
+    return products.map(product=>({...product,markupPercent:product.markupPercent ?? product.brandMarkupPercent ?? 0,brandMarkupPercent:product.markupPercent ?? product.brandMarkupPercent ?? 0}));
   };
   const handleFileUpload = async (event) => {
     const file=event.target.files?.[0];if(!file)return;
@@ -1252,6 +1242,7 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                 <div><span>Last cost price</span><strong>{stagingItem.lastCostPrice == null ? 'Unavailable' : 'LKR ' + Number(stagingItem.lastCostPrice).toFixed(2)}</strong></div>
                 <div><span>Available qty</span><strong>{stagingItem.stockLoading ? 'Loading…' : stagingItem.currentQuantity == null ? 'Unavailable' : stagingItem.currentQuantity + ' ' + stagingItem.unitOfMeasure}</strong></div>
                 <div><span>Current selling price</span><strong>{stagingItem.currentSellingPrice == null ? 'Unavailable' : 'LKR ' + Number(stagingItem.currentSellingPrice).toFixed(2)}</strong></div>
+                <div><span>MP%</span><strong>{stagingItem.markupPercent == null ? '0.00%' : Number(stagingItem.markupPercent).toFixed(2) + '%'}</strong></div>
               </div>
             )}
 
@@ -1267,15 +1258,12 @@ const GrnView = React.forwardRef(function GrnView(props, ref) {
                     value={stagingItem[field]} onChange={e => handleStagingChange(field, readNumericInput(e))} />
                 </label>
               ))}
-              <label>
-                <span className="grn-markup-label"><input type="checkbox" checked={stagingItem.useBrandMarkup}
-                  aria-label="Use brand MP%" onChange={(e) => handleStagingChange('useBrandMarkup', e.target.checked)} /> MP% ({stagingItem.useBrandMarkup ? 'Brand' : 'Calculated'})</span>
+              <label>MP%
                 <input className="input-glass erp-field" type="number" name="markupPercent" value={stagingItem.markupPercent} readOnly />
               </label>
               <label>SELLING PRICE (LKR)<input className="input-glass erp-field" type="number" name="salePrice" min="0" step="0.01"
-                inputMode="decimal" onFocus={event=>{if(!event.target.readOnly)event.target.select();}}
-                readOnly={stagingItem.useBrandMarkup} value={stagingItem.salePrice}
-                onChange={(e) => handleStagingChange('salePrice', readNumericInput(e))} /></label>
+                inputMode="decimal" onFocus={event=>event.target.select()}
+                readOnly value={stagingItem.salePrice} /></label>
             </div>
             <button type="button" className="btn btn-primary grn-add-item erp-button" disabled={!stagingItem.productId || saving} onClick={handleAddItemToGrn}>
               {editingLineIndex === null ? <Plus size={16} /> : <Edit2 size={16} />} {editingLineIndex === null ? 'Add item' : 'Update item'}

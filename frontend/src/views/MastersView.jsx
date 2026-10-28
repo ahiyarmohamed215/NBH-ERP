@@ -337,10 +337,11 @@ const MastersView = React.forwardRef(function MastersView({
         warehouseId: defaultWh ? defaultWh.id : '',
         unitOfMeasure: 'PCS',
         minStockLevel: '5',
+        markupPercent: 0,
         description: '',
       });
     } else if (activeTab === 'brands') {
-      setModalForm({ code: '', name: '', description: '', markupPercent: 0 });
+      setModalForm({ code: '', name: '', description: '' });
     } else if (activeTab === 'warehouses') {
       setModalForm({ code: '', name: '', address: '', contactNumber: '', phone: '', remarks: '' });
     } else if (activeTab === 'categories') {
@@ -366,6 +367,7 @@ const MastersView = React.forwardRef(function MastersView({
         warehouseId: item.warehouseId || item.defaultWarehouseId || (matchedWh ? matchedWh.id : ''),
         unitOfMeasure: item.unitOfMeasure || 'PCS',
         minStockLevel: item.minStockLevel?.toString() || '0',
+        markupPercent: item.markupPercent ?? item.brandMarkupPercent ?? 0,
         description: item.description || '',
       });
     } else if (activeTab === 'brands') {
@@ -373,7 +375,6 @@ const MastersView = React.forwardRef(function MastersView({
         code: item.code || '',
         name: item.name || '',
         description: item.description || '',
-        markupPercent: item.markupPercent ?? 0,
       });
     } else {
       setModalForm({
@@ -418,6 +419,7 @@ const MastersView = React.forwardRef(function MastersView({
           unitOfMeasure: modalForm.unitOfMeasure || 'PCS',
           costPrice: editingItem ? (parseFloat(editingItem.costPrice) || 0) : 0,
           sellingPrice: editingItem ? (parseFloat(editingItem.sellingPrice) || 0) : 0,
+          markupPercent: Number(modalForm.markupPercent ?? 0),
           useBrandMarkup: editingItem ? (editingItem.useBrandMarkup ?? Number(editingItem.sellingPrice || 0) === 0) : true,
           minStockLevel: parseInt(modalForm.minStockLevel, 10) || 0,
           description: modalForm.description?.trim() || null,
@@ -434,18 +436,11 @@ const MastersView = React.forwardRef(function MastersView({
           return;
         }
         const bCode = modalForm.code?.trim().toUpperCase() || (modalForm.name || '').trim().toUpperCase().replace(/\s+/g, '_').slice(0, 10);
-        const markupPercent = Number(modalForm.markupPercent);
-        if (!Number.isFinite(markupPercent) || markupPercent < 0 || markupPercent > 99999) {
-          addToast('Enter a valid MP% between 0 and 99999', 'error');
-          setSaving(false);
-          return;
-        }
         const payload = {
           status:savedStatus,
           code: bCode,
           name: modalForm.name?.trim() || null,
           description: modalForm.description?.trim() || '',
-          markupPercent,
         };
         if (editingItem) {
           await brandApi.update(editingItem.id, payload);
@@ -1456,7 +1451,11 @@ const MastersView = React.forwardRef(function MastersView({
                 <>
                   <div style={{ display:'grid',gridTemplateColumns:'140px 1fr',gap:8,padding:'10px 14px',background:'#f8fafc',borderRadius:8,border:'1px solid #e2e8f0' }}>
                     <span style={{ fontSize: 'var(--erp-text-field)', color:'#64748b', fontWeight:600 }}>Selling price</span>
-                    <span style={{fontWeight:600}}>LKR {Number(viewingItem.sellingPrice || 0).toFixed(2)}<small style={{ display:'block', marginTop:4, fontSize: 'var(--erp-text-caption)', fontWeight:400, color:'#64748b' }}>{viewingItem.useBrandMarkup ? `Cost + brand MP% (${Number(viewingItem.brandMarkupPercent || 0).toFixed(2)}%)` : 'Manual price'}</small></span>
+                    <span style={{fontWeight:600}}>LKR {Number(viewingItem.sellingPrice || 0).toFixed(2)}<small style={{ display:'block', marginTop:4, fontSize: 'var(--erp-text-caption)', fontWeight:400, color:'#64748b' }}>{viewingItem.useBrandMarkup ? `Cost + MP% (${Number(viewingItem.markupPercent ?? viewingItem.brandMarkupPercent ?? 0).toFixed(2)}%)` : 'Manual price'}</small></span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>MP% (Markup on cost)</span>
+                    <span style={{ fontWeight: 600 }}>{Number(viewingItem.markupPercent ?? viewingItem.brandMarkupPercent ?? 0).toFixed(2)}%</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <span style={{ fontSize: 'var(--erp-text-field)', color: '#64748b', fontWeight: 600 }}>Category</span>
@@ -1498,12 +1497,7 @@ const MastersView = React.forwardRef(function MastersView({
                 </>
               )}
 
-              {viewingItem.type === 'brands' && (
-                <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: 'var(--erp-text-body)', color: '#64748b', fontWeight: 600 }}>MP% (Markup on cost)</span>
-                  <div style={{ marginTop: '6px', fontWeight: 700 }}>{Number(viewingItem.markupPercent || 0).toFixed(2)}%</div>
-                </div>
-              )}
+
 
               {viewingItem.type === 'categories' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>

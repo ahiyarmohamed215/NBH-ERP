@@ -577,7 +577,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       const rawBalances = balancesQueryData?.content || balancesQueryData?.data?.content || (Array.isArray(balancesQueryData?.data) ? balancesQueryData?.data : (Array.isArray(balancesQueryData) ? balancesQueryData : []));
       if (Array.isArray(rawBalances) && rawBalances.length > 0) {
         const items = rawBalances
-          .filter((b) => Number(b.quantity ?? 0) > 0)
+          .filter((b) => Number(b.quantity ?? 0) > 0 || Number(b.availableQuantity ?? 0) > 0)
           .map((b) => {
             const prod = productsList && productsList.length > 0
               ? productsList.find((p) => String(p.id) === String(b.productId) || (b.productSku && p.sku === b.productSku))
@@ -606,8 +606,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               sellingPrice: sell,
               totalCostValue: canSeeCost ? Number(b.totalCostValue ?? (qty * (cost || 0))) : null,
               minStockLevel: min,
-              isLowStock: qty <= min && qty > 0,
-              isOutOfStock: qty <= 0,
+              isLowStock: avail <= min && avail > 0,
+              isOutOfStock: avail <= 0,
             };
           });
         setInventoryBalances(items);
@@ -651,7 +651,7 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
 
       if (fetchedBalances.length > 0) {
         items = fetchedBalances
-          .filter((b) => Number(b.quantity ?? 0) > 0)
+          .filter((b) => Number(b.quantity ?? 0) > 0 || Number(b.availableQuantity ?? 0) > 0)
           .map((b) => {
             const prod = currentProducts && currentProducts.length > 0
               ? currentProducts.find((p) => String(p.id) === String(b.productId) || (b.productSku && p.sku === b.productSku))
@@ -680,8 +680,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
               sellingPrice: sell,
               totalCostValue: canSeeCost ? Number(b.totalCostValue ?? (qty * (cost || 0))) : null,
               minStockLevel: min,
-              isLowStock: qty <= min && qty > 0,
-              isOutOfStock: qty <= 0,
+              isLowStock: avail <= min && avail > 0,
+              isOutOfStock: avail <= 0,
             };
           });
       }
@@ -712,11 +712,10 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
   }, []);
 
   useDataSync((event) => {
-    if (event?.detail?.remote) {
-      return Promise.allSettled([loadAdjustments(), loadQuotas()]);
-    }
+    invalidateInventoryQueries();
+    refetchBalances();
     return Promise.allSettled([loadInventoryBalances(), loadAdjustments(), loadQuotas()]);
-  }, ['erp:data_changed', 'erp:inventory_updated']);
+  }, ['erp:data_changed', 'erp:inventory_updated', 'erp:sales_updated'], [], ['inventory', 'sales', 'grn', 'gtn', 'prn', 'stock-adjustments', 'allocations']);
 
   // Filtered inventory balances
   const filteredInventory = useMemo(() => {
@@ -727,7 +726,8 @@ export default function InventoryHub({ activeSubTab = 'inventory-list', onSubTab
       if (invCategoryFilter !== 'ALL' && item.categoryName !== invCategoryFilter) {
         return false;
       }
-      if (invStatusFilter === 'IN_STOCK' && (item.quantity <= 0 || item.isLowStock)) {
+      const real = Number(item.availableQuantity != null ? item.availableQuantity : (item.quantity - (item.reservedQuantity || 0)));
+      if (invStatusFilter === 'IN_STOCK' && (real <= 0 || item.isLowStock)) {
         return false;
       }
       if (invStatusFilter === 'LOW_STOCK' && !item.isLowStock) {
