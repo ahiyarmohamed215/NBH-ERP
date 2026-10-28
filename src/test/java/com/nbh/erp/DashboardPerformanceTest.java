@@ -51,6 +51,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
@@ -66,7 +67,11 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+// Repository calls deliberately commit independently so query measurements do not
+// benefit from a test transaction's first-level cache. Keep this fixture's deletes
+// away from documents/adjustments committed by other test classes.
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:dashboard-performance-test;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class DashboardPerformanceTest {
 
     @Autowired

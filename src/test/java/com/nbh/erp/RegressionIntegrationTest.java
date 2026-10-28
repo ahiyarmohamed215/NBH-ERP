@@ -42,7 +42,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-@SpringBootTest @Transactional
+// A separate context (including Mockito overrides) must not share a create-drop
+// database or committed identity fixtures with unrelated test classes.
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:regression-integration-test;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1")
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
+@Transactional
 class RegressionIntegrationTest {
  @org.springframework.test.context.bean.override.mockito.MockitoBean com.nbh.erp.customer.service.PosCustomerAccess posCustomerAccess;
  @Autowired InvoiceService invoices; @Autowired InvoiceRepository invoiceRepository;
@@ -167,16 +171,26 @@ class RegressionIntegrationTest {
  @Test void rotatedRefreshCannotBeReused() { var login=new com.nbh.erp.auth.dto.LoginRequest();login.setUsername(admin.getUsername());login.setPassword("safe-test-password");var response=auth.login(login);var req=new com.nbh.erp.auth.dto.RefreshTokenRequest();req.setRefreshToken(response.getRefreshToken());var rotated=auth.refreshToken(req);assertNotEquals(response.getRefreshToken(),rotated.getRefreshToken());assertThrows(RuntimeException.class,()->auth.refreshToken(req)); }
  @Test void ordinaryUserCannotGrantAdministrator() { var p=UserPrincipal.builder().username("clerk").active(true).authorities(List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("USER_MANAGE"))).build();SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(p,null,p.getAuthorities()));assertThrows(org.springframework.security.access.AccessDeniedException.class,()->SecurityUtils.checkRoleGrant(roles.findByName("ROLE_ADMIN").orElseThrow())); }
  @Test void testSignupAndDuplicateHandling() {
-  auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "testnewuser@example.com", "New User", "0771234567"));
+  // Deterministic identities reserved for this rollback-only signup fixture.
+  String signupPhone="0770009101", otherPhone="0770009102";
+  auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "testnewuser@example.com", "New User", signupPhone));
+  User registered=users.findByUsername("testnewuser").orElseThrow();
+  assertEquals("+94770009101",registered.getPhone());
+  assertEquals("PENDING",registered.getApprovalStatus());
+  assertFalse(registered.getIsActive());
   // Duplicate username
-  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
-      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "other@example.com", "Other", "0779998888")));
+  var duplicateUsername=assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("testnewuser", "SecurePass123!", "other@example.com", "Other", otherPhone)));
+  assertTrue(duplicateUsername.getMessage().startsWith("Username 'testnewuser' is already registered."));
   // Duplicate email
-  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
-      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("differentuser", "SecurePass123!", "testnewuser@example.com", "Other", "0779998888")));
-  // Duplicate phone
-  assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
-      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("phoneuser", "SecurePass123!", "phoneuser@example.com", "Other", "0771234567")));
+  var duplicateEmail=assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("differentuser", "SecurePass123!", "testnewuser@example.com", "Other", otherPhone)));
+  assertTrue(duplicateEmail.getMessage().startsWith("This email address is already registered."));
+  // Same phone in a different format, with a distinct username and email. This
+  // must fail specifically on duplicate-phone validation, not another rule.
+  var duplicatePhone=assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
+      auth.signup(new com.nbh.erp.auth.dto.SignupRequest("phoneuser", "SecurePass123!", "phoneuser@example.com", "Other", "+94 77 000 9101")));
+  assertEquals("This phone number is already registered. Please use a different phone number and try again.",duplicatePhone.getMessage());
   // Weak password rejected
   assertThrows(com.nbh.erp.common.exception.BusinessException.class, () ->
       auth.signup(new com.nbh.erp.auth.dto.SignupRequest("weakuser", "123456", "weakuser@example.com", "Other", "0779997777")));

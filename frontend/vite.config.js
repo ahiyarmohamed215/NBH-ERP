@@ -8,6 +8,10 @@ export default defineConfig({
     ? `node_modules/.vite-tests/${process.pid}`
     : 'node_modules/.vite-dev',
   server: {
+    // Middleware-only test servers need no live reload. Without this default,
+    // fixtures that omit hmr start competing WebSocket listeners on port 24678.
+    // Leave normal development's HMR behavior unchanged.
+    hmr: process.env.NODE_TEST_CONTEXT ? false : undefined,
     port: 5173,
     proxy: {
       '/api': {
