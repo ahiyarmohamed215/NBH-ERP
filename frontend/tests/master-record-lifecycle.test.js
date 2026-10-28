@@ -44,14 +44,14 @@ test('all four master directories save partial drafts, filter them and require r
    row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes(`Completed ${name}`));await click(row);
    const remarks=[...host.querySelectorAll('.master-details-grid>div')].find(row=>row.querySelector('dt').textContent==='Remarks');assert.ok(remarks);assert.equal(remarks.querySelector('dd').textContent,'Complete record later');
    assert.equal(host.querySelector('[role="dialog"]').textContent.includes('Description / notes'),false);
-   assert.equal(findButton(`Activate ${name}`),undefined,'Drafts cannot change status');
-   assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),[`Edit ${name}`,`Delete ${name}`]);
-   assert.equal(findButton('Print'),undefined,'Drafts have only edit and delete record actions');
+   assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),[`Edit ${name}`,`Activate ${name}`,`Delete ${name}`]);
+   assert.equal(findButton('Print'),undefined,'Drafts have only edit, activate and delete record actions');
    await click(findButton('Close'));
    // Existing active records still support deactivation and reactivation.
    Object.assign(lists[type].find(row=>row.id===99),{status:'ACTIVE',isActive:true});
    await click(host.querySelector('[title="Filter records by status"]'));await click(document.querySelector('[role="option"][data-value="ALL"]'));
    await click(host.querySelector('[title="Refresh records"]'));
+   await act(async()=>new Promise(resolve=>setTimeout(resolve,350)));
    row=[...host.querySelectorAll('tbody tr')].find(row=>row.textContent.includes(`Completed ${name}`));await click(row);
    for(const [action,target] of [[`Deactivate ${name}`,'INACTIVE'],[`Reactivate ${name}`,'ACTIVE']]){
     await click(findButton(action));const dialog=host.querySelector('[aria-label="Change '+name+' status"]');assert.ok(dialog);
@@ -67,5 +67,10 @@ test('all four master directories save partial drafts, filter them and require r
    lists[type]=lists[type].filter(row=>row.id!==99);
   }
   assert.equal(changes.length,8);
- } finally {await act(async()=>new Promise(resolve=>setTimeout(resolve,5100)));await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}
+ } finally {
+  await act(async()=>root.unmount());
+  await server.close();
+  await window.happyDOM.close();
+  for(const key of ['window','document','localStorage','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];
+ }
 });

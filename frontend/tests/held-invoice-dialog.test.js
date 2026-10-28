@@ -11,5 +11,11 @@ test('invoice confirmation requires all packing counts, accepts zero and submits
  await fill('packing-others','0');assert.equal(submit.disabled,false);
  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));assert.deepEqual(submitted,{boxes:2,bags:3,pBags:1,others:0});
  await act(async()=>root.render(React.createElement(Dialog,{...props,busy:true})));assert.ok(document.querySelector('[type="submit"]').disabled);assert.ok(document.getElementById('packing-boxes').disabled);
+ const combined={boxes:7,bags:4,pBags:3,others:2};
+ await act(async()=>root.render(React.createElement(Dialog,{...props,preview:{...props.preview,packing:combined}})));
+ assert.deepEqual(['boxes','bags','pBags','others'].map(key=>document.getElementById(`packing-${key}`).value),['7','4','3','2']);
+ assert.ok(document.getElementById('packing-boxes').readOnly);assert.equal(document.querySelector('[title="Fill all packing counts with 0"]'),null);
+ assert.match(form.textContent,/Combined counts/);assert.equal(submit.disabled,false);
+ await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));assert.deepEqual(submitted,combined);
  }finally{await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}
 });

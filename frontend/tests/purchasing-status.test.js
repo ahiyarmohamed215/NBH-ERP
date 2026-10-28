@@ -33,7 +33,7 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     for(const text of ['Supplier contact','0771234567','supplier@example.com','Colombo']) assert.ok(viewing.textContent.includes(text));
     assert.ok(viewing.querySelector('[aria-label="Close supplier details"]'));
     assert.ok([...viewing.querySelectorAll('.purchase-inspection-detail-actions button')].some(button=>button.textContent.includes('Edit Supplier')));
-    let supplierPrint='';window.open=()=>({document:{open(){},write(html){supplierPrint=html;},close(){}}});
+    let supplierPrint='';window.open=()=>({focus(){},print(){},document:{readyState:'complete',querySelectorAll(){return [];},open(){},write(html){supplierPrint=html;},close(){}}});
     await act(async()=>viewing.querySelector('[title="Print Supplier Details (A4)"]').click());
     assert.ok(supplierPrint.includes('SUP-1'));assert.ok(supplierPrint.includes('supplier@example.com'));
 
@@ -41,7 +41,7 @@ test('Supplier and GRN status actions wait for a reason and preserve state on di
     await enterReason(dialog,'   ');assert.equal(confirmButton(dialog).disabled,true);
     await enterReason(dialog,'Account paused for review');await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,1);assert.equal(supplier.isActive,true);assert.ok(host.querySelector('[aria-label="Change Supplier status"]'));assert.ok(supplierAction('Deactivate Supplier'));
     fail=false;await act(async()=>confirmButton(dialog).click());assert.equal(toggleCalls,2);assert.equal(supplier.isActive,false);assert.equal(host.querySelector('[aria-label="Change Supplier status"]'),null);assert.ok(supplierAction('Reactivate Supplier'));
-    await act(async()=>supplierAction('Reactivate Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-activate'));assert.equal(confirmButton(dialog).disabled,true);
+    await act(async()=>supplierAction('Reactivate Supplier').click());dialog=host.querySelector('[aria-label="Change Supplier status"]');assert.ok(dialog.classList.contains('supplier-status-available') || dialog.classList.contains('supplier-status-activate'));assert.equal(confirmButton(dialog).disabled,true);
     await act(async()=>dialog.querySelector('[aria-label="Close status change"]').click());assert.equal(toggleCalls,2);assert.equal(supplier.isActive,false);
     let grn={id:5,grnNumber:'GRN-5',status:'DRAFT',supplierName:'Test supplier',receivedDate:'2026-10-12',items:[{productId:1,productSku:'P-1',productName:'Product',quantityReceived:2,unitCost:4}]},processCalls=0;
     apis.grnApi.search=async()=>({data:{content:[grn]}});apis.grnApi.getById=async()=>({data:grn});

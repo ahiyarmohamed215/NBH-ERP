@@ -15,7 +15,7 @@ test('master records validate text, phone and numeric boundaries without blockin
   const invalid={...form,name:'x'.repeat(201),description:'x'.repeat(5001),remarks:'x'.repeat(5001),phone:'not-a-phone',minStockLevel:'5abc',markupPercent:'12.34567'};
   const errors=masterErrors(type,invalid);assert.ok(errors.name);assert.ok(errors[type==='warehouses'?'remarks':'description']);
   if(type==='products')assert.ok(errors.minStockLevel);
-  if(type==='brands')assert.ok(errors.markupPercent);
+  if(type==='products')assert.ok(errors.markupPercent);
   if(type==='warehouses')assert.ok(errors.contactNumber);
  }
  assert.deepEqual(masterErrors('warehouses',{remarks:'Complete tomorrow'},{draft:true}),{});

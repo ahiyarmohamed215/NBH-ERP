@@ -17,26 +17,22 @@ test('GRN directory prints and intake accepts products with different destinatio
       for (const method of Object.keys(api)) if (typeof api[method] === 'function') api[method] = async () => ({ data: [] });
     }
     const products = [
-      { id: 1, sku: 'P-1', name: 'First product', defaultWarehouseId: 10, defaultWarehouseName: 'Hidden North Warehouse', categoryName: 'Rice', brandName: 'First brand', brandMarkupPercent: 25, costPrice: 4 },
-      { id: 2, sku: 'P-2', name: 'Second product', defaultWarehouseId: 20, defaultWarehouseName: 'Hidden South Warehouse', categoryName: 'Flour', brandName: 'Second brand', costPrice: 6 },
+      { id: 1, sku: 'P-1', name: 'First product', defaultWarehouseId: 10, defaultWarehouseName: 'Hidden North Warehouse', categoryName: 'Rice', brandName: 'First brand', markupPercent: 25, costPrice: 4 },
+      { id: 2, sku: 'P-2', name: 'Second product', defaultWarehouseId: 20, defaultWarehouseName: 'Hidden South Warehouse', categoryName: 'Flour', brandName: 'Second brand', markupPercent: 0, costPrice: 6 },
     ];
     const grn = { id: 5, grnNumber: 'GRN-5', supplierName: 'Test supplier', notes:'Delivery checked', warehouseName: 'Hidden North Warehouse', receivedDate: '2026-10-10', status: 'PROCESSED', items: [{ productId: 1,productSku:'P-1',productName:'First product' }, { productId: 1,productSku:'P-1',productName:'First product' }, { productId: 2,productSku:'P-2',productName:'Second product' }] };
     apis.grnApi.search = async () => ({ data: { content: [grn,{...grn,id:9,grnNumber:'GRN-OLDER',receivedDate:'2026-10-09'}] } });
     apis.grnApi.getById = async () => ({ data: grn });
     apis.supplierApi.getActive = async () => ({ data: [{ id: 3, name: 'Test supplier' }] });
     apis.productApi.getProducts = async () => ({ data: { content: products } });
-    // The product list can predate a brand edit. Selection must resolve the current brand.
-    products[0].brandId = 7;
-    products[0].brandMarkupPercent = 0;
     apis.productApi.getById = async (id) => ({ data: products.find(product=>product.id===id) });
-    apis.brandApi.getById = async () => ({ data: { id: 7, markupPercent: 25 } });
     const stockRequests = [];
     apis.inventoryApi.getWarehouseStock = async (id) => { stockRequests.push(id); return { data: [] }; };
     let saved;
     apis.grnApi.create = async (payload) => { saved = payload; return { data: { grnNumber: 'GRN-6' } }; };
     let printed,printedGrnId;
     apis.pdfApi.printGrn=async id=>{printedGrnId=id;};
-    window.open = () => ({ document: { open() {}, write(html) { printed = html; }, close() {} } });
+    window.open = () => ({ focus() {}, print() {}, document: { readyState: 'complete', querySelectorAll() { return []; }, open() {}, write(html) { printed = html; }, close() {} } });
     const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
     const { ToastProvider } = await server.ssrLoadModule('/src/context/ToastContext.jsx');
     const { default: GrnView } = await server.ssrLoadModule('/src/views/GrnView.jsx');
@@ -116,16 +112,11 @@ test('GRN directory prints and intake accepts products with different destinatio
     await changeNumber('costPrice', '008');
     assert.equal(host.querySelector('input[name="costPrice"]').value, '8');
     assert.equal(host.querySelector('input[name="salePrice"]').value, '10');
-    await act(async () => host.querySelector('[aria-label="Use brand MP%"]').click());
-    assert.equal(host.querySelector('input[name="salePrice"]').readOnly, false);
-    await changeNumber('salePrice', '');
-    assert.equal(host.querySelector('input[name="salePrice"]').value, '');
-    await changeNumber('salePrice', '11.25');
-    assert.equal(host.querySelector('input[name="markupPercent"]').value, '40.63');
-    assert.equal(host.querySelector('input[name="markupPercent"]').disabled, false);
+    assert.equal(host.querySelector('[aria-label="Use brand MP%"]'), null);
+    assert.equal(host.querySelector('input[name="markupPercent"]').value, '25');
     await act(async () => host.querySelector('.grn-add-item').click());
     assert.equal(host.querySelectorAll('tbody tr').length, 2, 'Editing replaces a line without duplicating its quantity');
-    assert.ok(host.querySelector('tbody tr').textContent.includes('11.25'));
+    assert.ok(host.querySelector('tbody tr').textContent.includes('10.00'));
     await act(async () => host.querySelector('[aria-label="Remove item 2"]').click());
     assert.equal(host.querySelectorAll('tbody tr').length,2,'GRN row is kept until removal is confirmed');
     assert.ok(document.querySelector('[role="alertdialog"]'));
@@ -137,9 +128,8 @@ test('GRN directory prints and intake accepts products with different destinatio
     const save = [...host.querySelectorAll('button')].find((button) => /Save (as )?Draft/.test(button.textContent));
     await act(async () => save.click());
     assert.deepEqual(saved.items.map((item) => item.productId), [1]);
-    assert.equal(saved.items[0].sellingPrice, 11.25);
-    assert.equal(saved.items[0].useBrandMarkup, false);
-    assert.equal(saved.items[0].markupPercent, 40.63);
+    assert.equal(saved.items[0].sellingPrice, 10);
+    assert.equal(saved.items[0].markupPercent, 25);
     assert.equal(saved.warehouseId, undefined);
     await act(async()=>[...host.querySelectorAll('button')].find(button=>button.textContent.includes('Upload Sheet')).click());
     const fileInput=host.querySelector('input[type="file"]');

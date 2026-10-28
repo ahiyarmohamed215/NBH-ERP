@@ -14,7 +14,7 @@ test('PRN shows purchase history for adjusted stock and shares its remaining qua
     apis.productApi.getProducts=async()=>({data:[{id:1,sku:'ADJ-P',name:'Adjusted product',costPrice:99}]});
     apis.warehouseApi.getActive=async()=>({data:[{id:1,name:'Original warehouse'},{id:2,name:'Adjusted warehouse'}]});
     apis.inventoryApi.getBalances=async()=>({data:[{productId:1,warehouseId:1,quantity:10},{productId:1,warehouseId:2,quantity:10}]});
-    apis.prnApi.getReturnSources=async()=>({data:[1,2].map(warehouseId=>({productId:1,sourceGrnId:7,originalGrnNumber:'GRN-7',supplierId:8,supplierName:'Historical supplier',warehouseId,warehouseName:warehouseId===1?'Original warehouse':'Adjusted warehouse',costPrice:4,returnableQuantity:5}))});
+    apis.prnApi.getReturnSources=async()=>({data:[1,2].map(warehouseId=>({productId:1,sourceGrnId:7,originalGrnNumber:'GRN-7',supplierId:8,supplierName:'Historical supplier',warehouseId,warehouseName:warehouseId===1?'Original warehouse':'Adjusted warehouse',costPrice:4,sellingPrice:4,returnableQuantity:5}))});
     const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');const {default:View}=await server.ssrLoadModule('/src/views/PrnView.jsx');const ref=React.createRef();
     await act(async()=>root.render(React.createElement(ToastProvider,null,React.createElement(View,{ref}))));await act(async()=>ref.current.openCreate());
     const search=host.querySelector('.purchase-product-search input');

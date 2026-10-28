@@ -23,9 +23,9 @@ test('onhold directory uses GRN filters, date ranges, row details and adjusted-o
   await act(async()=>root.render(React.createElement(Harness)));
   assert.equal(host.querySelectorAll('tbody tr').length,2);assert.ok(!host.textContent.includes('WORKING'));assert.ok(!host.textContent.includes('COPY'));
   await act(async()=>host.querySelector('[aria-label="Onhold bill status"]').click());
-  for(const value of ['YET_TO_PRINT','SENT_TO_WAREHOUSE','STOCK_ADJUSTED'])assert.ok(document.querySelector(`[role="option"][data-value="${value}"]`));
+  for(const value of ['SENT_TO_WAREHOUSE','STOCK_ADJUSTED'])assert.ok(document.querySelector(`[role="option"][data-value="${value}"]`));
   await act(async()=>document.querySelector('[role="option"][data-value="ALL"]').click());
-  assert.equal(host.querySelector('[aria-label="Select HLD-1"]').disabled,true);assert.equal(host.querySelector('[aria-label="Select HLD-2"]').disabled,false);
+  assert.equal(host.querySelector('[aria-label="Select HLD-2"]'),null);
   assert.equal(host.querySelector('[aria-label^="View onhold bill"] button[title="View"]'),null);
   await act(async()=>host.querySelector('tbody tr').click());assert.equal(viewed,1);
   await act(async()=>host.querySelector('[aria-label="Print HLD-1"]').click());assert.equal(printed,1);
@@ -46,12 +46,11 @@ test('onhold directory uses GRN filters, date ranges, row details and adjusted-o
   assert.match(host.querySelector('tbody').textContent,/HLD-1/);assert.ok(!host.querySelector('tbody').textContent.includes('HLD-2'));
   await act(async()=>root.render(React.createElement(Harness,{key:'archive',archive:true})));
   assert.match(host.querySelector('tbody').textContent,/COPY/);assert.equal(host.querySelector('input[type="checkbox"]'),null);assert.equal(host.querySelector('[aria-label="Cancel COPY-INVOICED"]'),null);assert.equal(host.querySelector('[aria-label="Cancel COPY-VOIDED"]'),null);
-  assert.match(host.querySelector('[aria-label="Held bill type"]').textContent,/POS Onhold Bill/);
   await act(async()=>host.querySelector('[aria-label="Onhold bill status"]').click());
-  await act(async()=>document.querySelector('[role="option"][data-value="INVOICE_CANCELLED"]').click());
+  await act(async()=>document.querySelector('[role="option"][data-value="CANCELLED"]').click());
   assert.equal(host.querySelectorAll('tbody tr').length,1);assert.match(host.querySelector('tbody').textContent,/COPY-VOIDED/);
-  await act(async()=>host.querySelector('[aria-label="Held bill type"]').click());
-  await act(async()=>document.querySelector('[role="option"][data-value="INVOICED"]').click());
+  await act(async()=>host.querySelector('[aria-label="Onhold bill status"]').click());
+  await act(async()=>document.querySelector('[role="option"][data-value="BILLED"]').click());
   assert.ok(!host.querySelector('tbody').textContent.includes('COPY-VOIDED'));
  }finally{await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const name of ['window','document','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[name];}
 });

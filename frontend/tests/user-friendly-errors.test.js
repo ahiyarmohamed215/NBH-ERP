@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import axios from 'axios';
-import api from '../src/api/apiClient.js';
+import api, { beginUserSession } from '../src/api/apiClient.js';
 import {
   getUserFriendlyErrorMessage,
   sanitizeErrorMessage,
@@ -19,6 +19,10 @@ globalThis.localStorage = {
 };
 globalThis.sessionStorage = globalThis.localStorage;
 globalThis.window = new EventTarget();
+
+test.beforeEach(() => {
+  beginUserSession();
+});
 
 test('Scenario 1: Backend returns 500 produces user-friendly message', async () => {
   api.defaults.adapter = async (config) => {

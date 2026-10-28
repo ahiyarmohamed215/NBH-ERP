@@ -30,8 +30,6 @@ async function fixture(run) {
   document.body.append(host);
   const root = createRoot(host);
   const server = await createServer({
-    root: path.resolve('frontend'),
-    cacheDir: '.build/outstanding-test-cache',
     server: { middlewareMode: true, hmr: false },
     appType: 'custom',
     optimizeDeps: { noDiscovery: true, include: [] },

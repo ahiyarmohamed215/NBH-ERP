@@ -27,7 +27,7 @@ test('POS Onhold list and details use immutable copies after office quantities c
   await act(async()=>document.querySelector('[title="Reset all filters to default"]').click());
   await act(async()=>new Promise(resolve=>setTimeout(resolve,250)));
   assert.equal(scopes.at(-1),'mine','Reset restores the default owner');
-  let printedHtml='';window.open=()=>({document:{open:()=>{},write:html=>{printedHtml=html;},close:()=>{}}});
+  let printedHtml='';window.open=()=>({focus(){},print(){},document:{readyState:'complete',querySelectorAll(){return [];},open:()=>{},write:html=>{printedHtml=html;},close:()=>{}}});
   await act(async()=>document.querySelector('[aria-label="Print bill directory (A4)"]').click());
   assert.match(printedHtml,/HLD-ORIGINAL/);assert.doesNotMatch(printedHtml,/HLD-OTHER/);
   assert.match(document.body.querySelector('tbody').textContent,/250.00/);assert.equal(workspaceReads,0);
@@ -70,6 +70,7 @@ test('POS Onhold list and details use immutable copies after office quantities c
   assert.equal(field(cancelledPopup,'Remarks'),'Deliver after 3 pm');assert.equal(field(cancelledPopup,'Cancellation reason'),'Invoice cancelled');
   const {default:Table}=await server.ssrLoadModule('/src/components/OnholdBillsTable.jsx');
   const statuses=['YET_TO_PRINT','SENT_TO_WAREHOUSE','STOCK_ADJUSTED','INVOICE_CREATED','INVOICE_CANCELLED','CANCELLED'];
+  const filterStatuses=['SENT_TO_WAREHOUSE','STOCK_ADJUSTED','INVOICE_CREATED','INVOICE_CANCELLED','CANCELLED'];
   const props={bills:statuses.map((status,index)=>({...original,id:index+1,heldNumber:`HLD-${status}`,originalCopy:false,status,canResume:true})),user:{permissions:['SALES_EDIT']},scope:'mine',onScopeChange:()=>{},query:'',onQueryChange:()=>{},onRefresh:()=>{},onView:()=>{},onSelect:()=>{},onStatusChange:()=>{}};
   await act(async()=>root.render(React.createElement(Table,{...props,status:'ALL'})));
   assert.equal(host.querySelectorAll('tbody tr').length,6,'The live workspace keeps every lifecycle stage');
@@ -84,7 +85,7 @@ test('POS Onhold list and details use immutable copies after office quantities c
   assert.match(host.querySelector('.onhold-selection').textContent,/warehouse-reviewed/);
   await act(async()=>host.querySelector('[title="Reset all filters to default"]').click());assert.deepEqual(cleared,[],'Reset clears invoice selection');
   await act(async()=>host.querySelector('[aria-label="Onhold bill status"]').click());
-  for(const status of statuses)assert.ok(document.querySelector(`[role="option"][data-value="${status}"]`),`Status filter includes ${status}`);
+  for(const status of filterStatuses)assert.ok(document.querySelector(`[role="option"][data-value="${status}"]`),`Status filter includes ${status}`);assert.equal(document.querySelector('[role="option"][data-value="YET_TO_PRINT"]'),null,'Status filter does not include YET_TO_PRINT');
   await act(async()=>document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
   await act(async()=>root.render(React.createElement(Table,{...props,status:'INVOICE_CREATED'})));
   assert.equal(host.querySelectorAll('tbody tr').length,1);assert.equal(host.querySelector('input[type="checkbox"]'),null);assert.equal(host.querySelector('.onhold-selection'),null);

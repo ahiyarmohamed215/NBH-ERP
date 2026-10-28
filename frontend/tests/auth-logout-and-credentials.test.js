@@ -22,19 +22,15 @@ test('Manual logout sets signed out notice and does not trigger session expired'
   assert.ok(loginViewSrc.includes('signedOutNotice'), 'LoginView renders signedOutNotice component');
 });
 
-test('Login differentiates between incorrect username and incorrect password', () => {
+test('Login keeps failed credentials uniform and handles throttling without identifying an account', () => {
   const loginViewSrc = fs.readFileSync(path.resolve('src/views/LoginView.jsx'), 'utf8');
-
-  // Verify state and validation
-  assert.ok(loginViewSrc.includes('usernameError'), 'LoginView tracks usernameError');
-  assert.ok(loginViewSrc.includes('passwordError'), 'LoginView tracks passwordError');
-  assert.ok(loginViewSrc.includes("setUsernameError('Username is incorrect.')"), 'LoginView sets Username is incorrect.');
-  assert.ok(loginViewSrc.includes("setPasswordError('Password is incorrect.')"), 'LoginView sets Password is incorrect.');
-
-  // Verify backend AuthService differentiates
   const authServiceSrc = fs.readFileSync(path.resolve('../src/main/java/com/nbh/erp/auth/service/AuthService.java'), 'utf8');
-  assert.ok(authServiceSrc.includes('Username is incorrect.'), 'AuthService throws Username is incorrect.');
-  assert.ok(authServiceSrc.includes('Password is incorrect.'), 'AuthService throws Password is incorrect.');
+  for (const source of [loginViewSrc, authServiceSrc]) {
+    assert.ok(source.includes('Invalid username or password'));
+    assert.doesNotMatch(source, /Username is incorrect\.|Password is incorrect\./);
+  }
+  assert.ok(loginViewSrc.includes('err.response?.status === 429'));
+  assert.ok(loginViewSrc.includes('Please wait a minute and try again'));
 });
 
 test('Forgot Password request feature is available on Login and handled in Admin', () => {

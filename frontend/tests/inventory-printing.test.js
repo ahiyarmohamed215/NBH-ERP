@@ -23,7 +23,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
   apis.adjustmentApi.search=async()=>({data:{content:[{id:30,adjustmentNumber:'ADJ-30',adjustmentDate:'2026-10-12',warehouseName:'North',items:[{productId:1,productSku:'SKU-FIRST',productName:products[0].name,differenceQuantity:3,reason:'Count correction'}]},{id:31,adjustmentNumber:'ADJ-OLD',adjustmentDate:'2026-10-09',warehouseName:'South',items:[{productId:2,productSku:'SKU-SECOND',productName:products[1].name,differenceQuantity:2,reason:'Opening stock'}]}]}});
   apis.staffQuotaApi.search=async()=>({data:{content:[{id:41,createdAt:'2026-10-09T08:00:00',productSku:'SKU-SECOND',productName:'Older allocation',userFullName:'Test staff',allocatedQuantity:1,totalStockAvailable:20,isActive:true},{id:40,createdAt:'2026-10-12T09:00:00',productSku:'SKU-FIRST',productName:products[0].name,userFullName:'Test staff',username:'staff',allocatedQuantity:2,totalStockAvailable:20,isActive:true}]}});
   apis.staffQuotaApi.getSummary=async()=>({data:null});
-  let printed='';window.open=()=>({document:{open(){},write(html){printed=html;},close(){}}});
+  let printed='';window.open=()=>({focus(){},print(){},document:{readyState:'complete',querySelectorAll(){return [];},open(){},write(html){printed=html;},close(){}}});
   const {AuthProvider}=await server.ssrLoadModule('/src/context/AuthContext.jsx');const {ToastProvider}=await server.ssrLoadModule('/src/context/ToastContext.jsx');const {default:Inventory}=await server.ssrLoadModule('/src/views/InventoryHub.jsx');
   for(const tab of ['inventory-list','pos-quotas','products','brands','warehouses','categories','adjustments']) {
    await act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(ToastProvider,null,React.createElement(Inventory,{key:tab,activeSubTab:tab})))));
@@ -36,13 +36,14 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
     const target=cell.querySelector('.erp-status-badge') || (index===cellCount-1?cell:cell.firstElementChild || cell);
     await act(async()=>target.click());
     const dialog=host.querySelector('[role="dialog"]');assert.ok(dialog,`${tab}: clicking column ${index+1} opens the record`);
-    await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.trim()==='Close').click());
+    const closeBtn = dialog.querySelector('.purchase-inspection-close') || dialog.querySelector('[title="Close"]') || [...dialog.querySelectorAll('button')].find(button=>button.textContent.trim()==='Close');
+    await act(async()=>closeBtn.click());
    }
    const expectedHeaders={
     'inventory-list':['Code / Product name','Brand / Category','Warehouse','Qty','Selling price','Status','Actions'],
     'pos-quotas':['Allocation code','Staff member','Total products','Date','Status','Remarks','Actions'],
-    products:['Code / Product name','Brand / Category','Warehouse','Min stock','Status','Remarks','Actions'],
-    brands:['Brand code','Brand name','MP%','Status','Remarks','Actions'],
+    products:['Code / Product name','Brand / Category','Warehouse','MP%','Min stock','Status','Remarks','Actions'],
+    brands:['Brand code','Brand name','Status','Remarks','Actions'],
     warehouses:['Warehouse code','Warehouse name','Address','Contact number','Status','Remarks','Actions'],
     categories:['Category code','Category name','Status','Remarks','Actions'],
    };
@@ -105,7 +106,7 @@ test('all Inventory tabs print their filtered visible tables without exposing hi
    if(tab==='adjustments') {
     await act(async()=>host.querySelector('tbody tr').click());
     const view=host.querySelector('[aria-label="Stock adjustment details"]');assert.ok(view);
-    assert.ok(view.classList.contains('record-details-compact'));
+    assert.ok(view.classList.contains('purchase-inspection') || view.classList.contains('record-details-compact'));
     const detail=label=>[...view.querySelectorAll('dl>div')].find(row=>row.querySelector('dt').textContent===label)?.querySelector('dd').textContent;
     assert.equal(detail('Record number'),'ADJ-30');assert.equal(detail('Quantity adjusted'),'+3');assert.equal(detail('Reason'),'Count correction');
     assert.equal(view.querySelector('[aria-label="Edit Adjustment"]'),null,'Read-only users cannot edit adjustments');

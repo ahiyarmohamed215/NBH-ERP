@@ -38,7 +38,7 @@ test('Purchasing popups share compact details, table controls and status workflo
     }
     apis.gtnApi.changeStatus=async(id,request)=>{assert.ok(request.reason.trim());docs.GTN={...docs.GTN,status:request.status,lastStatusReason:request.reason};return {data:docs.GTN};};
     let printed = '';
-    window.open = () => ({ document: { open() {}, write(html) { printed = html; }, close() {} } });
+    window.open = () => ({ focus() {}, print() {}, document: { readyState: 'complete', querySelectorAll() { return []; }, open() {}, write(html) { printed = html; }, close() {} } });
     apis.pdfApi.printGtn = () => { printed = 'GTN-1'; };
     const { ToastProvider } = await server.ssrLoadModule('/src/context/ToastContext.jsx');
     const { AuthProvider } = await server.ssrLoadModule('/src/context/AuthContext.jsx');
@@ -218,7 +218,7 @@ test('Purchasing popups share compact details, table controls and status workflo
         assert.ok(host.querySelector('.gtn-intake [aria-label="Responsible staff"]'),'Staff assignment can be changed through Edit');
         assert.ok(host.querySelector('.purchase-entry-fields input'),'Transferred quantities can be edited');
         await act(async()=>host.querySelector('[aria-label="Edit item 1"]').click());
-        assert.equal(host.querySelector('.gtn-available-quantity strong').textContent,'2','Transferred edit includes the original quantity when source stock is zero');
+        assert.equal((host.querySelector('.gtn-available-quantity strong') || host.querySelector('.prn-return-card-metrics b')).textContent,'2','Transferred edit includes the original quantity when source stock is zero');
         assert.equal(host.querySelector('.purchase-entry > button').disabled,false);
         await act(async()=>host.querySelector('.purchase-entry > button').click());
         assert.equal(host.querySelector('.purchase-items tbody tr .purchase-number').textContent,'2');

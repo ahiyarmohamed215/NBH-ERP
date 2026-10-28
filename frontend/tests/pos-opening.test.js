@@ -151,15 +151,15 @@ test('POS opens from sales, displays inventory, and returns to sales', async () 
     const changeEditor=async(index,value)=>act(async()=>{const input=host.querySelectorAll('[aria-labelledby="pos-line-title"] input')[index];Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new window.Event('input',{bubbles:true}));});
     const saveEditor=async()=>act(async()=>host.querySelector('[aria-labelledby="pos-line-title"]').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
     await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());
-    await changeEditor(2,'5000');await saveEditor();
+    await changeEditor(2,'2000');await saveEditor();
     assert.equal(savedRequests.length,0,'Adding/editing products must not create server drafts');
-    assert.match(host.querySelector('.pos-cart-table tbody td:nth-child(5)').textContent,/5,000.00/);assert.match(host.querySelector('.pos-cart-table tbody td:nth-child(6)').textContent,/7,345.00/);
+    assert.match(host.querySelector('.pos-cart-table tbody td:nth-child(5)').textContent,/2,000.00/);assert.match(host.querySelector('.pos-cart-table tbody td:nth-child(6)').textContent,/10,345.00/);
     await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());
-    assert.equal(host.querySelectorAll('[aria-labelledby="pos-line-title"] input')[2].value,'5000');
-    await changeEditor(0,'2');assert.equal(host.querySelectorAll('[aria-labelledby="pos-line-title"] input')[2].value,'5000');await saveEditor();
-    await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());await changeEditor(1,'10');await changeEditor(0,'3');await saveEditor();
+    assert.equal(host.querySelectorAll('[aria-labelledby="pos-line-title"] input')[2].value,'2000');
+    await changeEditor(0,'2');assert.equal(host.querySelectorAll('[aria-labelledby="pos-line-title"] input')[2].value,'2000');await saveEditor();
+    await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());await changeEditor(1,'10');await changeEditor(2,'');await changeEditor(0,'3');await saveEditor();
     assert.match(host.querySelector('.pos-cart-table tbody td:nth-child(5)').textContent,/3,703.50/);
-    await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());await changeEditor(2,'5000');await saveEditor();
+    await act(async()=>host.querySelector('[aria-label="Edit Opening test product"]').click());await changeEditor(1,'');await changeEditor(2,'2000');await saveEditor();
     await add('Second warehouse product');await add('Third warehouse product');
     assert.equal(host.querySelectorAll('.pos-cart-table tbody tr').length,3);assert.equal(savedRequests.length,0);assert.equal(localStorage.getItem('nbh_pos_working_bill_cashier'),null);
     apis.customerApi.getPosCustomers=async()=>({data:[{id:1,customerCode:'CUST-0001',name:'POS customer',currentBalance:100,creditLimit:100}]});
@@ -169,8 +169,22 @@ test('POS opens from sales, displays inventory, and returns to sales', async () 
     assert.equal([...host.querySelectorAll('button')].find(button=>button.textContent==='Save Onhold Bill').disabled,false);
     assert.equal(savedRequests.length,0,'Onhold bill stays local until explicitly saved');
     let published=null,publishCalls=0,failPublish=true;
-    apis.salesApi.sendHeld=async(id,payload)=>{publishCalls++;assert.equal(id,99);assert.equal(payload.expectedVersion,0);assert.equal(payload.printNow,false);if(failPublish)throw new Error('Warehouse publication failed');const bill=savedRequests.at(-1);assert.deepEqual(bill.items.map(line=>line.warehouseId),[1,2,3]);assert.equal(bill.items[0].discountAmount,5000);assert.equal(bill.items[0].discountRate,0);published={...bill,id,heldNumber:'HLD-PUBLISHED',customerName:'POS customer',createdBy:'cashier',recordVersion:1,status:'YET_TO_PRINT',netTotal:32185,items:bill.items.map((line,index)=>({...line,id:index+1,warehouseName:['Main','Second','Third'][index],productName:`Product ${index+1}`,productSku:`POS-${index+1}`,totalPrice:line.quantity*line.unitPrice-line.discountAmount}))};return {data:published};};
-    apis.salesApi.getHeldOriginals=async()=>({data:{bills:published?[{...published,originalCopy:true}]:[],mineCount:published?1:0,mineAmount:published?32185:0}});
+    const publishedBills=[];
+    delete apis.salesApi.saveSplitHeld; // Simulate a salesApi object loaded before batch saving existed.
+    apis.default.post=async(url,input,config)=>{
+      assert.equal(url,'/invoices/held/save-split');
+      const key=config.headers['Idempotency-Key'];
+      publishCalls++;assert.ok(key);assert.equal(input.draftId,null);
+      saved(input.bill);
+      if(failPublish)throw new Error('Warehouse publication failed');
+      const bill=input.bill;assert.deepEqual(bill.items.map(line=>line.warehouseId),[1,2,3]);
+      assert.equal(bill.items[0].discountAmount,2000);assert.equal(bill.items[0].discountRate,0);
+      publishedBills.push(...bill.items.map((line,index)=>({...bill,id:99+index,warehouseId:line.warehouseId,heldNumber:`HLD-PUBLISHED-${index+1}`,
+       customerName:'POS customer',createdBy:'cashier',recordVersion:1,status:'SENT_TO_WAREHOUSE',netTotal:line.quantity*line.unitPrice-line.discountAmount,
+       items:[{...line,id:index+1,warehouseName:['Main','Second','Third'][index],productName:`Product ${index+1}`,productSku:`POS-${index+1}`,totalPrice:line.quantity*line.unitPrice-line.discountAmount}]})));
+      published=publishedBills[0];return {data:publishedBills};
+    };
+    apis.salesApi.getHeldOriginals=async()=>({data:{bills:publishedBills.map(bill=>({...bill,originalCopy:true})),mineCount:publishedBills.length,mineAmount:published?32185:0}});
     const saveOnhold=()=>host.querySelector('[title="Save bill to Onhold Bills"]');
     await act(async()=>saveOnhold().click());
     const remarksDialog=()=>document.querySelector('[aria-labelledby="pos-bill-remarks-title"]');
@@ -183,9 +197,18 @@ test('POS opens from sales, displays inventory, and returns to sales', async () 
     assert.ok(host.querySelector('[aria-label="Edit Opening test product"]'));assert.equal(document.querySelector('[aria-label="Print Onhold Bill"]'),null);
     assert.match(remarksDialog().querySelector('[role="alert"]').textContent,/not saved/);
     await act(async()=>{const input=remarksDialog().querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'  Deliver after 3 pm  ');input.dispatchEvent(new window.Event('input',{bubbles:true}));});
-    failPublish=false;await confirmRemarks();assert.equal(publishCalls,2);assert.equal(savedRequests.at(-1).notes,'Deliver after 3 pm');assert.equal(remarksDialog(),null);
-    assert.match(host.querySelector('.pos-cart-table tbody').textContent,/Bill is currently empty/);assert.equal(document.querySelectorAll('[aria-label="Print Onhold Bill"] tbody tr').length,3);
-    await act(async()=>[...document.querySelectorAll('[aria-label="Print Onhold Bill"] button')].find(button=>button.textContent==='Print Later').click());
+    let printCalls=0;const append=document.body.appendChild;
+    document.body.appendChild=function(node){const result=append.call(this,node);if(node.tagName==='IFRAME'){
+      for(const bill of publishedBills)assert.ok(node.srcdoc.includes(bill.heldNumber));
+      assert.equal((node.srcdoc.match(/<section>/g)||[]).length,3);
+      node.contentWindow.focus=()=>{};node.contentWindow.print=()=>{printCalls++;};
+      queueMicrotask(()=>{node.onload?.();node.contentWindow.dispatchEvent(new window.Event('afterprint'));});
+    }return result;};
+    failPublish=false;try{await confirmRemarks();}finally{document.body.appendChild=append;}
+    assert.equal(publishCalls,2);assert.equal(savedRequests.at(-1).notes,'Deliver after 3 pm');assert.equal(remarksDialog(),null);
+    assert.match(host.querySelector('.pos-cart-table tbody').textContent,/Bill is currently empty/);
+    assert.equal(printCalls,1,'All saved warehouse bills share one native print dialog');
+    assert.equal(document.querySelector('[aria-label="Print Onhold Bill"]'),null,'Saving skips the extra application print popup');
     assert.equal(host.querySelector('[title="Inspect Held Bills"]').textContent.trim(),'Held Bills');
     await act(async()=>host.querySelector('[title="Inspect Held Bills"]').click());await act(async()=>new Promise(resolve=>setTimeout(resolve,250)));
     assert.match(document.querySelector('[aria-labelledby="pos-held-title"]').textContent,/HLD-PUBLISHED/);assert.ok(!host.textContent.includes('Unsubmitted POS bills'));

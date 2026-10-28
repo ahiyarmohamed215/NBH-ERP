@@ -139,7 +139,7 @@ test('SupplierDetailsModal floating card renders readable layout and all interac
     await act(async()=>root.render(React.createElement(SupplierDetailsModal,{
       supplier:{...supplier,status:'DRAFT'},canManage:true,onClose:()=>{},onEdit:()=>{},onDelete:()=>{},onStatusChange:()=>{},onPrint:()=>{},
     })));
-    assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),['Edit Supplier','Delete Supplier']);
+    assert.deepEqual([...host.querySelectorAll('.record-actions button')].map(button=>button.getAttribute('aria-label')),['Edit Supplier','Activate Supplier','Delete Supplier']);
     assert.equal(host.querySelector('[title="Print Supplier Details (A4)"]'),null);
 
   } finally {

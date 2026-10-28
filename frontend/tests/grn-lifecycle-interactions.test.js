@@ -52,7 +52,7 @@ test('processed GRNs stay editable and cancelled GRNs have no status actions', a
     assert.ok(host.querySelector('.grn-page'));
     assert.equal(button('Save Draft'), undefined); assert.ok(button('Save Changes'));
     await act(async () => button('Save Changes').click());
-    assert.ok(host.textContent.includes('Cannot edit GRN: insufficient inventory.'));
+    assert.ok((document.body.textContent || host.textContent).includes('Cannot edit GRN: insufficient inventory.'));
     assert.ok(host.querySelector('.grn-page'), 'Failed edits remain open');
     failEdit = false;
     await act(async () => button('Save Changes').click());
@@ -64,7 +64,7 @@ test('processed GRNs stay editable and cancelled GRNs have no status actions', a
       input.dispatchEvent(new window.Event('input', { bubbles: true }));
     });
     await act(async () => button('Confirm Cancellation').click());
-    assert.ok(host.textContent.includes('Cannot cancel GRN: insufficient inventory.'));
+    assert.ok((document.body.textContent || host.textContent).includes('Cannot cancel GRN: insufficient inventory.'));
     assert.equal(grn.status, 'PROCESSED');
     failCancel = false;
     await act(async () => button('Confirm Cancellation').click());

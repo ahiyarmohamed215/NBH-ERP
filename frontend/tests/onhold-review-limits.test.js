@@ -22,6 +22,12 @@ test('office editor permits increasing up to allocation and warehouse stock, and
  await fill(quantity,'4');assert.equal(save().disabled,false);
  assert.equal(host.querySelector('[aria-label="Physical stock SKU"]'),null);
  await act(async()=>save().click());assert.equal(saved.items[0].approvedQuantity,4);assert.equal('physicalStock' in saved.items[0],false);assert.equal(saved.remarks,'Warehouse review completed.');
+ const box=host.querySelector('[aria-label="Box count 1"]');
+ await fill(box,'');assert.ok(save().disabled,'Blank packing counts must not be submitted');
+ await fill(box,'2');await fill(host.querySelector('[aria-label="Bag count 1"]'),'3');
+ await fill(host.querySelector('[aria-label="P. Bag count 1"]'),'1');
+ await act(async()=>save().click());assert.deepEqual(saved.warehousePacking,{'1':{boxes:2,bags:3,pBags:1,others:0}});
+ await fill(quantity,'0');assert.ok(save().disabled,'A removed warehouse cannot retain packing counts');
 
  }finally{await act(async()=>root.unmount());await server.close();await window.happyDOM.close();for(const key of ['window','document','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[key];}
 });
