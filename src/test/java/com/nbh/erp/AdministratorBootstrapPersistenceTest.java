@@ -14,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Persistence checks run only in the isolated H2 verification environment. */
-@SpringBootTest @Transactional
+/** Bootstrap requires a genuinely empty database, independent of suite ordering. */
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:administrator-bootstrap-test;MODE=MySQL;NON_KEYWORDS=YEAR;DB_CLOSE_DELAY=-1")
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
+@Transactional
 class AdministratorBootstrapPersistenceTest {
     @Autowired DataInitializer initializer;
     @Autowired UserRepository users;
