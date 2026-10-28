@@ -10,6 +10,9 @@ import java.util.Optional;
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
     Optional<Role> findByName(String name);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select r from Role r where r.id = :id")
+    Optional<Role> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
     List<Role> findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(String name, String description);
 }
 

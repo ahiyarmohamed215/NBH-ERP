@@ -31,7 +31,7 @@ public class DeliveryRouteController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY')")
+    @PreAuthorize("T(com.nbh.erp.security.SecurityUtils).canRead('DELIVERY') or T(com.nbh.erp.security.SecurityUtils).canRead('SALES')")
     @Operation(summary = "Get active delivery routes")
     public ResponseEntity<ApiResponse<List<DeliveryRouteDto>>> getActiveRoutes() {
         return ResponseEntity.ok(ApiResponse.ok(routeService.getActiveRoutes()));
@@ -69,5 +69,20 @@ public class DeliveryRouteController {
     public ResponseEntity<ApiResponse<Void>> deleteRoute(@PathVariable Long id) {
         routeService.deleteRoute(id);
         return ResponseEntity.ok(ApiResponse.ok("Delivery route deleted successfully", null));
+    }
+
+    @PatchMapping("/{id}/toggle-active")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
+    public ResponseEntity<ApiResponse<DeliveryRouteDto>> toggleActive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(routeService.toggleActive(id)));
+    }
+
+    public record RouteStatusRequest(@jakarta.validation.constraints.Pattern(regexp="ACTIVE|INACTIVE") @jakarta.validation.constraints.NotBlank String status,
+                                     @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=1000) String reason) {}
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
+    public ResponseEntity<ApiResponse<DeliveryRouteDto>> changeStatus(@PathVariable Long id, @Valid @RequestBody RouteStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(routeService.changeStatus(id, request.status(), request.reason())));
     }
 }

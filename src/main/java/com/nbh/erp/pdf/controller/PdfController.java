@@ -26,13 +26,19 @@ public class PdfController {
             @PathVariable Long id,
             @RequestParam(value = "download", defaultValue = "false") boolean download
     ) {
-        invoiceService.getInvoiceById(id);
+        var bill = invoiceService.getInvoiceById(id);
         byte[] pdf = pdfService.generateInvoicePdf(id);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         String disposition = download ? "attachment" : "inline";
-        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"invoice-" + id + ".pdf\"");
+        boolean warehouseReview = bill.getInvoiceNumber() == null || java.util.Set.of(
+                "YET_TO_PRINT", "HELD", "SENT_TO_WAREHOUSE", "STOCK_ADJUSTED", "POS_ONHOLD")
+                .contains(java.util.Objects.toString(bill.getStatus(), "").toUpperCase(java.util.Locale.ROOT));
+        String filename = warehouseReview
+                ? "Onhold Bill WH Review Copy-" + java.time.LocalDate.now(java.time.ZoneId.of("Asia/Colombo")) + "-" + bill.getHeldNumber() + ".pdf"
+                : "invoice-" + id + ".pdf";
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, disposition + "; filename=\"" + filename + "\"");
 
         return ResponseEntity.ok().headers(headers).body(pdf);
     }

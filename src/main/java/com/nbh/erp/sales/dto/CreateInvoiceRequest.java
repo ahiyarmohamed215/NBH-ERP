@@ -21,6 +21,7 @@ import java.util.List;
 public class CreateInvoiceRequest {
 
     private Long customerId; // If null, defaults to walk-in customer
+    private Long deliveryRouteId; // Selected delivery route
 
     @NotNull(message = "Warehouse ID is required")
     private Long warehouseId;
@@ -84,7 +85,7 @@ public class CreateInvoiceRequest {
 
         @Builder.Default
         @PositiveOrZero
-        @jakarta.validation.constraints.DecimalMax("100")
+        @jakarta.validation.constraints.DecimalMax(value = "20.00", message = "Discount rate cannot exceed 20%")
         private BigDecimal discountRate = BigDecimal.ZERO;
 
         @Builder.Default

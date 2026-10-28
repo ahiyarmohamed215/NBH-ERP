@@ -32,18 +32,20 @@ public class UserPrincipal implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     public static UserPrincipal create(User user) {
-        boolean isSuperAdmin = "admin".equalsIgnoreCase(user.getUsername()) ||
-                (user.getRoles() != null && user.getRoles().stream().anyMatch(r ->
-                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
-
         Set<GrantedAuthority> authorities = new HashSet<>();
         Set<String> roleNames = new HashSet<>();
         Set<String> permissionNames = new HashSet<>();
 
         if (user.getRoles() != null) {
             user.getRoles().forEach(role -> {
+                if (role == null || !"ACTIVE".equals(role.getStatus())) return;
                 authorities.add(new SimpleGrantedAuthority(role.getName()));
                 roleNames.add(role.getName());
+                // Preserve the legacy stored role alias without granting unrelated roles.
+                if ("SUPER_ADMIN".equals(role.getName())) {
+                    authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+                    roleNames.add("ROLE_SUPER_ADMIN");
+                }
                 if (role.getPermissions() != null) {
                     role.getPermissions().forEach(permission -> {
                         authorities.add(new SimpleGrantedAuthority(permission.getName()));
@@ -51,13 +53,6 @@ public class UserPrincipal implements UserDetails {
                     });
                 }
             });
-        }
-
-        if (isSuperAdmin) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
-            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-            roleNames.add("ROLE_SUPER_ADMIN");
-            roleNames.add("ROLE_ADMIN");
         }
 
         java.util.List<String> sortedRoles = roleNames.stream().sorted().toList();
@@ -70,7 +65,7 @@ public class UserPrincipal implements UserDetails {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .active(isSuperAdmin || (Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus())))
+                .active(!user.isDeleted() && Boolean.TRUE.equals(user.getIsActive()) && "APPROVED".equals(user.getApprovalStatus()))
                 .tokenVersion(user.getTokenVersion())
                 .roles(sortedRoles)
                 .permissions(sortedPermissions)

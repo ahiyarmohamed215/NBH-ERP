@@ -3,6 +3,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.delivery.dto.CreateDeliveryRequest;
+import com.nbh.erp.delivery.dto.RescheduleDeliveryRequest;
 import com.nbh.erp.delivery.dto.DeliveryDto;
 import com.nbh.erp.delivery.dto.DeliverySummaryDto;
 import com.nbh.erp.delivery.dto.UpdateDeliveryStatusRequest;
@@ -91,6 +92,16 @@ public class DeliveryController {
             @RequestBody(required = false) UpdateDeliveryStatusRequest req) {
         DeliveryDto completed = deliveryService.completeDelivery(id, req);
         return ResponseEntity.ok(ApiResponse.ok("Delivery trip completed and invoices delivered", completed));
+    }
+
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
+    @Operation(summary = "Reschedule delivery trip with reason and new scheduled date")
+    public ResponseEntity<ApiResponse<DeliveryDto>> rescheduleDelivery(
+            @PathVariable Long id,
+            @Valid @RequestBody RescheduleDeliveryRequest req) {
+        DeliveryDto rescheduled = deliveryService.rescheduleDelivery(id, req);
+        return ResponseEntity.ok(ApiResponse.ok("Delivery trip rescheduled successfully", rescheduled));
     }
 
     @PostMapping("/{id}/cancel")

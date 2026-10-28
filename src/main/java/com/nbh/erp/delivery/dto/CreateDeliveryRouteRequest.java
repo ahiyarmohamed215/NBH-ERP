@@ -16,7 +16,6 @@ public class CreateDeliveryRouteRequest {
 
     private String routeCode;
 
-    @NotBlank(message = "Route name is required")
     private String routeName;
 
     private String description;
@@ -27,7 +26,14 @@ public class CreateDeliveryRouteRequest {
     private Integer estimatedDurationMinutes;
     private Double estimatedDistanceKm;
     private String deliveryDays;
+    private Boolean isActive;
     private List<Long> customerIds;
+    private Boolean isDraft;
+    private String status;
+
+    public boolean isDraft() {
+        return Boolean.TRUE.equals(isDraft) || "DRAFT".equalsIgnoreCase(status);
+    }
 
     // Helper for salesmanId alias
     public Long getEffectiveStaffId() {

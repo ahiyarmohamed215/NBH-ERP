@@ -9,7 +9,7 @@ import java.util.List;
 public class RecycleBinController {
     private final RecycleBinService service;
     @GetMapping @PreAuthorize("isAuthenticated()") public ApiResponse<List<RecycleBinService.Entry>> list(){return ApiResponse.ok(service.list());}
-    @DeleteMapping("/{type}/{id}") @PreAuthorize("isAuthenticated()") public void delete(@PathVariable String type,@PathVariable Long id){service.delete(type.toUpperCase(java.util.Locale.ROOT),id);}
+    @DeleteMapping("/{type}/{id}") @PreAuthorize("isAuthenticated()") public void delete(@PathVariable String type,@PathVariable Long id,@RequestParam(required=false) String reason){service.delete(type.toUpperCase(java.util.Locale.ROOT),id,reason);}
     @PostMapping("/{type}/{id}/restore") @PreAuthorize("isAuthenticated()") public void restore(@PathVariable String type,@PathVariable Long id){service.restore(type.toUpperCase(java.util.Locale.ROOT),id);}
     @DeleteMapping("/{type}/{id}/permanent") @PreAuthorize("isAuthenticated()") public void purge(@PathVariable String type,@PathVariable Long id){service.purge(type.toUpperCase(java.util.Locale.ROOT),id);}
 }

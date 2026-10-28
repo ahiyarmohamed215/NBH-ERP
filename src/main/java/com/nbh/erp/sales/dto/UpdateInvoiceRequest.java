@@ -73,6 +73,7 @@ public class UpdateInvoiceRequest {
         private BigDecimal unitPrice;
 
         @DecimalMin(value = "0.00", message = "Discount rate cannot be negative")
+        @jakarta.validation.constraints.DecimalMax(value = "20.00", message = "Discount rate cannot exceed 20%")
         private BigDecimal discountRate;
 
         @DecimalMin(value = "0.00", message = "Discount amount cannot be negative")

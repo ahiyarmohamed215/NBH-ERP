@@ -2,6 +2,7 @@ package com.nbh.erp.customer.service;
 
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.customer.dto.CustomerDto;
+import com.nbh.erp.customer.entity.Customer;
 import com.nbh.erp.customer.repository.CustomerRepository;
 import com.nbh.erp.security.SecurityUtils;
 import com.nbh.erp.security.UserPrincipal;
@@ -27,12 +28,26 @@ public class PosCustomerAccess {
     }
     @Transactional(readOnly=true)
     public List<CustomerDto> customers(){
-        var staff=currentStaff();return customers.findAssignedPosCustomers(staff.getId()).stream().map(CustomerDto::from).toList();
+        return customers(null);
+    }
+    @Transactional(readOnly=true)
+    public List<CustomerDto> customers(Long deliveryRouteId){
+        var staff=currentStaff();
+        List<Customer> list = (deliveryRouteId == null)
+            ? customers.findAssignedPosCustomers(staff.getId())
+            : customers.findAssignedPosCustomersByRoute(staff.getId(), deliveryRouteId);
+        return list.stream().map(CustomerDto::from).toList();
     }
     @Transactional(readOnly=true)
     public void requireAssigned(Long customerId){
+        requireAssigned(customerId, null);
+    }
+    @Transactional(readOnly=true)
+    public void requireAssigned(Long customerId, Long deliveryRouteId){
         var staff=currentStaff();
         if(customerId==null || !customers.isAssignedPosCustomer(customerId,staff.getId()))
             throw new BusinessException("This customer is not assigned to you in an active customer group. Select one of your assigned POS customers.");
+        if(deliveryRouteId!=null && !customers.isAssignedPosCustomerForRoute(customerId, staff.getId(), deliveryRouteId))
+            throw new BusinessException("This customer is not assigned to you on the selected delivery route.");
     }
 }

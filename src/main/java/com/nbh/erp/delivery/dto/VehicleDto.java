@@ -18,6 +18,9 @@ public class VehicleDto {
     private String model;
     private String vehicleType;
     private Double capacityKg;
+    private Long assignedStaffId;
+    private String assignedStaffName;
+    private String assignedStaffEmployeeCode;
     private String status;
     private Boolean isActive;
     private String notes;
@@ -31,6 +34,9 @@ public class VehicleDto {
                 .model(v.getModel())
                 .vehicleType(v.getVehicleType())
                 .capacityKg(v.getCapacityKg())
+                .assignedStaffId(v.getAssignedStaff() != null ? v.getAssignedStaff().getId() : null)
+                .assignedStaffName(v.getAssignedStaff() != null ? v.getAssignedStaff().getFullName() : null)
+                .assignedStaffEmployeeCode(v.getAssignedStaff() != null ? v.getAssignedStaff().getEmployeeCode() : null)
                 .status(v.getStatus())
                 .isActive(v.getIsActive())
                 .notes(v.getNotes())

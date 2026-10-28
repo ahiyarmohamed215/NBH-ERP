@@ -34,6 +34,7 @@ public class StockDto {
     private String categoryName;
     private Long brandId;
     private String brandName;
+    private BigDecimal markupPercent;
     private BigDecimal brandMarkupPercent;
     private Boolean useBrandMarkup;
 
@@ -50,13 +51,13 @@ public class StockDto {
 
         BigDecimal cost = null;
         BigDecimal totalValue = null;
-        if (allowCostPrice) {
-            cost = sb.getProduct() != null && sb.getProduct().getCostPrice() != null ? sb.getProduct().getCostPrice() : BigDecimal.ZERO;
-            totalValue = qty.multiply(cost);
+        if (allowCostPrice && sb.getProduct() != null) {
+            cost = sb.getProduct().getCostPrice();
+            totalValue = cost != null ? cost.multiply(qty) : BigDecimal.ZERO;
         }
 
-        int minLevel = sb.getProduct() != null && sb.getProduct().getMinStockLevel() != null ? sb.getProduct().getMinStockLevel() : 0;
-        boolean lowStock = qty.compareTo(BigDecimal.valueOf(minLevel)) <= 0;
+        Integer minLevel = sb.getProduct() != null ? sb.getProduct().getMinStockLevel() : 0;
+        Boolean lowStock = minLevel != null && available.compareTo(BigDecimal.valueOf(minLevel)) <= 0;
 
         Long categoryId = null;
         String categoryName = null;
@@ -67,12 +68,14 @@ public class StockDto {
 
         Long brandId = null;
         String brandName = null;
-        BigDecimal brandMarkupPercent = null;
         if (sb.getProduct() != null && sb.getProduct().getBrand() != null) {
             brandId = sb.getProduct().getBrand().getId();
             brandName = sb.getProduct().getBrand().getName();
-            brandMarkupPercent = sb.getProduct().getBrand().getMarkupPercent();
         }
+
+        BigDecimal markupPercent = sb.getProduct() != null && sb.getProduct().getMarkupPercent() != null
+                ? sb.getProduct().getMarkupPercent()
+                : BigDecimal.ZERO;
 
         Boolean useBrandMarkup = sb.getProduct() != null ? sb.getProduct().isBrandMarkupPricing() : null;
 
@@ -98,7 +101,8 @@ public class StockDto {
                 .categoryName(categoryName)
                 .brandId(brandId)
                 .brandName(brandName)
-                .brandMarkupPercent(brandMarkupPercent)
+                .markupPercent(markupPercent)
+                .brandMarkupPercent(markupPercent)
                 .useBrandMarkup(useBrandMarkup)
                 .build();
     }

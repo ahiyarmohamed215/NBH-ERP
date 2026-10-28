@@ -29,6 +29,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final com.nbh.erp.security.jwt.JwtAccessDeniedHandler jwtAccessDeniedHandler;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final com.nbh.erp.auth.service.LoginProtection loginProtection;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -70,6 +71,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(originValidationFilter, org.springframework.security.web.authentication.logout.LogoutFilter.class)
+                .addFilterBefore(new com.nbh.erp.security.LoginThrottleFilter(loginProtection), org.springframework.security.web.authentication.logout.LogoutFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

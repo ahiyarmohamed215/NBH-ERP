@@ -195,7 +195,7 @@ public class InvoiceService {
             .filter(i->i.getHeldNumber()!=null)
             .filter(i->!Objects.equals(i.getId(),excludeId))
             .filter(i->"all".equals(scope) || "mine".equals(scope)==Objects.equals(i.getCreatedBy(),username))
-            .filter(i->search.isBlank() || (i.getDocumentNumber()+" "+i.getCustomer().getName()+" "+i.getCreatedBy()).toLowerCase(Locale.ROOT).contains(search))
+            .filter(i->search.isBlank() || (i.getDocumentNumber()+" "+i.getCustomer().getName()+" "+(i.getWarehouse()!=null?i.getWarehouse().getName()+" "+i.getWarehouse().getCode():"")+" "+i.getCreatedBy()).toLowerCase(Locale.ROOT).contains(search))
             .sorted(Comparator.comparing(Invoice::getCreatedAt).reversed()).map(i->{var dto=InvoiceDto.from(i);
                 populateHeldDetails(i,dto);
                 dto.setCanResume(!history && (canViewAllSales() || (SecurityUtils.hasAuthority("SALES_EDIT") && !"HELD".equals(i.getStatus())) || Objects.equals(i.getCreatedBy(),username)));return dto;}).toList();
@@ -209,7 +209,7 @@ public class InvoiceService {
     }
 
     public record MergePreview(List<Long> sourceBillIds,List<String> sourceBills,String customerName,
-        List<InvoiceDto.InvoiceItemDto> items,BigDecimal totalAmount,String date,Map<Long,Long> expectedVersions) {}
+        List<InvoiceDto.InvoiceItemDto> items,BigDecimal totalAmount,String date,Map<Long,Long> expectedVersions,com.nbh.erp.sales.dto.InvoicePacking packing) {}
     @Transactional(readOnly = true)
     public MergePreview previewHeldMerge(List<Long> ids) {
         SecurityUtils.requirePermission("SALES_EDIT");
@@ -219,7 +219,12 @@ public class InvoiceService {
         for(var bill:bills){enforceAccess(bill);if(!"STOCK_ADJUSTED".equals(bill.getStatus()))throw new BusinessException("Only warehouse-reviewed held bills can be invoiced");
             if(!bill.getCustomer().getId().equals(first.getCustomer().getId()))throw new BusinessException("Select held bills for the same customer");}
         return new MergePreview(ids,bills.stream().map(Invoice::getDocumentNumber).toList(),first.getCustomer().getName(),
-            bills.stream().flatMap(b->b.getItems().stream()).map(InvoiceDto.InvoiceItemDto::from).toList(),bills.stream().map(Invoice::getNetTotal).reduce(BigDecimal.ZERO,BigDecimal::add),LocalDate.now(businessClock).toString(),bills.stream().collect(Collectors.toMap(Invoice::getId,Invoice::getRecordVersion)));
+            bills.stream().flatMap(b->b.getItems().stream()).map(InvoiceDto.InvoiceItemDto::from).toList(),bills.stream().map(Invoice::getNetTotal).reduce(BigDecimal.ZERO,BigDecimal::add),LocalDate.now(businessClock).toString(),bills.stream().collect(Collectors.toMap(Invoice::getId,Invoice::getRecordVersion)),reviewedPacking(bills));
+    }
+
+    private com.nbh.erp.sales.dto.InvoicePacking reviewedPacking(List<Invoice> bills){
+        return bills.stream().anyMatch(b->!b.getWarehousePacking().isEmpty())
+            ? com.nbh.erp.sales.dto.InvoicePacking.sum(bills.stream().map(com.nbh.erp.sales.dto.InvoicePacking::from).toList()):null;
     }
 
     private void populateHeldDetails(Invoice invoice,InvoiceDto dto) {
@@ -252,7 +257,7 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto createInvoice(CreateInvoiceRequest request) {
-        posCustomers.requireAssigned(request.getCustomerId());
+        posCustomers.requireAssigned(request.getCustomerId(), request.getDeliveryRouteId());
         var ticket=idempotency.reserve("createInvoice",request);
         if(ticket!=null && ticket.getResourceId()!=null) return getInvoiceById(ticket.getResourceId());
 
@@ -317,13 +322,29 @@ public class InvoiceService {
 
             if (!Boolean.TRUE.equals(product.getIsActive()) || itemReq.getQuantity()==null || itemReq.getQuantity().signum()<=0) throw new BusinessException("Active product and positive quantity required");
             BigDecimal lineGross = itemReq.getQuantity().multiply(unitPrice);
-            BigDecimal itemDisc = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
-            if (itemReq.getDiscountRate() != null && itemReq.getDiscountRate().compareTo(BigDecimal.ZERO) > 0) {
-                itemDisc = lineGross.multiply(itemReq.getDiscountRate()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            BigDecimal rate = itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO;
+            BigDecimal cashDisc = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
+
+            if (rate.signum() < 0 || rate.compareTo(BigDecimal.valueOf(20)) > 0) {
+                throw new BusinessException("Discount rate must be between 0 and 20%");
+            }
+            if (cashDisc.signum() < 0) {
+                throw new BusinessException("Discount amount cannot be negative");
             }
 
-            if (itemDisc.signum()<0 || itemDisc.compareTo(lineGross)>0) throw new BusinessException("Invalid discount");
-            BigDecimal lineNet = lineGross.subtract(itemDisc).setScale(2,RoundingMode.HALF_UP);
+            BigDecimal rateDisc = BigDecimal.ZERO;
+            if (rate.signum() > 0) {
+                rateDisc = lineGross.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            }
+
+            BigDecimal maxLineDisc = lineGross.multiply(new BigDecimal("0.20")).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal totalLineDisc = rateDisc.add(cashDisc);
+            if (totalLineDisc.signum() < 0 || totalLineDisc.compareTo(maxLineDisc.add(new BigDecimal("0.01"))) > 0) {
+                // Total discount (% + Rs) cannot exceed 20%
+                throw new BusinessException("Total discount cannot exceed 20% of item value (max " + maxLineDisc + ")");
+            }
+
+            BigDecimal lineNet = lineGross.subtract(totalLineDisc).setScale(2, RoundingMode.HALF_UP);
             if (lineNet.compareTo(BigDecimal.ZERO) < 0) {
                 lineNet = BigDecimal.ZERO;
             }
@@ -336,8 +357,8 @@ public class InvoiceService {
                     .quantity(itemReq.getQuantity())
                     .unitPrice(unitPrice)
                     .costPrice(product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO)
-                    .discountRate(itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO)
-                    .discountAmount(itemDisc)
+                    .discountRate(rate)
+                    .discountAmount(cashDisc)
                     .totalPrice(lineNet)
                     .build();
 
@@ -392,7 +413,7 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceDto savePosDraft(Long id,CreateInvoiceRequest request) {
-        posCustomers.requireAssigned(request.getCustomerId());
+        posCustomers.requireAssigned(request.getCustomerId(), request.getDeliveryRouteId());
         Invoice invoice=invoiceRepository.findByIdForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Invoice","id",id));
         enforceAccess(invoice);
         verifyPosVersion(invoice,request);
@@ -532,7 +553,13 @@ public class InvoiceService {
         parent.setTaxAmount(parent.getTaxAmount().subtract(source.getTaxAmount()));
         parent.setNetTotal(parent.getNetTotal().subtract(source.getNetTotal()));
         parent.setBalanceAmount(parent.getNetTotal());
-        if(parent.getItems().isEmpty()){parent.setStatus("VOIDED");parent.setBalanceAmount(BigDecimal.ZERO);}
+        if(!source.getWarehousePacking().isEmpty()){
+            parent.setPackingBoxes(Math.max(0,parent.getPackingBoxes()-source.getPackingBoxes()));
+            parent.setPackingBags(Math.max(0,parent.getPackingBags()-source.getPackingBags()));
+            parent.setPackingPBags(Math.max(0,parent.getPackingPBags()-source.getPackingPBags()));
+            parent.setPackingOthers(Math.max(0,parent.getPackingOthers()-source.getPackingOthers()));
+        }
+        if(parent.getItems().isEmpty()){parent.setStatus("VOIDED");parent.setBalanceAmount(BigDecimal.ZERO);new com.nbh.erp.sales.dto.InvoicePacking(0,0,0,0).applyTo(parent);}
         var remaining=invoiceRepository.findByMergedInvoiceId(parent.getId()).stream().filter(b->!b.getId().equals(source.getId()) && "MERGED".equals(b.getStatus())).map(Invoice::getHeldNumber).toList();
         parent.setNotes("Held bills: "+String.join(", ",remaining)+(parent.getNotes()==null?"":parent.getNotes().replaceFirst("^Held bills:[^\\n]*",""))+"\nCancelled "+source.getHeldNumber()+" by "+getCurrentUsername()+": "+reason);
         invoiceRepository.saveAndFlush(parent);
@@ -727,12 +754,16 @@ public class InvoiceService {
                         if(!Boolean.TRUE.equals(product.getIsActive()) || line.getQuantity()==null || line.getQuantity().signum()<=0) throw new BusinessException("Active product and positive quantity required");
                         BigDecimal gross=product.getSellingPrice().multiply(line.getQuantity());
                         BigDecimal rate=line.getDiscountRate()==null ? BigDecimal.ZERO : line.getDiscountRate();
-                        BigDecimal discount=line.getDiscountAmount()==null ? BigDecimal.ZERO : line.getDiscountAmount();
-                        if(rate.signum()<0 || rate.compareTo(BigDecimal.valueOf(100))>0) throw new BusinessException("Discount rate must be between 0 and 100");
-                        if(rate.signum()>0) discount=gross.multiply(rate).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP);
-                        if(discount.signum()<0 || discount.compareTo(gross)>0) throw new BusinessException("Invalid line discount");
+                        BigDecimal cashDisc=line.getDiscountAmount()==null ? BigDecimal.ZERO : line.getDiscountAmount();
+                        if(rate.signum()<0 || rate.compareTo(BigDecimal.valueOf(20))>0) throw new BusinessException("Discount rate must be between 0 and 20%");
+                        if(cashDisc.signum()<0) throw new BusinessException("Discount amount cannot be negative");
+                        BigDecimal rateDisc=BigDecimal.ZERO;
+                        if(rate.signum()>0) rateDisc=gross.multiply(rate).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP);
+                        BigDecimal maxLineDisc=gross.multiply(new BigDecimal("0.20")).setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal totalLineDisc=rateDisc.add(cashDisc);
+                        if(totalLineDisc.signum()<0 || totalLineDisc.compareTo(maxLineDisc.add(new BigDecimal("0.01")))>0) throw new BusinessException("Total discount cannot exceed 20% of item value (max " + maxLineDisc + ")");
                         invoice.getItems().add(InvoiceItem.builder().invoice(invoice).product(product).warehouse(resolveWarehouse(line.getWarehouseId(),invoice.getWarehouse())).quantity(line.getQuantity())
-                          .unitPrice(product.getSellingPrice()).costPrice(product.getCostPrice()).discountRate(rate).discountAmount(discount).totalPrice(gross.subtract(discount)).build());
+                          .unitPrice(product.getSellingPrice()).costPrice(product.getCostPrice()).discountRate(rate).discountAmount(cashDisc).totalPrice(gross.subtract(totalLineDisc)).build());
                     }
                 }
                 invoice.setSubtotal(invoice.getItems().stream().map(InvoiceItem::getTotalPrice).reduce(BigDecimal.ZERO,BigDecimal::add));
@@ -767,8 +798,6 @@ public class InvoiceService {
 
     @Transactional
     public List<InvoiceDto> completeHeldInvoices(List<Long> ids,Map<Long,Long> expectedVersions,com.nbh.erp.sales.dto.InvoicePacking packing){
-        if(packing==null)throw new BusinessException("Enter packing quantities before creating the invoice");
-        packing.validate();
         return List.of(mergeHeldBills(ids,expectedVersions,packing));
     }
 
@@ -796,6 +825,12 @@ public class InvoiceService {
         for(Invoice source:sources) {
             if(!source.getCustomer().getId().equals(first.getCustomer().getId()))throw new BusinessException("Select held bills for the same customer");
             if(source.getTaxRate().compareTo(first.getTaxRate())!=0)throw new BusinessException("Selected held bills must have the same tax rate");
+        }
+        var combinedPacking=reviewedPacking(sources);
+        if(combinedPacking!=null)packing=combinedPacking;
+        else {
+            if(packing==null)throw new BusinessException("Enter packing quantities before creating the invoice");
+            packing.validate();
         }
         customerRepository.findByIdForUpdate(first.getCustomer().getId()).orElseThrow();
         Invoice merged=Invoice.builder().invoiceNumber(sequenceService.generateInvoiceNumber()).customer(first.getCustomer())

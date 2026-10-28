@@ -36,6 +36,9 @@ public class QuotationDto {
     private String status;
     private Long convertedInvoiceId;
     private String convertedInvoiceNumber;
+    private String cancelReason;
+    private LocalDateTime cancelledAt;
+    private String cancelledBy;
     private String notes;
     private String terms;
     private LocalDateTime createdAt;
@@ -63,7 +66,7 @@ public class QuotationDto {
             if (item == null) return null;
             return QuotationItemDto.builder()
                     .id(item.getId())
-                    .productId(item.getProduct() != null ? item.getProduct().getId() : item.getProduct() != null ? item.getProduct().getId() : null)
+                    .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                     .productSku(item.getProductSku())
                     .productName(item.getProductName())
                     .quantity(item.getQuantity())
@@ -105,6 +108,9 @@ public class QuotationDto {
                 .status(q.getStatus())
                 .convertedInvoiceId(q.getConvertedInvoiceId())
                 .convertedInvoiceNumber(q.getConvertedInvoiceNumber())
+                .cancelReason(q.getCancelReason())
+                .cancelledAt(q.getCancelledAt())
+                .cancelledBy(q.getCancelledBy())
                 .notes(q.getNotes())
                 .terms(q.getTerms())
                 .createdAt(q.getCreatedAt())

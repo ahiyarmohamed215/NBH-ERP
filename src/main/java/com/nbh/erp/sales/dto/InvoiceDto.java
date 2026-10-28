@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class InvoiceDto {
     private InvoicePacking packing;
+    private java.util.Map<Long,InvoicePacking> warehousePacking;
     private Long id;
     private long recordVersion;
     private String invoiceNumber;
@@ -36,6 +37,7 @@ public class InvoiceDto {
     private Long customerId;
     private String customerCode;
     private String customerName;
+    private String customerAddress;
     private Long warehouseId;
     private String warehouseCode;
     private String warehouseName;
@@ -70,11 +72,12 @@ public class InvoiceDto {
     private String createdByName;
     private String createdByEmployeeCode;
     private LocalDateTime createdAt;
+    private LocalDateTime heldSavedAt;
 
     public static InvoiceDto from(Invoice inv) {
         Long delId = inv.getDelivery() != null ? inv.getDelivery().getId() : null;
         String delNumber = inv.getDelivery() != null ? inv.getDelivery().getDeliveryNumber() : null;
-        String delRouteName = inv.getDelivery() != null && inv.getDelivery().getRoute() != null ? inv.getDelivery().getRoute().getRouteName() : null;
+        String delRouteName = inv.getDelivery() != null && inv.getDelivery().getRoute() != null ? inv.getDelivery().getRoute().getRouteName() : (inv.getCustomer() != null && inv.getCustomer().getDeliveryRoute() != null ? inv.getCustomer().getDeliveryRoute().getRouteName() : null);
         String vehNum = inv.getDelivery() != null ? inv.getDelivery().getVehicleNumber() : null;
         String driver = inv.getDelivery() != null && inv.getDelivery().getDriver() != null
                 ? (inv.getDelivery().getDriver().getFullName() != null ? inv.getDelivery().getDriver().getFullName() : inv.getDelivery().getDriver().getUsername()) : null;
@@ -82,6 +85,7 @@ public class InvoiceDto {
                 ? (inv.getDelivery().getAssistantStaff().getFullName() != null ? inv.getDelivery().getAssistantStaff().getFullName() : inv.getDelivery().getAssistantStaff().getUsername()) : null;
 
         return InvoiceDto.builder()
+                .warehousePacking(inv.getWarehousePacking().entrySet().stream().collect(Collectors.toMap(java.util.Map.Entry::getKey,e->e.getValue().toDto())))
                 .packing(new InvoicePacking(inv.getPackingBoxes(),inv.getPackingBags(),inv.getPackingPBags(),inv.getPackingOthers()))
                 .id(inv.getId())
                 .recordVersion(inv.getRecordVersion())
@@ -92,6 +96,7 @@ public class InvoiceDto {
                 .customerId(inv.getCustomer().getId())
                 .customerCode(inv.getCustomer().getCustomerCode())
                 .customerName(inv.getCustomer().getName())
+                .customerAddress(inv.getCustomer().getAddress())
                 .warehouseId(inv.getWarehouse().getId())
                 .warehouseCode(inv.getWarehouse().getCode())
                 .warehouseName(inv.getWarehouse().getName())
@@ -123,6 +128,7 @@ public class InvoiceDto {
                 .notes(inv.getNotes()).posRemarks(inv.getNotes())
                 .createdBy(inv.getCreatedBy())
                 .createdAt(inv.getCreatedAt())
+                .heldSavedAt(inv.getOriginalHeldCapturedAt())
                 .items(inv.getItems() != null
                         ? inv.getItems().stream().map(InvoiceItemDto::from).collect(Collectors.toList())
                         : List.of())
@@ -142,6 +148,7 @@ public class InvoiceDto {
                 .customerId(inv.getCustomer() != null ? inv.getCustomer().getId() : null)
                 .customerCode(inv.getCustomer() != null ? inv.getCustomer().getCustomerCode() : null)
                 .customerName(inv.getCustomer() != null ? inv.getCustomer().getName() : null)
+                .customerAddress(inv.getCustomer() != null ? inv.getCustomer().getAddress() : null)
                 .warehouseId(inv.getWarehouse() != null ? inv.getWarehouse().getId() : null)
                 .warehouseCode(inv.getWarehouse() != null ? inv.getWarehouse().getCode() : null)
                 .warehouseName(inv.getWarehouse() != null ? inv.getWarehouse().getName() : null)
@@ -167,6 +174,7 @@ public class InvoiceDto {
                 .notes(inv.getNotes()).posRemarks(inv.getNotes())
                 .createdBy(inv.getCreatedBy())
                 .createdAt(inv.getCreatedAt())
+                .heldSavedAt(inv.getOriginalHeldCapturedAt())
                 .items(List.of())
                 .build();
     }

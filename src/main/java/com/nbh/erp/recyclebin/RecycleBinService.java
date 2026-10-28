@@ -25,9 +25,10 @@ public class RecycleBinService {
     private static final Map<String,Class<? extends RecyclableEntity>> TYPES=Map.of(
         "BRAND",com.nbh.erp.brand.entity.Brand.class,"CATEGORY",com.nbh.erp.category.entity.Category.class,
         "WAREHOUSE",com.nbh.erp.warehouse.entity.Warehouse.class,"CUSTOMER",com.nbh.erp.customer.entity.Customer.class,
-        "USER",User.class,"ALLOCATION",ProductStaffQuota.class,"PRODUCT",com.nbh.erp.product.entity.Product.class);
+        "USER",User.class,"ALLOCATION",ProductStaffQuota.class,"PRODUCT",com.nbh.erp.product.entity.Product.class,
+        "VEHICLE",com.nbh.erp.delivery.entity.Vehicle.class,"DELIVERY_ROUTE",com.nbh.erp.delivery.entity.DeliveryRoute.class);
     public record Entry(String type,Long id,String code,String name,LocalDateTime deletedAt) {}
-    private String permission(String type) { return "ALLOCATION".equals(type)?"INVENTORY":type; }
+    private String permission(String type) { return java.util.Set.of("VEHICLE","DELIVERY_ROUTE").contains(type)?"DELIVERY":"ALLOCATION".equals(type)?"INVENTORY":type; }
     private void authorize(String type) { SecurityUtils.enforceCanEdit(permission(type),"Recycle bin: "+type); }
     private RecyclableEntity locked(String type,Long id) {
         authorize(type);Class<? extends RecyclableEntity> cls=TYPES.get(type);
@@ -48,7 +49,9 @@ public class RecycleBinService {
     private Entry entry(String type,RecyclableEntity record) {
         String name=record instanceof User ? value(record,"getFullName") : record instanceof ProductStaffQuota quota ? (quota.getProduct()==null?"Draft allocation":quota.getProduct().getName())+" / "+(quota.getUser()==null?"Unassigned":quota.getUser().getFullName()) : value(record,"getName");
         String code=record instanceof User ? value(record,"getEmployeeCode") : "CUSTOMER".equals(type)?value(record,"getCustomerCode"):"PRODUCT".equals(type)?value(record,"getSku"):value(record,"getCode");
-        return new Entry(type,record.getId(),"—".equals(code)?String.valueOf(record.getId()):code,name,record.getDeletedAt());
+        if(record instanceof com.nbh.erp.delivery.entity.Vehicle vehicle){code=vehicle.getVehicleNumber();name=vehicle.getModel()!=null?vehicle.getModel():"Vehicle draft";}
+        if(record instanceof com.nbh.erp.delivery.entity.DeliveryRoute route){code=route.getRouteCode();name=route.getRouteName();}
+        return new Entry(type,record.getId(),code==null || "—".equals(code)?String.valueOf(record.getId()):code,name,record.getDeletedAt());
     }
     @Transactional(readOnly=true) public List<Entry> list() {
         List<Entry> result=new ArrayList<>();
@@ -56,10 +59,19 @@ public class RecycleBinService {
         TYPES.forEach((type,cls)->{if(SecurityUtils.canEdit(permission(type))) entities.createQuery("select e from "+cls.getSimpleName()+" e where e.deletedAt is not null and e.purgedAt is null",cls).getResultList().forEach(record->result.add(entry(type,record)));});
         result.sort(Comparator.comparing(Entry::deletedAt).reversed());return result;
     }
-    @Transactional public void delete(String type,Long id) {
+    @Transactional public void delete(String type,Long id) { delete(type,id,null); }
+    @Transactional public void delete(String type,Long id,String reason) {
         if("SUPPLIER".equals(type)){authorize(type);suppliers.deleteSupplier(id);return;}
         RecyclableEntity record=locked(type,id);record.requireNotDeleted();
         record.setActiveBeforeDelete(record.getIsActive());
+        if(record instanceof com.nbh.erp.delivery.entity.Vehicle vehicle){
+            record.setStatusBeforeDelete(vehicle.getStatus());
+            vehicle.setStatus("INACTIVE");
+            if(reason!=null && !reason.isBlank()){
+                String existing=vehicle.getNotes()!=null && !vehicle.getNotes().isBlank()?vehicle.getNotes()+"\n":"";
+                vehicle.setNotes(existing+"[Deletion reason: "+reason.trim()+"]");
+            }
+        }
         if(record instanceof com.nbh.erp.product.entity.Product product){record.setStatusBeforeDelete(product.getStatus());product.setStatus("INACTIVE");}
         if(record instanceof com.nbh.erp.brand.entity.Brand brand){record.setStatusBeforeDelete(brand.getStatus());brand.setStatus("INACTIVE");}
         if(record instanceof com.nbh.erp.category.entity.Category category){record.setStatusBeforeDelete(category.getStatus());category.setStatus("INACTIVE");}
@@ -67,7 +79,8 @@ public class RecycleBinService {
         if(record instanceof ProductStaffQuota quota){record.setStatusBeforeDelete(quota.getAllocationStatus());quota.setAllocationStatus("INACTIVE");}
         record.setIsActive(false);record.setDeletedAt(LocalDateTime.now());
         if(record instanceof User user) user.setTokenVersion(user.getTokenVersion()+1);
-        audit.log("RECORD_DELETE",type,String.valueOf(id),"Moved to global recycle bin");
+        String auditDetail=reason!=null && !reason.isBlank()?"Moved to global recycle bin. Reason: "+reason.trim():"Moved to global recycle bin";
+        audit.log("RECORD_DELETE",type,String.valueOf(id),auditDetail);
     }
     @Transactional public void restore(String type,Long id) {
         if("SUPPLIER".equals(type)){authorize(type);suppliers.restoreSupplier(id);return;}
@@ -85,6 +98,7 @@ public class RecycleBinService {
         if(record instanceof com.nbh.erp.brand.entity.Brand brand)brand.setStatus(record.getStatusBeforeDelete());
         if(record instanceof com.nbh.erp.category.entity.Category category)category.setStatus(record.getStatusBeforeDelete());
         if(record instanceof com.nbh.erp.warehouse.entity.Warehouse warehouse)warehouse.setStatus(record.getStatusBeforeDelete());
+        if(record instanceof com.nbh.erp.delivery.entity.Vehicle vehicle)vehicle.setStatus(record.getStatusBeforeDelete());
         record.setActiveBeforeDelete(null);record.setStatusBeforeDelete(null);
         if(record instanceof User user) user.setTokenVersion(user.getTokenVersion()+1);
         audit.log("RECORD_RESTORE",type,String.valueOf(id),"Restored from global recycle bin");
@@ -94,6 +108,8 @@ public class RecycleBinService {
         RecyclableEntity record=locked(type,id);
         if(!record.isDeleted() || record.getPurgedAt()!=null) throw new BusinessException("Only records in the recycle bin can be permanently deleted");
         record.setPurgedAt(LocalDateTime.now());record.setActiveBeforeDelete(null);record.setStatusBeforeDelete(null);
+        if(record instanceof com.nbh.erp.delivery.entity.Vehicle vehicle)vehicle.setNotes(null);
+        if(record instanceof com.nbh.erp.delivery.entity.DeliveryRoute route)route.setDescription(null);
         if(record instanceof com.nbh.erp.customer.entity.Customer customer){customer.setContactPerson(null);customer.setEmail(null);customer.setPhone(null);customer.setAddress(null);}
         if(record instanceof com.nbh.erp.warehouse.entity.Warehouse warehouse){warehouse.setContactPerson(null);warehouse.setPhone(null);warehouse.setAddress(null);warehouse.setRemarks(null);}
         if(record instanceof com.nbh.erp.brand.entity.Brand brand)brand.setDescription(null);

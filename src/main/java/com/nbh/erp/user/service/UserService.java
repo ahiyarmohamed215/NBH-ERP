@@ -144,13 +144,12 @@ public class UserService {
 
         boolean isSuperAdmin = SecurityUtils.isSuperAdmin(user);
 
-        if (isSuperAdmin) {
-            if (Boolean.FALSE.equals(request.getIsActive())) {
-                throw new BusinessException("Super Administrator cannot be deactivated. Full system access must remain active.");
-            }
-            user.setIsActive(true);
-            user.setApprovalStatus("APPROVED");
-        } else if (request.getIsActive() != null) {
+        if (isSuperAdmin && Boolean.FALSE.equals(request.getIsActive())) {
+            throw new BusinessException("Super Administrator cannot be deactivated. Full system access must remain active.");
+        }
+        // Editing a profile is not approval or account recovery. Preserve stored
+        // status unless the authorized request explicitly changes activation.
+        if (request.getIsActive() != null) {
             user.setIsActive(request.getIsActive());
         }
 

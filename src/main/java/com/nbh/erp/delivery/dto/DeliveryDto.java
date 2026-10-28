@@ -59,8 +59,12 @@ public class DeliveryDto {
     private String notes;
     private String cancellationReason;
     private LocalDateTime cancellationDate;
+    private String rescheduleReason;
+    private LocalDate rescheduledDate;
+    private LocalDateTime rescheduledAt;
 
     private List<Long> invoiceIds;
+    private List<Long> specialInvoiceIds;
     private List<String> invoiceNumbers;
     private List<InvoiceDto> invoices;
 
@@ -83,6 +87,15 @@ public class DeliveryDto {
         List<InvoiceDto> invDtos = (includeInvoices && d.getInvoices() != null)
                 ? d.getInvoices().stream().filter(i -> Boolean.TRUE.equals(i.getCustomer().getIsActive())).map(InvoiceDto::from).toList()
                 : List.of();
+
+        List<Long> specInvIds = List.of();
+        if (d.getSpecialInvoiceIds() != null && !d.getSpecialInvoiceIds().isBlank()) {
+            specInvIds = java.util.Arrays.stream(d.getSpecialInvoiceIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::valueOf)
+                    .toList();
+        }
 
         String driverName = d.getDriver() != null
                 ? (d.getDriver().getFullName() != null ? d.getDriver().getFullName() : d.getDriver().getUsername()) : null;
@@ -124,7 +137,11 @@ public class DeliveryDto {
                 .notes(d.getNotes())
                 .cancellationReason(d.getCancellationReason())
                 .cancellationDate(d.getCancellationDate())
+                .rescheduleReason(d.getRescheduleReason())
+                .rescheduledDate(d.getRescheduledDate())
+                .rescheduledAt(d.getRescheduledAt())
                 .invoiceIds(invIds)
+                .specialInvoiceIds(specInvIds)
                 .invoiceNumbers(invNums)
                 .invoices(invDtos)
                 .createdAt(d.getCreatedAt())

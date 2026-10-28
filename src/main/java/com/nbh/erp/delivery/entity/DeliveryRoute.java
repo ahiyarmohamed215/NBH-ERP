@@ -18,7 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class DeliveryRoute extends BaseEntity {
+public class DeliveryRoute extends com.nbh.erp.common.entity.RecyclableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,8 +27,12 @@ public class DeliveryRoute extends BaseEntity {
     @Column(name = "route_code", nullable = false, unique = true, length = 30)
     private String routeCode; // e.g. DR-001
 
-    @Column(name = "route_name", nullable = false, length = 100)
+    @Column(name = "route_name", length = 100)
     private String routeName; // e.g. Colombo - Western Corridor
+
+    @Column(length = 20)
+    @Builder.Default
+    private String status = "ACTIVE";
 
     @Column(columnDefinition = "TEXT")
     private String description;

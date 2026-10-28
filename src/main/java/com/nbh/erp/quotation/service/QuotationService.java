@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -82,12 +83,20 @@ public class QuotationService {
         }
 
         if (customer != null && Boolean.FALSE.equals(customer.getIsActive())) {
-            throw new com.nbh.erp.common.exception.BusinessException("Cannot issue quotation for inactive customer: " + customer.getName());
+            throw new BusinessException("Cannot issue quotation for inactive customer: " + customer.getName());
         }
 
         String quotationNumber = sequenceService.generateQuotationNumber();
         LocalDate qDate = request.getQuotationDate() != null ? request.getQuotationDate() : LocalDate.now();
         LocalDate validUntil = request.getValidUntil() != null ? request.getValidUntil() : qDate.plusDays(30);
+
+        String initialStatus = "PENDING";
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            String s = request.getStatus().trim().toUpperCase();
+            if (List.of("PENDING", "ACCEPTED", "REJECTED").contains(s)) {
+                initialStatus = s;
+            }
+        }
 
         Quotation quotation = Quotation.builder()
                 .quotationNumber(quotationNumber)
@@ -97,7 +106,7 @@ public class QuotationService {
                 .customerEmail(customer != null ? customer.getEmail() : request.getCustomerEmail())
                 .quotationDate(qDate)
                 .validUntil(validUntil)
-                .status("PENDING")
+                .status(initialStatus)
                 .notes(request.getNotes())
                 .terms(request.getTerms())
                 .items(new ArrayList<>())
@@ -124,8 +133,10 @@ public class QuotationService {
                 BigDecimal discRate = itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO;
                 BigDecimal discAmount = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
 
+                BigDecimal gross = unitPrice.multiply(BigDecimal.valueOf(qty));
+                BigDecimal rateDisc = discRate.signum() > 0 ? gross.multiply(discRate).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO;
                 BigDecimal itemTotal = itemReq.getTotalPrice() != null ? itemReq.getTotalPrice()
-                        : unitPrice.multiply(BigDecimal.valueOf(qty)).subtract(discAmount);
+                        : gross.subtract(rateDisc).subtract(discAmount);
 
                 QuotationItem item = QuotationItem.builder()
                         .product(product)
@@ -176,8 +187,15 @@ public class QuotationService {
 
         SecurityUtils.enforceCanEdit("QUOTATION", quotation.getQuotationNumber());
 
-        if ("CONVERTED".equals(quotation.getStatus())) {
-            throw new BusinessException("Cannot update quotation " + quotation.getQuotationNumber() + " because it is already converted to an invoice.");
+        if ("CONVERTED".equals(quotation.getStatus()) || "CANCELLED".equals(quotation.getStatus())) {
+            throw new BusinessException("Cannot update quotation " + quotation.getQuotationNumber() + " because it is already " + quotation.getStatus().toLowerCase() + ".");
+        }
+
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            String s = request.getStatus().trim().toUpperCase();
+            if (List.of("PENDING", "ACCEPTED", "REJECTED").contains(s)) {
+                quotation.setStatus(s);
+            }
         }
 
         if (request.getCustomerId() != null) {
@@ -196,17 +214,20 @@ public class QuotationService {
         if (request.getNotes() != null) quotation.setNotes(request.getNotes());
         if (request.getTerms() != null) quotation.setTerms(request.getTerms());
 
+        BigDecimal subtotal = BigDecimal.ZERO;
         if (request.getItems() != null && !request.getItems().isEmpty()) {
             quotation.getItems().clear();
-            BigDecimal subtotal = BigDecimal.ZERO;
             for (CreateQuotationRequest.CreateQuotationItemRequest itemReq : request.getItems()) {
                 Product product = itemReq.getProductId() != null
                         ? productRepository.findById(itemReq.getProductId()).orElse(null) : null;
                 int qty = itemReq.getQuantity() != null && itemReq.getQuantity() > 0 ? itemReq.getQuantity() : 1;
                 BigDecimal unitPrice = itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : BigDecimal.ZERO;
+                BigDecimal discRate = itemReq.getDiscountRate() != null ? itemReq.getDiscountRate() : BigDecimal.ZERO;
                 BigDecimal discAmount = itemReq.getDiscountAmount() != null ? itemReq.getDiscountAmount() : BigDecimal.ZERO;
+                BigDecimal gross = unitPrice.multiply(BigDecimal.valueOf(qty));
+                BigDecimal rateDisc = discRate.signum() > 0 ? gross.multiply(discRate).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO;
                 BigDecimal itemTotal = itemReq.getTotalPrice() != null ? itemReq.getTotalPrice()
-                        : unitPrice.multiply(BigDecimal.valueOf(qty)).subtract(discAmount);
+                        : gross.subtract(rateDisc).subtract(discAmount);
 
                 QuotationItem item = QuotationItem.builder()
                         .product(product)
@@ -222,12 +243,23 @@ public class QuotationService {
                 quotation.addItem(item);
                 subtotal = subtotal.add(itemTotal);
             }
-            quotation.setSubtotal(subtotal);
-            quotation.setTotalAmount(subtotal);
         } else if (request.getTotalAmount() != null) {
-            quotation.setTotalAmount(request.getTotalAmount());
-            quotation.setSubtotal(request.getTotalAmount());
+            subtotal = request.getTotalAmount();
+        } else {
+            subtotal = quotation.getSubtotal() != null ? quotation.getSubtotal() : BigDecimal.ZERO;
         }
+
+        quotation.setSubtotal(subtotal);
+
+        BigDecimal totalDiscount = request.getDiscountAmount() != null ? request.getDiscountAmount() : quotation.getDiscountAmount();
+        BigDecimal taxAmount = request.getTaxAmount() != null ? request.getTaxAmount() : quotation.getTaxAmount();
+        if (totalDiscount == null) totalDiscount = BigDecimal.ZERO;
+        if (taxAmount == null) taxAmount = BigDecimal.ZERO;
+
+        quotation.setDiscountAmount(totalDiscount);
+        quotation.setTaxAmount(taxAmount);
+        BigDecimal grandTotal = subtotal.subtract(totalDiscount).add(taxAmount);
+        quotation.setTotalAmount(grandTotal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : grandTotal);
 
         Quotation saved = quotationRepository.save(quotation);
         String username = SecurityUtils.getCurrentUsername().orElse("system");
@@ -245,6 +277,47 @@ public class QuotationService {
     }
 
     @Transactional
+    public QuotationDto cancelQuotation(Long id, String reason) {
+        Quotation quotation = quotationRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Quotation", "id", id));
+        CustomerRepository.requireActive(quotation.getCustomer());
+
+        SecurityUtils.enforceCanEdit("QUOTATION", quotation.getQuotationNumber());
+
+        if ("CONVERTED".equals(quotation.getStatus())) {
+            throw new BusinessException("Cannot cancel quotation " + quotation.getQuotationNumber() + " because it is already converted to invoice " + quotation.getConvertedInvoiceNumber());
+        }
+        if ("CANCELLED".equals(quotation.getStatus())) {
+            throw new BusinessException("Quotation " + quotation.getQuotationNumber() + " is already cancelled.");
+        }
+
+        String trimmedReason = (reason != null) ? reason.trim() : "";
+        if (trimmedReason.isEmpty()) {
+            throw new BusinessException("Cancellation reason is required to cancel quotation " + quotation.getQuotationNumber());
+        }
+
+        String currentUsername = SecurityUtils.getCurrentUsername().orElse("system");
+        quotation.setStatus("CANCELLED");
+        quotation.setCancelReason(trimmedReason);
+        quotation.setCancelledAt(LocalDateTime.now());
+        quotation.setCancelledBy(currentUsername);
+
+        Quotation saved = quotationRepository.save(quotation);
+
+        auditLogService.log(
+                "QUOTATION_CANCEL",
+                "Quotation",
+                saved.getQuotationNumber(),
+                String.format("Quotation %s cancelled by %s. Reason: %s",
+                        saved.getQuotationNumber(),
+                        currentUsername,
+                        trimmedReason)
+        );
+
+        return QuotationDto.from(saved);
+    }
+
+    @Transactional
     public void deleteQuotation(Long id) {
         SecurityUtils.enforceNoDelete("Quotation", id);
     }
@@ -257,6 +330,9 @@ public class QuotationService {
 
         if ("CONVERTED".equals(quotation.getStatus())) {
             throw new BusinessException("Quotation " + quotation.getQuotationNumber() + " has already been converted to invoice " + quotation.getConvertedInvoiceNumber());
+        }
+        if ("CANCELLED".equals(quotation.getStatus())) {
+            throw new BusinessException("Cannot convert cancelled quotation " + quotation.getQuotationNumber());
         }
 
         Warehouse warehouse;
@@ -273,8 +349,8 @@ public class QuotationService {
         if (quotation.getItems() != null && !quotation.getItems().isEmpty()) {
             for (QuotationItem qi : quotation.getItems()) {
                 Long pId = qi.getProduct() != null ? qi.getProduct().getId() : null;
-                if(pId==null) throw new BusinessException("Link every quotation line to a product before conversion");
-                if(qi.getUnitPrice().compareTo(qi.getProduct().getSellingPrice())!=0) throw new BusinessException("Quotation price differs from catalog; update and approve the quotation before conversion");
+                if (pId == null) throw new BusinessException("Link every quotation line to a product before conversion");
+                if (qi.getUnitPrice().compareTo(qi.getProduct().getSellingPrice()) != 0) throw new BusinessException("Quotation price differs from catalog; update and approve the quotation before conversion");
                 if (pId != null) {
                     invoiceItems.add(CreateInvoiceRequest.CreateInvoiceItemRequest.builder()
                             .productId(pId)
@@ -287,7 +363,7 @@ public class QuotationService {
             }
         }
 
-        if(invoiceItems.isEmpty()) throw new BusinessException("Quotation has no invoiceable lines");
+        if (invoiceItems.isEmpty()) throw new BusinessException("Quotation has no invoiceable lines");
 
         CreateInvoiceRequest invoiceRequest = CreateInvoiceRequest.builder()
                 .warehouseId(warehouse.getId())

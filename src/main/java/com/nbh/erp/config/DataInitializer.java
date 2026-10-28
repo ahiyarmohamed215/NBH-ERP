@@ -44,7 +44,7 @@ public class DataInitializer implements ApplicationRunner {
     private String adminEmail;
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public void run(ApplicationArguments args) {
         log.info("Checking system authorization & permissions initialization...");
         ensureLegacyUserColumnsHaveDefaults();
@@ -69,26 +69,12 @@ public class DataInitializer implements ApplicationRunner {
         Role superAdminRole = seedRole("ROLE_SUPER_ADMIN", "Full unrestricted access across all ERP features", allPermissions);
         Role adminRole = seedRole("ROLE_ADMIN", "Enterprise Administrator with all management permissions", allPermissions);
 
-        // 3. Seed Super Admin User if enabled and absent
+        // 3. Explicit, first-account-only bootstrap. Existing security decisions are retained.
         if (initialAdminEnabled) {
-            if (adminPassword == null || adminPassword.length() < 12) throw new IllegalStateException("INITIAL_ADMIN_PASSWORD must contain at least 12 characters");
             seedSuperAdminUser(superAdminRole, adminRole);
         } else {
             log.info("Initial super admin user creation is disabled via configuration (initial-admin.enabled=false).");
         }
-
-        // Ensure primary admin and any super admin users are active, approved, and granted superAdminRole
-        userRepository.findByUsername(adminUsername).ifPresent(admin -> {
-            boolean changed = false;
-            if (!Boolean.TRUE.equals(admin.getIsActive())) { admin.setIsActive(true); changed = true; }
-            if (!"APPROVED".equals(admin.getApprovalStatus())) { admin.setApprovalStatus("APPROVED"); changed = true; }
-            if (admin.getRoles() == null) { admin.setRoles(new HashSet<>()); }
-            if (!admin.getRoles().contains(superAdminRole)) { admin.getRoles().add(superAdminRole); changed = true; }
-            if (changed) {
-                userRepository.save(admin);
-                log.info("Guaranteed super administrator '{}' is ACTIVE and APPROVED with full system access.", adminUsername);
-            }
-        });
 
         // 4. Seed initial distribution fleet vehicles and routes
         vehicleService.seedDefaultVehiclesIfEmpty();
@@ -177,39 +163,41 @@ public class DataInitializer implements ApplicationRunner {
                     .build();
             role = roleRepository.save(role);
             log.info("Initialized system role: {}", roleName);
-        } else {
-            // Ensure permissions are up to date
-            if (role.getPermissions() == null) {
-                role.setPermissions(new HashSet<>());
-            }
-            role.getPermissions().addAll(permissions);
-            role = roleRepository.save(role);
         }
         return role;
     }
 
     private void seedSuperAdminUser(Role superAdminRole, Role adminRole) {
-        if (userRepository.findByUsername(adminUsername).isEmpty()) {
-            Set<Role> roles = new HashSet<>();
-            roles.add(superAdminRole);
-            roles.add(adminRole);
-
-            User superAdmin = User.builder()
-                    .username(adminUsername)
-                    .password(passwordEncoder.encode(adminPassword))
-                    .email(adminEmail)
-                    .fullName("System Super Administrator")
-                    .phone("+94 11 000 0000")
-                    .employeeCode("ADM-001")
-                    .commissionRate(java.math.BigDecimal.ZERO)
-                    .approvalStatus("APPROVED")
-                    .isActive(true)
-                    .roles(roles)
-                    .build();
-
-            userRepository.save(superAdmin);
-            log.info("Initialized default Super Admin user: '{}' with full ERP privileges.", adminUsername);
+        // Serialize concurrent explicit bootstraps. READ_COMMITTED makes the count
+        // observe the preceding bootstrap's commit after acquiring this row lock.
+        roleRepository.findByIdForUpdate(superAdminRole.getId())
+                .orElseThrow(() -> new IllegalStateException("Bootstrap role is unavailable"));
+        // Includes inactive and soft-deleted accounts: startup is not account recovery.
+        if (userRepository.count() != 0) {
+            log.warn("Initial administrator bootstrap skipped because user accounts already exist.");
+            return;
         }
+        com.nbh.erp.common.validation.PasswordValidator.validate(adminPassword, adminUsername, adminEmail);
+        if (adminPassword.length() < 12) throw new IllegalStateException("INITIAL_ADMIN_PASSWORD must contain at least 12 characters");
+        Set<Role> roles = new HashSet<>();
+        roles.add(superAdminRole);
+        roles.add(adminRole);
+
+        User superAdmin = User.builder()
+                .username(adminUsername)
+                .password(passwordEncoder.encode(adminPassword))
+                .email(adminEmail)
+                .fullName("System Super Administrator")
+                .phone("+94 11 000 0000")
+                .employeeCode("ADM-001")
+                .commissionRate(java.math.BigDecimal.ZERO)
+                .approvalStatus("APPROVED")
+                .isActive(true)
+                .roles(roles)
+                .build();
+
+        userRepository.save(superAdmin);
+        log.info("Initialized default Super Admin user: '{}' with full ERP privileges.", adminUsername);
     }
 
     private void ensureLegacyUserColumnsHaveDefaults() {

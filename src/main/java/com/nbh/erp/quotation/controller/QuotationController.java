@@ -2,6 +2,7 @@ package com.nbh.erp.quotation.controller;
 
 import com.nbh.erp.common.dto.ApiResponse;
 import com.nbh.erp.common.dto.PagedResponse;
+import com.nbh.erp.quotation.dto.CancelQuotationRequest;
 import com.nbh.erp.quotation.dto.CreateQuotationRequest;
 import com.nbh.erp.quotation.dto.QuotationDto;
 import com.nbh.erp.quotation.service.QuotationService;
@@ -69,6 +70,17 @@ public class QuotationController {
     ) {
         QuotationDto quotation = quotationService.updateQuotation(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Quotation updated successfully", quotation));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','QUOTATION_MANAGE','SALES_CREATE')")
+    @Operation(summary = "Cancel quotation with mandatory audit reason")
+    public ResponseEntity<ApiResponse<QuotationDto>> cancelQuotation(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelQuotationRequest request
+    ) {
+        QuotationDto quotation = quotationService.cancelQuotation(id, request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok("Quotation cancelled successfully", quotation));
     }
 
     @DeleteMapping("/{id}")

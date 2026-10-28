@@ -33,14 +33,15 @@ public class HeldOriginalsService {
     }
     public void capture(Invoice bill) {
         if (bill.getOriginalHeldSnapshot()!=null) return;
-        var dto=InvoiceDto.from(bill);staff.enrich(dto);dto.setStatus("SENT_TO_WAREHOUSE");dto.setOriginalCopy(true);dto.setCanResume(false);
+        var capturedAt=LocalDateTime.now(clock);
+        var dto=InvoiceDto.from(bill);dto.setHeldSavedAt(capturedAt);staff.enrich(dto);dto.setStatus("SENT_TO_WAREHOUSE");dto.setOriginalCopy(true);dto.setCanResume(false);
         try {bill.setOriginalHeldSnapshot(JSON.writeValueAsString(dto));}
         catch(Exception e) {throw new IllegalStateException("Unable to preserve original onhold bill",e);}
-        bill.setOriginalHeldTotal(bill.getNetTotal());bill.setOriginalHeldCapturedAt(LocalDateTime.now(clock));
+        bill.setOriginalHeldTotal(bill.getNetTotal());bill.setOriginalHeldCapturedAt(capturedAt);
     }
     public InvoiceDto read(Invoice bill) {
         if(bill.getOriginalHeldSnapshot()==null) throw new BusinessException("An original warehouse copy is unavailable for this older bill");
-        try {var dto=JSON.readValue(bill.getOriginalHeldSnapshot(),InvoiceDto.class);dto.setPosRemarks(dto.getPosRemarks()!=null?dto.getPosRemarks():dto.getNotes());dto.setOriginalCopy(true);dto.setCanResume(false);return dto;}
+        try {var dto=JSON.readValue(bill.getOriginalHeldSnapshot(),InvoiceDto.class);if(dto.getHeldSavedAt()==null)dto.setHeldSavedAt(bill.getOriginalHeldCapturedAt());dto.setPosRemarks(dto.getPosRemarks()!=null?dto.getPosRemarks():dto.getNotes());dto.setOriginalCopy(true);dto.setCanResume(false);return dto;}
         catch(Exception e) {throw new IllegalStateException("Unable to read original onhold bill",e);}
     }
     @Transactional
@@ -59,7 +60,7 @@ public class HeldOriginalsService {
                 dto.setStatus("CANCELLED".equals(b.getStatus())?"CANCELLED":"BILLED");dto.setRecordVersion(b.getRecordVersion());dto.setCancellationReason(b.getCancellationReason());dto.setMergedInvoiceId(b.getMergedInvoiceId());
                 if(b.getMergedInvoiceId()!=null){var invoice=invoices.findById(b.getMergedInvoiceId()).orElseThrow();dto.setInvoiceNumber(invoice.getInvoiceNumber());if(Set.of("VOIDED","CANCELLED").contains(invoice.getStatus())){dto.setStatus("CANCELLED");if(dto.getCancellationReason()==null)dto.setCancellationReason(invoice.getCancellationReason());}}
                 dto.setCanResume(false);return dto;})
-            .filter(b->text.isBlank() || (b.getHeldNumber()+" "+b.getCustomerName()+" "+b.getCreatedBy()+" "+b.getCreatedByName()+" "+b.getCreatedByEmployeeCode()).toLowerCase(Locale.ROOT).contains(text)).toList();
+            .filter(b->text.isBlank() || (b.getHeldNumber()+" "+b.getCustomerName()+" "+(b.getWarehouseName()!=null?b.getWarehouseName()+" "+b.getWarehouseCode():"")+" "+b.getCreatedBy()+" "+b.getCreatedByName()+" "+b.getCreatedByEmployeeCode()).toLowerCase(Locale.ROOT).contains(text)).toList();
         var today=LocalDate.now(clock);var month=all.stream().filter(b->b.getInvoiceDate()!=null && YearMonth.from(b.getInvoiceDate()).equals(YearMonth.from(today))).toList();
         var mine=month.stream().filter(b->Objects.equals(b.getCreatedBy(),username)).toList();var others=month.stream().filter(b->!Objects.equals(b.getCreatedBy(),username)).toList();
         return new HeldBillWorkspaceDto(rows,today.withDayOfMonth(1),today.withDayOfMonth(today.lengthOfMonth()),mine.size(),sum(mine),others.size(),sum(others),sum(rows));

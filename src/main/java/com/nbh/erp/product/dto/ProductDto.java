@@ -23,6 +23,7 @@ public class ProductDto {
     private String categoryName;
     private Long brandId;
     private String brandName;
+    private BigDecimal markupPercent;
     private BigDecimal brandMarkupPercent;
     private Long supplierId;
     private String supplierName;
@@ -51,6 +52,7 @@ public class ProductDto {
 
     public static ProductDto from(Product p, boolean allowCostPrice) {
         if (p == null) return null;
+        BigDecimal mp = p.getMarkupPercent() != null ? p.getMarkupPercent() : BigDecimal.ZERO;
         return ProductDto.builder()
                 .id(p.getId())
                 .sku(p.getSku())
@@ -61,7 +63,8 @@ public class ProductDto {
                 .categoryName(p.getCategory() != null ? p.getCategory().getName() : null)
                 .brandId(p.getBrand() != null ? p.getBrand().getId() : null)
                 .brandName(p.getBrand() != null ? p.getBrand().getName() : null)
-                .brandMarkupPercent(p.getBrand() != null ? p.getBrand().getMarkupPercent() : BigDecimal.ZERO)
+                .markupPercent(mp)
+                .brandMarkupPercent(mp)
                 .supplierId(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getId() : null)
                 .supplierName(p.getDefaultSupplier() != null ? p.getDefaultSupplier().getDisplayName() : null)
                 .warehouseId(p.getDefaultWarehouse() != null ? p.getDefaultWarehouse().getId() : null)

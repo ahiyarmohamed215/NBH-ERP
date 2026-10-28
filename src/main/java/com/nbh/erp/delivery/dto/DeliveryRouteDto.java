@@ -27,6 +27,7 @@ public class DeliveryRouteDto {
     private Double estimatedDistanceKm;
     private String deliveryDays;
     private Boolean isActive;
+    private String status;
     private Integer customerCount;
     private List<Long> customerIds;
     private LocalDateTime createdAt;
@@ -44,6 +45,10 @@ public class DeliveryRouteDto {
     public static DeliveryRouteDto from(DeliveryRoute r, List<Long> customerIds) {
         Long staffId = r.getAssignedStaff() != null ? r.getAssignedStaff().getId() : null;
         String staffName = r.getAssignedStaff() != null ? r.getAssignedStaff().getFullName() : null;
+        String status = r.getStatus();
+        if (status == null) {
+            status = Boolean.TRUE.equals(r.getIsActive()) ? "ACTIVE" : "INACTIVE";
+        }
 
         return DeliveryRouteDto.builder()
                 .id(r.getId())
@@ -59,6 +64,7 @@ public class DeliveryRouteDto {
                 .estimatedDistanceKm(r.getEstimatedDistanceKm())
                 .deliveryDays(r.getDeliveryDays())
                 .isActive(r.getIsActive())
+                .status(status)
                 .customerCount(customerIds != null ? customerIds.size() : 0)
                 .customerIds(customerIds != null ? customerIds : List.of())
                 .createdAt(r.getCreatedAt())

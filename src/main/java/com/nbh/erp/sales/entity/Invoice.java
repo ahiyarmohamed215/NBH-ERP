@@ -47,6 +47,10 @@ public class Invoice extends BaseEntity {
     @Column(name="packing_bags") @Builder.Default private Integer packingBags=0;
     @Column(name="packing_p_bags") @Builder.Default private Integer packingPBags=0;
     @Column(name="packing_others") @Builder.Default private Integer packingOthers=0;
+    @ElementCollection
+    @CollectionTable(name="invoice_warehouse_packing",joinColumns=@JoinColumn(name="invoice_id"))
+    @MapKeyColumn(name="warehouse_id")
+    @Builder.Default private java.util.Map<Long,WarehousePacking> warehousePacking=new java.util.LinkedHashMap<>();
     private String assignedStaff;
     private String reviewedBy;
     private java.time.LocalDateTime reviewedAt;
@@ -59,6 +63,9 @@ public class Invoice extends BaseEntity {
 
     @Column(name = "merged_invoice_id")
     private Long mergedInvoiceId;
+
+    @Column(name="held_batch_id")
+    private Long heldBatchId;
 
     public String getDocumentNumber() { return invoiceNumber != null ? invoiceNumber : heldNumber; }
 

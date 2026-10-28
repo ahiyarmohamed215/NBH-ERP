@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
+public interface VehicleRepository extends com.nbh.erp.common.repository.RecyclableRepository<Vehicle> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @org.springframework.data.jpa.repository.Query("select e from Vehicle e where e.id = :id")
+    @org.springframework.data.jpa.repository.Query("select e from Vehicle e where e.id = :id and e.deletedAt is null")
     java.util.Optional<Vehicle> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
 
     Optional<Vehicle> findByVehicleNumber(String vehicleNumber);

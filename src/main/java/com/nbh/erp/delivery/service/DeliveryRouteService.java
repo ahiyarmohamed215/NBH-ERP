@@ -30,36 +30,73 @@ public class DeliveryRouteService {
 
     @Transactional(readOnly = true)
     public List<DeliveryRouteDto> getAllRoutes() {
-        return routeRepository.findAll().stream().map(route -> {
-            List<Long> custIds = customerRepository.findByDeliveryRouteId(route.getId()).stream()
-                    .map(Customer::getId)
-                    .toList();
-            return DeliveryRouteDto.from(route, custIds);
-        }).toList();
+        return routeRepository.findAll().stream()
+                .filter(r -> r.getDeletedAt() == null)
+                .sorted(java.util.Comparator.comparing(
+                        (DeliveryRoute r) -> r.getUpdatedAt() != null ? r.getUpdatedAt() : r.getCreatedAt(),
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+                ).thenComparing(DeliveryRoute::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(route -> {
+                    List<Long> custIds = customerRepository.findByDeliveryRouteId(route.getId()).stream()
+                            .map(Customer::getId)
+                            .toList();
+                    return DeliveryRouteDto.from(route, custIds);
+                }).toList();
     }
 
     @Transactional(readOnly = true)
     public List<DeliveryRouteDto> getActiveRoutes() {
-        return routeRepository.findByIsActiveTrue().stream().map(route -> {
-            List<Long> custIds = customerRepository.findByDeliveryRouteId(route.getId()).stream()
-                    .map(Customer::getId)
-                    .toList();
-            return DeliveryRouteDto.from(route, custIds);
-        }).toList();
+        return routeRepository.findByIsActiveTrue().stream()
+                .filter(r -> r.getDeletedAt() == null)
+                .sorted(java.util.Comparator.comparing(
+                        (DeliveryRoute r) -> r.getUpdatedAt() != null ? r.getUpdatedAt() : r.getCreatedAt(),
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+                ).thenComparing(DeliveryRoute::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(route -> {
+                    List<Long> custIds = customerRepository.findByDeliveryRouteId(route.getId()).stream()
+                            .map(Customer::getId)
+                            .toList();
+                    return DeliveryRouteDto.from(route, custIds);
+                }).toList();
     }
 
     @Transactional(readOnly = true)
     public DeliveryRouteDto getRouteById(Long id) {
         DeliveryRoute route = routeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
+        route.requireNotDeleted();
         List<Long> custIds = customerRepository.findByDeliveryRouteId(route.getId()).stream()
                 .map(Customer::getId)
                 .toList();
         return DeliveryRouteDto.from(route, custIds);
     }
 
+    private void validateRouteInput(CreateDeliveryRouteRequest req, boolean draft) {
+        if (!draft && !StringUtils.hasText(req.getRouteName())) {
+            throw new com.nbh.erp.common.exception.BusinessException("Route name is required before activation");
+        }
+        if (draft) {
+            boolean hasAny = StringUtils.hasText(req.getRouteName())
+                    || StringUtils.hasText(req.getRouteCode())
+                    || StringUtils.hasText(req.getDescription())
+                    || StringUtils.hasText(req.getArea())
+                    || req.getEffectiveStaffId() != null
+                    || StringUtils.hasText(req.getStartLocation())
+                    || StringUtils.hasText(req.getEndLocation())
+                    || req.getEstimatedDurationMinutes() != null
+                    || req.getEstimatedDistanceKm() != null
+                    || (req.getCustomerIds() != null && !req.getCustomerIds().isEmpty());
+            if (!hasAny) {
+                throw new com.nbh.erp.common.exception.BusinessException("Fill at least one input before saving a route draft");
+            }
+        }
+    }
+
     @Transactional
     public DeliveryRouteDto createRoute(CreateDeliveryRouteRequest req) {
+        boolean isDraft = req.isDraft();
+        validateRouteInput(req, isDraft);
+
         String code = req.getRouteCode();
         if (!StringUtils.hasText(code)) {
             code = "DR-" + String.format("%03d", routeRepository.count() + 1);
@@ -77,9 +114,15 @@ public class DeliveryRouteService {
             assignedStaff = userRepository.findById(staffId).orElse(null);
         }
 
+        String routeName = StringUtils.hasText(req.getRouteName())
+                ? req.getRouteName().trim()
+                : (isDraft ? "Draft Route " + code : code);
+
+        String status = isDraft ? "DRAFT" : (Boolean.FALSE.equals(req.getIsActive()) ? "INACTIVE" : "ACTIVE");
+
         DeliveryRoute route = DeliveryRoute.builder()
                 .routeCode(code)
-                .routeName(req.getRouteName().trim())
+                .routeName(routeName)
                 .description(req.getDescription())
                 .area(req.getArea())
                 .assignedStaff(assignedStaff)
@@ -88,7 +131,8 @@ public class DeliveryRouteService {
                 .estimatedDurationMinutes(req.getEstimatedDurationMinutes())
                 .estimatedDistanceKm(req.getEstimatedDistanceKm())
                 .deliveryDays(req.getDeliveryDays())
-                .isActive(true)
+                .status(status)
+                .isActive(!isDraft && (req.getIsActive() == null || req.getIsActive()))
                 .build();
 
         DeliveryRoute saved = routeRepository.save(route);
@@ -116,6 +160,10 @@ public class DeliveryRouteService {
                 .orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
 
         SecurityUtils.enforceCanEdit("DELIVERY", "Delivery Route: " + route.getRouteName());
+        route.requireNotDeleted();
+
+        boolean isDraft = req.isDraft();
+        validateRouteInput(req, isDraft);
 
         String code = req.getRouteCode();
         if (StringUtils.hasText(code)) {
@@ -133,7 +181,25 @@ public class DeliveryRouteService {
             route.setAssignedStaff(null);
         }
 
-        route.setRouteName(req.getRouteName().trim());
+        if (isDraft) {
+            if (StringUtils.hasText(req.getRouteName())) {
+                route.setRouteName(req.getRouteName().trim());
+            } else if (!StringUtils.hasText(route.getRouteName())) {
+                route.setRouteName("Draft Route " + route.getRouteCode());
+            }
+            route.setStatus("DRAFT");
+            route.setIsActive(false);
+        } else {
+            route.setRouteName(req.getRouteName().trim());
+            if ("DRAFT".equals(route.getStatus())) {
+                route.setStatus(Boolean.FALSE.equals(req.getIsActive()) ? "INACTIVE" : "ACTIVE");
+                route.setIsActive(req.getIsActive() == null || req.getIsActive());
+            } else if (req.getIsActive() != null) {
+                route.setIsActive(req.getIsActive());
+                route.setStatus(req.getIsActive() ? "ACTIVE" : "INACTIVE");
+            }
+        }
+
         route.setDescription(req.getDescription());
         route.setArea(req.getArea());
         route.setStartLocation(req.getStartLocation());
@@ -169,6 +235,36 @@ public class DeliveryRouteService {
     @Transactional
     public void deleteRoute(Long id) {
         SecurityUtils.enforceNoDelete("DeliveryRoute", id);
+    }
+
+    @Transactional
+    public DeliveryRouteDto toggleActive(Long id) {
+        DeliveryRoute route = routeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
+        SecurityUtils.enforceCanEdit("DELIVERY", "Delivery Route: " + route.getRouteName());
+        route.requireNotDeleted();
+        boolean nextActive = !Boolean.TRUE.equals(route.getIsActive());
+        route.setIsActive(nextActive);
+        route.setStatus(nextActive ? "ACTIVE" : "INACTIVE");
+        DeliveryRoute saved = routeRepository.save(route);
+        auditLogService.log("DELIVERY_ROUTE_STATUS", "DeliveryRoute", saved.getRouteCode(),
+                "Delivery route status changed to " + (saved.getIsActive() ? "Active" : "Inactive"));
+        List<Long> customerIds = customerRepository.findByDeliveryRouteId(id).stream().map(Customer::getId).toList();
+        return DeliveryRouteDto.from(saved, customerIds);
+    }
+
+    @Transactional
+    public DeliveryRouteDto changeStatus(Long id, String status, String reason) {
+        reason = com.nbh.erp.common.dto.StatusChangeRequest.requireReason(reason);
+        if (!java.util.Set.of("ACTIVE", "INACTIVE", "DRAFT").contains(status)) throw new com.nbh.erp.common.exception.BusinessException("Choose Active or Inactive");
+        DeliveryRoute route = routeRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("DeliveryRoute", "id", id));
+        SecurityUtils.enforceCanEdit("DELIVERY", "Delivery Route: " + route.getRouteName());
+        route.requireNotDeleted();
+        route.setStatus(status);
+        route.setIsActive("ACTIVE".equals(status));
+        routeRepository.save(route);
+        auditLogService.log("DELIVERY_ROUTE_STATUS", "DeliveryRoute", route.getRouteCode(), "Status changed to " + status + ". Reason: " + reason);
+        return getRouteById(id);
     }
 
     @Transactional

@@ -34,7 +34,11 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final com.nbh.erp.auth.repository.RefreshSessionRepository refreshSessions;
     private final SessionActivityService sessionActivity;
+    private static final String LOGIN_FAILURE = "Invalid username or password";
+    private static final String DUMMY_HASH = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+            .encode(java.util.UUID.randomUUID().toString());
     private final com.nbh.erp.role.repository.PermissionRepository permissionRepository;
+    private final LoginProtection loginProtection;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -139,45 +143,28 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         String usernameOrEmail = request.getUsername() != null ? request.getUsername().trim() : "";
 
-        // Pre-check user status using single fetch join query to provide specific error messages
-        User candidateUser = userRepository.findByUsernameOrEmailWithRolesAndPermissions(usernameOrEmail)
-                .orElse(null);
-
-        if (candidateUser == null) {
-            throw new BusinessException("Username is incorrect.");
+        User candidateUser = userRepository.findByUsernameOrEmailWithRolesAndPermissions(usernameOrEmail).orElse(null);
+        // The immutable ID unifies email, username and MySQL's case-insensitive aliases.
+        String accountKey = candidateUser != null ? "user:" + candidateUser.getId() : null;
+        // Unknown names still receive the same dummy hash/failure, but cannot fill the account cache.
+        boolean allowed = candidateUser != null && loginProtection.beginAccount(accountKey);
+        if (!allowed || candidateUser == null || !UserPrincipal.create(candidateUser).isEnabled()) {
+            passwordEncoder.matches(request.getPassword(), DUMMY_HASH);
+            log.info("login outcome=denied");
+            throw new org.springframework.security.authentication.BadCredentialsException(LOGIN_FAILURE);
         }
 
-        boolean isSuperAdmin = "admin".equalsIgnoreCase(candidateUser.getUsername()) ||
-                (candidateUser.getRoles() != null && candidateUser.getRoles().stream().anyMatch(r ->
-                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
-
-        if (!isSuperAdmin) {
-            if ("PENDING".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                throw new BusinessException("Your account is pending administrator approval. Please contact your system admin.");
-            }
-            if ("REJECTED".equalsIgnoreCase(candidateUser.getApprovalStatus())) {
-                throw new BusinessException("Your account registration request has been rejected. Please contact support.");
-            }
-            if (Boolean.FALSE.equals(candidateUser.getIsActive())) {
-                throw new BusinessException("Your account is deactivated. Please contact an administrator.");
-            }
-        } else {
-            // Self-heal: ensure super admin is permanently active and approved in DB
-            if (!Boolean.TRUE.equals(candidateUser.getIsActive()) || !"APPROVED".equals(candidateUser.getApprovalStatus())) {
-                candidateUser.setIsActive(true);
-                candidateUser.setApprovalStatus("APPROVED");
-                userRepository.save(candidateUser);
-                log.info("Auto-restored active and approved status for super administrator '{}'", candidateUser.getUsername());
-            }
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(candidateUser.getUsername(), request.getPassword()));
+        } catch (org.springframework.security.authentication.BadCredentialsException |
+                 org.springframework.security.authentication.AccountStatusException ex) {
+            log.info("login outcome=denied");
+            throw new org.springframework.security.authentication.BadCredentialsException(LOGIN_FAILURE);
         }
-
-        if (!passwordEncoder.matches(request.getPassword(), candidateUser.getPassword())) {
-            throw new BusinessException("Password is incorrect.");
-        }
-
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(candidateUser.getUsername(), request.getPassword())
-        );
+        loginProtection.success(accountKey);
+        log.info("login outcome=success accountId={}", candidateUser.getId());
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
@@ -185,18 +172,8 @@ public class AuthService {
         String refreshToken = newRefreshSession(userPrincipal);
         String accessToken = tokenProvider.generateAccessToken(authentication, tokenProvider.claims(refreshToken).get("sid", String.class));
 
-        isSuperAdmin = "admin".equalsIgnoreCase(userPrincipal.getUsername()) ||
-                userPrincipal.getAuthorities().stream().anyMatch(a ->
-                        "ROLE_SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()) || "SUPER_ADMIN".equalsIgnoreCase(a.getAuthority()));
-
-        List<String> roles = new ArrayList<>(userPrincipal.getRoles());
-        if (isSuperAdmin && !roles.contains("ROLE_SUPER_ADMIN")) {
-            roles.add("ROLE_SUPER_ADMIN");
-        }
-
-        List<String> permissions = isSuperAdmin
-                ? permissionRepository.findAll().stream().map(com.nbh.erp.role.entity.Permission::getName).distinct().collect(Collectors.toList())
-                : userPrincipal.getPermissions();
+        List<String> roles = userPrincipal.getRoles();
+        List<String> permissions = userPrincipal.getPermissions();
 
         return LoginResponse.builder()
                 .accessToken(accessToken)

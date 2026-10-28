@@ -39,11 +39,17 @@ public interface CustomerRepository extends com.nbh.erp.common.repository.Recycl
         }
     }
 
-    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId))")
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId)) AND NOT EXISTS (SELECT other.id FROM Customer owner JOIN owner.customerGroups other WHERE owner.id=c.id AND other.assignedStaff IS NOT NULL AND other.assignedStaff.id<>:staffId) AND (primaryGroup.assignedStaff IS NULL OR primaryGroup.assignedStaff.id=:staffId)")
     List<Customer> findAssignedPosCustomers(@Param("staffId") Long staffId);
 
-    @Query("SELECT CASE WHEN COUNT(DISTINCT c.id) > 0 THEN true ELSE false END FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.id = :customerId AND c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId))")
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.isActive = true AND c.deletedAt IS NULL AND c.deliveryRoute.id = :routeId AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId)) AND NOT EXISTS (SELECT other.id FROM Customer owner JOIN owner.customerGroups other WHERE owner.id=c.id AND other.assignedStaff IS NOT NULL AND other.assignedStaff.id<>:staffId) AND (primaryGroup.assignedStaff IS NULL OR primaryGroup.assignedStaff.id=:staffId)")
+    List<Customer> findAssignedPosCustomersByRoute(@Param("staffId") Long staffId, @Param("routeId") Long routeId);
+
+    @Query("SELECT CASE WHEN COUNT(DISTINCT c.id) > 0 THEN true ELSE false END FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.id = :customerId AND c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId)) AND NOT EXISTS (SELECT other.id FROM Customer owner JOIN owner.customerGroups other WHERE owner.id=c.id AND other.assignedStaff IS NOT NULL AND other.assignedStaff.id<>:staffId) AND (primaryGroup.assignedStaff IS NULL OR primaryGroup.assignedStaff.id=:staffId)")
     boolean isAssignedPosCustomer(@Param("customerId") Long customerId,@Param("staffId") Long staffId);
+
+    @Query("SELECT CASE WHEN COUNT(DISTINCT c.id) > 0 THEN true ELSE false END FROM Customer c LEFT JOIN c.customerGroups g LEFT JOIN c.customerGroup primaryGroup WHERE c.id = :customerId AND c.deliveryRoute.id = :routeId AND c.isActive = true AND c.deletedAt IS NULL AND ((g.isActive = true AND g.assignedStaff.id = :staffId) OR (primaryGroup.isActive = true AND primaryGroup.assignedStaff.id = :staffId)) AND NOT EXISTS (SELECT other.id FROM Customer owner JOIN owner.customerGroups other WHERE owner.id=c.id AND other.assignedStaff IS NOT NULL AND other.assignedStaff.id<>:staffId) AND (primaryGroup.assignedStaff IS NULL OR primaryGroup.assignedStaff.id=:staffId)")
+    boolean isAssignedPosCustomerForRoute(@Param("customerId") Long customerId, @Param("staffId") Long staffId, @Param("routeId") Long routeId);
 
     Optional<Customer> findByCustomerCode(String customerCode);
     boolean existsByCustomerCode(String customerCode);
@@ -52,6 +58,15 @@ public interface CustomerRepository extends com.nbh.erp.common.repository.Recycl
 
     @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g WHERE c.isActive = true AND (g.id = :customerGroupId OR c.customerGroup.id = :customerGroupId)")
     List<Customer> findByCustomerGroupId(@Param("customerGroupId") Long customerGroupId);
+
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN c.customerGroups g WHERE c.deletedAt IS NULL AND (g.id = :groupId OR c.customerGroup.id = :groupId)")
+    List<Customer> findAllGroupMembers(@Param("groupId") Long groupId);
+
+    @Query("SELECT DISTINCT g.assignedStaff.id FROM Customer c JOIN c.customerGroups g WHERE c.id=:customerId AND g.assignedStaff IS NOT NULL AND (:excludedGroup IS NULL OR g.id<>:excludedGroup)")
+    List<Long> findMappedStaffIds(@Param("customerId") Long customerId,@Param("excludedGroup") Long excludedGroup);
+
+    @Query("SELECT c.customerGroup.assignedStaff.id FROM Customer c WHERE c.id=:customerId AND c.customerGroup.assignedStaff IS NOT NULL AND (:excludedGroup IS NULL OR c.customerGroup.id<>:excludedGroup)")
+    List<Long> findPrimaryStaffIds(@Param("customerId") Long customerId,@Param("excludedGroup") Long excludedGroup);
 
     List<Customer> findByDeliveryRouteIdAndIsActiveTrue(Long deliveryRouteId);
 

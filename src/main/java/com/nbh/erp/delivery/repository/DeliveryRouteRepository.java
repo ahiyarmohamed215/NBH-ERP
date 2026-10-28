@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface DeliveryRouteRepository extends JpaRepository<DeliveryRoute, Long> {
+public interface DeliveryRouteRepository extends com.nbh.erp.common.repository.RecyclableRepository<DeliveryRoute> {
     Optional<DeliveryRoute> findByRouteCode(String routeCode);
     boolean existsByRouteCode(String routeCode);
     List<DeliveryRoute> findByIsActiveTrue();

@@ -83,7 +83,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
         String reqId = RequestIdFilter.getCurrentRequestId();
-        log.warn("[{}] Authentication failure: {}", reqId, ex.getMessage());
+        log.warn("[{}] Authentication failure", reqId);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error("Invalid username or password", "INVALID_CREDENTIALS", reqId));
     }

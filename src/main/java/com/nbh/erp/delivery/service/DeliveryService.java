@@ -4,6 +4,7 @@ import com.nbh.erp.audit.service.AuditLogService;
 import com.nbh.erp.common.exception.BusinessException;
 import com.nbh.erp.common.exception.ResourceNotFoundException;
 import com.nbh.erp.delivery.dto.CreateDeliveryRequest;
+import com.nbh.erp.delivery.dto.RescheduleDeliveryRequest;
 import com.nbh.erp.delivery.dto.DeliveryDto;
 import com.nbh.erp.delivery.dto.DeliverySummaryDto;
 import com.nbh.erp.delivery.dto.UpdateDeliveryStatusRequest;
@@ -74,62 +75,121 @@ public class DeliveryService {
 
     @Transactional
     public DeliveryDto createDelivery(CreateDeliveryRequest req) {
-        var ticket=idempotency.reserve("createDelivery",req);
-        if(ticket!=null && ticket.getResourceId()!=null) return getDeliveryById(ticket.getResourceId());
+        var ticket = idempotency.reserve("createDelivery", req);
+        if (ticket != null && ticket.getResourceId() != null) return getDeliveryById(ticket.getResourceId());
 
-        // Validation: Two assigned staff members are required
-        if (req.getDriverId().equals(req.getAssistantStaffId())) {
+        boolean isDraft = req.isDraft();
+
+        if (isDraft) {
+            boolean hasAny = req.getWarehouseId() != null
+                    || req.getRouteId() != null
+                    || req.getVehicleId() != null
+                    || req.getDriverId() != null
+                    || req.getAssistantStaffId() != null
+                    || req.getScheduledDate() != null
+                    || (req.getNotes() != null && !req.getNotes().trim().isEmpty())
+                    || req.getStartOdometer() != null
+                    || (req.getInvoiceIds() != null && !req.getInvoiceIds().isEmpty())
+                    || (req.getSpecialInvoiceIds() != null && !req.getSpecialInvoiceIds().isEmpty());
+            if (!hasAny) {
+                throw new BusinessException("Fill at least one input before saving a delivery draft");
+            }
+        } else {
+            if (req.getDriverId() == null || req.getAssistantStaffId() == null) {
+                throw new BusinessException("Primary driver and assistant staff are required");
+            }
+            if (req.getScheduledDate() == null) {
+                throw new BusinessException("Scheduled date is required");
+            }
+            if (req.getInvoiceIds() == null || req.getInvoiceIds().isEmpty()) {
+                throw new BusinessException("At least one valid invoice must be selected for delivery");
+            }
+        }
+
+        if (req.getDriverId() != null && req.getAssistantStaffId() != null && req.getDriverId().equals(req.getAssistantStaffId())) {
             throw new BusinessException("Primary driver and assistant staff must be two different staff members");
         }
 
-        for (Long staffId : java.util.stream.Stream.of(req.getDriverId(), req.getAssistantStaffId()).sorted().toList()) {
-            userRepository.findByIdForUpdate(staffId).orElseThrow(() -> new BusinessException("Unknown staff member"));
-            if (deliveryRepository.activeTripsForStaff(staffId) > 0) throw new BusinessException("Staff member is already assigned to an active trip");
+        User driver = null;
+        if (req.getDriverId() != null) {
+            if (!isDraft) {
+                userRepository.findByIdForUpdate(req.getDriverId()).orElseThrow(() -> new BusinessException("Unknown staff member"));
+                if (deliveryRepository.activeTripsForStaff(req.getDriverId()) > 0) throw new BusinessException("Staff member is already assigned to an active trip");
+            }
+            driver = userRepository.findById(req.getDriverId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User (Driver)", "id", req.getDriverId()));
+            if (!isDraft && !Boolean.TRUE.equals(driver.getIsActive())) throw new BusinessException("Assigned staff must be active");
         }
-        User driver = userRepository.findById(req.getDriverId())
-                .orElseThrow(() -> new ResourceNotFoundException("User (Driver)", "id", req.getDriverId()));
 
-        User assistantStaff = userRepository.findById(req.getAssistantStaffId())
-                .orElseThrow(() -> new ResourceNotFoundException("User (Assistant Staff)", "id", req.getAssistantStaffId()));
+        User assistantStaff = null;
+        if (req.getAssistantStaffId() != null) {
+            if (!isDraft) {
+                userRepository.findByIdForUpdate(req.getAssistantStaffId()).orElseThrow(() -> new BusinessException("Unknown staff member"));
+                if (deliveryRepository.activeTripsForStaff(req.getAssistantStaffId()) > 0) throw new BusinessException("Staff member is already assigned to an active trip");
+            }
+            assistantStaff = userRepository.findById(req.getAssistantStaffId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User (Assistant Staff)", "id", req.getAssistantStaffId()));
+            if (!isDraft && !Boolean.TRUE.equals(assistantStaff.getIsActive())) throw new BusinessException("Assigned staff must be active");
+        }
 
         Vehicle vehicle = null;
         if (req.getVehicleId() != null) {
             vehicle = vehicleRepository.findByIdForUpdate(req.getVehicleId()).orElse(null);
+            if (vehicle == null) throw new BusinessException("Unknown vehicle");
+            if (!isDraft && (!Boolean.TRUE.equals(vehicle.getIsActive()) || !"AVAILABLE".equals(vehicle.getStatus()))) {
+                throw new BusinessException("Vehicle is not available");
+            }
         }
 
         DeliveryRoute route = null;
         if (req.getRouteId() != null) {
             route = routeRepository.findById(req.getRouteId()).orElse(null);
+            if (route == null) throw new BusinessException("Unknown route");
+            if (!isDraft && (route.isDeleted() || !Boolean.TRUE.equals(route.getIsActive()))) {
+                throw new BusinessException("Route is not available");
+            }
         }
 
         Warehouse warehouse = null;
         if (req.getWarehouseId() != null) {
             warehouse = warehouseRepository.findById(req.getWarehouseId()).orElse(null);
+            if (warehouse == null) throw new BusinessException("Unknown warehouse");
         }
 
-        // Validate invoices
-        List<Invoice> selectedInvoices = req.getInvoiceIds().stream().distinct().sorted().map(id -> invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new BusinessException("Unknown invoice: " + id))).toList();
-        if (selectedInvoices.isEmpty()) {
-            throw new BusinessException("At least one valid invoice must be selected for delivery");
-        }
-
-        for (Invoice inv : selectedInvoices) {
-            com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
-            if (!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) || inv.getDelivery() != null) {
-                throw new BusinessException(String.format("Invoice '%s' is already in transit under delivery trip '%s'",
-                        inv.getInvoiceNumber(), inv.getDelivery()!=null ? inv.getDelivery().getDeliveryNumber() : "ineligible"));
+        List<Invoice> selectedInvoices = List.of();
+        if (req.getInvoiceIds() != null && !req.getInvoiceIds().isEmpty()) {
+            selectedInvoices = req.getInvoiceIds().stream().distinct().sorted()
+                    .map(id -> invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new BusinessException("Unknown invoice: " + id)))
+                    .toList();
+            if (warehouse == null && selectedInvoices.get(0).getWarehouse() != null) {
+                warehouse = selectedInvoices.get(0).getWarehouse();
+            }
+            for (Invoice inv : selectedInvoices) {
+                com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
+                if (!isDraft && (!com.nbh.erp.sales.service.InvoiceBalances.POSTED.contains(inv.getStatus()) || inv.getDelivery() != null)) {
+                    throw new BusinessException(String.format("Invoice '%s' is already in transit under delivery trip '%s'",
+                            inv.getInvoiceNumber(), inv.getDelivery() != null ? inv.getDelivery().getDeliveryNumber() : "ineligible"));
+                }
+            }
+            if (req.getWarehouseId() != null && warehouse != null && !isDraft) {
+                for (Invoice inv : selectedInvoices) {
+                    if (!warehouse.getId().equals(inv.getWarehouse().getId())) throw new BusinessException("Invoice warehouse does not match trip");
+                }
             }
         }
 
-        if(!Boolean.TRUE.equals(driver.getIsActive()) || !Boolean.TRUE.equals(assistantStaff.getIsActive())) throw new BusinessException("Assigned staff must be active");
-        if(vehicle!=null && (!Boolean.TRUE.equals(vehicle.getIsActive()) || !"AVAILABLE".equals(vehicle.getStatus()))) throw new BusinessException("Vehicle is not available");
-        if(req.getVehicleId()!=null && vehicle==null || req.getRouteId()!=null && route==null || req.getWarehouseId()!=null && warehouse==null) throw new BusinessException("Unknown vehicle, route, or warehouse");
-        if(warehouse!=null) for(Invoice inv:selectedInvoices) if(!warehouse.getId().equals(inv.getWarehouse().getId())) throw new BusinessException("Invoice warehouse does not match trip");
-        String deliveryNumber=sequences.getNextNumber("DEL");
-
+        String deliveryNumber = sequences.getNextNumber("DEL");
         BigDecimal totalAmount = selectedInvoices.stream()
                 .map(Invoice::getNetTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        String specialInvoiceIds = null;
+        if (req.getSpecialInvoiceIds() != null && !req.getSpecialInvoiceIds().isEmpty()) {
+            specialInvoiceIds = req.getSpecialInvoiceIds().stream()
+                    .distinct()
+                    .map(String::valueOf)
+                    .collect(java.util.stream.Collectors.joining(","));
+        }
 
         Delivery delivery = Delivery.builder()
                 .deliveryNumber(deliveryNumber)
@@ -142,40 +202,40 @@ public class DeliveryService {
                 .scheduledDate(req.getScheduledDate())
                 .departureTime(req.getDepartureTime())
                 .returnTime(req.getReturnTime())
-                .status("SCHEDULED")
+                .status(isDraft ? "DRAFT" : "SCHEDULED")
                 .totalInvoicesCount(selectedInvoices.size())
                 .totalAmount(totalAmount)
                 .startOdometer(req.getStartOdometer())
                 .endOdometer(req.getEndOdometer())
                 .gpsTrackingCode(req.getGpsTrackingCode())
                 .notes(req.getNotes())
+                .specialInvoiceIds(specialInvoiceIds)
                 .build();
 
         Delivery saved = deliveryRepository.save(delivery);
 
-        // Update assigned invoices
-        for (Invoice inv : selectedInvoices) {
-            com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
-            inv.setDelivery(saved);
-            inv.setDeliveryStatus("OUT_FOR_DELIVERY");
-            invoiceRepository.save(inv);
-        }
-
-        if (vehicle != null) {
-            vehicle.setStatus("ON_DELIVERY");
-            vehicleRepository.save(vehicle);
+        if (!isDraft) {
+            for (Invoice inv : selectedInvoices) {
+                com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer());
+                inv.setDelivery(saved);
+                inv.setDeliveryStatus("OUT_FOR_DELIVERY");
+                invoiceRepository.save(inv);
+            }
+            if (vehicle != null) {
+                vehicle.setStatus("ON_DELIVERY");
+                vehicleRepository.save(vehicle);
+            }
         }
 
         auditLogService.log(
-                "DELIVERY_CREATE",
+                isDraft ? "DELIVERY_DRAFT_CREATE" : "DELIVERY_CREATE",
                 "Delivery",
                 saved.getDeliveryNumber(),
-                String.format("Delivery trip '%s' created with %d invoices (Driver: %s, Assistant: %s)",
-                        saved.getDeliveryNumber(), selectedInvoices.size(), driver.getUsername(), assistantStaff.getUsername())
+                String.format("Delivery trip '%s' created (Status: %s)", saved.getDeliveryNumber(), saved.getStatus())
         );
 
         saved.setInvoices(selectedInvoices);
-        return idempotency.complete(ticket,saved.getId(),DeliveryDto.from(saved,true));
+        return idempotency.complete(ticket, saved.getId(), DeliveryDto.from(saved, true));
     }
 
     @Transactional
@@ -191,7 +251,7 @@ public class DeliveryService {
             throw new BusinessException("Delivery trip has already been completed");
         }
 
-        if(!"SCHEDULED".equals(delivery.getStatus())) throw new BusinessException("Only scheduled trips can be dispatched");
+        if(!"SCHEDULED".equals(delivery.getStatus()) && !"RESCHEDULED".equals(delivery.getStatus())) throw new BusinessException("Only scheduled or rescheduled trips can be dispatched");
         LocalDateTime departTime = (req != null && req.getDepartureTime() != null)
                 ? req.getDepartureTime()
                 : (delivery.getDepartureTime() != null ? delivery.getDepartureTime() : LocalDateTime.now());
@@ -206,7 +266,7 @@ public class DeliveryService {
             delivery.setNotes(req.getNotes());
         }
 
-        if (delivery.getVehicle() != null) {
+        if (delivery.getVehicle() != null && !delivery.getVehicle().isDeleted()) {
             delivery.getVehicle().setStatus("ON_DELIVERY");
             vehicleRepository.save(delivery.getVehicle());
         }
@@ -262,7 +322,7 @@ public class DeliveryService {
             delivery.setGpsLastLocation(req.getGpsLastLocation());
         }
 
-        if (delivery.getVehicle() != null) {
+        if (delivery.getVehicle() != null && !delivery.getVehicle().isDeleted()) {
             delivery.getVehicle().setStatus("AVAILABLE");
             vehicleRepository.save(delivery.getVehicle());
         }
@@ -288,6 +348,57 @@ public class DeliveryService {
     }
 
     @Transactional
+    public DeliveryDto rescheduleDelivery(Long id, RescheduleDeliveryRequest req) {
+        Delivery delivery = deliveryRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
+        delivery.getInvoices().forEach(inv -> com.nbh.erp.customer.repository.CustomerRepository.requireActive(inv.getCustomer()));
+
+        if ("CANCELLED".equalsIgnoreCase(delivery.getStatus())) {
+            throw new BusinessException("Cannot reschedule a cancelled delivery trip");
+        }
+        if ("DELIVERED".equalsIgnoreCase(delivery.getStatus())) {
+            throw new BusinessException("Cannot reschedule an already completed delivery trip");
+        }
+        if ("IN_TRANSIT".equalsIgnoreCase(delivery.getStatus())) {
+            throw new BusinessException("Cannot reschedule a trip that is already in transit");
+        }
+
+        if (req == null || req.getNewScheduledDate() == null) {
+            throw new BusinessException("New scheduled date is required");
+        }
+        if (req.getReason() == null || req.getReason().trim().isEmpty()) {
+            throw new BusinessException("Reason for rescheduling is required");
+        }
+
+        delivery.setStatus("RESCHEDULED");
+        delivery.setRescheduleReason(req.getReason().trim());
+        delivery.setRescheduledDate(req.getNewScheduledDate());
+        delivery.setRescheduledAt(LocalDateTime.now());
+        delivery.setScheduledDate(req.getNewScheduledDate());
+
+        if (req.getNotes() != null && !req.getNotes().trim().isEmpty()) {
+            delivery.setNotes(req.getNotes().trim());
+        }
+
+        if (delivery.getVehicle() != null && !delivery.getVehicle().isDeleted()) {
+            delivery.getVehicle().setStatus("AVAILABLE");
+            vehicleRepository.save(delivery.getVehicle());
+        }
+
+        Delivery saved = deliveryRepository.save(delivery);
+
+        auditLogService.log(
+                "DELIVERY_RESCHEDULE",
+                "Delivery",
+                saved.getDeliveryNumber(),
+                String.format("Delivery trip '%s' rescheduled to %s. Reason: %s",
+                        saved.getDeliveryNumber(), req.getNewScheduledDate(), req.getReason().trim())
+        );
+
+        return DeliveryDto.from(saved, true);
+    }
+
+    @Transactional
     public DeliveryDto cancelDelivery(Long id, UpdateDeliveryStatusRequest req) {
         Delivery delivery = deliveryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery", "id", id));
@@ -304,7 +415,7 @@ public class DeliveryService {
                 ? req.getCancellationReason()
                 : "Cancelled by distribution controller");
 
-        if (delivery.getVehicle() != null) {
+        if (delivery.getVehicle() != null && !delivery.getVehicle().isDeleted()) {
             delivery.getVehicle().setStatus("AVAILABLE");
             vehicleRepository.save(delivery.getVehicle());
         }
@@ -335,6 +446,7 @@ public class DeliveryService {
         long inTransit = deliveryRepository.countByStatus("IN_TRANSIT");
         long delivered = deliveryRepository.countByStatus("DELIVERED");
         long cancelled = deliveryRepository.countByStatus("CANCELLED");
+        long rescheduled = deliveryRepository.countByStatus("RESCHEDULED");
         long today = deliveryRepository.countByScheduledDate(LocalDate.now());
 
         long pendingInvoices = invoiceRepository.findAll().stream()
@@ -352,6 +464,7 @@ public class DeliveryService {
                 .inTransitCount(inTransit)
                 .deliveredCount(delivered)
                 .cancelledCount(cancelled)
+                .rescheduledCount(rescheduled)
                 .todayDeliveriesCount(today)
                 .pendingInvoicesForDeliveryCount(pendingInvoices)
                 .totalDeliveredAmount(deliveredAmount)

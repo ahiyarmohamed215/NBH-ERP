@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,13 +69,22 @@ public class Quotation extends BaseEntity {
 
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private String status = "PENDING"; // PENDING, ACCEPTED, REJECTED, CONVERTED, EXPIRED
+    private String status = "PENDING"; // PENDING, ACCEPTED, REJECTED, CONVERTED, CANCELLED, EXPIRED
 
     @Column(name = "converted_invoice_id")
     private Long convertedInvoiceId;
 
     @Column(name = "converted_invoice_number", length = 50)
     private String convertedInvoiceNumber;
+
+    @Column(name = "cancel_reason", length = 1000)
+    private String cancelReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_by", length = 100)
+    private String cancelledBy;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

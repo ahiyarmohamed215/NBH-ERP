@@ -1,6 +1,5 @@
 package com.nbh.erp.brand.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,9 +17,4 @@ public class UpdateBrandRequest {
 
     @jakarta.validation.constraints.Size(max=5000)
     private String description;
-
-    @jakarta.validation.constraints.DecimalMin(value = "0", message = "MP% cannot be negative")
-    @jakarta.validation.constraints.DecimalMax(value = "99999", message = "MP% must not exceed 99999")
-    @jakarta.validation.constraints.Digits(integer=5,fraction=4)
-    private java.math.BigDecimal markupPercent;
 }

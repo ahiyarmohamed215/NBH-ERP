@@ -50,15 +50,15 @@ public class Delivery extends BaseEntity {
 
     // Two Assigned Staff Members
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "driver_id", nullable = false)
+    @JoinColumn(name = "driver_id")
     private User driver; // Staff 1: Driver / Lead Dispatcher
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assistant_staff_id", nullable = false)
+    @JoinColumn(name = "assistant_staff_id")
     private User assistantStaff; // Staff 2: Delivery Assistant / Helper
 
     // Journey Timings
-    @Column(name = "scheduled_date", nullable = false)
+    @Column(name = "scheduled_date")
     private LocalDate scheduledDate;
 
     @Column(name = "departure_time")
@@ -103,6 +103,18 @@ public class Delivery extends BaseEntity {
 
     @Column(name = "cancellation_date")
     private LocalDateTime cancellationDate;
+
+    @Column(name = "reschedule_reason", columnDefinition = "TEXT")
+    private String rescheduleReason;
+
+    @Column(name = "rescheduled_date")
+    private LocalDate rescheduledDate;
+
+    @Column(name = "rescheduled_at")
+    private LocalDateTime rescheduledAt;
+
+    @Column(name = "special_invoice_ids", columnDefinition = "TEXT")
+    private String specialInvoiceIds;
 
     @OneToMany(mappedBy = "delivery")
     @Builder.Default

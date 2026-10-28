@@ -34,21 +34,23 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
 
     long countByStatusAndScheduledDate(String status, LocalDate scheduledDate);
 
-    @Query("SELECT d FROM Delivery d WHERE " +
+    @Query("SELECT d FROM Delivery d " +
+            "LEFT JOIN d.driver dr " +
+            "LEFT JOIN d.assistantStaff asst " +
+            "LEFT JOIN d.route r " +
+            "WHERE " +
             "(:status IS NULL OR :status = '' OR d.status = :status) AND " +
-            "(:routeId IS NULL OR (d.route IS NOT NULL AND d.route.id = :routeId)) AND " +
+            "(:routeId IS NULL OR (r IS NOT NULL AND r.id = :routeId)) AND " +
             "(:vehicleId IS NULL OR (d.vehicle IS NOT NULL AND d.vehicle.id = :vehicleId)) AND " +
             "(:startDate IS NULL OR d.scheduledDate >= :startDate) AND " +
             "(:endDate IS NULL OR d.scheduledDate <= :endDate) AND " +
             "(:search IS NULL OR :search = '' OR " +
             "LOWER(d.deliveryNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(d.vehicleNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-            "LOWER(d.driver.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-            "LOWER(d.driver.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-            "LOWER(d.assistantStaff.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-            "LOWER(d.assistantStaff.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-            "(d.route IS NOT NULL AND LOWER(d.route.routeName) LIKE LOWER(CONCAT('%', :search, '%')))) " +
-            "ORDER BY d.createdAt DESC")
+            "(dr IS NOT NULL AND (LOWER(dr.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(dr.username) LIKE LOWER(CONCAT('%', :search, '%')))) OR " +
+            "(asst IS NOT NULL AND (LOWER(asst.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(asst.username) LIKE LOWER(CONCAT('%', :search, '%')))) OR " +
+            "(r IS NOT NULL AND LOWER(r.routeName) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+            "ORDER BY d.createdAt DESC, d.id DESC")
     List<Delivery> searchDeliveries(
             @Param("status") String status,
             @Param("routeId") Long routeId,

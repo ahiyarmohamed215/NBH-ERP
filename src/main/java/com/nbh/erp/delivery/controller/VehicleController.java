@@ -63,6 +63,26 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.ok("Vehicle updated successfully", updated));
     }
 
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
+    @Operation(summary = "Change delivery vehicle status with reason")
+    public ResponseEntity<ApiResponse<VehicleDto>> changeStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.delivery.dto.VehicleStatusRequest request) {
+        VehicleDto updated = vehicleService.changeStatus(id, request.status(), request.reason());
+        return ResponseEntity.ok(ApiResponse.ok("Vehicle status updated successfully", updated));
+    }
+
+    @PostMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
+    @Operation(summary = "Change delivery vehicle status with reason (POST alias)")
+    public ResponseEntity<ApiResponse<VehicleDto>> changeStatusPost(
+            @PathVariable Long id,
+            @Valid @RequestBody com.nbh.erp.delivery.dto.VehicleStatusRequest request) {
+        VehicleDto updated = vehicleService.changeStatus(id, request.status(), request.reason());
+        return ResponseEntity.ok(ApiResponse.ok("Vehicle status updated successfully", updated));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','DELIVERY_MANAGE')")
     @Operation(summary = "Deactivate a delivery vehicle")

@@ -144,6 +144,7 @@ public class ProductService {
                 .unitOfMeasure(StringUtils.hasText(request.getUnitOfMeasure()) ? request.getUnitOfMeasure().trim().toUpperCase() : "PCS")
                 .costPrice(request.getCostPrice() != null ? request.getCostPrice() : BigDecimal.ZERO)
                 .sellingPrice(request.getSellingPrice() != null ? request.getSellingPrice() : BigDecimal.ZERO)
+                .markupPercent(request.getMarkupPercent() != null ? request.getMarkupPercent() : BigDecimal.ZERO)
                 .useBrandMarkup(request.getUseBrandMarkup() != null ? request.getUseBrandMarkup()
                         : request.getSellingPrice() == null || request.getSellingPrice().signum() == 0)
                 .minStockLevel(request.getMinStockLevel() != null ? request.getMinStockLevel() : 5)
@@ -229,6 +230,9 @@ public class ProductService {
         if (request.getSellingPrice() != null) {
             product.setSellingPrice(request.getSellingPrice());
             if (request.getUseBrandMarkup() == null) product.setUseBrandMarkup(request.getSellingPrice().signum() == 0);
+        }
+        if (request.getMarkupPercent() != null) {
+            product.setMarkupPercent(request.getMarkupPercent());
         }
         if (request.getUseBrandMarkup() != null) product.setUseBrandMarkup(request.getUseBrandMarkup());
         if (request.getMinStockLevel() != null) {

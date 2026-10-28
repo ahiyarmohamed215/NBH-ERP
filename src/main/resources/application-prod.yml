@@ -1,0 +1,78 @@
+# Activate with SPRING_PROFILES_ACTIVE=prod. Local application.yml stays unchanged.
+server:
+  address: 127.0.0.1
+  port: 8080
+  shutdown: graceful
+  # Only NGINX on loopback may supply forwarded headers; keep 8080 private.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: '127\.0\.0\.1|0:0:0:0:0:0:0:1|::1'
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    # Use the RDS DNS endpoint, not its IP: VERIFY_IDENTITY checks the hostname.
+    url: jdbc:mysql://${RDS_HOST}:${RDS_PORT:3306}/${DB_NAME}?sslMode=VERIFY_IDENTITY&allowPublicKeyRetrieval=false&createDatabaseIfNotExist=false&serverTimezone=UTC&connectTimeout=5000&socketTimeout=${DB_SOCKET_TIMEOUT_MS:60000}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      pool-name: erp-runtime
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:10}
+      minimum-idle: ${HIKARI_MIN_IDLE:2}
+      connection-timeout: 5000
+      validation-timeout: 2000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      keepalive-time: 120000
+      # Five-second development leak warnings can be noisy for reports.
+      leak-detection-threshold: 0
+      data-source-properties:
+        trustCertificateKeyStoreUrl: ${DB_SSL_TRUSTSTORE_URL}
+        trustCertificateKeyStoreType: PKCS12
+        trustCertificateKeyStorePassword: ${DB_SSL_TRUSTSTORE_PASSWORD}
+        fallbackToSystemTrustStore: false
+  flyway:
+    enabled: true
+    url: ${spring.datasource.url}
+    user: ${FLYWAY_USERNAME}
+    password: ${FLYWAY_PASSWORD}
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    clean-disabled: true
+    create-schemas: false
+    out-of-order: false
+    jdbc-properties:
+      trustCertificateKeyStoreUrl: ${DB_SSL_TRUSTSTORE_URL}
+      trustCertificateKeyStoreType: PKCS12
+      trustCertificateKeyStorePassword: ${DB_SSL_TRUSTSTORE_PASSWORD}
+      fallbackToSystemTrustStore: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  jwt:
+    # No development-key fallback in production. Existing token lifetimes apply.
+    secret: ${JWT_SECRET}
+  security:
+    cookie:
+      secure: true
+      same-site: Lax
+
+logging:
+  level:
+    root: INFO
+    com.nbh.erp: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: 'OFF'
+    org.hibernate.orm.jdbc.bind: 'OFF'
+    com.zaxxer.hikari: INFO
+    org.flywaydb: INFO
+# Console logs are collected by systemd/journald; configure retention on EC2.

@@ -17,6 +17,7 @@ public class DeliverySummaryDto {
     private long inTransitCount; // On Route
     private long deliveredCount;
     private long cancelledCount;
+    private long rescheduledCount;
     private long todayDeliveriesCount;
     private long pendingInvoicesForDeliveryCount;
     private BigDecimal totalDeliveredAmount;

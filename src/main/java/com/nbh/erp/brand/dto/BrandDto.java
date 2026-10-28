@@ -18,7 +18,6 @@ public class BrandDto {
     private String code;
     private String name;
     private String description;
-    private java.math.BigDecimal markupPercent;
     private Boolean isActive;
     private String status;
     private LocalDateTime createdAt;
@@ -31,7 +30,6 @@ public class BrandDto {
                 .code(brand.getCode())
                 .name(brand.getName())
                 .description(brand.getDescription())
-                .markupPercent(brand.getMarkupPercent())
                 .isActive(brand.getIsActive())
                 .status(brand.getStatus())
                 .createdAt(brand.getCreatedAt())

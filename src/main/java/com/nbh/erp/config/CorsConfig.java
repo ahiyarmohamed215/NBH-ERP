@@ -16,7 +16,7 @@ import java.util.Set;
 @Configuration
 public class CorsConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://nbh-erp.vercel.app}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
     public Set<String> getAllowedOriginSet() {
@@ -30,7 +30,6 @@ public class CorsConfig {
             approvedOrigins.add("http://localhost:5173");
             approvedOrigins.add("http://localhost:3000");
             approvedOrigins.add("http://127.0.0.1:5173");
-            approvedOrigins.add("https://nbh-erp.vercel.app");
         }
         return approvedOrigins;
     }

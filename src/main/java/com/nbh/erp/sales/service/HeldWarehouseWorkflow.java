@@ -30,7 +30,9 @@ public class HeldWarehouseWorkflow {
         public SendRequest(Long version,String staff){this(version,staff,true);}
     }
     public record ReviewLine(Long itemId,BigDecimal approvedQuantity,BigDecimal physicalStock) {}
-    public record ReviewRequest(Long expectedVersion,String remarks,List<ReviewLine> items) {}
+    public record ReviewRequest(Long expectedVersion,String remarks,List<ReviewLine> items,Map<Long,com.nbh.erp.sales.dto.InvoicePacking> warehousePacking) {
+        public ReviewRequest(Long version,String remarks,List<ReviewLine> items){this(version,remarks,items,null);}
+    }
 
     public void access(Invoice bill){
         com.nbh.erp.customer.repository.CustomerRepository.requireActive(bill.getCustomer());
@@ -107,6 +109,18 @@ public class HeldWarehouseWorkflow {
             if(line.physicalStock()!=null)throw new BusinessException("Physical stock cannot be changed in Warehouse Review. Use Inventory Stock Adjustments.");
         }
         if(request.remarks()==null || request.remarks().isBlank() || request.remarks().length()>1000)throw new BusinessException("Enter warehouse review remarks, up to 1000 characters");
+        if(request.warehousePacking()!=null){
+            var warehouseIds=bill.getItems().stream().map(i->i.fulfillmentWarehouse().getId()).collect(java.util.stream.Collectors.toSet());
+            if(!request.warehousePacking().keySet().equals(warehouseIds))throw new BusinessException("Enter packing quantities for every bill warehouse");
+            for(var entry:request.warehousePacking().entrySet()){
+                if(entry.getValue()==null)throw new BusinessException("Enter packing quantities for every bill warehouse");
+                entry.getValue().validate();
+                boolean approved=bill.getItems().stream().anyMatch(i->i.fulfillmentWarehouse().getId().equals(entry.getKey()) && input.get(i.getId())!=null && input.get(i.getId()).approvedQuantity().signum()>0);
+                if(!approved && !entry.getValue().equals(new com.nbh.erp.sales.dto.InvoicePacking(0,0,0,0)))throw new BusinessException("Packing must be zero for a warehouse with no approved products");
+            }
+            var packing=com.nbh.erp.sales.dto.InvoicePacking.sum(request.warehousePacking().values());packing.validate();packing.applyTo(bill);
+            bill.getWarehousePacking().clear();request.warehousePacking().forEach((warehouse,value)->bill.getWarehousePacking().put(warehouse,WarehousePacking.from(value)));
+        }
         allocations.lockStaff(bill);
         var ordered=bill.getItems().stream().sorted(Comparator.comparing((InvoiceItem i)->i.fulfillmentWarehouse().getId()).thenComparing(i->i.getProduct().getId())).toList();
         boolean reserved=Boolean.TRUE.equals(bill.getStockReserved());
@@ -118,8 +132,12 @@ public class HeldWarehouseWorkflow {
             if(item.getQuantity().compareTo(line.approvedQuantity())!=0)
                 changes.add(item.getProduct().getSku()+" / "+item.fulfillmentWarehouse().getCode()+": "+item.getQuantity().toPlainString()+" -> "+line.approvedQuantity().toPlainString());
             BigDecimal approved=line.approvedQuantity();
-            BigDecimal discount=item.getQuantity().signum()==0?BigDecimal.ZERO:item.getDiscountAmount().multiply(approved).divide(item.getQuantity(),2,RoundingMode.HALF_UP);
-            item.setQuantity(approved);item.setDiscountAmount(discount);item.setTotalPrice(approved.multiply(item.getUnitPrice()).subtract(discount));
+            BigDecimal gross=approved.multiply(item.getUnitPrice());
+            BigDecimal rate=item.getDiscountRate()!=null ? item.getDiscountRate() : BigDecimal.ZERO;
+            BigDecimal rateDiscount=rate.signum()>0 ? gross.multiply(rate).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            BigDecimal cashDiscount=item.getQuantity().signum()==0?BigDecimal.ZERO:item.getDiscountAmount().multiply(approved).divide(item.getQuantity(),2,RoundingMode.HALF_UP);
+            BigDecimal totalDiscount=rateDiscount.add(cashDiscount);
+            item.setQuantity(approved);item.setDiscountAmount(cashDiscount);item.setTotalPrice(gross.subtract(totalDiscount));
         }
         bill.getItems().removeIf(i->i.getQuantity().signum()==0);
         if(bill.getItems().isEmpty())throw new BusinessException("No approved products remain. Cancel the held bill instead.");

@@ -59,6 +59,12 @@ public class CreateProductRequest {
     @PositiveOrZero(message = "Selling price cannot be negative")
     @jakarta.validation.constraints.Digits(integer=36,fraction=2)
     private BigDecimal sellingPrice;
+
+    @jakarta.validation.constraints.DecimalMin(value = "0", message = "MP% cannot be negative")
+    @jakarta.validation.constraints.DecimalMax(value = "99999", message = "MP% must not exceed 99999")
+    @jakarta.validation.constraints.Digits(integer=5,fraction=4)
+    private BigDecimal markupPercent;
+
     private Boolean useBrandMarkup;
 
     @jakarta.validation.constraints.Min(0)

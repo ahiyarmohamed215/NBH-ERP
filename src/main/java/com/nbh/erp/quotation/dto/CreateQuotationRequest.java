@@ -29,6 +29,7 @@ public class CreateQuotationRequest {
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
 
+    private String status;
     private String notes;
     private String terms;
 

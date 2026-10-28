@@ -21,23 +21,26 @@ public class CreateDeliveryRequest {
     private Long routeId;
     private Long vehicleId;
 
-    @NotNull(message = "Primary driver (Staff 1) is required")
     private Long driverId;
 
-    @NotNull(message = "Delivery assistant / helper (Staff 2) is required")
     private Long assistantStaffId;
 
-    @NotNull(message = "Scheduled date is required")
     private LocalDate scheduledDate;
 
     private LocalDateTime departureTime;
     private LocalDateTime returnTime;
 
-    @NotEmpty(message = "At least one sales invoice must be selected for delivery")
     private List<Long> invoiceIds;
+    private List<Long> specialInvoiceIds;
 
     private Double startOdometer;
     private Double endOdometer;
     private String gpsTrackingCode;
     private String notes;
+    private Boolean isDraft;
+    private String status;
+
+    public boolean isDraft() {
+        return Boolean.TRUE.equals(isDraft) || "DRAFT".equalsIgnoreCase(status);
+    }
 }

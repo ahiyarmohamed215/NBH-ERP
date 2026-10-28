@@ -70,8 +70,9 @@ public class GrnService {
                 if (incoming.getNotes() != null) line.setNotes(incoming.getNotes());
             }
             line.setUseBrandMarkup(incoming.getUseBrandMarkup());
-            if (Boolean.TRUE.equals(incoming.getUseBrandMarkup())) {
-                BigDecimal markup = product.getBrand() != null ? product.getBrand().getMarkupPercent() : BigDecimal.ZERO;
+            if (Boolean.TRUE.equals(incoming.getUseBrandMarkup()) || incoming.getSellingPrice() == null) {
+                BigDecimal markup = incoming.getMarkupPercent() != null ? incoming.getMarkupPercent()
+                        : product.getMarkupPercent() != null ? product.getMarkupPercent() : BigDecimal.ZERO;
                 line.setMarkupPercent(markup);
                 line.setSellingPrice(line.getUnitCost().multiply(BigDecimal.ONE.add(markup.movePointLeft(2)))
                         .setScale(2, java.math.RoundingMode.HALF_UP));
@@ -461,6 +462,7 @@ public class GrnService {
             if (Boolean.TRUE.equals(item.getUseBrandMarkup())) product.setUseBrandMarkup(true);
             else if (item.getSellingPrice() != null) product.setUseBrandMarkup(false);
             if (item.getSellingPrice() != null) product.setSellingPrice(item.getSellingPrice());
+            if (item.getMarkupPercent() != null) product.setMarkupPercent(item.getMarkupPercent());
             productRepository.save(product);
         }
     }

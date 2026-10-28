@@ -28,8 +28,8 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final InvoiceRepository invoiceRepository;
-    private final com.nbh.erp.customergroup.repository.CustomerGroupRepository customerGroupRepository;
     private final AuditLogService auditLogService;
+    private final CustomerAssignmentPolicy assignmentPolicy;
 
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
@@ -67,7 +67,7 @@ public class CustomerService {
         return CustomerDto.from(customer);
     }
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public CustomerDto createCustomer(CreateCustomerRequest request) {
         String code = request.getCustomerCode();
         if (!StringUtils.hasText(code)) {
@@ -84,7 +84,7 @@ public class CustomerService {
         List<Long> groupIds = request.getEffectiveCustomerGroupIds();
         Set<com.nbh.erp.customergroup.entity.CustomerGroup> groups = new HashSet<>();
         if (groupIds != null && !groupIds.isEmpty()) {
-            groups.addAll(customerGroupRepository.findAllById(groupIds));
+            groups.addAll(assignmentPolicy.customerGroups(groupIds));
         }
         com.nbh.erp.customergroup.entity.CustomerGroup primaryGroup = groups.isEmpty() ? null : groups.iterator().next();
 

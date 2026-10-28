@@ -15,6 +15,7 @@ import java.util.Optional;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
+    List<Invoice> findByHeldBatchIdOrderByIdAsc(Long heldBatchId);
     @Query("select i from Invoice i where i.originalHeldSnapshot is not null order by i.originalHeldCapturedAt desc")
     List<Invoice> findWarehouseOriginals();
 

@@ -124,7 +124,7 @@ public final class SecurityUtils {
             case "CUSTOMER_TARGET" -> Set.of("CUSTOMER_MANAGE");
             case "INVENTORY", "STOCK_ADJUSTMENT" -> Set.of("INVENTORY_ADJUST");
             case "PAYMENT" -> Set.of("PAYMENT_CREATE");
-            case "QUOTATION" -> Set.of("SALES_CREATE");
+            case "QUOTATION" -> Set.of("SALES_CREATE", "QUOTATION_MANAGE");
             default -> Set.of();
         };
         return aliases.stream().anyMatch(authorities::contains);
@@ -180,18 +180,14 @@ public final class SecurityUtils {
 
     public static boolean isSuperAdmin() {
         Set<String> authorities = getCurrentUserAuthorities();
-        if (authorities.contains("ROLE_SUPER_ADMIN") || authorities.contains("SUPER_ADMIN")) {
-            return true;
-        }
-        return getCurrentUsername().map(u -> "admin".equalsIgnoreCase(u)).orElse(false);
+        return authorities.contains("ROLE_SUPER_ADMIN") || authorities.contains("SUPER_ADMIN");
     }
 
     public static boolean isSuperAdmin(com.nbh.erp.user.entity.User user) {
         if (user == null) return false;
-        if ("admin".equalsIgnoreCase(user.getUsername())) return true;
         if (user.getRoles() != null) {
-            return user.getRoles().stream().anyMatch(r ->
-                    "ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName()));
+            return user.getRoles().stream().anyMatch(r -> r != null && "ACTIVE".equals(r.getStatus()) &&
+                    ("ROLE_SUPER_ADMIN".equalsIgnoreCase(r.getName()) || "SUPER_ADMIN".equalsIgnoreCase(r.getName())));
         }
         return false;
     }

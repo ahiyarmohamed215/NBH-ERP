@@ -14,24 +14,28 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Vehicle extends BaseEntity {
+public class Vehicle extends com.nbh.erp.common.entity.RecyclableEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "vehicle_number", nullable = false, unique = true, length = 50)
+    @Column(name = "vehicle_number", unique = true, length = 50)
     private String vehicleNumber; // e.g. WP-CAB-4821
 
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String model; // e.g. Isuzu Elf 4-Ton Truck
 
     @Column(name = "vehicle_type", length = 50)
     @Builder.Default
-    private String vehicleType = "TRUCK"; // TRUCK, LORRY, VAN, MOTORCYCLE
+    private String vehicleType = "LORRY"; // LORRY, TRUCK, THREEWHEEL, VAN
 
     @Column(name = "capacity_kg")
     private Double capacityKg;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private com.nbh.erp.user.entity.User assignedStaff;
 
     @Column(name = "status", length = 30)
     @Builder.Default

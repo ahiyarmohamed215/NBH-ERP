@@ -28,6 +28,7 @@ public class CustomerGroupService {
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
     private final AuditLogService auditLogService;
+    private final com.nbh.erp.customer.service.CustomerAssignmentPolicy assignmentPolicy;
 
     private User assignedPosStaff(Long staffId){
         if(staffId==null)return null;
@@ -46,7 +47,12 @@ public class CustomerGroupService {
         List<CustomerGroup> groups = includeInactive
                 ? customerGroupRepository.findAll()
                 : customerGroupRepository.findByIsActiveTrue();
-        return groups.stream().map(group -> {
+        return groups.stream()
+                .sorted(java.util.Comparator.comparing(
+                        (CustomerGroup g) -> g.getUpdatedAt() != null ? g.getUpdatedAt() : g.getCreatedAt(),
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+                ).thenComparing(CustomerGroup::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(group -> {
             List<Long> custIds = customerRepository.findByCustomerGroupId(group.getId()).stream()
                     .filter(c -> includeInactive || Boolean.TRUE.equals(c.getIsActive()))
                     .map(com.nbh.erp.customer.entity.Customer::getId)
@@ -57,7 +63,12 @@ public class CustomerGroupService {
 
     @Transactional(readOnly = true)
     public List<CustomerGroupDto> getActiveGroups() {
-        return customerGroupRepository.findByIsActiveTrue().stream().map(group -> {
+        return customerGroupRepository.findByIsActiveTrue().stream()
+                .sorted(java.util.Comparator.comparing(
+                        (CustomerGroup g) -> g.getUpdatedAt() != null ? g.getUpdatedAt() : g.getCreatedAt(),
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
+                ).thenComparing(CustomerGroup::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .map(group -> {
             List<Long> custIds = customerRepository.findByCustomerGroupId(group.getId()).stream()
                     .map(com.nbh.erp.customer.entity.Customer::getId)
                     .toList();
@@ -75,7 +86,7 @@ public class CustomerGroupService {
         return CustomerGroupDto.from(group, custIds);
     }
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public CustomerGroupDto createGroup(CreateCustomerGroupRequest request) {
         String code = request.getEffectiveCode();
         if (!StringUtils.hasText(code)) {
@@ -107,10 +118,13 @@ public class CustomerGroupService {
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
 
+        var members=assignmentPolicy.lockCustomers(request.getCustomerIds()==null?List.of():request.getCustomerIds());
+        members.forEach(CustomerRepository::requireActive);
+        assignmentPolicy.validateGroup(null,staffId,members);
         CustomerGroup saved = customerGroupRepository.save(group);
 
         if (request.getCustomerIds() != null && !request.getCustomerIds().isEmpty()) {
-            customerRepository.requireActiveCustomers(request.getCustomerIds()).forEach(c -> {
+            members.forEach(c -> {
                 c.getCustomerGroups().add(saved);
                 if (c.getCustomerGroup() == null) {
                     c.setCustomerGroup(saved);
@@ -131,12 +145,21 @@ public class CustomerGroupService {
         return CustomerGroupDto.from(saved, custIds);
     }
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public CustomerGroupDto updateGroup(Long id, CreateCustomerGroupRequest request) {
-        CustomerGroup group = customerGroupRepository.findById(id)
+        CustomerGroup group = customerGroupRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CustomerGroup", "id", id));
 
         SecurityUtils.enforceCanEdit("CUSTOMER", "Customer Group: " + group.getGroupName());
+
+        var previousMembers=customerRepository.findAllGroupMembers(id);
+        var memberIds=request.getCustomerIds()==null?previousMembers.stream().map(com.nbh.erp.customer.entity.Customer::getId).toList():request.getCustomerIds();
+        var affected=new java.util.HashSet<Long>(memberIds);
+        previousMembers.forEach(c->affected.add(c.getId()));
+        var lockedMembers=assignmentPolicy.lockCustomers(affected);
+        var members=lockedMembers.stream().filter(c->memberIds.contains(c.getId())).toList();
+        if(request.getCustomerIds()!=null)members.forEach(CustomerRepository::requireActive);
+        assignmentPolicy.validateGroup(id,request.getEffectiveStaffId(),members);
 
         String code = request.getEffectiveCode();
         if (StringUtils.hasText(code)) {
@@ -169,15 +192,16 @@ public class CustomerGroupService {
         CustomerGroup saved = customerGroupRepository.save(group);
 
         if (request.getCustomerIds() != null) {
-            customerRepository.findByCustomerGroupId(saved.getId()).forEach(c -> {
+            previousMembers.forEach(c -> {
                 if (!request.getCustomerIds().contains(c.getId())) {
-                    c.getCustomerGroups().removeIf(g -> g.getId().equals(saved.getId()));
+                    var remainingGroups=c.getCustomerGroups();
+                    remainingGroups.removeIf(g -> g.getId().equals(saved.getId()));
                     if (c.getCustomerGroup() != null && c.getCustomerGroup().getId().equals(saved.getId())) {
-                        c.setCustomerGroup(c.getCustomerGroups().isEmpty() ? null : c.getCustomerGroups().iterator().next());
+                        c.setCustomerGroup(remainingGroups.isEmpty() ? null : remainingGroups.iterator().next());
                     }
                 }
             });
-            customerRepository.requireActiveCustomers(request.getCustomerIds()).forEach(c -> {
+            members.forEach(c -> {
                 c.getCustomerGroups().add(saved);
                 if (c.getCustomerGroup() == null) {
                     c.setCustomerGroup(saved);

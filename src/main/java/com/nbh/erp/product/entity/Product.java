@@ -66,6 +66,10 @@ public class Product extends com.nbh.erp.common.entity.RecyclableEntity {
     @Builder.Default
     private BigDecimal sellingPrice = BigDecimal.ZERO;
 
+    @Column(name = "markup_percent", precision = 9, scale = 4)
+    @Builder.Default
+    private BigDecimal markupPercent = BigDecimal.ZERO;
+
     @Column(name = "use_brand_markup")
     private Boolean useBrandMarkup;
 
@@ -76,7 +80,7 @@ public class Product extends com.nbh.erp.common.entity.RecyclableEntity {
     public BigDecimal getSellingPrice() {
         if (!isBrandMarkupPricing()) return sellingPrice != null ? sellingPrice : BigDecimal.ZERO;
         BigDecimal cost = costPrice != null ? costPrice : BigDecimal.ZERO;
-        BigDecimal markup = brand != null && brand.getMarkupPercent() != null ? brand.getMarkupPercent() : BigDecimal.ZERO;
+        BigDecimal markup = markupPercent != null ? markupPercent : BigDecimal.ZERO;
         return cost.multiply(BigDecimal.ONE.add(markup.movePointLeft(2))).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 

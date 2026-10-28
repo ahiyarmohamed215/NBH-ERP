@@ -33,8 +33,9 @@ public class CustomerController {
 
     @GetMapping("/pos")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_SUPER_ADMIN','SALES_CREATE')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> getPosCustomers(){
-        return ResponseEntity.ok(ApiResponse.ok(posCustomers.customers()));
+    public ResponseEntity<ApiResponse<List<CustomerDto>>> getPosCustomers(
+            @RequestParam(required = false) Long deliveryRouteId){
+        return ResponseEntity.ok(ApiResponse.ok(posCustomers.customers(deliveryRouteId)));
     }
 
     @GetMapping("/active")
